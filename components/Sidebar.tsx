@@ -22,6 +22,9 @@ import {
   MenuItem,
   MenuList,
   Image,
+  DrawerOverlay,
+  DrawerProps,
+  DrawerCloseButton,
 } from '@chakra-ui/react'
 import {
   FiHome,
@@ -33,6 +36,7 @@ import {
   FiBell,
   FiChevronDown,
 } from 'react-icons/fi'
+import { HamburgerIcon } from '@chakra-ui/icons'
 import { LiaMountainSolid } from "react-icons/lia";
 import { Im500Px } from "react-icons/im";
 import { MdDirectionsBike } from "react-icons/md";
@@ -71,15 +75,19 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
       bg={('black')}
       borderRight="0px"
       borderRightColor={('red')}
-      w={{ base: 'full', md: 60 }}
+      w={{ base: 'full', md: 'xs' }}
       pos="fixed"
       h="full"
       {...rest}>
       <Flex h="20" alignItems="center" mx="8" justifyContent="space-between">
-        <Text fontSize="2xl" fontFamily="monospace" fontWeight="bold" textColor='white'>
-          DZR
-        </Text>
-        <CloseButton display={{ base: 'flex', md: 'none' }} onClick={onClose} />
+      <Image 
+          display={'flex'}
+          boxSize='50px' 
+          src='/general/DZR_logo.svg' 
+          alt='DZR logo' 
+          rounded={'md'}
+          />
+        <CloseButton display={'flex'} onClick={onClose} color = 'white' size={'s'}/>
       </Flex>
       {LinkItems.map((link) => (
         <NavItem key={link.name} icon={link.icon} href={link.href}>
@@ -129,62 +137,70 @@ const NavItem = ({ icon, children, href, ...rest }: NavItemProps) => {
 const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
   return (
     <Flex
-      ml={{ base: 0, md: 60 }}
-      px={{ base: 4, md: 4 }}
+      ml={0}
+      px={4}
       height="20"
       alignItems="center"
       bg={('black')}
       borderBottomWidth="1px"
       borderBottomColor={('black')}
-      justifyContent={{ base: 'space-between', md: 'flex-end' }}
-      {...rest}>
+      
+      justifyContent={'space-between'}
+      
+      >
       <IconButton
-        display={{ base: 'flex', md: 'none' }}
+        display={'flex'}
         onClick={onOpen}
         variant="outline"
         aria-label="open menu"
-        bg={('white')}
-        icon={<FiMenu />}
+        bg={('black')}
+        borderColor={'black'}
+        color={'white'}
+        icon={<HamburgerIcon />}
+        position={'fixed'}
+        _hover={{ bg: 'gray.700', borderColor: 'gray.700' }}
+        fontSize={{base:"34px", md:"44px"}}
+        fontWeight = '900'
       />
-
-      <Text
-        display={{ base: 'flex', md: 'none' }}
-        fontSize="large"
-        fontFamily="monospace"
-        fontWeight="bold"
-        textColor={'white'}>
-        Danish Zwift Racers
-      </Text>
-
-      <HStack spacing={{ base: '0', md: '6' }}>
-        <Flex alignItems={'center'}>
-            <Image boxSize='50px' src='/general/DZR_logo.svg' alt='DZR logo'/>
-        </Flex>
-      </HStack>
+      
+      {/* <Image 
+          display={'flex'}
+          boxSize='50px' 
+          src='/general/DZR_logo.svg' 
+          alt='DZR logo' 
+          />
+  */}
+      
+      
     </Flex>
   )
 }
 
 const SidebarWithHeader = () => {
   const { isOpen, onOpen, onClose } = useDisclosure()
-
+  
   return (
     <Box  bg={('black')}>
-      <SidebarContent onClose={() => onClose} display={{ base: 'none', md: 'block' }} />
+      <SidebarContent onClose={() => onClose} display={'none'} />
       <Drawer
         isOpen={isOpen}
         placement="left"
         onClose={onClose}
-        returnFocusOnClose={false}
+        returnFocusOnClose={true}
         onOverlayClick={onClose}
-        size="full">
+        closeOnOverlayClick= {true}
+        size={'xs'}
+        
+        >
+        <DrawerOverlay />
         <DrawerContent>
+          <DrawerCloseButton color={'red'}/>
           <SidebarContent onClose={onClose} />
         </DrawerContent>
       </Drawer>
       {/* mobilenav */}
       <MobileNav onOpen={onOpen} />
-      <Box ml={{ base: 0, md: 60 }} p="0">
+      <Box ml={0} p="0">
         {/* Content */}
       </Box>
     </Box>
