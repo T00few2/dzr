@@ -81,7 +81,7 @@ export default function Features() {
       <Container maxW={'5xl'} mt={12}>
         <Flex flexWrap="wrap" gridGap={20} justify="center">
           <Card
-            heading={'DZR After Party'}
+            heading={'DZR After Party Series'}
             icon={<Icon as={LiaMountainSolid} w={10} h={10} />}
             description={'Uphill finishes \n Thursdays 17:15 | 11:15 AM EST'}
             href={'dzr-after-party'}
