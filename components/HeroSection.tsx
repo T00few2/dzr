@@ -74,7 +74,7 @@ export default function HeroSection() {
           <Button as ='a' colorScheme='facebook' href='https://www.facebook.com/groups/358114378652929' target="_blank" borderRadius="full">
             <FaFacebook style={{ fontSize: '24px'}} />
           </Button>
-          <Button as='a' bg='#7289da' href='https://discord.gg/WBtQ7J82JV' target ='_blank'>
+          <Button as='a' bg='#7289da' href='https://discord.gg/J3NAx9F4sS' target ='_blank'>
           <FaDiscord style={{ fontSize: '24px', color: 'white' }} />
           </Button>
         </Stack>
