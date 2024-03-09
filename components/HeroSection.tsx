@@ -22,7 +22,7 @@ export default function HeroSection() {
         py={{ base: 20, md: 28 }}
         >
         <Heading
-          fontWeight={600}
+          
           fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
           lineHeight={'110%'}
           textColor='white'>

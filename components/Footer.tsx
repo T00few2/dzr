@@ -54,9 +54,9 @@ export default function Testimonials() {
         py={4}
         direction={{ base: 'column', md: 'row' }}
         spacing={4}
-        justify={{ base: 'center', md: 'space-between' }}
+        justify={{ base: 'center', md: 'center' }}
         align={{ base: 'center', md: 'center' }}>
-        <Text>Danish Zwift Racers</Text>
+        
         <Stack direction={'row'} spacing={6}>
           <SocialButton label={'Facebook'} href='https://www.facebook.com/groups/358114378652929'>
             <FaFacebook />
