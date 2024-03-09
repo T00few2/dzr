@@ -36,26 +36,7 @@ export default function dzrafterpartypage() {
   return (
       <Container maxW={'5xl'} py={12}>
         <SimpleGrid columns={{ base: 1, md: 1 }} spacing={10}>
-          <Stack spacing={4}>
-            <Text
-              textTransform={'uppercase'}
-              color={'white'}
-              fontWeight={800}
-              fontSize={'large'}
-              bg={('red.600')}
-              p={2}
-              alignSelf={'flex-start'}
-              rounded={'md'}>
-              DZR After Party Series
-            </Text>
-            <Heading color={'white'}>Thursdays 17:15 CET | 11:15 AM EST</Heading>
-            <Text color={'white'} fontSize={'lg'}>
-                  A weekly race series with carefully selected routes all finishing uphill (aka after parties). Check out the coming race below and study the profile to know when to start the sprint. Use Zwift link to join race. Race calendar in menu.
-
-            </Text>
-            
-          </Stack>
-          <Flex>
+        <Flex>
             <Image
               rounded={'md'}
               alt={'feature image'}
@@ -65,6 +46,12 @@ export default function dzrafterpartypage() {
               objectFit={'contain'}
             />
           </Flex>
+          <Stack spacing={4}>
+            <Heading color={'white'}>Thursdays 17:15 CET | 11:15 AM EST</Heading>
+            <Text color={'white'} fontSize={'lg'}>
+                  A weekly race series with carefully selected routes all finishing uphill (aka after parties). Check out the coming race below and study the profile to know when to start the sprint. Use Zwift link to join race. Race calendar in menu.
+            </Text>
+          </Stack>
         </SimpleGrid>
       </Container>
   )
