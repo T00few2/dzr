@@ -23,7 +23,7 @@ const SocialButton = ({
 }) => {
   return (
     <chakra.button
-      bg={('blackAlpha.100')}
+      bg={('blue')}
       rounded={'full'}
       w={10}
       h={10}
@@ -35,7 +35,8 @@ const SocialButton = ({
       justifyContent={'center'}
       transition={'background 0.3s ease'}
       _hover={{
-        bg: ('blue'),
+        bg: ('white'),
+        color: ('blue')
       }}>
       <VisuallyHidden>{label}</VisuallyHidden>
       {children}

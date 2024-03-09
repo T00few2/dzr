@@ -89,7 +89,7 @@ export default function Features() {
           <Card
             heading={'The Zwifty Fifty'}
             icon={<Icon as={Im500Px} w={10} h={10} />}
-            description={"50km ('ish) races \n Sundays 14:14 CET | 8:45 AM EST"}
+            description={"50km (ish) races \n Sundays 14:14 CET | 8:45 AM EST"}
             href={'the-zwifty-fifty'}
           />
         </Flex>
