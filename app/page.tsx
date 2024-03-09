@@ -12,7 +12,6 @@ export default function Home() {
     <div style={{backgroundColor:'black'}}>
     <HeroSection />
     <Features />
-    <Testimonials />
     </div>
   );
 }
