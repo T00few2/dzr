@@ -19,18 +19,18 @@ export default function HeroSection() {
         textAlign={'center'}
         align={'center'}
         spacing={{ base: 8, md: 10 }}
-        py={{ base: 20, md: 28 }}
+        py={{ base: 20, md: 10 }}
         >
         <Heading
           
           fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
           lineHeight={'110%'}
           textColor='white'>
-          <Text>Welcome to the Danish Zwift Racers
+          <Text>Danish Zwift Racers
           </Text>
         </Heading>
-        <Text color={'white'} maxW={'3xl'}>
-          we are the pain in the peleton
+        <Text color={'white'} maxW={'3xl'} as='cite' fontSize={{ base: 'l', sm: 'xl', md: '2xl' }}>
+          the pain in the peleton
         </Text>
         
       </Stack>

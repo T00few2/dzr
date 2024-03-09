@@ -10,6 +10,13 @@ const theme = extendTheme({
     heading: 'Roboto, sans-serif, black 900',
     // Add more font styles if needed
   },
+  styles: {
+    global: () => ({
+      body: {
+        background:'black',
+      }
+    })
+  }
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {

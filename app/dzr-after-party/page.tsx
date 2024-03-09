@@ -34,7 +34,6 @@ const Feature = ({ text, icon, iconBg }: FeatureProps) => {
 
 export default function dzrafterpartypage() {
   return (
-    <div style={{backgroundColor:'black'}}>
       <Container maxW={'5xl'} py={12}>
         <SimpleGrid columns={{ base: 1, md: 1 }} spacing={10}>
           <Stack spacing={4}>
@@ -68,6 +67,5 @@ export default function dzrafterpartypage() {
           </Flex>
         </SimpleGrid>
       </Container>
-    </div>
   )
 }

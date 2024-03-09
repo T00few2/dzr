@@ -69,8 +69,8 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
     <Box
       transition="3s ease"
       bg={('black')}
-      borderRight="1px"
-      borderRightColor={('black')}
+      borderRight="0px"
+      borderRightColor={('red')}
       w={{ base: 'full', md: 60 }}
       pos="fixed"
       h="full"
@@ -158,7 +158,7 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
 
       <HStack spacing={{ base: '0', md: '6' }}>
         <Flex alignItems={'center'}>
-            <Image borderRadius='full' boxSize='40px' src='/general/DZR_logo.svg' alt='DZR logo'/>
+            <Image boxSize='50px' src='/general/DZR_logo.svg' alt='DZR logo'/>
         </Flex>
       </HStack>
     </Flex>

@@ -25,8 +25,8 @@ const SocialButton = ({
     <chakra.button
       bg={('blackAlpha.100')}
       rounded={'full'}
-      w={8}
-      h={8}
+      w={10}
+      h={10}
       cursor={'pointer'}
       as={'a'}
       href={href}
@@ -35,7 +35,7 @@ const SocialButton = ({
       justifyContent={'center'}
       transition={'background 0.3s ease'}
       _hover={{
-        bg: useColorModeValue('blackAlpha.200', 'whiteAlpha.200'),
+        bg: ('blue'),
       }}>
       <VisuallyHidden>{label}</VisuallyHidden>
       {children}
@@ -51,7 +51,7 @@ export default function Testimonials() {
       <Container
         as={Stack}
         maxW={'6xl'}
-        py={4}
+        py={10}
         direction={{ base: 'column', md: 'row' }}
         spacing={4}
         justify={{ base: 'center', md: 'center' }}
