@@ -15,7 +15,10 @@ export class ZwiftyFiftyRacesTemplate {
     if (initializer.laps) this.laps = initializer.laps;
     if (initializer.length) this.length = initializer.length;
     if (initializer.hm) this.hm = initializer.hm;
-    if (initializer.climbs) this.climbs = initializer.climbs;
+    if (initializer.climbs) {
+      // Replace spaces with dashes in climb names
+    this.climbs = initializer.climbs.map((climb: string) => climb.split(' ').join('-'));
+    }
   }
 }
 
