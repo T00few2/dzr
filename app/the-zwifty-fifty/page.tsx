@@ -20,7 +20,7 @@ import {
 import { ExternalLinkIcon } from '@chakra-ui/icons'
 import { IoAnalyticsSharp, IoLogoBitcoin, IoSearchSharp } from 'react-icons/io5'
 import { ReactElement } from 'react'
-import { MdCheckCircle, MdSettings, MdBackHand, MdPower } from 'react-icons/md'
+import { MdCheckCircle, MdSettings, MdBackHand, MdPowerOff } from 'react-icons/md'
 import { FaSuperpowers,FaHeartCircleBolt } from "react-icons/fa6";
 import { LuBike } from "react-icons/lu";
 
@@ -146,7 +146,7 @@ export default function thezwiftyfiftypage() {
                 No TT bikes Enforced
               </ListItem>
               <ListItem>
-                <ListIcon as={MdPower} color='yellow' fontSize={'20px'}/>
+                <ListIcon as={MdPowerOff} color='yellow' fontSize={'20px'}/>
                 No PowerUps
               </ListItem>
             </List>
