@@ -75,7 +75,7 @@ export default function HeroSection() {
             <FaFacebook style={{ fontSize: '24px'}} />
           </Button>
           <Button as='a' bg='#7289da' href='https://discord.gg/J3NAx9F4sS' target ='_blank'>
-          <FaDiscord style={{ fontSize: '24px', color: 'white' }} />
+          <FaDiscord style={{ fontSize: '20px', color: 'white' }} />
           </Button>
         </Stack>
         
