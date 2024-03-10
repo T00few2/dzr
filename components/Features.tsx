@@ -35,13 +35,15 @@ interface CardProps {
 
 const Card = ({ heading, description, icon, href }: CardProps) => {
   return (
+    <Link href={href}>
     <Box
       maxW={{ base: 'full', md: '275px' }}
       w={'full'}
       borderWidth="5px"
       borderRadius="lg"
       overflow="hidden"
-      p={5}>
+      p={5}
+      >
       <Stack align={'start'} spacing={5}>
         <Flex
           w={16}
@@ -58,11 +60,10 @@ const Card = ({ heading, description, icon, href }: CardProps) => {
             {description}
           </Text>
         </Box>
-        <Button variant={'link'} colorScheme={'orange'} size={'sm'}>
-          <Link href={href}>Learn more</Link>
-        </Button>
+
       </Stack>
     </Box>
+    </Link>
   )
 }
 
