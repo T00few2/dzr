@@ -39,7 +39,7 @@ function RaceList({ races }: RaceProps) {
         
         <Stack spacing={6}>
             {races.map((race) =>(
-                <Stack spacing={6}>
+                <Stack key={race.date} spacing={6}>
                 <Heading as='h1' size ='lg' color={'white'}>{race.date}</Heading>
                 <Heading as='h2' size ='md' color={'white'}>14:45 CET | 8:45 AM EST</Heading>
                 <TableContainer  textAlign="center">
@@ -70,7 +70,7 @@ function RaceList({ races }: RaceProps) {
                     </Table>
                 </TableContainer>
                 <Heading as='h1' size ='lg' color={'white'}>Route Profile and Key Climbs</Heading>
-                <Heading as='h1' size ='lg' color={'white'}>{race.route}</Heading>
+                <Heading as='h2' size ='lg' color={'white'}>{race.route}</Heading>
                 </Stack>
             ))}
             
