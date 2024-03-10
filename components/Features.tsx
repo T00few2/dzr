@@ -72,7 +72,7 @@ export default function Features() {
       <Stack spacing={4} as={Container} maxW={'3xl'} textAlign={'center'}>
       <Box position='relative' padding='10'>
         <Divider />
-        <AbsoluteCenter bg='red' px='10' borderRadius='full' color={'white'} fontWeight={900}>
+        <AbsoluteCenter bg='red' borderRadius='full' color={'white'} fontWeight={900} borderWidth={'10px'} borderColor={'red'} fontSize={{ base: 'm', sm: 'l', md: 'xl' }}>
             Active Race Series
         </AbsoluteCenter>
 </Box>
