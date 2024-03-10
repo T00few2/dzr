@@ -36,7 +36,7 @@ export const ZwiftyFiftyRacesData = [
     laps: '2',
     length: '55.6',
     hm: '531',    
-    climbs: 'Fox Hilll',
+    climbs: ['Fox Hill'],
   }),
   new ZwiftyFiftyRacesTemplate({
     route: '2022 Bambino Fondo',
@@ -45,6 +45,6 @@ export const ZwiftyFiftyRacesData = [
     laps: '1',
     length: '52.3',
     hm: '400',  
-    climbs: 'Fox Hlill', 
+    climbs: ['Fox Hill'], 
   }),
 ];
