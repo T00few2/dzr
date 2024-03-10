@@ -22,7 +22,6 @@ import { LuBike } from "react-icons/lu";
 
 export default function thezwiftyfiftypage() {
   const formattedDate = formatNextSunday();
-  const filteredRaces = ZwiftyFiftyRacesData.filter(race => race.date === formattedDate);
   return (
     <div style={{backgroundColor:'black'}}>
       <Container maxW={'5xl'} py={12}>
@@ -67,7 +66,8 @@ export default function thezwiftyfiftypage() {
                 No PowerUps
               </ListItem>
             </List>
-            <RaceList races={filteredRaces} />
+            
+            <RaceList nextDate={formattedDate} />
           </Stack>
           
         </SimpleGrid>
