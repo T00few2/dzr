@@ -1,5 +1,5 @@
 import React from 'react';
-import { ZwiftyFiftyRacesTemplate } from './ZwiftyFiftyRacesTemplate';
+import { ZwiftyFiftyRacesTemplate } from './ZwiftyFiftyRaces';
 
 import {
     Container,
