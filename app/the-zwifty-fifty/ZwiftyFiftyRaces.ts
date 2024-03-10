@@ -5,6 +5,7 @@ export class ZwiftyFiftyRacesTemplate {
   laps: string = '';
   length: string = '';
   hm: string = '';
+  climbs: string[] = [];
       
   constructor(initializer?: any) {
     if (!initializer) return;
@@ -14,6 +15,7 @@ export class ZwiftyFiftyRacesTemplate {
     if (initializer.laps) this.laps = initializer.laps;
     if (initializer.length) this.length = initializer.length;
     if (initializer.hm) this.hm = initializer.hm;
+    if (initializer.climbs) this.climbs = initializer.climbs;
   }
 }
 
@@ -24,7 +26,8 @@ export const ZwiftyFiftyRacesData = [
     linkRoute: 'https://zwiftinsider.com/route/the-london-pretzel/',
     laps: '1',
     length: '55.6',
-    hm: '531',    
+    hm: '531',
+    climbs: ['Fox Hill', 'Box Hill'],
   }),
   new ZwiftyFiftyRacesTemplate({
     route: 'The Muckle Yin',
@@ -33,13 +36,15 @@ export const ZwiftyFiftyRacesData = [
     laps: '2',
     length: '55.6',
     hm: '531',    
+    climbs: 'Fox Hilll',
   }),
   new ZwiftyFiftyRacesTemplate({
     route: '2022 Bambino Fondo',
-    world: 'WatopiA',
+    world: 'Watopia',
     linkRoute: 'https://zwiftinsider.com/route/2022-bambino-fondo/',
     laps: '1',
     length: '52.3',
-    hm: '400',    
+    hm: '400',  
+    climbs: 'Fox Hlill', 
   }),
 ];

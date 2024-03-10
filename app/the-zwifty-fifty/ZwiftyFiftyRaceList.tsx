@@ -41,7 +41,7 @@ function RaceList({ nextDate }: RaceProps) {
     const nextRace = ZwiftyFiftyCalender.filter(date => date.date === nextDate);
     const nextRouteName = nextRace.map((nextRace) =>(nextRace.route));
     const nextRouteDetails = ZwiftyFiftyRacesData.filter(race => nextRouteName.includes(race.route));
-
+    
     return (
         <Stack spacing={6}>
             {nextRace.map((nextRace)=>(
@@ -77,6 +77,20 @@ function RaceList({ nextDate }: RaceProps) {
                         </TableContainer>
                         <Heading as='h1' size ='lg' color={'white'}>Route Profile and Key Climbs</Heading>
                         <Heading as='h2' size ='lg' color={'white'}>{nextRouteDetails.route}</Heading>
+                        <Image
+                            key={'profile'}
+                            src={`The-Zwifty-Fifty/The-London-Pretzel/${nextRouteDetails.route} profile.png`}
+                            alt={'Profile'}
+                        />
+                        {nextRouteDetails.climbs.map((climb, index) => (
+                        <Image
+                            key={index}
+                            src={`The-Zwifty-Fifty/The-London-Pretzel/${climb}.png`}
+                            alt={climb}
+                        />
+                        ))}
+                        
+                
                     </Stack>
                 ))))}
         </Stack>
