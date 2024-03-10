@@ -79,7 +79,8 @@ function RaceList({ nextDate }: RaceProps) {
                         <Heading as='h2' size ='lg' color={'white'}>{nextRouteDetails.route}</Heading>
                         <Image
                             key={'profile'}
-                            src={`/the-zwifty-fifty/the-london-pretzel/${nextRouteDetails.route.split(' ').join('-')}-profile.png`}
+                            src='/the-zwifty-fifty/the-london-pretzel/the-london-pretzel-profile.png'
+                            //src={`/the-zwifty-fifty/the-london-pretzel/${nextRouteDetails.route.split(' ').join('-')}-profile.png`}
                             alt={'Profile'}
                         />
                         {nextRouteDetails.climbs.map((climb, index) => (
