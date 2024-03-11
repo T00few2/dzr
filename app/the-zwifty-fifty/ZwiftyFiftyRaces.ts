@@ -52,8 +52,8 @@ export const ZwiftyFiftyRacesData = [
     length: '52.3',
     hm: '400',  
     climbs: ['Epic KOM Bypass','Volcano KOM'],
-    sprints: ['Sprint1','Sprint2'],
-    sprintLaps: ['1,2,3','2'],
+    sprints: ['Fuego Flats Long','Volcano Circuit Reverse'],
+    sprintLaps: ['1','1'],
     bonus: ['3.0','2.0','1.0'],
   }),
 ];
