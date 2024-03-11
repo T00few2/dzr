@@ -3,6 +3,8 @@ import { ZwiftyFiftyRacesTemplate } from './ZwiftyFiftyRaces';
 import { ZwiftyFiftyCalender } from './ZwiftyFiftyCalender';
 import { ZwiftyFiftyRacesData } from './ZwiftyFiftyRaces';
 import { formatNextSunday } from './nextSunday';
+import Carousel from '../carousel';
+
 
 import {
     Container,
@@ -31,17 +33,20 @@ import {
     TableContainer,
   } from '@chakra-ui/react'
 
-  import { ExternalLinkIcon } from '@chakra-ui/icons'
+import { ExternalLinkIcon } from '@chakra-ui/icons'
+
+import Slider from 'react-slick';
 
 interface RaceProps {
   nextDate: string;
 }
 
+
 function RaceList({ nextDate }: RaceProps) {
     const nextRace = ZwiftyFiftyCalender.filter(date => date.date === nextDate);
     const nextRouteName = nextRace.map((nextRace) =>(nextRace.route));
     const nextRouteDetails = ZwiftyFiftyRacesData.filter(race => nextRouteName.includes(race.route));
-    
+       
     return (
         <Stack spacing={6}>
             {nextRace.map((nextRace)=>(
@@ -77,6 +82,13 @@ function RaceList({ nextDate }: RaceProps) {
                         </TableContainer>
                         <Heading as='h1' size ='lg' color={'white'}>Route Profile and Key Climbs</Heading>
                         <Heading as='h2' size ='lg' color={'white'}>{nextRouteDetails.route}</Heading>
+                        
+                        <Carousel
+                            cards={[
+                                `/the-zwifty-fifty/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${nextRouteDetails.route.split(' ').join('-')}-profile.png`,
+                                ...nextRouteDetails.climbs.map(climb => `/the-zwifty-fifty/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${climb.split(' ').join('-')}.png`)
+                                    ]}
+                            />
                         <Image
                             key={'profile'}
                             src={`/the-zwifty-fifty/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${nextRouteDetails.route.split(' ').join('-')}-profile.png`}
@@ -135,7 +147,6 @@ function RaceList({ nextDate }: RaceProps) {
                             </Tbody>
                             </Table>
                         </TableContainer>
-                
                     </Stack>
                 ))))}
         </Stack>
