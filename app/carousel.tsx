@@ -1,9 +1,11 @@
 'use client'
 
 import React from 'react'
-import { Box, IconButton, useBreakpointValue } from '@chakra-ui/react'
+import { Box, IconButton, useBreakpointValue, Image } from '@chakra-ui/react'
 // Here we have used react-icons package for the icons
 import { BiLeftArrowAlt, BiRightArrowAlt } from 'react-icons/bi'
+import { FaArrowRight } from "react-icons/fa";
+import { MdOutlineKeyboardArrowRight, MdOutlineKeyboardArrowLeft } from "react-icons/md";
 // And react-slick as our Carousel Lib
 import Slider from 'react-slick'
 
@@ -54,41 +56,39 @@ export default function Carousel({cards}: ImagesProps) {
       {/* Left Icon */}
       <IconButton
         aria-label="left-arrow"
-        colorScheme="messenger"
-        borderRadius="full"
+        size='md'
+        variant={'solid'}
+        colorScheme="whiteAlpha"
+        borderColor={'transparent'}
         position="absolute"
         left={side}
         top={top}
         transform={'translate(0%, -50%)'}
         zIndex={2}
-        onClick={() => slider?.slickPrev()}>
-        <BiLeftArrowAlt />
+        onClick={() => slider?.slickNext()}>
+        <MdOutlineKeyboardArrowLeft fontSize={'30px'} color='black'/>
       </IconButton>
       {/* Right Icon */}
       <IconButton
         aria-label="right-arrow"
-        colorScheme="messenger"
-        borderRadius="full"
+        size='md'
+        variant={'solid'}
+        colorScheme="whiteAlpha"
+        borderColor={'transparent'}
+        
         position="absolute"
         right={side}
         top={top}
         transform={'translate(0%, -50%)'}
         zIndex={2}
         onClick={() => slider?.slickNext()}>
-        <BiRightArrowAlt />
+        <MdOutlineKeyboardArrowRight fontSize={'30px'} color='black'/>
       </IconButton>
       {/* Slider */}
       <Slider {...settings} ref={(slider) => setSlider(slider)}>
         {cards.map((url, index) => (
-          <Box
-            key={index}
-            height={'xl'}
-            position="relative"
-            backgroundPosition="center"
-            backgroundRepeat="no-repeat"
-            backgroundSize="cover"
-            backgroundImage={`url(${url})`}
-          />
+          <Image src={url}></Image>
+
         ))}
       </Slider>
     </Box>

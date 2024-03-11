@@ -56,7 +56,7 @@ export default function HeroSection() {
         textAlign={'center'}
         align={'center'}
         spacing={{ base: 8, md: 10 }}
-        py={{ base: 20, md: 10 }}
+        py={{ base: 0, md: 0 }}
         >
         <Heading
           

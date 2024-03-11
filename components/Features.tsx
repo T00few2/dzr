@@ -79,7 +79,7 @@ export default function Features() {
 </Box>
       </Stack>
 
-      <Container maxW={'5xl'} mt={12}>
+      <Container maxW={'5xl'} mt={12} mb={20}>
         <Flex flexWrap="wrap" gridGap={20} justify="center">
           <Card
             heading={'DZR After Party Series'}

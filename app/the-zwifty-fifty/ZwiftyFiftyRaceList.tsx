@@ -31,6 +31,7 @@ import {
     Td,
     TableCaption,
     TableContainer,
+    Center
   } from '@chakra-ui/react'
 
 import { ExternalLinkIcon } from '@chakra-ui/icons'
@@ -82,26 +83,13 @@ function RaceList({ nextDate }: RaceProps) {
                         </TableContainer>
                         <Heading as='h1' size ='lg' color={'white'}>Route Profile and Key Climbs</Heading>
                         <Heading as='h2' size ='lg' color={'white'}>{nextRouteDetails.route}</Heading>
-                        
+
                         <Carousel
                             cards={[
                                 `/the-zwifty-fifty/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${nextRouteDetails.route.split(' ').join('-')}-profile.png`,
                                 ...nextRouteDetails.climbs.map(climb => `/the-zwifty-fifty/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${climb.split(' ').join('-')}.png`)
                                     ]}
-                            />
-                        <Image
-                            key={'profile'}
-                            src={`/the-zwifty-fifty/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${nextRouteDetails.route.split(' ').join('-')}-profile.png`}
-                            alt={'route profile'}
                         />
-                        {nextRouteDetails.climbs.map((climb, index) => (
-                        <Image
-                            key={index}
-                            src={`/the-zwifty-fifty/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${climb.split(' ').join('-')}.png`}
-                            alt={climb}
-                        />
-                        ))}
-
                         <Heading as='h1' size ='lg' color={'white'}>Bonus Sprints</Heading>
                         <Heading as='h2' size ='md' color={'white'}>First across line (FAL) bonus seconds on segments below</Heading>
                         <TableContainer  textAlign="center" gridTemplateColumns="auto auto auto">
