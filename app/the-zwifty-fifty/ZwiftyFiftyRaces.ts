@@ -6,6 +6,9 @@ export class ZwiftyFiftyRacesTemplate {
   length: string = '';
   hm: string = '';
   climbs: string[] = [];
+  sprints: string[] = [];
+  sprintLaps: string[] = [];
+  bonus: string[] = [];
       
   constructor(initializer?: any) {
     if (!initializer) return;
@@ -15,10 +18,10 @@ export class ZwiftyFiftyRacesTemplate {
     if (initializer.laps) this.laps = initializer.laps;
     if (initializer.length) this.length = initializer.length;
     if (initializer.hm) this.hm = initializer.hm;
-    if (initializer.climbs) {
-      // Replace spaces with dashes in climb names
-    this.climbs = initializer.climbs.map((climb: string) => climb.split(' ').join('-'));
-    }
+    if (initializer.climbs) this.climbs = initializer.climbs;
+    if (initializer.sprints) this.sprints = initializer.sprints;
+    if (initializer.sprintLaps) this.sprintLaps = initializer.sprintLaps;
+    if (initializer.bonus) this.bonus = initializer.bonus;
   }
 }
 
@@ -48,6 +51,9 @@ export const ZwiftyFiftyRacesData = [
     laps: '1',
     length: '52.3',
     hm: '400',  
-    climbs: ['Fox Hill'], 
+    climbs: ['Epic KOM Bypass','Volcano KOM'],
+    sprints: ['Sprint1','Sprint2'],
+    sprintLaps: ['1,2,3','2'],
+    bonus: ['3.0','2.0','1.0'],
   }),
 ];

@@ -79,17 +79,62 @@ function RaceList({ nextDate }: RaceProps) {
                         <Heading as='h2' size ='lg' color={'white'}>{nextRouteDetails.route}</Heading>
                         <Image
                             key={'profile'}
-                            src={`/the-zwifty-fifty/the-london-pretzel/${nextRouteDetails.route.split(' ').join('-')}-profile.png`}
+                            src={`/the-zwifty-fifty/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${nextRouteDetails.route.split(' ').join('-')}-profile.png`}
                             alt={'route profile'}
                         />
                         {nextRouteDetails.climbs.map((climb, index) => (
                         <Image
                             key={index}
-                            src={`/the-zwifty-fifty/the-london-pretzel/${climb}.png`}
+                            src={`/the-zwifty-fifty/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${climb.split(' ').join('-')}.png`}
                             alt={climb}
                         />
                         ))}
-                        
+
+                        <Heading as='h1' size ='lg' color={'white'}>Bonus Sprints</Heading>
+                        <Heading as='h2' size ='md' color={'white'}>First across line (FAL) bonus seconds on segments below</Heading>
+                        <TableContainer  textAlign="center" gridTemplateColumns="auto auto auto">
+                            <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
+                            <Thead >
+                                <Tr>
+                                <Th textAlign="left" textColor={'white'} borderRight={'1px solid white'} fontWeight={700}>Segment</Th>
+                                {nextRouteDetails.sprints.map((sprint, index) => (
+                                    <Th key={index} textAlign={'center'} textColor={'white'} borderRight={'1px solid white'} fontWeight={700}>{sprint}</Th>
+                                ))}
+
+                                </Tr>
+                            </Thead>
+                            <Tbody>
+                                <Tr>
+                                <Td textAlign="left" borderRight={'1px solid white'} fontWeight={700}>Laps</Td>
+                                {nextRouteDetails.sprintLaps.map((laps, index) => (
+                                    <Td key={index} textAlign="center" borderRight={'1px solid white'}>{laps}</Td>
+                                ))}
+                                </Tr>    
+                            </Tbody>
+                            </Table>
+                        </TableContainer>
+
+                        <Heading as='h2' size ='md' color={'white'}>Bonus seconds on each sprint are awarded according to</Heading>
+                        <TableContainer  textAlign="center" gridTemplateColumns="auto auto auto auto">
+                            <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
+                            <Thead >
+                                <Tr>
+                                <Th textAlign="left" textColor={'white'} borderRight={'1px solid white'} fontWeight={700}>Position</Th>
+                                <Th textAlign="center" textColor={'white'} borderRight={'1px solid white'} fontWeight={700}>1</Th>
+                                <Th textAlign="center" textColor={'white'} borderRight={'1px solid white'} fontWeight={700}>2</Th>
+                                <Th textAlign="center" textColor={'white'}>3</Th>
+                                </Tr>
+                            </Thead>
+                            <Tbody>
+                                <Tr>
+                                <Td textAlign="left" borderRight={'1px solid white'} fontWeight={700}>Bonus</Td>
+                                {nextRouteDetails.bonus.map((bonus, index) => (
+                                    <Td key={index} textAlign="center" borderRight={'1px solid white'}>{bonus}s</Td>
+                                ))}
+                                </Tr>    
+                            </Tbody>
+                            </Table>
+                        </TableContainer>
                 
                     </Stack>
                 ))))}
