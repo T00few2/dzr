@@ -1,4 +1,7 @@
 'use client'
+import { AfterPartyRacesData } from './AfterPartyRaces';
+import AfterPartyRaceList from './AfterPartyRaceList';
+import { formatNextThursday } from './nextThursday';
 
 import {
   Container,
@@ -11,9 +14,11 @@ import {
   StackDivider,
   Icon,
   useColorModeValue,
+  Divider,
 } from '@chakra-ui/react'
 import { IoAnalyticsSharp, IoLogoBitcoin, IoSearchSharp } from 'react-icons/io5'
 import { ReactElement } from 'react'
+
 
 interface FeatureProps {
   text: string
@@ -33,6 +38,7 @@ const Feature = ({ text, icon, iconBg }: FeatureProps) => {
 }
 
 export default function dzrafterpartypage() {
+    const formattedDate = formatNextThursday();
   return (
       <Container maxW={'5xl'} py={0} mb={20}>
         <SimpleGrid columns={{ base: 1, md: 1 }} spacing={10}>
@@ -47,10 +53,18 @@ export default function dzrafterpartypage() {
             />
           </Flex>
           <Stack spacing={4}>
-            <Heading color={'white'}>Thursdays 17:15 CET | 11:15 AM EST</Heading>
-            <Text color={'white'} fontSize={'lg'}>
-                  A weekly race series with carefully selected routes all finishing uphill (aka after parties). Check out the coming race below and study the profile to know when to start the sprint. Use Zwift link to join race. Race calendar in menu.
-            </Text>
+            <Text color={'white'} fontSize={'md'} align={'center'}>A weekly race series with carefully selected routes all finishing uphill (aka after parties).
+             Check out the coming race below and study the profile to know when to start the sprint. Use Zwift link to join race. Race calendar in menu. <br /><br />
+             Ride on!</Text>
+             <center>
+             <Divider width='50%'/>
+             <br />
+             <Heading as='h1' color={'white'}>{formattedDate}</Heading>
+             <Heading color={'white'}>17:15 CET | 11:15 AM EST</Heading>
+             <br />
+             <Divider width='50%'/>
+             </center>
+             <AfterPartyRaceList nextDate={formattedDate} />
           </Stack>
         </SimpleGrid>
       </Container>
