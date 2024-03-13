@@ -191,9 +191,8 @@ const SidebarWithHeader = () => {
         onOverlayClick={onClose}
         closeOnOverlayClick= {true}
         size={'xs'}
-        
         >
-        <DrawerOverlay />
+        <DrawerOverlay  bg="rgba(173, 26, 45, 0.95)" />
         <DrawerContent>
           <DrawerCloseButton color={'red'}/>
           <SidebarContent onClose={onClose} />
