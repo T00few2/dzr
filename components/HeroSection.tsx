@@ -11,6 +11,8 @@ import {
   Button,
   Icon,
   IconProps,
+  Circle,
+  Square,
 } from '@chakra-ui/react'
 
 import { FaFacebook, FaTwitter, FaYoutube, FaDiscord } from 'react-icons/fa'
@@ -71,12 +73,13 @@ export default function HeroSection() {
         </Text>
 
         <Stack direction={'row'} spacing={6}>
-          <Button as ='a' colorScheme='facebook' href='https://www.facebook.com/groups/358114378652929' target="_blank" borderRadius="full">
-            <FaFacebook style={{ fontSize: '24px'}} />
-          </Button>
-          <Button as='a' bg='#7289da' href='https://discord.gg/6CZrD34cCv' target ='_blank'>
-          <FaDiscord style={{ fontSize: '20px', color: 'white' }} />
-          </Button>
+          <Circle as='a' size='40px' bg='#4267B2' color='white'  href='https://www.facebook.com/groups/358114378652929' target="_blank">
+          <FaFacebook />
+          </Circle>
+          <Circle as='a' size='40px' bg='#5865F2' color='white'  href='https://discord.gg/6CZrD34cCv' target="_blank">
+          <FaDiscord />
+          </Circle>
+
         </Stack>
         <br/>
         
