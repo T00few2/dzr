@@ -1,5 +1,7 @@
 'use client'
 
+import DZR_Header from '@/app/gasp'
+
 import {
   Flex,
   Container,
@@ -60,14 +62,8 @@ export default function HeroSection() {
         spacing={{ base: 8, md: 10 }}
         py={{ base: 10, md: 10 }}
         >
-        <Heading
-          
-          fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
-          lineHeight={'110%'}
-          textColor='white'>
-          <Text>Danish Zwift Racers
-          </Text>
-        </Heading>
+          <DZR_Header />
+
         <Text color={'white'} maxW={'3xl'} as='cite' fontSize={{ base: 'l', sm: 'xl', md: '2xl' }}>
           the pain in the peleton
         </Text>

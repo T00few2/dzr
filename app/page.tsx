@@ -4,6 +4,7 @@ import HeroSection from "@/components/HeroSection";
 import Features from "@/components/Features";
 import { ColorModeScript } from '@chakra-ui/react'
 
+
 const inter = Inter({ subsets: ['latin']})
 
 export default function Home() {
@@ -11,6 +12,7 @@ export default function Home() {
     <div style={{backgroundColor:'black'}}>
     <HeroSection />
     <Features />
+
     </div>
   );
 }
