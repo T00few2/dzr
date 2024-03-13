@@ -58,7 +58,7 @@ export default function HeroSection() {
         textAlign={'center'}
         align={'center'}
         spacing={{ base: 8, md: 10 }}
-        py={{ base: 0, md: 0 }}
+        py={{ base: 10, md: 10 }}
         >
         <Heading
           
@@ -81,7 +81,7 @@ export default function HeroSection() {
           </Circle>
 
         </Stack>
-        <br/>
+   
         
       </Stack>
     </Container>
