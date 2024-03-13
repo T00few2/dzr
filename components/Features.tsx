@@ -87,7 +87,7 @@ export default function Features() {
           <Card
             heading={'DZR After Party Series'}
             icon={<Icon as={LiaMountainSolid} w={10} h={10} />}
-            description={'Uphill finishes \n Thursdays 17:15 | 11:15 AM EST'}
+            description={'Uphill finishes \n Thursdays 17:15 CET | 11:15 AM EST'}
             href={'dzr-after-party'}
           />
           <Card

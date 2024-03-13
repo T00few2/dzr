@@ -20,11 +20,11 @@ export const AfterPartyCalender = [
   new AfterPartyCalenderTemplate({
     date: "Thursday March 21",
     route: "Libby Hill After Party+",
-    raceID: "",
+    raceID: "4269551",
   }),
   new AfterPartyCalenderTemplate({
     date: "Thursday March 28",
     route: "Tempus Frugit",
-    raceID: "",
-  })
-];
+    raceID: "4269519",
+  }),
+];  

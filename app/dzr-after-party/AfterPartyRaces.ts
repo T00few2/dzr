@@ -29,4 +29,13 @@ export const AfterPartyRacesData = [
       finish: 'Banner on Petit KOM Reverse',
       linkRoute: 'https://zwiftinsider.com/route/roule-ma-poule/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Libby Hill After Party+',
+      world: 'Richmond',
+      laps: '1+',
+      distance: '36.767',
+      elevation: '166',
+      finish: 'Banner second time on Governor St. Climb',
+      linkRoute: 'https://zwiftinsider.com/route/libby-hill-after-party/',
+    }),
 ];
