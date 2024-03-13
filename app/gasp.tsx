@@ -33,7 +33,7 @@ const DZR_Header = () => {
     const animateText = () => {
         gsap.to(textRef.current, {
             duration: 0.5,
-            delay: 1,
+            delay: 0,
             color: 'white',
             text: {
               value: "Danish Zwift Racers",
