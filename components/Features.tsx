@@ -75,7 +75,7 @@ export default function Features() {
       <Box position='relative' padding='10'>
         <Divider />
         <AbsoluteCenter>
-        <Circle bg='#ad1a2d' borderRadius='full' color={'white'} fontWeight={900} borderWidth={'15px'} borderColor={'#ad1a2d'} fontSize={{ base: 'm', sm: 'l', md: 'xl' }}>
+        <Circle bg='#ad1a2d' borderRadius='full' color={'white'} fontWeight={900} borderWidth={{ base: '10px', sm: '15px', md: '15px' }} borderColor={'#ad1a2d'} fontSize={{ base: 'm', sm: 'l', md: 'xl' }}>
             Active Race Series
         </Circle>
         </AbsoluteCenter>
