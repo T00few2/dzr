@@ -13,6 +13,7 @@ import {
   Link,
   Divider,
   AbsoluteCenter,
+  Circle,
 } from '@chakra-ui/react'
 import { ReactElement } from 'react'
 import {
@@ -74,9 +75,9 @@ export default function Features() {
       <Box position='relative' padding='10'>
         <Divider />
         <AbsoluteCenter>
-        <Button bg='#ad1a2d' borderRadius='full' color={'white'} fontWeight={900} borderWidth={'10px'} borderColor={'#ad1a2d'} fontSize={{ base: 'm', sm: 'l', md: 'xl' }}>
+        <Circle bg='#ad1a2d' borderRadius='full' color={'white'} fontWeight={900} borderWidth={'15px'} borderColor={'#ad1a2d'} fontSize={{ base: 'm', sm: 'l', md: 'xl' }}>
             Active Race Series
-        </Button>
+        </Circle>
         </AbsoluteCenter>
 </Box>
       </Stack>
