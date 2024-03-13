@@ -78,6 +78,7 @@ export default function HeroSection() {
           <FaDiscord style={{ fontSize: '20px', color: 'white' }} />
           </Button>
         </Stack>
+        <br/>
         
       </Stack>
     </Container>
