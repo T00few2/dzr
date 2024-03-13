@@ -74,7 +74,7 @@ export default function Features() {
       <Box position='relative' padding='10'>
         <Divider />
         <AbsoluteCenter>
-        <Button bg='red' borderRadius='full' color={'white'} fontWeight={900} borderWidth={'10px'} borderColor={'red'} fontSize={{ base: 'm', sm: 'l', md: 'xl' }}>
+        <Button bg='#ad1a2d' borderRadius='full' color={'white'} fontWeight={900} borderWidth={'10px'} borderColor={'#ad1a2d'} fontSize={{ base: 'm', sm: 'l', md: 'xl' }}>
             Active Race Series
         </Button>
         </AbsoluteCenter>
