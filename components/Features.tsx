@@ -89,7 +89,9 @@ export default function Features() {
       <Link href={'dzr-after-party'} style={{ textDecoration: 'none' }}>
           <Card bg={'black'} borderWidth="5px" borderRadius="lg" borderColor={'white'} _hover={{ transform: 'scale(1.05)', bg: "rgba(173, 26, 45, 0.95)"}}> 
             <CardHeader>
-                <Icon as={LiaMountainSolid} w={10} h={10} color='white'/>
+              <Flex justify="center" align="center" bg="white" borderRadius="full" p={2} width={16} height={16}>
+                <Icon as={LiaMountainSolid} w={10} h={10} color='black'/>
+              </Flex>
             </ CardHeader>
             <CardBody>
                 <Stack align={'start'} spacing={5}>
@@ -106,7 +108,9 @@ export default function Features() {
           <Link href={'the-zwifty-fifty'} style={{ textDecoration: 'none' }}>
           <Card bg={'black'} borderWidth="5px" borderRadius="lg" borderColor={'white'} _hover={{ transform: 'scale(1.05)', bg: "rgba(173, 26, 45, 0.95)"}}> 
           <CardHeader>
-          <Icon as={Im500Px} w={10} h={10} color='white' />
+            <Flex justify="center" align="center" bg="white" borderRadius="full" p={2} width={16} height={16}>
+              <Icon as={Im500Px} w={10} h={10} color='black' />
+            </Flex>
             </ CardHeader>
             <CardBody>
                 <Stack align={'start'} spacing={5}>
