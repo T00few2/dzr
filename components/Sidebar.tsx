@@ -41,6 +41,7 @@ import { LiaMountainSolid } from "react-icons/lia";
 import { Im500Px } from "react-icons/im";
 import { MdDirectionsBike } from "react-icons/md";
 import { IconType } from 'react-icons'
+import { FaPeopleGroup } from "react-icons/fa6";
 
 interface LinkItemProps {
   name: string
@@ -66,6 +67,7 @@ const LinkItems: Array<LinkItemProps> = [
   { name: 'Home', href: '/', icon: MdDirectionsBike },
   { name: 'DZR After Party Series', href: 'dzr-after-party', icon: LiaMountainSolid },
   { name: 'The Zwifty Fifty', href: 'the-zwifty-fifty', icon: Im500Px },
+  { name: 'Members Zone', href: 'members', icon: FaPeopleGroup },
 ]
 
 const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
