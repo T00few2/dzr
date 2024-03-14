@@ -39,7 +39,7 @@ export default function Features() {
       </Box>
       </Stack>
       <Stack  spacing={4} as={Container} maxW={'3xl'} mt={12} mb={20}>
-      <SimpleGrid spacing={8}  minChildWidth='120px' alignContent={'center'}>
+      <SimpleGrid spacing={8}  minChildWidth='200px' alignContent={'center'}>
       <Link href={'dzr-after-party'} style={{ textDecoration: 'none' }}>
           <Card height='100%' bg={'black'} borderWidth="5px" borderRadius="lg" borderColor={'white'} _hover={{ transform: 'scale(1.05)', bg: "rgba(173, 26, 45, 0.95)"}}> 
             <CardHeader>
