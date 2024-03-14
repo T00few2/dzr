@@ -14,19 +14,21 @@ import {
   Divider,
   AbsoluteCenter,
   Circle,
+  Card,
+  CardBody,
+  CardBodyProps,
+  CardHeader,
+  SimpleGrid,
+  SimpleGridProps,
 } from '@chakra-ui/react'
 import { ReactElement } from 'react'
-import {
-  FcAbout,
-  FcAssistant,
-  FcCollaboration,
-  FcDonate,
-  FcManager,
-} from 'react-icons/fc'
+
+
 
 import { LiaMountainSolid } from "react-icons/lia";
 import { Im500Px } from "react-icons/im";
 
+/*
 interface CardProps {
   heading: string
   description: string
@@ -43,7 +45,8 @@ const Card = ({ heading, description, icon, href }: CardProps) => {
       borderWidth="5px"
       borderRadius="lg"
       overflow="hidden"
-      p={5}
+      p={4}
+      flex='1'
       >
       <Stack align={'start'} spacing={5}>
         <Flex
@@ -67,7 +70,7 @@ const Card = ({ heading, description, icon, href }: CardProps) => {
     </Link>
   )
 }
-
+*/
 export default function Features() {
   return (
     <Box p={0}>
@@ -79,25 +82,46 @@ export default function Features() {
             Active Race Series
         </Circle>
         </AbsoluteCenter>
-</Box>
+      </Box>
       </Stack>
-
-      <Container maxW={'5xl'} mt={12} mb={20}>
-        <Flex flexWrap="wrap" gridGap={20} justify="center">
-          <Card
-            heading={'DZR After Party Series'}
-            icon={<Icon as={LiaMountainSolid} w={10} h={10} />}
-            description={'Uphill finishes \n Thursdays 17:15 CET | 11:15 AM EST'}
-            href={'dzr-after-party'}
-          />
-          <Card
-            heading={'The Zwifty Fifty'}
-            icon={<Icon as={Im500Px} w={10} h={10} />}
-            description={"50km (ish) races \n Sundays 14:14 CET | 8:45 AM EST"}
-            href={'the-zwifty-fifty'}
-          />
-        </Flex>
-      </Container>
+      <Stack  spacing={4} as={Container} maxW={'3xl'} mt={12} mb={20}>
+      <SimpleGrid spacing={8}  minChildWidth='120px' alignContent={'center'}>
+      <Link href={'dzr-after-party'} style={{ textDecoration: 'none' }}>
+          <Card bg={'black'} borderWidth="5px" borderRadius="lg" borderColor={'white'} _hover={{ transform: 'scale(1.05)', bg: "rgba(173, 26, 45, 0.95)"}}> 
+            <CardHeader>
+                <Icon as={LiaMountainSolid} w={10} h={10} color='white'/>
+            </ CardHeader>
+            <CardBody>
+                <Stack align={'start'} spacing={5}>
+                    <Box mt={2}>
+                    <Heading size="md" color={'white'}>DZR After Party Series</Heading>
+                    <Text mt={1} fontSize={'sm'} color={'white'} whiteSpace="pre-line">
+                    Uphill finishes <br/> Thursdays 17:15 CET | 11:15 AM EST
+                    </Text>
+                    </Box>
+                </Stack>
+            </CardBody>
+          </Card>
+          </Link>
+          <Link href={'the-zwifty-fifty'} style={{ textDecoration: 'none' }}>
+          <Card bg={'black'} borderWidth="5px" borderRadius="lg" borderColor={'white'} _hover={{ transform: 'scale(1.05)', bg: "rgba(173, 26, 45, 0.95)"}}> 
+          <CardHeader>
+          <Icon as={Im500Px} w={10} h={10} color='white' />
+            </ CardHeader>
+            <CardBody>
+                <Stack align={'start'} spacing={5}>
+                    <Box mt={2}>
+                    <Heading size="md" color={'white'}>The Zwifty Fifty</Heading>
+                    <Text mt={1} fontSize={'sm'} color={'white'} whiteSpace="pre-line">
+                    50km (ish) races <br/> Sundays 14:14 CET | 8:45 AM EST
+                    </Text>
+                    </Box>
+                </Stack>
+            </CardBody>
+          </Card>
+          </Link>
+      </SimpleGrid>
+      </Stack>
     </Box>
   )
 }

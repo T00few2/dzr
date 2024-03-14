@@ -62,11 +62,14 @@ export default function HeroSection() {
         spacing={{ base: 8, md: 10 }}
         py={{ base: 10, md: 10 }}
         >
-          <DZR_Header />
+        <Heading
+          fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
+          lineHeight={'110%'}
+          textColor='white'>
+          <Text>Danish Zwift Racers</Text>
+        </Heading>
 
-        <Text color={'white'} maxW={'3xl'} as='cite' fontSize={{ base: 'l', sm: 'xl', md: '2xl' }}>
-          the pain in the peleton
-        </Text>
+        <DZR_Header />
 
         <Stack direction={'row'} spacing={6}>
           <Circle as='a' size='40px' bg='#4267B2' color='white'  href='https://www.facebook.com/groups/358114378652929' target="_blank">

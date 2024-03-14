@@ -32,11 +32,11 @@ const DZR_Header = () => {
     // Animation function
     const animateText = () => {
         gsap.to(textRef.current, {
-            duration: 0.5,
+            duration: 1,
             delay: 0,
             color: 'white',
             text: {
-              value: "Danish Zwift Racers",
+              value: "the pain in the peleton",
               rtl: false,
               
             },
@@ -49,14 +49,9 @@ const DZR_Header = () => {
       }, []); 
   
     return (
-            <Heading ref={textRef}
-          
-          fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
-          lineHeight={'110%'}
-          textColor='black'>
-          <Text>-</Text>
-        </Heading>
-
+        <Text ref={textRef} color={'black'} maxW={'3xl'} as='cite' fontSize={{ base: 'l', sm: 'xl', md: '2xl' }}>
+            -
+        </Text>
     );
   };
   
