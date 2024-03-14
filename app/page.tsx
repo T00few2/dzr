@@ -6,15 +6,24 @@ import GoogleCalendarEmbed from "@/components/GoogleCalendar";
 
 import { ColorModeScript } from '@chakra-ui/react'
 
+import Meta from '../components/Meta';
+
 
 const inter = Inter({ subsets: ['latin']})
 
 export default function Home() {
   return (
+    <>
+    <Meta
+    title="DZR"
+    description="Danish Zwift Racers"
+    frontPageImage="/DZR_logo.svg"
+    />
     <div style={{backgroundColor:'black'}}>
     <HeroSection />
     <Features />
     </div>
+    </>
   );
 }
 
