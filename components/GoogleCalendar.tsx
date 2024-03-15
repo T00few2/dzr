@@ -19,8 +19,8 @@ interface GoogleCalendarEmbedProps {
 }
 
 const GoogleCalendarEmbed: React.FC<GoogleCalendarEmbedProps> = ({ calendarId }) => {
-  const url = `https://calendar.google.com/calendar/embed?src=${calendarId}&ctz=UTC`;
-
+  const url = `https://calendar.google.com/calendar/embed?src=${calendarId}&ctz=UTC&mode=WEEK`;
+  //"https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Europe%2FCopenhagen&bgcolor=%23ffffff&mode=WEEK&showTabs=0&showPrint=0&showCalendars=0&title&showTitle=0&hl=da&src=MTM4ZjEyMTliZmJlMDhjMzQ5M2EwNDU3MjMyZmMzMGRlNmI2ODExYzdiZGNiZjQzYzRlYTE0Yjg0NjI3MTM1ZEBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&color=%23F4511E" 
   return (
     <Container maxW={'5xl'} bg={('black')} alignContent={'center'}>
     <Stack
