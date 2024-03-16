@@ -62,4 +62,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1','1'],
     bonus: ['3.0','2.0','1.0'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Downtown Titans',
+    world: 'Watopia',
+    linkRoute: 'https://zwiftinsider.com/route/downtown-titans/',
+    laps: '2',
+    length: '50.09',
+    hm: '584',  
+    climbs: ['Titans Groove KOM Reverse','Zwift KOM'],
+    sprints: ['Titans Groove KOM Reverse','Zwift KOM'],
+    sprintLaps: ['1,2','1,2'],
+    bonus: ['3.0','2.0','1.0'],
+  }),
 ];
