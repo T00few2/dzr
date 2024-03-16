@@ -24,7 +24,7 @@ export const AfterPartyCalender = [
   }),
   new AfterPartyCalenderTemplate({
     date: "Thursday March 28",
-    route: "Tempus Frugit",
+    route: "Sand And Sequoias",
     raceID: "",
   })
 ];

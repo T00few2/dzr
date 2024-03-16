@@ -72,10 +72,10 @@ export default function HeroSection() {
         <DZR_Header />
 
         <Stack direction={'row'} spacing={6}>
-          <Circle as='a' size='40px' bg='#4267B2' color='white'  href='https://www.facebook.com/groups/358114378652929' target="_blank">
+          <Circle as='a' size='40px' bg='#4267B2' color='white'  href='https://www.facebook.com/groups/358114378652929' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
           <FaFacebook />
           </Circle>
-          <Circle as='a' size='40px' bg='#5865F2' color='white'  href='https://discord.gg/6CZrD34cCv' target="_blank">
+          <Circle as='a' size='40px' bg='#5865F2' color='white'  href='https://discord.gg/6CZrD34cCv' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
           <FaDiscord />
           </Circle>
 
