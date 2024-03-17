@@ -1,11 +1,13 @@
 export class AfterPartyCalenderTemplate {
   date: string = '';
+  postDate: string = '';
   route: string = '';
   raceID: string = '';
 
   constructor(initializer?: any) {
     if (!initializer) return;
     if (initializer.date) this.date = initializer.date;
+    if (initializer.postDate) this.postDate = initializer.postDate;
     if (initializer.route) this.route = initializer.route;
     if (initializer.raceID) this.raceID = initializer.raceID;
   }
@@ -14,17 +16,20 @@ export class AfterPartyCalenderTemplate {
 export const AfterPartyCalender = [
   new AfterPartyCalenderTemplate({
     date: "Thursday March 14",
-    route: "Roule Ma Poule",
-    raceID: "4269511",
+    postDate: "Roule Ma Poule",
+    route: "4269511",
+    raceID: "",
   }),
   new AfterPartyCalenderTemplate({
     date: "Thursday March 21",
-    route: "Libby Hill After Party+",
-    raceID: "4285111",
+    postDate: "Libby Hill After Party+",
+    route: "4285111",
+    raceID: "",
   }),
   new AfterPartyCalenderTemplate({
     date: "Thursday March 28",
-    route: "Sand And Sequoias",
+    postDate: "Tempus Frugit",
+    route: "",
     raceID: "",
   })
 ];
