@@ -11,7 +11,7 @@ export async function GET(request: Request) {
         description: `We are taking on ${race.route} this ${race.date}`, // Use date as description
         link: `https://www.zwift.com/eu/events/view/${race.raceID}`, // Zwift link using raceID
         pubDate: race.postDate, // Use postDate as pubDate
-        raceSeries: race.raceSeries, // Include raceSeries
+        date: race.date,
         guid: race.raceID // Use raceID as the unique identifier for <guid>
     }));
   
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
                   <link>${post.link}</link>
                   <description>${post.description}</description>
                   <pubDate>${post.pubDate}</pubDate>
-                  <guid isPermaLink="false">${post.guid}</guid>
+                  <guid isPermaLink="false">${post.title}; ${post.date}; ID: ${post.guid}</guid>
               </item>
               `
                 )
