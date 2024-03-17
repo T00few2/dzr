@@ -16,20 +16,20 @@ export class AfterPartyCalenderTemplate {
 export const AfterPartyCalender = [
   new AfterPartyCalenderTemplate({
     date: "Thursday March 14",
-    postDate: "Roule Ma Poule",
-    route: "4269511",
-    raceID: "",
+    postDate: "08-03-2024",
+    route: "Roule Ma Poule",
+    raceID: "4269511",
   }),
   new AfterPartyCalenderTemplate({
     date: "Thursday March 21",
-    postDate: "Libby Hill After Party+",
-    route: "4285111",
-    raceID: "",
+    postDate: "15-03-2024",
+    route: "Libby Hill After Party+",
+    raceID: "4285111",
   }),
   new AfterPartyCalenderTemplate({
     date: "Thursday March 28",
-    postDate: "Tempus Frugit",
-    route: "",
+    postDate: "22-03-2024",
+    route: "Tempus Frugit",
     raceID: "",
   })
 ];
