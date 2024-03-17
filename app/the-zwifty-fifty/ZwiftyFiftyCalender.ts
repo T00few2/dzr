@@ -1,6 +1,6 @@
 export class ZwiftyFiftyCalenderTemplate {
   date: string = '';
-  postDate: string = '';
+  postDate: Date = '';
   route: string = '';
   raceID: string = '';
 
