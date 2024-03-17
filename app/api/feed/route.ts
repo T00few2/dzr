@@ -22,7 +22,7 @@ export async function GET(request: Request) {
               <link>https://dzrracingseries.com</link>
               <description>Danish Zwift Racers - Racing Series</description>
               <language>en-us</language>
-              <atom:link href="https://dzrracingseries.com/api/feed" rel="self" type="application/rss+xml" />
+              <atom:link href="https://www.dzrracingseries.com/api/feed" rel="self" type="application/rss+xml" />
               ${blogPosts
                 .map(
                   (post) => `
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
                   <link>${post.link}</link>
                   <description>${post.description}</description>
                   <pubDate>${post.pubDate}</pubDate>
-                  <guid>${post.guid}</guid>
+                  <guid isPermaLink="false">${post.guid}</guid>
               </item>
               `
                 )
