@@ -1,6 +1,6 @@
 export class AfterPartyCalenderTemplate {
   date: string = '';
-  postDate: string = '';
+  postDate: Date = '';
   route: string = '';
   raceID: string = '';
 
