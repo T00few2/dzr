@@ -1,18 +1,18 @@
 import { racePosts } from "../racePosts";
 
-const zfRaces = racePosts()
+const Races = racePosts()
 
 export async function GET(request: Request) {
+    {Races.map((allRaces)=> (
+      console.log(allRaces.postDate)))}
     
-    
-    const blogPosts = [
-      {
-        title: "DZR After Party Series",
-        description: "Thursday March 21.",
-        link: "https://dzrracingseries.com/dzr-after-party",
-        pubDate: new Date().toUTCString(),
-      },
-    ];
+      const blogPosts = Races.map(race => ({
+        title: race.raceSeries, // Use route as title
+        description: `We are taking on ${race.route} this ${race.date}`, // Use date as description
+        link: `https://www.zwift.com/eu/events/view/${race.raceID}`, // Zwift link using raceID
+        pubDate: race.postDate, // Use postDate as pubDate
+        raceSeries: race.raceSeries // Include raceSeries
+    }));
   
     const feed = `<?xml version="1.0" encoding="UTF-8" ?>
       <rss version="2.0">
