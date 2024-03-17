@@ -25,7 +25,7 @@ export function racePosts() {
     // Format postDate to RFC 2822 format
     const formattedRaces = allRaces.map(race => ({
         ...race,
-        postDate: new Date(race.postDate).toDateString() // Convert Date object to a string
+        postDate: new Date(race.postDate).toUTCString() // Convert Date object to a string
     }));
 
     return formattedRaces;
