@@ -21,11 +21,6 @@ export function racePosts() {
 
     // Sort allRaces by postDate
     allRaces.sort((a, b) => new Date(a.postDate).getTime() - new Date(b.postDate).getTime());
-
-    
-    // Log the sorted allRaces to the console
-    console.log(allRaces);
-
     
     return allRaces
 }

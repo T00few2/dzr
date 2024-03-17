@@ -3,9 +3,7 @@ import { racePosts } from "../racePosts";
 const Races = racePosts()
 
 export async function GET(request: Request) {
-    {Races.map((allRaces)=> (
-      console.log(allRaces.postDate)))}
-    
+
       const blogPosts = Races.map(race => ({
         title: race.raceSeries, // Use route as title
         description: `We are taking on ${race.route} this ${race.date}`, // Use date as description
@@ -36,8 +34,12 @@ export async function GET(request: Request) {
           </channel>
       </rss>`;
   
-    return new Response(feed, {
-      status: 200,
-      headers: { "Content-Type": "application/rss+xml" },
-    });
-  }
+      const headers = new Headers();
+      headers.set("Content-Type", "application/rss+xml");
+    
+      return new Response(feed, {
+          status: 200,
+          headers: headers
+      });
+}
+  
