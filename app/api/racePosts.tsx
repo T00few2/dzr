@@ -21,6 +21,12 @@ export function racePosts() {
 
     // Sort allRaces by postDate
     allRaces.sort((a, b) => new Date(a.postDate).getTime() - new Date(b.postDate).getTime());
-    
-    return allRaces
+
+    // Format postDate to RFC 2822 format
+    const formattedRaces = allRaces.map(race => ({
+        ...race,
+        postDate: new Date(race.postDate).toDateString() // Convert Date object to a string
+    }));
+
+    return formattedRaces;
 }

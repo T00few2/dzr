@@ -5,6 +5,8 @@ const Races = racePosts()
 export async function GET(request: Request) {
 
       const blogPosts = Races.map(race => ({
+        
+        
         title: race.raceSeries, // Use route as title
         description: `We are taking on ${race.route} this ${race.date}`, // Use date as description
         link: `https://www.zwift.com/eu/events/view/${race.raceID}`, // Zwift link using raceID
