@@ -11,7 +11,8 @@ export async function GET(request: Request) {
         description: `We are taking on ${race.route} this ${race.date}`, // Use date as description
         link: `https://www.zwift.com/eu/events/view/${race.raceID}`, // Zwift link using raceID
         pubDate: race.postDate, // Use postDate as pubDate
-        raceSeries: race.raceSeries // Include raceSeries
+        raceSeries: race.raceSeries, // Include raceSeries
+        guid: race.raceID // Use raceID as the unique identifier for <guid>
     }));
   
     const feed = `<?xml version="1.0" encoding="UTF-8" ?>
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
               <link>https://dzrracingseries.com</link>
               <description>Danish Zwift Racers - Racing Series</description>
               <language>en-us</language>
+              <atom:link href="https://dzrracingseries.com/api/feed" rel="self" type="application/rss+xml" />
               ${blogPosts
                 .map(
                   (post) => `
@@ -29,6 +31,7 @@ export async function GET(request: Request) {
                   <link>${post.link}</link>
                   <description>${post.description}</description>
                   <pubDate>${post.pubDate}</pubDate>
+                  <guid>${post.guid}</guid>
               </item>
               `
                 )
