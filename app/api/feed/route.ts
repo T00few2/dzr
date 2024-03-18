@@ -27,7 +27,7 @@ export async function GET(request: Request) {
               <item>
                   <title>${post.title}</title>
                   <link>${post.link}</link>
-                  <description>${post.description}</description>
+                  <description><![CDATA[${post.description}]]></description>
                   <pubDate>${post.pubDate}</pubDate>
                   <guid isPermaLink="false">${post.title}; ${post.date}; ID: ${post.guid}</guid>
               </item>
