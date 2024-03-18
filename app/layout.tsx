@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import SidebarWithHeader from "@/components/Sidebar";
+import { Analytics } from "@vercel/analytics/react"
 
 
 
