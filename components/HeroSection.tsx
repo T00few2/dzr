@@ -15,6 +15,12 @@ import {
   IconProps,
   Circle,
   Square,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverHeader,
+  PopoverArrow,
+  PopoverProps,
 } from '@chakra-ui/react'
 
 import { FaFacebook, FaTwitter, FaYoutube, FaDiscord } from 'react-icons/fa'
@@ -72,13 +78,29 @@ export default function HeroSection() {
         <DZR_Header />
 
         <Stack direction={'row'} spacing={6}>
-          <Circle as='a' size='40px' bg='#4267B2' color='white'  href='https://www.facebook.com/groups/358114378652929' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
-          <FaFacebook />
-          </Circle>
-          <Circle as='a' size='40px' bg='#5865F2' color='white'  href='https://discord.gg/6CZrD34cCv' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
-          <FaDiscord />
-          </Circle>
-
+        <Popover trigger='hover'>
+          <PopoverTrigger>
+            <Circle as='a' size='40px' bg='#4267B2' color='white'  href='https://www.facebook.com/groups/358114378652929' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
+            <FaFacebook />
+            </Circle>
+          </PopoverTrigger>
+          <PopoverContent>
+              <PopoverArrow />
+              <PopoverHeader color='#4267B2'>Join our Facebook Group!</PopoverHeader>
+            </PopoverContent>
+        </Popover>
+         
+        <Popover trigger='hover'>
+          <PopoverTrigger>
+            <Circle as='a' size='40px' bg='#5865F2' color='white'  href='https://discord.gg/6CZrD34cCv' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
+            <FaDiscord />
+            </Circle>
+          </PopoverTrigger>
+          <PopoverContent>
+              <PopoverArrow />
+              <PopoverHeader color='#5865F2'>Join our Discord Channel!</PopoverHeader>
+            </PopoverContent>
+        </Popover>
         </Stack>
    
         
