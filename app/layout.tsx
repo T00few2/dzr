@@ -19,6 +19,7 @@ export default function RootLayout({
         <Providers>
           <SidebarWithHeader />
           {children}
+          <Analytics />
         </Providers>
       </body>
     </html>
