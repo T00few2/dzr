@@ -22,8 +22,8 @@ export const metadata: Metadata = {
     siteName: 'DZR',
     images: [
       {
-        url: '/general/DZR_logo.svg'
-      }
+        url: '/general/DZR_logo.svg',
+      },
     ],
     type: 'website',
     locale: 'en_US',
