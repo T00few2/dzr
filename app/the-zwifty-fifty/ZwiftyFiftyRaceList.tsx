@@ -1,3 +1,4 @@
+'use client'
 import React from 'react';
 import { ZwiftyFiftyRacesTemplate } from './ZwiftyFiftyRaces';
 import { ZwiftyFiftyCalender } from './ZwiftyFiftyCalender';

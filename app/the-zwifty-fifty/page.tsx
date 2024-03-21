@@ -1,4 +1,3 @@
-'use client'
 import { ZwiftyFiftyRacesData } from './ZwiftyFiftyRaces';
 import RaceList from './ZwiftyFiftyRaceList';
 import { formatNextSunday } from './nextSunday';
@@ -19,6 +18,29 @@ import {
 import { MdBackHand, MdPowerOff } from 'react-icons/md'
 import { FaSuperpowers,FaHeartCircleBolt } from "react-icons/fa6";
 import { LuBike } from "react-icons/lu";
+
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: 'The Zwifty Fifty',
+  description: 'DZR brings to you the Goldilocks of Zwift racing intensity and endurance. With weekly races at about 50km the races are not too short and intensive to build stamina and not too long and time consuming to actually get done. They are just right. And they are on every Sunday 14:45 CET | 8:45 AM EST.',
+
+  metadataBase: new URL('https://www.dzrracingseries.com/the-zwifty-fifty/'),
+
+  openGraph: {
+    title: 'The Zwifty Fifty',
+    description: 'DZR brings to you the Goldilocks of Zwift racing intensity and endurance. With weekly races at about 50km the races are not too short and intensive to build stamina and not too long and time consuming to actually get done. They are just right. And they are on every Sunday 14:45 CET | 8:45 AM EST.',
+    url: 'https://www.dzrracingseries.com/the-zwifty-fifty/',
+    siteName: 'DZR',
+    images: [
+      {
+        url: '/general/TZF_logo.png',
+      },
+    ],
+    type: 'website',
+    locale: 'en_US',
+  }
+}
 
 export default function thezwiftyfiftypage() {
   const formattedDate = formatNextSunday();

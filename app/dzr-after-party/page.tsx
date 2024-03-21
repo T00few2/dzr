@@ -1,4 +1,3 @@
-
 import { AfterPartyRacesData } from './AfterPartyRaces';
 import AfterPartyRaceList from './AfterPartyRaceList';
 import { formatNextThursday } from './nextThursday';

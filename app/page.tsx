@@ -10,8 +10,8 @@ import { ColorModeScript } from '@chakra-ui/react'
 const inter = Inter({ subsets: ['latin']})
 
 export const metadata: Metadata = {
-  title: 'DZR',
-  description: 'Danish Zwift Racers',
+  title: 'Danish Zwift Racers',
+  description: 'Join the Danish Zwift Racers community for virtual cycling races and training.',
 
   metadataBase: new URL('https://www.dzrracingseries.com/'),
 
