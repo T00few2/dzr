@@ -2,7 +2,7 @@
     "crons": [
       {
         "path": "/api/discord",
-        "schedule": "16 22 * * *"
+        "schedule": "22 22 * * *"
       }
     ]
   }
