@@ -1,12 +1,5 @@
 'use client'
 import {
-    Container,
-    SimpleGrid,
-    Image,
-    Flex,
-    Heading,
-    Text,
-    Stack,
     List,
     ListItem,
     ListIcon,

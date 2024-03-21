@@ -1,4 +1,3 @@
-import { AfterPartyRacesData } from './AfterPartyRaces';
 import AfterPartyRaceList from './AfterPartyRaceList';
 import { formatNextThursday } from './nextThursday';
 
@@ -10,12 +9,8 @@ import {
   Heading,
   Text,
   Stack,
-  StackDivider,
-  Icon,
-  useColorModeValue,
   Divider,
 } from '@chakra-ui/react'
-import { IoAnalyticsSharp, IoLogoBitcoin, IoSearchSharp } from 'react-icons/io5'
 import { ReactElement } from 'react'
 
 import { Metadata } from "next";

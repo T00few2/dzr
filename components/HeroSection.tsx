@@ -3,24 +3,18 @@
 import DZR_Header from '@/app/gasp'
 
 import {
-  Flex,
   Container,
   chakra,
   VisuallyHidden,
   Heading,
   Stack,
   Text,
-  Button,
-  Icon,
-  IconProps,
   Circle,
-  Square,
   Popover,
   PopoverTrigger,
   PopoverContent,
   PopoverHeader,
   PopoverArrow,
-  PopoverProps,
 } from '@chakra-ui/react'
 
 import { FaFacebook, FaTwitter, FaYoutube, FaDiscord } from 'react-icons/fa'
