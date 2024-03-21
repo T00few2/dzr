@@ -19,15 +19,6 @@ import {
 import { IoAnalyticsSharp, IoLogoBitcoin, IoSearchSharp } from 'react-icons/io5'
 import { ReactElement } from 'react'
 
-import { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: 'DZR After Party Series',
-  description: 'A weekly race series with carefully selected routes all finishing uphill (aka after parties).',
-
-
-}
-
 interface FeatureProps {
   text: string
   iconBg: string
