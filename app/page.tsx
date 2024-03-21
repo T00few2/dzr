@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://www.dzrracingseries.com/'),
 
   openGraph: {
-    title: 'DZR: Race, Train, and Ride Together on Zwift',
+    title: 'Danish Zwift Racers: Race, Train, and Ride Together on Zwift',
     description: 'Join the Danish Zwift Racers community for virtual cycling races and training.',
     url: 'https://www.dzrracingseries.com/',
     siteName: 'DZR',
