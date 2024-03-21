@@ -1,3 +1,4 @@
+'use client'
 import React from 'react';
 import { AfterPartyRacesTemplate } from './AfterPartyRaces';
 import { AfterPartyCalender } from './AfterPartyCalender';
