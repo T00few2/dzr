@@ -1,6 +1,6 @@
-import { ZwiftyFiftyRacesData } from './ZwiftyFiftyRaces';
 import RaceList from './ZwiftyFiftyRaceList';
 import { formatNextSunday } from './nextSunday';
+import ZwiftyFiftyRules from './ZwiftyFiftyRules';
 
 import {
   Container,
@@ -10,14 +10,7 @@ import {
   Heading,
   Text,
   Stack,
-  List,
-  ListItem,
-  ListIcon,
 } from '@chakra-ui/react'
-
-import { MdBackHand, MdPowerOff } from 'react-icons/md'
-import { FaSuperpowers,FaHeartCircleBolt } from "react-icons/fa6";
-import { LuBike } from "react-icons/lu";
 
 import { Metadata } from "next";
 
@@ -66,28 +59,9 @@ export default function thezwiftyfiftypage() {
             DZR brings to you the Goldilocks of Zwift racing intensity and endurance. With weekly races at about 50km the races are not too short and intensive to build stamina and not too long and time consuming to actually get done. They are just right. And they are on every Sunday 14:45 CET | 8:45 AM EST.
             </Text>
             <Heading color={'white'} fontSize={'2xl'}>Rules:</Heading>
-            <List spacing={3} color={'white'} >
-              <ListItem>
-                <ListIcon as={MdBackHand} color='orange' fontSize={'20px'}/>
-                Category Enforced
-              </ListItem>
-              <ListItem>
-                <ListIcon as={FaSuperpowers} color='green.500' fontSize={'20px'}/>
-                Power Meter Enforced
-              </ListItem>
-              <ListItem>
-                <ListIcon as={FaHeartCircleBolt} color='red.500' fontSize={'20px'}/>
-                Heart Rate Monitor Enforced
-              </ListItem>
-              <ListItem>
-                <ListIcon as={LuBike} color='white' fontSize={'20px'}/>
-                No TT bikes Enforced
-              </ListItem>
-              <ListItem>
-                <ListIcon as={MdPowerOff} color='yellow' fontSize={'20px'}/>
-                No PowerUps
-              </ListItem>
-            </List>
+
+            <ZwiftyFiftyRules />
+
             
             <RaceList nextDate={formattedDate} />
           </Stack>
