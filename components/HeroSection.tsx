@@ -86,7 +86,7 @@ export default function HeroSection() {
          
         <Popover trigger='hover'>
           <PopoverTrigger>
-            <Circle as='a' size='40px' bg='#5865F2' color='white'  href='https://discord.gg/vgdu7fmuCa' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
+            <Circle as='a' size='40px' bg='#5865F2' color='white'  href='https://discord.gg/FBtCsddbmU' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
             <FaDiscord />
             </Circle>
           </PopoverTrigger>
