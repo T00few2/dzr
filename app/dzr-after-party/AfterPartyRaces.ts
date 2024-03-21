@@ -38,4 +38,13 @@ export const AfterPartyRacesData = [
       finish: 'Banner second time on Governor St. Climb',
       linkRoute: 'https://zwiftinsider.com/route/libby-hill-after-party/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Sand And Sequoias',
+      world: 'Watopia',
+      laps: '1+',
+      distance: '35.285',
+      elevation: '297',
+      finish: 'Second time on Titans Grove KOM',
+      linkRoute: 'https://zwiftinsider.com/route/sand-and-sequoias/',
+    }),
 ];

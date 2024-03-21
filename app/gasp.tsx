@@ -5,20 +5,7 @@ import { TextPlugin } from 'gsap/dist/TextPlugin'; // Make sure to import from '
 import { useRef, useEffect } from 'react';
 
 import {
-    Box,
-    Button,
-    Container,
-    Flex,
-    Heading,
-    Icon,
-    Stack,
     Text,
-    useColorModeValue,
-    Link,
-    Divider,
-    AbsoluteCenter,
-    Circle,
-    Spacer,
   } from '@chakra-ui/react'
 
 // Ensure TextPlugin is added to gsap
@@ -38,10 +25,8 @@ const DZR_Header = () => {
             text: {
               value: "the pain in the peleton",
               rtl: false,
-              
             },
-          });
-          
+          });    
     };
 
     useEffect(() => {
@@ -53,6 +38,6 @@ const DZR_Header = () => {
             -
         </Text>
     );
-  };
+};
   
-  export default DZR_Header;
+export default DZR_Header;
