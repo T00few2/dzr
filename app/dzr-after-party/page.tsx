@@ -25,21 +25,7 @@ export const metadata: Metadata = {
   title: 'DZR After Party Series',
   description: 'A weekly race series with carefully selected routes all finishing uphill (aka after parties).',
 
-  metadataBase: new URL('https://www.dzrracingseries.com/dzr-after-party/'),
 
-  openGraph: {
-    title: 'DZR After Party Series',
-    description: 'A weekly race series with carefully selected routes all finishing uphill (aka after parties).',
-    url: 'https://www.dzrracingseries.com/dzr-after-party',
-    siteName: 'DZR',
-    images: [
-      {
-        url: '/general/DAP_logo.png',
-      },
-    ],
-    type: 'website',
-    locale: 'en_US',
-  }
 }
 
 interface FeatureProps {
