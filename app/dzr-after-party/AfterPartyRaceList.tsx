@@ -6,7 +6,6 @@ import { AfterPartyRacesData } from './AfterPartyRaces';
 import { formatNextThursday } from './nextThursday';
 import Carousel from '../carousel';
 
-
 import {
     Container,
     SimpleGrid,
@@ -87,6 +86,7 @@ function AfterPartyRaceList({ nextDate }: RaceProps) {
    
                         />
                     </Stack>
+                    
                 ))))}
         </Stack>
     );

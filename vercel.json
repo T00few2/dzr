@@ -1,0 +1,9 @@
+{
+    "crons": [
+      {
+        "path": "/api/discord/webHookMessage",
+        "schedule": "*/5 * * * *"
+      }
+    ]
+  }
+  
