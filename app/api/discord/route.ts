@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-export async function POST(req: Request, res: Response) {
+export async function POST(req: Request) {
     const headers = req.headers;
     const body = req.body;
     
