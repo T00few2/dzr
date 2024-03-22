@@ -2,6 +2,7 @@ import axios from 'axios';
 
 export async function POST(req: Request, res: Response) {
     const headers = req.headers;
+    console.log(headers);
   const webhookUrl = process.env.DISCORD_WEB_HOOK_DZR_AFTER_PARTY
   if (!webhookUrl) {
     throw new Error('WEBHOOK_URL is not defined');
