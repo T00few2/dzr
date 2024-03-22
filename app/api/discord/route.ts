@@ -22,10 +22,10 @@ export async function POST(req: Request, res: Response) {
               }
           ]
       });
-      console.log('Message with image sent to Discord successfully!');
+      return new Response('Discord message sent');
       
   } catch (error) {
-      console.error('Error sending message to Discord:', error);
-      
+    
+    return new Response('Error sending Discord message');      
   }
 }
