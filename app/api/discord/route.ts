@@ -8,8 +8,6 @@ export async function POST(req: Request) {
   const Races = racePosts().slice(-5)
   const race = Races.filter(race => race.raceSeries === raceSeries).slice(-1)[0];
   const imageUrl1 =`https://www.dzrracingseries.com/${race.raceSeries.toLowerCase().replace(/\s+/g, '-')}/${race.route.toLowerCase().replace(/\s+/g, '-')}/${race.route.split(' ').join('-')}-profile.png`
-  const imageUrl2 =`https://www.dzrracingseries.com/${race.raceSeries.toLowerCase().replace(/\s+/g, '-')}/${race.route.toLowerCase().replace(/\s+/g, '-')}/${race.route.split(' ').join('-')}-finish.png`
-  
 
 let message;
 let webhookUrl;

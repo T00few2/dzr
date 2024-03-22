@@ -37,8 +37,8 @@ function ProtectedPage() {
   const [authenticated, setAuthenticated] = useState(false);
 
   const handleLogin = () => {
-    
-    if (password === 'kode1234') {
+  const password = process.env.MEMBERS_ZONE
+    if (password === password) {
       setAuthenticated(true);
     } else {
       alert('Incorrect password');
