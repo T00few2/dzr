@@ -7,7 +7,7 @@ export async function GET(req: Request, res: Response) {
 }
 
 export async function POST(req: Request, res: Response) {
-  const webhookUrl = 'https://discord.com/api/webhooks/1220454320777072721/WUKlYyFtiTRgJvOBM3e3l7uU3hX4XBNiylzNgKrSfu2SPOWWUwdPOebeLmoWGyC1hA78'
+  const webhookUrl = process.env.DISCORD_WEB_HOOK_DZR_AFTER_PARTY//'https://discord.com/api/webhooks/1220454320777072721/WUKlYyFtiTRgJvOBM3e3l7uU3hX4XBNiylzNgKrSfu2SPOWWUwdPOebeLmoWGyC1hA78'
   const message = 'Todays profile!'
   const imageUrl ='https://dzrracingseries.com/dzr-after-party/libby-hill-after-party+/Libby-Hill-After-Party+-profile.png'
   
@@ -25,7 +25,7 @@ export async function POST(req: Request, res: Response) {
       return new Response('Discord message sent');
       
   } catch (error) {
-    
+
     return new Response('Error sending Discord message');      
   }
 }
