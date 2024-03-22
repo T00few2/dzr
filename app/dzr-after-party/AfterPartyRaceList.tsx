@@ -1,9 +1,7 @@
 'use client'
 import React from 'react';
-import { AfterPartyRacesTemplate } from './AfterPartyRaces';
 import { AfterPartyCalender } from './AfterPartyCalender';
 import { AfterPartyRacesData } from './AfterPartyRaces';
-import { formatNextThursday } from './nextThursday';
 import Carousel from '../carousel';
 
 import {

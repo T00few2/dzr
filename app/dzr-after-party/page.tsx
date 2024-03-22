@@ -1,5 +1,5 @@
 import AfterPartyRaceList from './AfterPartyRaceList';
-import { formatNextThursday } from './nextThursday';
+import {formatNextThursday} from './nextThursday';
 
 import {
   Container,
