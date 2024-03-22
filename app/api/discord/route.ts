@@ -1,7 +1,7 @@
-
 import axios from 'axios';
 
 export async function POST(req: Request, res: Response) {
+    const headers = req.headers;
   const webhookUrl = process.env.DISCORD_WEB_HOOK_DZR_AFTER_PARTY
   if (!webhookUrl) {
     throw new Error('WEBHOOK_URL is not defined');
@@ -20,7 +20,8 @@ export async function POST(req: Request, res: Response) {
               }
           ]
       });
-      return new Response('Discord message sent');
+      const responseMessage = `Discord message sent. Headers: ${JSON.stringify(headers)}`;
+      return new Response(responseMessage);
       
   } catch (error) {
 
