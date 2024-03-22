@@ -28,8 +28,8 @@ export const AfterPartyCalender = [
   }),
   new AfterPartyCalenderTemplate({
     date: "Thursday March 28",
-    postDate: "01-00-1900",
+    postDate: "03-22-2024",
     route: "Sand And Sequoias",
-    raceID: "",
+    raceID: "4299191",
   })
 ];
