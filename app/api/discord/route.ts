@@ -1,8 +1,7 @@
 import axios from 'axios';
 
 export async function POST(req: Request) {
-    const headers = req.headers;
-    const body = req.body;
+  const raceSeries = req.headers.get('raceseries');
     
   const webhookUrl = process.env.DISCORD_WEB_HOOK_DZR_AFTER_PARTY
   if (!webhookUrl) {
@@ -22,11 +21,11 @@ export async function POST(req: Request) {
               }
           ]
       });
-      const responseMessage = `Discord message sent. Headers: ${JSON.stringify(headers)}${JSON.stringify(body)}`;
+      const responseMessage = `Discord message sent to: ${raceSeries}`;
       return new Response(responseMessage);
       
   } catch (error) {
 
-    return new Response('Error sending Discord message');      
+    return new Response(`Error sending Discord message to: ${raceSeries}`);      
   }
 }
