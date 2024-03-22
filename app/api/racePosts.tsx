@@ -14,13 +14,17 @@ export function racePosts() {
         if (afterPartyRaceData) {
             return{
             ...race,
-            raceSeries: "DZR After Party Series",
+            raceSeries: "DZR After Party",
             world: afterPartyRaceData.world,
             laps: afterPartyRaceData.laps,
             distance: afterPartyRaceData.distance,
             elevation: afterPartyRaceData.elevation,
             finish: afterPartyRaceData.finish,
             linkRoute: afterPartyRaceData.linkRoute,
+            climbs: '',
+            sprints: '',
+            sprintLaps: '',
+            bonus: '',
             }
         } else {
             return race;
@@ -40,6 +44,10 @@ export function racePosts() {
             elevation: zwiftyFiftyRaceData.hm,
             finish: '',
             linkRoute: zwiftyFiftyRaceData.linkRoute,
+            climbs: zwiftyFiftyRaceData.climbs,
+            sprints: zwiftyFiftyRaceData.sprints,
+            sprintLaps: zwiftyFiftyRaceData.sprintLaps,
+            bonus: zwiftyFiftyRaceData.bonus,
             }
         } else {
             return race;
@@ -57,7 +65,7 @@ export function racePosts() {
         postDate: new Date(race.postDate).toUTCString() // Convert Date object to a string
     }));
 
-    const Races = formattedRaces as { postDate: string; raceSeries: string; world: string; laps: string; distance: string; elevation: string; finish: string; linkRoute: string; date: string; route: string; raceID: string; }[];
+    const Races = formattedRaces as { postDate: string; raceSeries: string; world: string; laps: string; distance: string; elevation: string; finish: string; linkRoute: string; date: string; route: string; raceID: string; climbs: string[]; sprints: string[]; sprintLaps: string[]; bonus: string[];}[];
 
     return Races;
 }

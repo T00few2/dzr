@@ -1,9 +1,7 @@
 import { racePosts } from "../racePosts";
 
-const Races = racePosts()
-
 export async function GET(request: Request) {
-
+      const Races = racePosts()
       const blogPosts = Races.map(race => ({
         title: race.raceSeries, // Use route as title
         description: `Date: ${race.date} <br/> World: ${race.world} <br/> Route: ${race.route} <br/> Laps: ${race.laps} <br/>`, // Use date as description
