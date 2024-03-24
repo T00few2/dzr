@@ -12,7 +12,7 @@ import {
 gsap.registerPlugin(TextPlugin);
 
 // Component
-const DZR_Header = () => {
+const DZR_slogan = () => {
     // Ref for the text element
     const textRef = useRef(null);
   
@@ -20,7 +20,7 @@ const DZR_Header = () => {
     const animateText = () => {
         gsap.to(textRef.current, {
             duration: 1,
-            delay: 0,
+            delay: 0.5,
             color: 'white',
             text: {
               value: "the pain in the peleton",
@@ -40,4 +40,4 @@ const DZR_Header = () => {
     );
 };
   
-export default DZR_Header;
+export default DZR_slogan;

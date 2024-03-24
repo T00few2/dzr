@@ -1,6 +1,6 @@
 'use client'
 
-import DZR_Header from '@/app/gasp'
+import DZR_slogan from '@/app/gasp'
 import { motion } from 'framer-motion';
 
 import {
@@ -58,18 +58,24 @@ const animationKeyframesRev = keyframes`
 
 const animationKeyframesMid = keyframes`
   0% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  40% { transform: scale(0.95) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  40% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  45% { transform: scale(0.95) rotate(0deg) translateY(-20px); border-radius: 100%; }
   50% { transform: scale(1.25) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  60% { transform: scale(0.85) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  70% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
-
+  55% { transform: scale(0.85) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  60% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
   100% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
+`;
+
+const animationKeyframesRot = keyframes`
+  0% { transform: scale(1) rotate(0deg); border-radius: 100%; }
+  100% { transform: scale(1) rotate(365deg); border-radius: 100%; }
 `;
 
 
 const animation = `${animationKeyframes} linear 1s infinite`;
 const animationRev = `${animationKeyframesRev} linear 1s infinite`;
-const animationMid = `${animationKeyframesMid} linear 0.8s infinite`;
+const animationMid = `${animationKeyframesMid} linear 2s infinite`;
+const animationRot = `${animationKeyframesRot} linear 2s infinite`;
 
 
 export default function HeroSection() {
@@ -83,25 +89,20 @@ export default function HeroSection() {
         py={{ base: 10, md: 10 }}
         >
         <Heading
-          fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
+          fontSize={{ base: '2xl', sm: '4xl', md: '6xl' }}
           lineHeight={'110%'}
           textColor='white'>
-          <Text as ={motion.div} style={{ display: 'inline-block' }} animation={animation} >DANISH </Text>
           
-          <motion.div style={{ width: '20px', display: 'inline-block' }}></motion.div>
-          <Text as ={motion.div} style={{ display: 'inline-block' }} animation={animationMid}> ZWIFT </Text>
-          <motion.div style={{ width: '20px', display: 'inline-block' }}></motion.div>
-          <Text as ={motion.div} style={{ display: 'inline-block' }} animation={animationRev} >RACERS</Text>
+          <Text as ={motion.div} style={{ display: 'inline-block' }} animation={animationMid}>DANISH ZWIFT RACERS</Text>
+          
         </Heading>
-
-        <DZR_Header />
-
+        <DZR_slogan />
         <Stack direction={'row'} spacing={6}>
         <Popover trigger='hover'>
           <PopoverTrigger>
             <Link href='https://www.facebook.com/groups/358114378652929' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
-            <Circle size='40px' bg='#4267B2' color='white'>
-            <FaFacebook />
+            <Circle as={motion.div} animation={animationRot} size='50px' bg='#4267B2' color='white'>
+            <FaFacebook fontSize = {25}/>
             </Circle>
             </Link>
           </PopoverTrigger>
@@ -113,9 +114,11 @@ export default function HeroSection() {
          
         <Popover trigger='hover'>
           <PopoverTrigger>
-            <Circle as='a' size='40px' bg='#5865F2' color='white'  href='https://discord.gg/FBtCsddbmU' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
-            <FaDiscord />
+            <Link href='https://discord.gg/FBtCsddbmU' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
+            <Circle as={motion.div} animation={animationRot} size='50px' bg='#5865F2' color='white'>
+            <FaDiscord fontSize = {25}/>
             </Circle>
+            </Link>
           </PopoverTrigger>
           <PopoverContent>
               <PopoverArrow />
