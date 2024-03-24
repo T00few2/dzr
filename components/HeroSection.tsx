@@ -1,6 +1,7 @@
 'use client'
 
 import DZR_Header from '@/app/gasp'
+import { motion } from 'framer-motion';
 
 import {
   Container,
@@ -15,42 +16,61 @@ import {
   PopoverContent,
   PopoverHeader,
   PopoverArrow,
+  keyframes,
+  Link,
 } from '@chakra-ui/react'
 
 import { FaFacebook, FaTwitter, FaYoutube, FaDiscord } from 'react-icons/fa'
 import { ReactNode } from 'react'
 
-const SocialButton = ({
-  children,
-  label,
-  href,
-}: {
-  children: ReactNode
-  label: string
-  href: string
-}) => {
-  return (
-    <chakra.button
-      bg={('#7289da')}
-      rounded={'full'}
-      w={10}
-      h={10}
-      cursor={'pointer'}
-      as={'a'}
-      href={href}
-      display={'inline-flex'}
-      alignItems={'center'}
-      justifyContent={'center'}
-      transition={'background 0.3s ease'}
-      _hover={{
-        bg: ('white'),
-        color: ('#4267B2')
-      }}>
-      <VisuallyHidden>{label}</VisuallyHidden>
-      {children}
-    </chakra.button>
-  )
-}
+
+const animationKeyframes = keyframes`
+  0% { transform: scale(1) rotate(0deg) translateY(0px); border-radius: 100%; }
+  10% { transform: scale(0.98) rotate(0deg) translateY(-8px); border-radius: 100%; }
+  20% { transform: scale(0.96) rotate(0deg) translateY(-16px); border-radius: 100%; }
+  25% { transform: scale(0.95) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  30% { transform: scale(0.96) rotate(0deg) translateY(-24px); border-radius: 100%; }
+  40% { transform: scale(0.98) rotate(0deg) translateY(-32px); border-radius: 100%; }
+  50% { transform: scale(1) rotate(0deg) translateY(-40px); border-radius: 100%; }
+  60% { transform: scale(1.02) rotate(0deg) translateY(-32px); border-radius: 100%; }
+  70% { transform: scale(1.04) rotate(0deg) translateY(-24px); border-radius: 100%; }
+  75% { transform: scale(1.05) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  80% { transform: scale(1.04) rotate(0deg) translateY(-16px); border-radius: 100%; }
+  90% { transform: scale(1.02) rotate(0deg) translateY(-8px); border-radius: 100%; }
+  100% { transform: scale(1) rotate(0deg) translateY(0px); border-radius: 100%; }
+`;
+
+const animationKeyframesRev = keyframes`
+  0% { transform: scale(1) rotate(0deg) translateY(-40px); border-radius: 100%; }
+  10% { transform: scale(1.02) rotate(0deg) translateY(-32px); border-radius: 100%; }
+  20% { transform: scale(1.04) rotate(0deg) translateY(-24px); border-radius: 100%; }
+  25% { transform: scale(1.05) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  30% { transform: scale(1.04) rotate(0deg) translateY(-16px); border-radius: 100%; }
+  40% { transform: scale(1.02) rotate(0deg) translateY(-8px); border-radius: 100%; }
+  50% { transform: scale(1) rotate(0deg) translateY(0px); border-radius: 100%; }
+  60% { transform: scale(.98) rotate(0deg) translateY(-8px); border-radius: 100%; }
+  70% { transform: scale(0.96) rotate(0deg) translateY(-16px); border-radius: 100%; }
+  75% { transform: scale(0.95) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  80% { transform: scale(0.96) rotate(0deg) translateY(-24px); border-radius: 100%; }
+  90% { transform: scale(0.98) rotate(0deg) translateY(-32px); border-radius: 100%; }
+  100% { transform: scale(1) rotate(0deg) translateY(-40px); border-radius: 100%; }
+`;
+
+const animationKeyframesMid = keyframes`
+  0% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  40% { transform: scale(0.95) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  50% { transform: scale(1.25) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  60% { transform: scale(0.85) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  70% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
+
+  100% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
+`;
+
+
+const animation = `${animationKeyframes} linear 1s infinite`;
+const animationRev = `${animationKeyframesRev} linear 1s infinite`;
+const animationMid = `${animationKeyframesMid} linear 0.8s infinite`;
+
 
 export default function HeroSection() {
   return (
@@ -66,7 +86,12 @@ export default function HeroSection() {
           fontSize={{ base: '3xl', sm: '4xl', md: '6xl' }}
           lineHeight={'110%'}
           textColor='white'>
-          <Text>Danish Zwift Racers</Text>
+          <Text as ={motion.div} style={{ display: 'inline-block' }} animation={animation} >DANISH </Text>
+          
+          <motion.div style={{ width: '20px', display: 'inline-block' }}></motion.div>
+          <Text as ={motion.div} style={{ display: 'inline-block' }} animation={animationMid}> ZWIFT </Text>
+          <motion.div style={{ width: '20px', display: 'inline-block' }}></motion.div>
+          <Text as ={motion.div} style={{ display: 'inline-block' }} animation={animationRev} >RACERS</Text>
         </Heading>
 
         <DZR_Header />
@@ -74,9 +99,11 @@ export default function HeroSection() {
         <Stack direction={'row'} spacing={6}>
         <Popover trigger='hover'>
           <PopoverTrigger>
-            <Circle as='a' size='40px' bg='#4267B2' color='white'  href='https://www.facebook.com/groups/358114378652929' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
+            <Link href='https://www.facebook.com/groups/358114378652929' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
+            <Circle size='40px' bg='#4267B2' color='white'>
             <FaFacebook />
             </Circle>
+            </Link>
           </PopoverTrigger>
           <PopoverContent>
               <PopoverArrow />
