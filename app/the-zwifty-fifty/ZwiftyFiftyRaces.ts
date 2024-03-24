@@ -74,4 +74,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1,2','1,2'],
     bonus: ['3.0','2.0','1.0'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Turf N Surf',
+    world: 'Makuri Islands',
+    linkRoute: 'https://zwiftinsider.com/route/turf-n-surf/',
+    laps: '2',
+    length: '49.3',
+    hm: '391.6',  
+    climbs: [],
+    sprints: ['Shisha Sprint'],
+    sprintLaps: ['1,2'],
+    bonus: ['3.0','2.0','1.0'],
+  }),
 ];
