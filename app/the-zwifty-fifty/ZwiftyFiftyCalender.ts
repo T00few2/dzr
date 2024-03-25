@@ -220,9 +220,9 @@ export const ZwiftyFiftyCalender = [
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday March 31",
-    postDate: "01-00-1900",
+    postDate: "03-25-2024",
     route: "Turf N Surf",
-    raceID: "",
+    raceID: "4305091",
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday April 7",
