@@ -19,7 +19,7 @@ const DZR_slogan = () => {
     // Animation function
     const animateText = () => {
         gsap.to(textRef.current, {
-            duration: 1,
+            duration: 4,
             delay: 0.5,
             color: 'white',
             text: {

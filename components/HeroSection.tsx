@@ -23,59 +23,24 @@ import {
 import { FaFacebook, FaTwitter, FaYoutube, FaDiscord } from 'react-icons/fa'
 import { ReactNode } from 'react'
 
-
-const animationKeyframes = keyframes`
-  0% { transform: scale(1) rotate(0deg) translateY(0px); border-radius: 100%; }
-  10% { transform: scale(0.98) rotate(0deg) translateY(-8px); border-radius: 100%; }
-  20% { transform: scale(0.96) rotate(0deg) translateY(-16px); border-radius: 100%; }
-  25% { transform: scale(0.95) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  30% { transform: scale(0.96) rotate(0deg) translateY(-24px); border-radius: 100%; }
-  40% { transform: scale(0.98) rotate(0deg) translateY(-32px); border-radius: 100%; }
-  50% { transform: scale(1) rotate(0deg) translateY(-40px); border-radius: 100%; }
-  60% { transform: scale(1.02) rotate(0deg) translateY(-32px); border-radius: 100%; }
-  70% { transform: scale(1.04) rotate(0deg) translateY(-24px); border-radius: 100%; }
-  75% { transform: scale(1.05) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  80% { transform: scale(1.04) rotate(0deg) translateY(-16px); border-radius: 100%; }
-  90% { transform: scale(1.02) rotate(0deg) translateY(-8px); border-radius: 100%; }
-  100% { transform: scale(1) rotate(0deg) translateY(0px); border-radius: 100%; }
-`;
-
-const animationKeyframesRev = keyframes`
-  0% { transform: scale(1) rotate(0deg) translateY(-40px); border-radius: 100%; }
-  10% { transform: scale(1.02) rotate(0deg) translateY(-32px); border-radius: 100%; }
-  20% { transform: scale(1.04) rotate(0deg) translateY(-24px); border-radius: 100%; }
-  25% { transform: scale(1.05) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  30% { transform: scale(1.04) rotate(0deg) translateY(-16px); border-radius: 100%; }
-  40% { transform: scale(1.02) rotate(0deg) translateY(-8px); border-radius: 100%; }
-  50% { transform: scale(1) rotate(0deg) translateY(0px); border-radius: 100%; }
-  60% { transform: scale(.98) rotate(0deg) translateY(-8px); border-radius: 100%; }
-  70% { transform: scale(0.96) rotate(0deg) translateY(-16px); border-radius: 100%; }
-  75% { transform: scale(0.95) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  80% { transform: scale(0.96) rotate(0deg) translateY(-24px); border-radius: 100%; }
-  90% { transform: scale(0.98) rotate(0deg) translateY(-32px); border-radius: 100%; }
-  100% { transform: scale(1) rotate(0deg) translateY(-40px); border-radius: 100%; }
-`;
-
-const animationKeyframesMid = keyframes`
+const animationKeyframesPulse = keyframes`
   0% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  40% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  45% { transform: scale(0.95) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  45% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  47% { transform: scale(0.95) rotate(0deg) translateY(-20px); border-radius: 100%; }
   50% { transform: scale(1.25) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  55% { transform: scale(0.85) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  60% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  53% { transform: scale(0.85) rotate(0deg) translateY(-20px); border-radius: 100%; }
+  55% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
   100% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
 `;
 
 const animationKeyframesRot = keyframes`
   0% { transform: scale(1) rotate(0deg); border-radius: 100%; }
-  100% { transform: scale(1) rotate(365deg); border-radius: 100%; }
+  70% { transform: scale(1) rotate(0deg); border-radius: 100%; }
+  100% { transform: scale(1) rotate(7200deg); border-radius: 100%; }
 `;
 
-
-const animation = `${animationKeyframes} linear 1s infinite`;
-const animationRev = `${animationKeyframesRev} linear 1s infinite`;
-const animationMid = `${animationKeyframesMid} linear 2s infinite`;
-const animationRot = `${animationKeyframesRot} linear 2s infinite`;
+const animationPulse = `${animationKeyframesPulse} linear 4s infinite`;
+const animationRot = `${animationKeyframesRot} ease-in-out 15s infinite`;
 
 
 export default function HeroSection() {
@@ -85,7 +50,7 @@ export default function HeroSection() {
       <Stack
         textAlign={'center'}
         align={'center'}
-        spacing={{ base: 8, md: 10 }}
+        spacing={{ base: 6, sm: 7, md: 8 }}
         py={{ base: 10, md: 10 }}
         >
         <Heading
@@ -93,7 +58,7 @@ export default function HeroSection() {
           lineHeight={'110%'}
           textColor='white'>
           
-          <Text as ={motion.div} style={{ display: 'inline-block' }} animation={animationMid}>DANISH ZWIFT RACERS</Text>
+          <Text as ={motion.div} style={{ display: 'inline-block' }} animation={animationPulse}>DANISH ZWIFT RACERS</Text>
           
         </Heading>
         <DZR_slogan />
