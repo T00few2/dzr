@@ -82,7 +82,7 @@ export const ZwiftyFiftyRacesData = [
     length: '49.3',
     hm: '394',  
     climbs: ['Turf N Surf'],
-    sprints: ['Shisha Sprint'],
+    sprints: ['Shisa Sprint'],
     sprintLaps: ['1,2'],
     bonus: ['3.0','2.0','1.0'],
   }),
