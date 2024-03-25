@@ -36,6 +36,7 @@ const animationKeyframesPulse = keyframes`
 const animationKeyframesRot = keyframes`
   0% { transform: scale(1) rotate(0deg); border-radius: 100%; }
   70% { transform: scale(1) rotate(0deg); border-radius: 100%; }
+  98% { transform: scale(1) rotate(7215deg); border-radius: 100%; }
   100% { transform: scale(1) rotate(7200deg); border-radius: 100%; }
 `;
 
