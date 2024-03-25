@@ -2,6 +2,7 @@
 
 import DZR_slogan from '@/app/gasp'
 import { motion } from 'framer-motion';
+import './css/Hero.css'
 
 import {
   Container,
@@ -23,27 +24,6 @@ import {
 import { FaFacebook, FaTwitter, FaYoutube, FaDiscord } from 'react-icons/fa'
 import { ReactNode } from 'react'
 
-const animationKeyframesPulse = keyframes`
-  0% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  45% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  47% { transform: scale(0.95) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  50% { transform: scale(1.25) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  53% { transform: scale(0.85) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  55% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
-  100% { transform: scale(1) rotate(0deg) translateY(-20px); border-radius: 100%; }
-`;
-
-const animationKeyframesRot = keyframes`
-  0% { transform: scale(1) rotate(0deg); border-radius: 100%; }
-  70% { transform: scale(1) rotate(0deg); border-radius: 100%; }
-  98% { transform: scale(1) rotate(7215deg); border-radius: 100%; }
-  100% { transform: scale(1) rotate(7200deg); border-radius: 100%; }
-`;
-
-const animationPulse = `${animationKeyframesPulse} linear 4s infinite`;
-const animationRot = `${animationKeyframesRot} ease-in-out 15s infinite`;
-
-
 export default function HeroSection() {
   return (
     <Container maxW={'5xl'}
@@ -59,15 +39,15 @@ export default function HeroSection() {
           lineHeight={'110%'}
           textColor='white'>
           
-          <Text as ={motion.div} style={{ display: 'inline-block' }} animation={animationPulse}>DANISH ZWIFT RACERS</Text>
+          <Text>DANISH ZWIFT RACERS</Text>
           
         </Heading>
         <DZR_slogan />
         <Stack direction={'row'} spacing={6}>
         <Popover trigger='hover'>
           <PopoverTrigger>
-            <Link href='https://www.facebook.com/groups/358114378652929' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
-            <Circle as={motion.div} animation={animationRot} size='50px' bg='#4267B2' color='white'>
+            <Link href='https://www.facebook.com/groups/358114378652929' target="_blank" _hover={{ animation: 'pulseIcon ease-in-out 0.2s forwards'}}>
+            <Circle className='rotate-animation' as={motion.div} size='50px' bg='#4267B2' color='white'>
             <FaFacebook fontSize = {25}/>
             </Circle>
             </Link>
@@ -80,8 +60,8 @@ export default function HeroSection() {
          
         <Popover trigger='hover'>
           <PopoverTrigger>
-            <Link href='https://discord.gg/FBtCsddbmU' target="_blank" _hover={{ transform: 'scale(1.25)'}}>
-            <Circle as={motion.div} animation={animationRot} size='50px' bg='#5865F2' color='white'>
+            <Link href='https://discord.gg/FBtCsddbmU' target="_blank" _hover={{ animation: 'pulseIcon ease-in-out 0.2s forwards'}}>
+            <Circle className='rotate-animation' as={motion.div} size='50px' bg='#5865F2' color='white'>
             <FaDiscord fontSize = {25}/>
             </Circle>
             </Link>

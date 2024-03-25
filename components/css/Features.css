@@ -1,0 +1,25 @@
+  .hover-animation:hover {
+    animation: pulse ease-in-out 0.2s forwards, changeBackgroundColor ease-in-out 0.2s forwards; /* Apply animation and color change on hover */
+  }
+  
+  @keyframes pulse {
+    0% {
+      transform: scale(1) rotate(0deg);
+    }
+    50% {
+      transform: scale(1.15) rotate(0deg);
+    }
+    100% {
+      transform: scale(1.05) rotate(0deg);      
+    }
+  }
+  
+  @keyframes changeBackgroundColor {
+    0% {
+      background-color: rgba(0, 0, 0, 1); /* Initial background color */
+    }
+    100% {
+      background-color: rgba(173, 26, 45, 0.95); /* Color to change to on hover */
+    }
+  }
+  

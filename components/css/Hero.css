@@ -1,0 +1,43 @@
+.rotate-animation {
+    animation: rotate ease-in-out 15s forwards; /* Apply rotation animation */
+  }
+  
+  .pulse-animation {
+    animation: pulse ease-in-out 0.2s forwards; /* Apply pulse animation */
+  }
+  
+  @keyframes rotate {
+    0% {
+      transform: scale(1) rotate(0deg);
+      border-radius: 100%;
+    }
+    35% {
+      transform: scale(1) rotate(0deg);
+      border-radius: 100%;
+    }
+    63% {
+      transform: scale(1) rotate(7215deg);
+      border-radius: 100%;
+    }
+    65% {
+      transform: scale(1) rotate(7200deg);
+      border-radius: 100%;
+    }
+    100% {
+      transform: scale(1) rotate(7200deg);
+      border-radius: 100%;
+    }
+  }
+  
+  @keyframes pulseIcon {
+    0% {
+      transform: scale(1) rotate(0deg);
+    }
+    50% {
+      transform: scale(1.65) rotate(0deg);
+    }
+    100% {
+      transform: scale(1.35) rotate(0deg);      
+    }
+  }
+  
