@@ -83,7 +83,7 @@ import {
         </List>
     </List>
     <Text color='white'>Find all you need to know (probably a bit more than that actually) about zone 2 training in the excellent video below from
-     <Link color={'orange'} href={'https://www.youtube.com/@PeterAttiaMD/videos'} target='_Blank' isExternal> Peter Attia's</Link> podcast, <Link color={'orange'} href={'https://peterattiamd.com/podcast/'} target='_Blank' isExternal>The Drive</Link>, featuring Pogačar's coach and internationally
+     <Link color={'orange'} href={'https://www.youtube.com/@PeterAttiaMD/videos'} target='_Blank' isExternal> Peter Attia&apos;s</Link> podcast, <Link color={'orange'} href={'https://peterattiamd.com/podcast/'} target='_Blank' isExternal>The Drive</Link>, featuring Pogačar&apos;s coach and internationally
       renowned <Link color={'orange'} href={'https://twitter.com/doctorinigo'} target='_Blank' isExternal>Iñigo San Millán</Link></Text>
     <Divider/>
     </Stack>

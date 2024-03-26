@@ -87,7 +87,7 @@ export default function Carousel({cards}: ImagesProps) {
       {/* Slider */}
       <Slider {...settings} ref={(slider) => setSlider(slider)}>
         {cards.map((url, index) => (
-          <Image src={url} key = {index}></Image>
+          <Image src={url} alt={`Image ${index + 1}`} key = {index}></Image>
 
         ))}
       </Slider>
