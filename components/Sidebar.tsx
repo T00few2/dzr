@@ -42,6 +42,7 @@ import { Im500Px } from "react-icons/im";
 import { MdDirectionsBike } from "react-icons/md";
 import { IconType } from 'react-icons'
 import { FaPeopleGroup } from "react-icons/fa6";
+import { AiOutlineAim } from "react-icons/ai";
 
 interface LinkItemProps {
   name: string
@@ -66,6 +67,7 @@ interface SidebarProps extends BoxProps {
 const LinkItems: Array<LinkItemProps> = [
   { name: 'Home', href: '/', icon: MdDirectionsBike },
   { name: 'DZR After Party Series', href: 'dzr-after-party', icon: LiaMountainSolid },
+  { name: 'In The Zone 2', href: 'in-the-zone-2', icon: AiOutlineAim },
   { name: 'The Zwifty Fifty', href: 'the-zwifty-fifty', icon: Im500Px },
   { name: 'Members Zone', href: 'members', icon: FaPeopleGroup },
 ]
