@@ -62,7 +62,7 @@ export default function dzrafterpartypage() {
           </Stack>
           
           <Flex py={5} justifyContent="center" alignItems="center" height="auto" borderWidth={1}>
-          <YouTubeEmbed videoId="-6PDBVRkCKc?si=x-VHEK30F8SKWHxT" />
+          <YouTubeEmbed videoId='-6PDBVRkCKc'/>
           </Flex>
       </Container>
   )

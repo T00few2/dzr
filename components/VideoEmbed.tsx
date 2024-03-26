@@ -6,9 +6,11 @@ interface YouTubeEmbedProps {
 }
 
 const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({ videoId }) => {
+  
   return (
     <Box
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      referrerPolicy="strict-origin-when-cross-origin"
       as="iframe"
       title="YouTube video player"
       width="95%"
