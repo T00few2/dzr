@@ -35,7 +35,7 @@ import {
     return (
     <Stack spacing={6}>
         {nextEvent.map((event)=>(
-                    <TableContainer  textAlign="center">
+                    <TableContainer key={event.eventID1} textAlign="center">
                 <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
                 <Thead >
                     <Tr>
