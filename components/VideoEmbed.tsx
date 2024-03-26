@@ -16,6 +16,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({ videoId }) => {
       style={{ aspectRatio: '560 / 315' }}
       src={`https://www.youtube.com/embed/${videoId}`}
       allowFullScreen
+      key={videoId}
     />
   );
 };

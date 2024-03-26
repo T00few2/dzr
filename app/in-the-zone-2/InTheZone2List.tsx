@@ -32,7 +32,6 @@ import {
 
   export default function InTheZoneList({ nextDate }: eventProps) {
     const nextEvent = InTheZone2Calender.filter(date => date.date === nextDate);
-    console.log(nextEvent)
     return (
     <Stack spacing={6}>
         {nextEvent.map((event)=>(
