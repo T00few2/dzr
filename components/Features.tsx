@@ -23,6 +23,7 @@ import {
   SimpleGridProps,
   keyframes,
 } from '@chakra-ui/react'
+import { IconType } from 'react-icons';
 
 import { motion } from 'framer-motion';
 
@@ -30,75 +31,53 @@ import { LiaMountainSolid } from "react-icons/lia";
 import { Im500Px } from "react-icons/im";
 import { AiOutlineAim } from "react-icons/ai";
 
+
+interface Props {
+  href: string;
+  icon: IconType;
+  heading: string;
+  text1: string;
+  text2: string;
+}
+
+const CustomCard: React.FC<Props> = ({ href, icon, heading, text1, text2 }) => {
+  return (
+    <Link href={href} style={{ textDecoration: 'none' }}>
+      <Card className='hover-animation' as={motion.div} height='100%' bg={'black'} borderWidth={{ base:'1px', sm: '3px', md:'4px'}} borderRadius="lg" borderColor={'white'}> 
+        <CardHeader>
+          <Flex justify="center" align="center" bg="white" borderRadius="full" p={2} width={{ base:'10', sm: '14', md:'16'}} height={{ base:'10', sm: '14', md:'16'}}>
+            <Icon as={icon} boxSize={'90%'} color='black'/>
+          </Flex>
+        </CardHeader>
+        <CardBody>
+          <Stack align={'start'} spacing={5}>
+            <Box mt={2}>
+              <Heading size={['sm','sm','md']} color={'white'}>{heading}</Heading>
+              <Text mt={1} fontSize={['small','medium','medium']} color={'white'} whiteSpace="pre-line" >
+                {text1} <br/> {text2}
+              </Text>
+            </Box>
+          </Stack>
+        </CardBody>
+      </Card>
+    </Link>
+  );
+};
+
 export default function Features() {
   return (
     <Box p={0}>
       <Stack spacing={4} as={Container} maxW={'3xl'} textAlign={'center'}>
-      <Box position='relative' padding='10'>
-        <Divider />
-
-      </Box>
+        <Box position='relative' padding='10'>
+          <Divider />
+        </Box>
       </Stack>
       <Stack  spacing={4} as={Container} maxW={'3xl'} mt={12} mb={20}>
-      <SimpleGrid spacing={8}  minChildWidth='250px' alignContent={'center'}>
-      <Link href={'dzr-after-party'} style={{ textDecoration: 'none' }}>
-          <Card className='hover-animation' as={motion.div} height='100%' bg={'black'} borderWidth="5px" borderRadius="lg" borderColor={'white'}> 
-            <CardHeader>
-              <Flex justify="center" align="center" bg="white" borderRadius="full" p={2} width={16} height={16}>
-                <Icon as={LiaMountainSolid} w={10} h={10} color='black'/>
-              </Flex>
-            </ CardHeader>
-            <CardBody>
-                <Stack align={'start'} spacing={5}>
-                    <Box mt={2}>
-                    <Heading size="md" color={'white'}>DZR After Party Series</Heading>
-                    <Text mt={1} fontSize={'sm'} color={'white'} whiteSpace="pre-line">
-                    Uphill finishes <br/> Thursdays 17:15 CET | 11:15 AM EST
-                    </Text>
-                    </Box>
-                </Stack>
-            </CardBody>
-          </Card>
-          </Link>
-          <Link href={'in-the-zone-2'} style={{ textDecoration: 'none' }}>
-          <Card className='hover-animation' as={motion.div} height='100%' bg={'black'} borderWidth="5px" borderRadius="lg" borderColor={'white'}> 
-          <CardHeader>
-            <Flex justify="center" align="center" bg="white" borderRadius="full" p={2} width={16} height={16}>
-              <Icon as={AiOutlineAim} w={10} h={10} color='black' />
-            </Flex>
-            </ CardHeader>
-            <CardBody>
-                <Stack align={'start'} spacing={5}>
-                    <Box mt={2}>
-                    <Heading size="md" color={'white'}>In The Zone 2</Heading>
-                    <Text mt={1} fontSize={'sm'} color={'white'} whiteSpace="pre-line">
-                    Structured zone 2 group workouts <br/> Saturdays 9:30 CET & 14:30 CET
-                    </Text>
-                    </Box>
-                </Stack>
-            </CardBody>
-          </Card>
-          </Link>
-          <Link href={'the-zwifty-fifty'} style={{ textDecoration: 'none' }}>
-          <Card className='hover-animation' as={motion.div} height='100%' bg={'black'} borderWidth="5px" borderRadius="lg" borderColor={'white'}> 
-          <CardHeader>
-            <Flex justify="center" align="center" bg="white" borderRadius="full" p={2} width={16} height={16}>
-              <Icon as={Im500Px} w={10} h={10} color='black' />
-            </Flex>
-            </ CardHeader>
-            <CardBody>
-                <Stack align={'start'} spacing={5}>
-                    <Box mt={2}>
-                    <Heading size="md" color={'white'}>The Zwifty Fifty</Heading>
-                    <Text mt={1} fontSize={'sm'} color={'white'} whiteSpace="pre-line">
-                    50km (ish) races with bonus seconds sprints<br/> Sundays 14:14 CET | 8:45 AM EST
-                    </Text>
-                    </Box>
-                </Stack>
-            </CardBody>
-          </Card>
-          </Link>
-      </SimpleGrid>
+        <SimpleGrid spacing={8}  minChildWidth='250px' alignContent={'center'}>
+          <CustomCard href='dzr-after-party' icon = {LiaMountainSolid} heading = 'DZR After Party Series' text1 = 'Uphill finishes' text2= 'Thursdays 17:15 CET | 11:15 AM EST' />
+          <CustomCard href='in-the-zone-2' icon = {AiOutlineAim} heading = 'In The Zone 2' text1 = 'Structured zone 2 group workouts' text2= 'Saturdays 9:30 CET & 14:30 CET' />
+          <CustomCard href='the-zwifty-fifty' icon = {Im500Px} heading = 'The Zwifty Fifty' text1 = '50km (ish) races with bonus seconds sprints' text2= 'Sundays 14:14 CET | 8:45 AM EST' />
+        </SimpleGrid>
       </Stack>
     </Box>
   )
