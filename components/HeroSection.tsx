@@ -37,7 +37,7 @@ export default function HeroSection() {
         py={{ base: 10, md: 10 }}
         >
         <div className="image-container">
-  <Image width='75vw' src="/general/FRONT_logo.png" />
+  <Image src="/general/FRONT_logo.png" />
 </div>
 
         <Heading
@@ -53,8 +53,8 @@ export default function HeroSection() {
         <Popover trigger='hover'>
           <PopoverTrigger>
             <Link href='https://www.facebook.com/groups/358114378652929' target="_blank" _hover={{ animation: 'pulseIcon ease-in-out 0.2s forwards'}}>
-            <Circle className='rotate-animation' as={motion.div} size='50px' bg='#4267B2' color='white'>
-            <FaFacebook fontSize = {25}/>
+            <Circle className='rotate-animation' as={motion.div} size={{ base:'30px', sm: '40px', md:'50px'}} bg='#4267B2' color='white'>
+            <FaFacebook size = '50%'/>
             </Circle>
             </Link>
           </PopoverTrigger>
@@ -67,8 +67,8 @@ export default function HeroSection() {
         <Popover trigger='hover'>
           <PopoverTrigger>
             <Link href='https://discord.gg/FBtCsddbmU' target="_blank" _hover={{ animation: 'pulseIcon ease-in-out 0.2s forwards'}}>
-            <Circle className='rotate-animation' as={motion.div} size='50px' bg='#5865F2' color='white'>
-            <FaDiscord fontSize = {25}/>
+            <Circle className='rotate-animation' as={motion.div} size ={{ base:'30px', sm: '40px', md:'50px'}} bg='#5865F2' color='white'>
+            <FaDiscord size = '60%'/>
             </Circle>
             </Link>
           </PopoverTrigger>
