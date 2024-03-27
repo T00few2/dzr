@@ -57,7 +57,8 @@ export default function dzrafterpartypage() {
           </Flex>
           <Stack spacing={4}>
             <Heading size={{ base: 'lg', sm: 'xl', md: '2xl' }} color='white'>In The Zone 2 with DZR</Heading>
-            <Text color={'white'} fontSize={'md'}>Work smarter to build your endurance, preserve peak power and recover faster with Zone 2 focused training. We have a European morning and afternoon session taking place every Saturday starting April 6th. Stay tuned!</Text>
+            <Text color={'white'} fontSize={'md'}>Work smarter to build your endurance, preserve peak power and recover faster with Zone 2 focused training. 
+            Join the European morning or afternoon session taking place every Saturday starting April 6th. Stay tuned!</Text>
             <InTheZoneList nextDate={formattedDate}/>
           </Stack>
           
