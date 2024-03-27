@@ -91,7 +91,7 @@ export default function Features() {
                     <Box mt={2}>
                     <Heading size="md" color={'white'}>The Zwifty Fifty</Heading>
                     <Text mt={1} fontSize={'sm'} color={'white'} whiteSpace="pre-line">
-                    50km (ish) races <br/> Sundays 14:14 CET | 8:45 AM EST
+                    50km (ish) races with bonus seconds sprints<br/> Sundays 14:14 CET | 8:45 AM EST
                     </Text>
                     </Box>
                 </Stack>

@@ -162,6 +162,7 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
         borderColor={'black'}
         color={'white'}
         icon={<HamburgerIcon />}
+        zIndex={20}
         position={'fixed'}
         _hover={{ bg: 'gray.700', borderColor: 'gray.700' }}
         fontSize={{base:"34px", md:"44px"}}
