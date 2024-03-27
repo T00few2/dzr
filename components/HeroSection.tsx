@@ -19,6 +19,7 @@ import {
   PopoverArrow,
   keyframes,
   Link,
+  Image,
 } from '@chakra-ui/react'
 
 import { FaFacebook, FaTwitter, FaYoutube, FaDiscord } from 'react-icons/fa'
@@ -27,19 +28,24 @@ import { ReactNode } from 'react'
 export default function HeroSection() {
   return (
     <Container maxW={'5xl'}
-    bg={('black')}>
+    bg={('black')}
+    >
       <Stack
         textAlign={'center'}
         align={'center'}
         spacing={{ base: 6, sm: 7, md: 8 }}
         py={{ base: 10, md: 10 }}
         >
+        <div className="image-container">
+  <Image width='75vw' src="/general/FRONT_logo.png" />
+</div>
+
         <Heading
           fontSize={{ base: '2xl', sm: '4xl', md: '6xl' }}
           lineHeight={'110%'}
           textColor='white'>
           
-          <Text>DANISH ZWIFT RACERS</Text>
+          
           
         </Heading>
         <DZR_slogan />

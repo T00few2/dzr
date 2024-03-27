@@ -21,7 +21,7 @@ const DZR_slogan = () => {
         gsap.to(textRef.current, {
             duration: 4,
             delay: 0.5,
-            color: 'white',
+            color: 'grey',
             text: {
               value: "the pain in the peleton",
               rtl: false,
