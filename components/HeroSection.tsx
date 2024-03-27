@@ -34,7 +34,7 @@ export default function HeroSection() {
         textAlign={'center'}
         align={'center'}
         spacing={{ base: 6, sm: 7, md: 8 }}
-        py={{ base: 10, md: 10 }}
+        py={{ base: 0, sm: 0, md: 0 }}
         >
         <div className="image-container">
   <Image src="/general/FRONT_logo.png" />
