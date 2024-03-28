@@ -43,7 +43,7 @@ interface Props {
 const CustomCard: React.FC<Props> = ({ href, icon, heading, text1, text2 }) => {
   return (
     <Link href={href} style={{ textDecoration: 'none' }}>
-      <Card className='hover-animation' as={motion.div} height='100%' bg={'black'} borderWidth={{ base:'1px', sm: '3px', md:'4px'}} borderRadius="lg" borderColor={'white'}> 
+      <Card className='hover-animation' as={motion.div} height='100%' bg={'black'} borderWidth={{ base:'2px', sm: '3px', md:'4px'}} borderRadius="lg" borderColor={'white'}> 
         <CardHeader>
           <Flex justify="center" align="center" bg="white" borderRadius="full" p={2} width={{ base:'10', sm: '14', md:'16'}} height={{ base:'10', sm: '14', md:'16'}}>
             <Icon as={icon} boxSize={'90%'} color='black'/>
@@ -72,8 +72,8 @@ export default function Features() {
           <Divider />
         </Box>
       </Stack>
-      <Stack  spacing={4} as={Container} maxW={'3xl'} mt={12} mb={20}>
-        <SimpleGrid spacing={8}  minChildWidth='250px' alignContent={'center'}>
+      <Stack  spacing={4} as={Container} maxW={'3xl'} mt={12} mb={20} align={'center'}>
+        <SimpleGrid spacing={8} minChildWidth='250px' maxWidth='90%'>
           <CustomCard href='dzr-after-party' icon = {LiaMountainSolid} heading = 'DZR After Party Series' text1 = 'Uphill finishes' text2= 'Thursdays 17:15 CET | 11:15 AM EST' />
           <CustomCard href='in-the-zone-2' icon = {AiOutlineAim} heading = 'In The Zone 2' text1 = 'Structured zone 2 group workouts' text2= 'Saturdays 9:30 CET & 14:30 CET' />
           <CustomCard href='the-zwifty-fifty' icon = {Im500Px} heading = 'The Zwifty Fifty' text1 = '50km (ish) races with sprints for bonus seconds' text2= 'Sundays 14:14 CET | 8:45 AM EST' />
