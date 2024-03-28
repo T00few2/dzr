@@ -1,6 +1,6 @@
 'use client'
 
-import DZR_slogan from '@/app/gasp'
+import {DZR_slogan, DZR_logo} from '@/app/gasp'
 import { motion } from 'framer-motion';
 import './css/Hero.css'
 
@@ -36,18 +36,11 @@ export default function HeroSection() {
         spacing={{ base: 6, sm: 7, md: 8 }}
         py={{ base: 0, sm: 0, md: 0 }}
         >
-        <div className="image-container">
-  <Image 
-  src="/general/FRONT_logo.png"
-  display={{ base: 'none', sm: 'block', md: 'block' }}/>
-</div>
+
 
         <Heading
-          fontSize={'3xl'}
-          lineHeight={'110%'}
-          textColor='white'
-          fontWeight={900}
-          display={{ base: 'block', sm: 'none', md: 'none' }}>DANISH ZWIFT RACERS</Heading>
+          lineHeight={'150%'}
+          display={{ base: 'block', sm: 'block', md: 'block' }}><DZR_logo/></Heading>
         <DZR_slogan />
         <Stack direction={'row'} spacing={6}>
         <Popover trigger='hover'>
