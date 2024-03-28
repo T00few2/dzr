@@ -37,17 +37,17 @@ export default function HeroSection() {
         py={{ base: 0, sm: 0, md: 0 }}
         >
         <div className="image-container">
-  <Image src="/general/FRONT_logo.png" />
+  <Image 
+  src="/general/FRONT_logo.png"
+  display={{ base: 'none', sm: 'block', md: 'block' }}/>
 </div>
 
         <Heading
-          fontSize={{ base: '2xl', sm: '4xl', md: '6xl' }}
+          fontSize={'3xl'}
           lineHeight={'110%'}
-          textColor='white'>
-          
-          
-          
-        </Heading>
+          textColor='white'
+          fontWeight={900}
+          display={{ base: 'block', sm: 'none', md: 'none' }}>DANISH ZWIFT RACERS</Heading>
         <DZR_slogan />
         <Stack direction={'row'} spacing={6}>
         <Popover trigger='hover'>
