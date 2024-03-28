@@ -43,7 +43,7 @@ export const metadata: Metadata = {
 export default function dzrafterpartypage() {
   const formattedDate = formatNextSaturday();
   return (
-      <Container maxW={'5xl'} py={0} mb={20}>
+      <Container maxW={{base: '90%', md: '5xl'}} py={0} mb={20}>
         
         <Flex mb={5}>
             <Image

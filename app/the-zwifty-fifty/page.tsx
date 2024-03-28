@@ -39,7 +39,7 @@ export default function thezwiftyfiftypage() {
   const formattedDate = formatNextSunday();
   return (
     <div style={{backgroundColor:'black'}}>
-      <Container maxW={'5xl'} py={0} mb={20}>
+      <Container maxW={{base: '90%', md: '5xl'}} py={0} mb={20}>
         <SimpleGrid columns={{ base: 1, md: 1 }} spacing={10}>
         <Flex>
             <Image
