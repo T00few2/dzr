@@ -56,7 +56,7 @@ const Feature = ({ text, icon, iconBg }: FeatureProps) => {
 export default function dzrafterpartypage() {
     const formattedDate = formatNextThursday();
   return (
-      <Container maxW={{base: '90%', ld: '5xl'}} py={0} mb={20}>
+      <Container maxW={{base: '90%', md: '5xl'}} py={0} mb={20}>
         <SimpleGrid columns={{ base: 1, md: 1 }} spacing={10}>
         <Flex>
             <Image
@@ -68,7 +68,7 @@ export default function dzrafterpartypage() {
               objectFit={'contain'}
             />
           </Flex>
-          <Stack spacing={4} align={'center'}>
+          <Stack spacing={4}>
             <Text color={'white'} fontSize={'md'} align={'center'}>A weekly race series with carefully selected routes all finishing uphill (aka after parties).
              Check out the coming race below and study the profile to know when to start the sprint. Use Zwift link to join race. Race calendar in menu. <br /><br />
              Ride on!</Text>
