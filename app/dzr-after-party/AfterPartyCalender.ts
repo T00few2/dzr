@@ -35,7 +35,7 @@ export const AfterPartyCalender = [
   new AfterPartyCalenderTemplate({
     date: "Thursday April 4",
     postDate: "03-29-2024",
-    route: "Country to Coastal",
+    route: "Country To Coastal",
     raceID: "4315021",
   })
 ];
