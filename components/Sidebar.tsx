@@ -7,6 +7,7 @@ import {
   CloseButton,
   Flex,
   HStack,
+  Link,
   VStack,
   Icon,
   useColorModeValue,
@@ -84,13 +85,14 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
       h="full"
       {...rest}>
       <Flex h="20" alignItems="center" mx="8" justifyContent="space-between">
-      <Image 
+      <Link href= '/'><Image 
           display={'flex'}
           boxSize='50px' 
           src='/general/DZR_logo.svg' 
           alt='DZR logo' 
           rounded={'md'}
           />
+        </Link>
         <CloseButton display={'flex'} onClick={onClose} color = 'white' size={'s'}/>
       </Flex>
       {LinkItems.map((link) => (
