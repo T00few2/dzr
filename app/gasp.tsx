@@ -50,8 +50,8 @@ export const DZR_logo = () => {
           duration: 5,
           delay: 0,
           
-          textShadow: '0 0 10px  rgba(173, 26, 45, 1),0 0 20px  rgba(173, 26, 45, 1),0 0 30px  rgba(173, 26, 45, 1),0 0 40px  rgba(173, 26, 45, 1)',
-
+          textShadow: '0 0 10px  rgba(173, 26, 45, 1),0 0 20px  rgba(173, 26, 45, 1),0 0 30px  rgba(173, 26, 45, 1),0 0 40px  rgba(173, 26, 45, 1),0 0 60px  rgba(173, 26, 45, 1),0 0 80px  rgba(173, 26, 45, 1)',
+          zIndex : -1,
           });    
     };
 
