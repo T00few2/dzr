@@ -226,9 +226,9 @@ export const ZwiftyFiftyCalender = [
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday April 7",
-    postDate: "01-00-1900",
+    postDate: "04-01-2024",
     route: "The Muckle Yin",
-    raceID: "",
+    raceID: "4319209",
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday April 14",
