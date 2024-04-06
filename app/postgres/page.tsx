@@ -1,19 +1,19 @@
 import { sql } from "@vercel/postgres";
-import { Text } from '@chakra-ui/react';
+import { Text, Button } from '@chakra-ui/react';
 
-export default async function test({ params }: { params: { user: string } }): Promise<JSX.Element> {
+import {data} from "../data/data";
 
-  const { rows } = await sql`SELECT * FROM public.test`;
-
-
+export default async function MyComponent() {
+  const dataNow = await data
+  const rows = dataNow.rows
   return (
-    <div>
-      {rows.map((row) => (
-        <div key={row.brand}>
-          <Text color = 'white'>{row.brand}</Text>
-          <Text color = 'white'>{row.model}</Text>
+        <div > 
+          {rows.map((row) => (
+            <div key = {row.brand}>
+          <Text color="white">{row.brand}</Text>
+          </div>
+          ))}
         </div>
-      ))}
-    </div>
-  );
-}
+    
+)}
+  

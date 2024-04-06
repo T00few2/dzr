@@ -101,4 +101,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner fourth time on Legsnapper',
       linkRoute: 'https://zwiftinsider.com/route/innsbruckring/',
     }),
+    new AfterPartyRacesTemplate({
+      route: '2019 UCI Worlds',
+      world: 'Yorkshire',
+      laps: '2+',
+      distance: '36.575',
+      elevation: '673',
+      finish: 'Blue banner third time on Yorkshire KOM',
+      linkRoute: 'https://zwiftinsider.com/route/2019-uci-worlds-harrogate-circuit/',
+    }),
 ];
