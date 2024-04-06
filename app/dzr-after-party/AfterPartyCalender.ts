@@ -37,5 +37,11 @@ export const AfterPartyCalender = [
     postDate: "03-29-2024",
     route: "Country To Coastal",
     raceID: "4315021",
+  }),
+  new AfterPartyCalenderTemplate({
+    date: "Thursday April 11",
+    postDate: "04-06-2024",
+    route: "2019 UCI Worlds",
+    raceID: "4327975",
   })
 ];
