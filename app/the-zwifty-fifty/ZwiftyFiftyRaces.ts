@@ -86,4 +86,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1,2'],
     bonus: ['3.0','2.0','1.0'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: '2015 UCI Worlds Course',
+    world: 'Richmond',
+    linkRoute: 'https://zwiftinsider.com/route/richmond-uci-worlds/',
+    laps: '3',
+    length: '49',
+    hm: '476',  
+    climbs: ['Libby 23rd Governor'],
+    sprints: ['Broad St'],
+    sprintLaps: ['1,2,3'],
+    bonus: ['4.0','2.5','1.0'],
+  }),
 ];
