@@ -1,4 +1,4 @@
-{/*import { sql } from "@vercel/postgres";
+import { sql } from "@vercel/postgres";
 import { Text, Button } from '@chakra-ui/react';
 
 import {data} from "../data/data";
@@ -16,4 +16,4 @@ export default async function MyComponent() {
         </div>
     
 )}
-*/}
+
