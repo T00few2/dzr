@@ -40,8 +40,9 @@ export const metadata: Metadata = {
   }
 }
 
-export default function dzrafterpartypage() {
+export default function inthezone2page() {
   const formattedDate = formatNextSaturday();
+  const htmlContent = "<svg><circle cx='50' cy='50' r='40' fill='red' /></svg>";
   return (
       <Container maxW={{base: '90%', md: '5xl'}} py={0} mb={20}>
         
@@ -59,12 +60,15 @@ export default function dzrafterpartypage() {
             <Heading size={{ base: 'lg', sm: 'xl', md: '2xl' }} color='white'>In The Zone 2 with DZR</Heading>
             <Text color={'white'} fontSize={'md'}>Work smarter to build your endurance, preserve peak power and recover faster with Zone 2 focused training. 
             Join the European morning or afternoon session taking place every Saturday starting April 6th. Stay tuned!</Text>
+            
             <InTheZoneList nextDate={formattedDate}/>
           </Stack>
           
           <Flex py={5} justifyContent="center" alignItems="center" height="auto" borderWidth={1}>
           <YouTubeEmbed videoId='-6PDBVRkCKc'/>
           </Flex>
+          
       </Container>
   )
 }
+

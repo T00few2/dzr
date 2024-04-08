@@ -28,6 +28,15 @@ export class InTheZone2CalenderTemplate {
       stressPoints: '101',
       eventID1: "4307240",
       eventID2: "4307242",
+    }),
+    new InTheZone2CalenderTemplate({
+      date: "Saturday April 13",
+      postDate: "04-08-2024",
+      workout: "In The Zone 2 #1",
+      duration: '2h',
+      stressPoints: '95',
+      eventID1: "4330782",
+      eventID2: "4330876",
     })
   ];
   
