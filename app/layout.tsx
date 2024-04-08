@@ -20,7 +20,7 @@ export default function RootLayout({
         <Providers>
           <SidebarWithHeader />
           {children}
-          <Analytics />
+          
           <SpeedInsights />
         </Providers>
       </body>
