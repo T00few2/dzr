@@ -232,9 +232,9 @@ export const ZwiftyFiftyCalender = [
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday April 14",
-    postDate: "01-00-1900",
+    postDate: "04-08-2024",
     route: "2015 UCI Worlds Course",
-    raceID: "",
+    raceID: "4332409",
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday April 21",
