@@ -27,6 +27,7 @@ import {
   import { ExternalLinkIcon } from '@chakra-ui/icons'
 
   import Workout from '@/components/Workout';
+  
 
   interface eventProps {
     nextDate: string;
@@ -63,6 +64,7 @@ import {
                 </Table>
             </TableContainer>
         ))}
+        
         <Heading size={{ base: 'md', sm: 'lg', md: 'xl' }} color='white'>The Talking Test</Heading>
         <Text color='white'>Zones in Zwift workouts are based on FTP and might not always accurately reflect your effort level. Here&apos;s how the talking test can help:</Text>
         <div style={{ display: 'inline-block' }}>
