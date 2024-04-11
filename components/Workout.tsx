@@ -15,7 +15,7 @@ import {
 
 import { useDisclosure } from '@chakra-ui/react';
 
-import { WorkoutGraphSVG } from '@/app/in-the-zone-2/workouts/nextWorkout_';
+import { WorkoutGraphSVG } from '@/app/in-the-zone-2/workouts/nextWorkout';
 
 function Workout() {
     const { isOpen, onOpen, onClose } = useDisclosure()

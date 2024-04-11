@@ -1,75 +1,189 @@
-import {Box, Tooltip} from '@chakra-ui/react'
-import './css/Workout.css'
 
-export const WorkoutGraphSVG = () => (
+    import {Box, Tooltip, Heading, Text, Stack} from '@chakra-ui/react'
+    import './css/Workout.css'
+
+    export const WorkoutGraphSVG = () => (
     <div>
+    <Stack spacing={6}>
+    <Heading size={{ base: 'xs', sm: 'lg', md: 'xl' }} color = 'white'>Workout</Heading>
+    <Text color = 'white'>Zone 2 training is one of the most important aspects of any training plan. We do not always get faster by training faster.
+
+    In Zone 2 training we are stimulating your type I muscle fibers - slow twitch.
+
+    Spending time in Zone 2 is absolutely essential to improving performance. This workout is a mashup of shorter zone 2 workouts - Zone 2 1, Cadence Pyramid & Aerobic Threshold Development - to get a long and varied zone 2 workout.</Text>
     <Box as='svg'
-    viewBox='0 0 730 100'
+    viewBox='0 0 1000 100'
     width='100%'
     height={'auto'}
     transform= 'scaleY(-1)'>
-    <svg className="WorkoutGraph-module__workoutGraphSVG--5B-H8" data-testid="workoutGraph">
-        <Tooltip label = ''>
-        <path className="WorkoutGraph-module__z1--1KErG" d="M 10 0 L 10 49.5 L 20.10416617158566 49.5 L 20.10416617158566 0 Z"></path>
+    <svg><Tooltip label = " 2:30min @50%">
+    <path d="M 0 0 L 0 50.0 L 18.54166605891205 50.0 L 18.54166605891205 0 0 Z" fill="grey" stroke="grey" />
+    </Tooltip>
+<Tooltip label = " 1:00min @60%">
+    <path d="M 20.54166605891205 0 L 20.54166605891205 60.000001999999995 L 27.958332976921298 60.000001999999995 L 27.958332976921298 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @65%">
+    <path d="M 29.958332976921298 0 L 29.958332976921298 64.999998 L 37.374999894930546 64.999998 L 37.374999894930546 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @81%">
+    <path d="M 39.374999894930546 0 L 39.374999894930546 81.0 L 46.791666812939795 81.0 L 46.791666812939795 0 0 Z" fill="green" stroke="green" />
+    </Tooltip>
+<Tooltip label = " 1:00min @95%">
+    <path d="M 48.791666812939795 0 L 48.791666812939795 94.999999 L 56.20833373094904 94.999999 L 56.20833373094904 0 0 Z" fill="yellow" stroke="yellow" />
+    </Tooltip>
+<Tooltip label = " 2:00min @50%">
+    <path d="M 58.20833373094904 0 L 58.20833373094904 50.0 L 73.04166781418975 50.0 L 73.04166781418975 0 0 Z" fill="grey" stroke="grey" />
+    </Tooltip>
+<Tooltip label = " 4:00min @80%">
+    <path d="M 75.04166781418975 0 L 75.04166781418975 80.000001 L 104.70833598067117 80.000001 L 104.70833598067117 0 0 Z" fill="green" stroke="green" />
+    </Tooltip>
+<Tooltip label = " 2:00min @50%">
+    <path d="M 106.70833598067117 0 L 106.70833598067117 50.0 L 121.5416688278008 50.0 L 121.5416688278008 0 0 Z" fill="grey" stroke="grey" />
+    </Tooltip>
+<Tooltip label = " 6:00min ramp from 52% to 70%">
+        <path d="M 123.5416688278008 0 L 123.5416688278008 51.930803000000004 L 142.37200481638655 60.0 L 142.37200481638655 0 0 Z" fill="grey" stroke="grey" />
         </Tooltip>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 25.10416617158566 0 L 25.10416617158566 59.40000198 L 26.145833042997687 59.40000198 L 26.145833042997687 0 Z"></path>
-        
-        <path className="WorkoutGraph-module__z2--476M_" d="M 31.145833042997687 0 L 31.145833042997687 64.34999802 L 32.18749991440971 64.34999802 L 32.18749991440971 0 Z"></path>
-        <path className="WorkoutGraph-module__z3--3WzZQ" d="M 37.18749991440971 0 L 37.18749991440971 80.19000000000001 L 38.22916678582174 80.19000000000001 L 38.22916678582174 0 Z"></path>
-        <path className="WorkoutGraph-module__z4--TlVqP" d="M 43.22916678582174 0 L 43.22916678582174 94.04999901000001 L 44.270833657233766 94.04999901000001 L 44.270833657233766 0 Z"></path>
-        <path className="WorkoutGraph-module__z1--1KErG" d="M 49.270833657233766 0 L 49.270833657233766 49.5 L 56.354167601446704 49.5 L 56.354167601446704 0 Z"></path>
-        <path className="WorkoutGraph-module__z3--3WzZQ" d="M 61.354167601446704 0 L 61.354167601446704 79.20000098999999 L 80.52083548987258 79.20000098999999 L 80.52083548987258 0 Z"></path>
-        <path className="WorkoutGraph-module__z1--1KErG" d="M 85.52083548987258 0 L 85.52083548987258 49.5 L 92.6041684271411 49.5 L 92.6041684271411 0 Z"></path>
-        <path className="WorkoutGraph-module__z1--1KErG" d="M 97.6041684271411 0 L 97.6041684271411 51.41149497 L 111.3866012191503 59.300999999999995 L 111.3866012191503 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 111.3866012191503 0 L 111.3866012191503 59.300999999999995 L 128.85416723894667 69.29999307 L 128.85416723894667 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 133.85416723894667 0 L 133.85416723894667 69.29999901000001 L 146.97916865873827 69.29999901000001 L 146.97916865873827 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 151.97916865873827 0 L 151.97916865873827 59.40000198 L 189.27083696001137 69.29999307 L 189.27083696001137 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 194.27083696001137 0 L 194.27083696001137 59.40000198 L 231.5625022404512 74.25 L 231.5625022404512 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 236.5625022404512 0 L 236.5625022404512 74.25 L 261.7708345836225 74.25 L 261.7708345836225 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 266.7708345836225 0 L 266.7708345836225 64.49849901 L 301.04166662974524 74.39850099 L 301.04166662974524 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 306.04166662974524 0 L 306.04166662974524 61.875 L 313.1250005739582 61.875 L 313.1250005739582 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 318.1250005739582 0 L 318.1250005739582 69.29999901000001 L 325.2083345181711 69.29999901000001 L 325.2083345181711 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 330.2083345181711 0 L 330.2083345181711 69.29999901000001 L 331.25000138958313 69.29999901000001 L 331.25000138958313 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 336.25000138958313 0 L 336.25000138958313 69.29999901000001 L 337.29166826099515 69.29999901000001 L 337.29166826099515 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 342.29166826099515 0 L 342.29166826099515 69.29999901000001 L 343.33333513240717 69.29999901000001 L 343.33333513240717 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 348.33333513240717 0 L 348.33333513240717 69.29999901000001 L 349.3750020038192 69.29999901000001 L 349.3750020038192 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 354.3750020038192 0 L 354.3750020038192 69.29999901000001 L 355.4166688752312 69.29999901000001 L 355.4166688752312 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 360.4166688752312 0 L 360.4166688752312 69.29999901000001 L 367.50000281944415 69.29999901000001 L 367.50000281944415 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 372.50000281944415 0 L 372.50000281944415 61.875 L 379.5833357567127 61.875 L 379.5833357567127 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 384.5833357567127 0 L 384.5833357567127 69.29999901000001 L 391.66666970092564 69.29999901000001 L 391.66666970092564 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 396.66666970092564 0 L 396.66666970092564 69.29999901000001 L 397.70833657233766 69.29999901000001 L 397.70833657233766 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 402.70833657233766 0 L 402.70833657233766 69.29999901000001 L 403.7500034437497 69.29999901000001 L 403.7500034437497 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 408.7500034437497 0 L 408.7500034437497 69.29999901000001 L 409.7916703151617 69.29999901000001 L 409.7916703151617 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 414.7916703151617 0 L 414.7916703151617 69.29999901000001 L 415.8333371865737 69.29999901000001 L 415.8333371865737 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 420.8333371865737 0 L 420.8333371865737 69.29999901000001 L 421.87500405798573 69.29999901000001 L 421.87500405798573 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 426.87500405798573 0 L 426.87500405798573 69.29999901000001 L 433.9583380021987 69.29999901000001 L 433.9583380021987 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 438.9583380021987 0 L 438.9583380021987 61.875 L 446.0416709394672 61.875 L 446.0416709394672 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 451.0416709394672 0 L 451.0416709394672 69.29999901000001 L 458.12500488368016 69.29999901000001 L 458.12500488368016 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 463.12500488368016 0 L 463.12500488368016 69.29999901000001 L 464.1666717550922 69.29999901000001 L 464.1666717550922 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 469.1666717550922 0 L 469.1666717550922 69.29999901000001 L 470.2083386265042 69.29999901000001 L 470.2083386265042 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 475.2083386265042 0 L 475.2083386265042 69.29999901000001 L 476.2500054979162 69.29999901000001 L 476.2500054979162 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 481.2500054979162 0 L 481.2500054979162 69.29999901000001 L 482.29167236932824 69.29999901000001 L 482.29167236932824 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 487.29167236932824 0 L 487.29167236932824 69.29999901000001 L 488.33333924074026 69.29999901000001 L 488.33333924074026 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 493.33333924074026 0 L 493.33333924074026 69.29999901000001 L 500.4166721780088 69.29999901000001 L 500.4166721780088 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 505.4166721780088 0 L 505.4166721780088 61.875 L 512.5000051152773 61.875 L 512.5000051152773 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 517.5000051152773 0 L 517.5000051152773 74.25 L 524.5833380525459 74.25 L 524.5833380525459 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 529.5833380525459 0 L 529.5833380525459 69.29999901000001 L 536.6666709898144 69.29999901000001 L 536.6666709898144 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 541.6666709898144 0 L 541.6666709898144 74.25 L 548.750003927083 74.25 L 548.750003927083 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 553.750003927083 0 L 553.750003927083 69.29999901000001 L 560.8333368643515 69.29999901000001 L 560.8333368643515 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 565.8333368643515 0 L 565.8333368643515 74.25 L 572.9166698016201 74.25 L 572.9166698016201 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 577.9166698016201 0 L 577.9166698016201 69.29999901000001 L 585.0000027388886 69.29999901000001 L 585.0000027388886 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 590.0000027388886 0 L 590.0000027388886 74.25 L 597.0833356761572 74.25 L 597.0833356761572 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 602.0833356761572 0 L 602.0833356761572 69.29999901000001 L 609.1666686134257 69.29999901000001 L 609.1666686134257 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 614.1666686134255 0 L 614.1666686134255 61.875 L 621.250001550694 61.875 L 621.250001550694 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 626.250001550694 0 L 626.250001550694 74.25 L 639.3750009565969 74.25 L 639.3750009565969 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 644.3750009565969 0 L 644.3750009565969 69.29999901000001 L 651.4583338938654 69.29999901000001 L 651.4583338938654 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 656.4583338938653 0 L 656.4583338938653 74.25 L 669.5833332997681 74.25 L 669.5833332997681 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 674.5833332997681 0 L 674.5833332997681 69.29999901000001 L 681.6666662370367 69.29999901000001 L 681.6666662370367 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 686.6666662370367 0 L 686.6666662370367 74.25 L 699.7916656429395 74.25 L 699.7916656429395 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 704.7916656429395 0 L 704.7916656429395 69.29999901000001 L 711.8749985802081 69.29999901000001 L 711.8749985802081 0 Z"></path>
-        <path className="WorkoutGraph-module__z2--476M_" d="M 716.874998580208 0 L 716.874998580208 64.34999802 L 721.249997886805 59.4 L 721.249997886805 0 Z"></path>
-        <path className="WorkoutGraph-module__z1--1KErG" d="M 721.249997886805 0 L 721.249997886805 59.4 L 729.9999999999995 49.5 L 729.9999999999995 0 Z"></path>
-        </svg>
-    </Box>
-    </div>
-);
+<Tooltip label = " 6:00min ramp from 52% to 70%">
+        <path d="M 142.37200481638655 0 L 142.37200481638655 60.0 L 168.0416673691897 70.999993 L 168.0416673691897 0 0 Z" fill="blue" stroke="blue" />
+        </Tooltip>
+<Tooltip label = " 3:00min @70%">
+    <path d="M 170.04166736918972 0 L 170.04166736918972 69.999999 L 192.29166911210632 69.999999 L 192.29166911210632 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 7:00min ramp from 60% to 70%">
+        <path d="M 194.29166911210632 0 L 194.29166911210632 60.000001999999995 L 246.20833778539327 70.999993 L 246.20833778539327 0 0 Z" fill="blue" stroke="blue" />
+        </Tooltip>
+<Tooltip label = " 7:00min ramp from 60% to 75%">
+        <path d="M 248.20833778539327 0 L 248.20833778539327 60.000001999999995 L 300.125002750347 76.0 L 300.125002750347 0 0 Z" fill="blue" stroke="blue" />
+        </Tooltip>
+<Tooltip label = " 5:00min @75%">
+    <path d="M 302.125002750347 0 L 302.125002750347 75.0 L 339.2083348681711 75.0 L 339.2083348681711 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 6:30min ramp from 65% to 75%">
+        <path d="M 341.2083348681711 0 L 341.2083348681711 65.14999900000001 L 388.75927601620367 76.0 L 388.75927601620367 0 0 Z" fill="blue" stroke="blue" />
+        </Tooltip>
+<Tooltip label = " 2:00min @62%">
+    <path d="M 391.4166666213424 0 L 391.4166666213424 62.5 L 406.2500007045831 62.5 L 406.2500007045831 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%, Cadence 60">
+    <path d="M 408.2500007045831 0 L 408.2500007045831 69.999999 L 423.0833347878238 69.999999 L 423.0833347878238 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 75">
+    <path d="M 425.0833347878238 0 L 425.0833347878238 69.999999 L 432.50000170583303 69.999999 L 432.50000170583303 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 90">
+    <path d="M 434.50000170583303 0 L 434.50000170583303 69.999999 L 441.91666862384227 69.999999 L 441.91666862384227 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 100">
+    <path d="M 443.91666862384227 0 L 443.91666862384227 69.999999 L 451.3333355418515 69.999999 L 451.3333355418515 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 90">
+    <path d="M 453.3333355418515 0 L 453.3333355418515 69.999999 L 460.75000245986075 69.999999 L 460.75000245986075 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 75">
+    <path d="M 462.75000245986075 0 L 462.75000245986075 69.999999 L 470.16666937787 69.999999 L 470.16666937787 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%, Cadence 60">
+    <path d="M 472.16666937787 0 L 472.16666937787 69.999999 L 487.0000034611107 69.999999 L 487.0000034611107 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @62%">
+    <path d="M 489.0000034611107 0 L 489.0000034611107 62.5 L 503.8333363082403 62.5 L 503.8333363082403 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%">
+    <path d="M 505.8333363082403 0 L 505.8333363082403 69.999999 L 520.666670391481 69.999999 L 520.666670391481 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 75">
+    <path d="M 522.666670391481 0 L 522.666670391481 69.999999 L 530.0833373094903 69.999999 L 530.0833373094903 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 90">
+    <path d="M 532.0833373094903 0 L 532.0833373094903 69.999999 L 539.5000042274995 69.999999 L 539.5000042274995 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 100">
+    <path d="M 541.5000042274995 0 L 541.5000042274995 69.999999 L 548.9166711455088 69.999999 L 548.9166711455088 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 90">
+    <path d="M 550.9166711455088 0 L 550.9166711455088 69.999999 L 558.333338063518 69.999999 L 558.333338063518 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 75">
+    <path d="M 560.333338063518 0 L 560.333338063518 69.999999 L 567.7500049815272 69.999999 L 567.7500049815272 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%, Cadence 60">
+    <path d="M 569.7500049815272 0 L 569.7500049815272 69.999999 L 584.583339064768 69.999999 L 584.583339064768 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @62%">
+    <path d="M 586.583339064768 0 L 586.583339064768 62.5 L 601.4166719118977 62.5 L 601.4166719118977 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%, Cadence 60">
+    <path d="M 603.4166719118977 0 L 603.4166719118977 69.999999 L 618.2500059951384 69.999999 L 618.2500059951384 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 75">
+    <path d="M 620.2500059951384 0 L 620.2500059951384 69.999999 L 627.6666729131476 69.999999 L 627.6666729131476 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 90">
+    <path d="M 629.6666729131476 0 L 629.6666729131476 69.999999 L 637.0833398311569 69.999999 L 637.0833398311569 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 100">
+    <path d="M 639.0833398311569 0 L 639.0833398311569 69.999999 L 646.5000067491661 69.999999 L 646.5000067491661 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 90">
+    <path d="M 648.5000067491661 0 L 648.5000067491661 69.999999 L 655.9166736671754 69.999999 L 655.9166736671754 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 1:00min @70%, Cadence 75">
+    <path d="M 657.9166736671754 0 L 657.9166736671754 69.999999 L 665.3333405851846 69.999999 L 665.3333405851846 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%, Cadence 60">
+    <path d="M 667.3333405851846 0 L 667.3333405851846 69.999999 L 682.1666734323143 69.999999 L 682.1666734323143 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @62%">
+    <path d="M 684.1666734323143 0 L 684.1666734323143 62.5 L 699.0000062794439 62.5 L 699.0000062794439 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @75%">
+    <path d="M 701.0000062794439 0 L 701.0000062794439 75.0 L 715.8333391265736 75.0 L 715.8333391265736 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%">
+    <path d="M 717.8333391265736 0 L 717.8333391265736 69.999999 L 732.6666719737033 69.999999 L 732.6666719737033 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @75%">
+    <path d="M 734.6666719737033 0 L 734.6666719737033 75.0 L 749.5000048208329 75.0 L 749.5000048208329 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%">
+    <path d="M 751.5000048208329 0 L 751.5000048208329 69.999999 L 766.3333376679626 69.999999 L 766.3333376679626 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @75%">
+    <path d="M 768.3333376679626 0 L 768.3333376679626 75.0 L 783.1666705150923 75.0 L 783.1666705150923 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%">
+    <path d="M 785.1666705150923 0 L 785.1666705150923 69.999999 L 800.000003362222 69.999999 L 800.000003362222 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @75%">
+    <path d="M 802.000003362222 0 L 802.000003362222 75.0 L 816.8333362093516 75.0 L 816.8333362093516 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%">
+    <path d="M 818.8333362093516 0 L 818.8333362093516 69.999999 L 833.6666690564813 69.999999 L 833.6666690564813 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @62%">
+    <path d="M 835.6666690564813 0 L 835.6666690564813 62.5 L 850.500001903611 62.5 L 850.500001903611 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 3:00min @75%">
+    <path d="M 852.500001903611 0 L 852.500001903611 75.0 L 874.7500011743055 75.0 L 874.7500011743055 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%">
+    <path d="M 876.7500011743055 0 L 876.7500011743055 69.999999 L 891.5833340214351 69.999999 L 891.5833340214351 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 3:00min @75%">
+    <path d="M 893.5833340214351 0 L 893.5833340214351 75.0 L 915.8333332921296 75.0 L 915.8333332921296 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%">
+    <path d="M 917.8333332921296 0 L 917.8333332921296 69.999999 L 932.6666661392593 69.999999 L 932.6666661392593 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 3:00min @75%">
+    <path d="M 934.6666661392593 0 L 934.6666661392593 75.0 L 956.9166654099538 75.0 L 956.9166654099538 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 2:00min @70%">
+    <path d="M 958.9166654099538 0 L 958.9166654099538 69.999999 L 973.7499982570835 69.999999 L 973.7499982570835 0 0 Z" fill="blue" stroke="blue" />
+    </Tooltip>
+<Tooltip label = " 3:00min ramp from 65% to 50%">
+        <path d="M 975.7499982570835 0 L 975.7499982570835 64.999998 L 984.0937471723956 59.0 L 984.0937471723956 0 0 Z" fill="blue" stroke="blue" />
+        </Tooltip>
+<Tooltip label = " 3:00min ramp from 65% to 50%">
+        <path d="M 984.0937471723956 0 L 984.0937471723956 59.0 L 998.0000000000001 49.0 L 998.0000000000001 0 0 Z" fill="grey" stroke="grey" />
+        </Tooltip></svg></Box></Stack></div>);

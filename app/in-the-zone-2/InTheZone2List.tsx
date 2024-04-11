@@ -27,6 +27,7 @@ import {
   import { ExternalLinkIcon } from '@chakra-ui/icons'
 
   import Workout from '@/components/Workout';
+  import { WorkoutGraphSVG } from '@/app/in-the-zone-2/workouts/nextWorkout';
   
 
   interface eventProps {
@@ -43,7 +44,6 @@ import {
                 <Thead >
                     <Tr>
                     <Th textAlign="center" textColor={'white'}>Date</Th>
-                    <Th textAlign="center" textColor={'white'}>Workout</Th>
                     <Th textAlign="center" textColor={'white'}>Duration</Th>
                     <Th textAlign="center" textColor={'white'}>Stress Points</Th>
                     <Th textAlign="center" textColor={'white'}>9:30 CET</Th>
@@ -53,7 +53,6 @@ import {
                 <Tbody>
                     <Tr>
                     <Td textAlign="center">{event.date}</Td>
-                    <Td textAlign="center"><Workout/></Td>
                     {/*<Link  color={'orange'} href = {`https://whatsonzwift.com/workouts/${event.workout}`} target='_Blank' isExternal>{event.workout}<ExternalLinkIcon mx='2px' /></Link>*/}
                     <Td textAlign="center">{event.duration}</Td>
                     <Td textAlign="center">{event.stressPoints}</Td>
@@ -62,9 +61,10 @@ import {
                     </Tr>    
                 </Tbody>
                 </Table>
-            </TableContainer>
+            </TableContainer>            
         ))}
         
+        <WorkoutGraphSVG/>
         <Heading size={{ base: 'md', sm: 'lg', md: 'xl' }} color='white'>The Talking Test</Heading>
         <Text color='white'>Zones in Zwift workouts are based on FTP and might not always accurately reflect your effort level. Here&apos;s how the talking test can help:</Text>
         <div style={{ display: 'inline-block' }}>
