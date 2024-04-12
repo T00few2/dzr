@@ -38,6 +38,7 @@ import {
     const nextEvent = InTheZone2Calender.filter(date => date.date === nextDate);
     return (
     <Stack spacing={6}>
+        <Heading size={{ base: 'md', sm: 'lg', md: 'xl' }} color = 'white'>Next Workout</Heading>
         {nextEvent.map((event)=>(
                     <TableContainer key={event.eventID1} textAlign="center">
                 <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>

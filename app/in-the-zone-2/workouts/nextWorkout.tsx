@@ -5,7 +5,6 @@
     export const WorkoutGraphSVG = () => (
     <div>
     <Stack spacing={6}>
-    <Heading size={{ base: 'xs', sm: 'lg', md: 'xl' }} color = 'white'>Workout</Heading>
     <Text color = 'white'>Zone 2 training is one of the most important aspects of any training plan. We do not always get faster by training faster.
 
     In Zone 2 training we are stimulating your type I muscle fibers - slow twitch.
