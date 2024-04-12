@@ -110,4 +110,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner third time on Yorkshire KOM',
       linkRoute: 'https://zwiftinsider.com/route/2019-uci-worlds-harrogate-circuit/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Fine And Sandy',
+      world: 'Makuri Islands',
+      laps: '3+',
+      distance: '34.013',
+      elevation: '261',
+      finish: 'Blue banner seventh time on top of Mech Isle Climb',
+      linkRoute: 'https://zwiftinsider.com/route/fine-and-sandy/',
+    }),
 ];
