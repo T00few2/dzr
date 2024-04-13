@@ -8,6 +8,3 @@ def hello_world():
 @app.route('/oh', methods=['GET'])
 def oh():
     return "Oh!"
-
-if __name__ == '__main__':
-    app.run(port=5328)
