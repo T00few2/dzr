@@ -1,8 +1,8 @@
 import next from "next";
-import { ZwiftyFiftyCalender } from "../app/the-zwifty-fifty/ZwiftyFiftyCalender";
-import { AfterPartyCalender } from "../app/dzr-after-party/AfterPartyCalender";
-import { AfterPartyRacesData } from "../app/dzr-after-party/AfterPartyRaces";
-import { ZwiftyFiftyRacesData } from "../app/the-zwifty-fifty/ZwiftyFiftyRaces";
+import { ZwiftyFiftyCalender } from "../the-zwifty-fifty/ZwiftyFiftyCalender";
+import { AfterPartyCalender } from "../dzr-after-party/AfterPartyCalender";
+import { AfterPartyRacesData } from "../dzr-after-party/AfterPartyRaces";
+import { ZwiftyFiftyRacesData } from "../the-zwifty-fifty/ZwiftyFiftyRaces";
 
 export function racePosts() {
     const tzfRaces = ZwiftyFiftyCalender.filter(data => data.raceID !== '');
