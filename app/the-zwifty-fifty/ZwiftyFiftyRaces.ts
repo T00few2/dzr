@@ -107,7 +107,7 @@ export const ZwiftyFiftyRacesData = [
     hm: '418',
     climbs: ['Petit KOM Reverse'],
     sprints: ['Pavé Sprint','Marina Sprint'],
-    sprintLaps: ['1,2'],
+    sprintLaps: ['1,2','1,2'],
     bonus: ['1.5','1.0','0.5'],
   }),
 ];
