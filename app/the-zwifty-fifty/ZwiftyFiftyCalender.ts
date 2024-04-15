@@ -238,9 +238,9 @@ export const ZwiftyFiftyCalender = [
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday April 21",
-    postDate: "01-00-1900",
+    postDate: "04-15-2024",
     route: "Roule Ma Poule",
-    raceID: "",
+    raceID: "4343846",
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday April 28",
