@@ -119,4 +119,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner seventh time on top of Mech Isle Climb',
       linkRoute: 'https://zwiftinsider.com/route/fine-and-sandy/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Volcano Climb',
+      world: 'Watopia',
+      laps: '1+',
+      distance: '38.483',
+      elevation: '390',
+      finish: 'Blue banner second time on Volcano KOM',
+      linkRoute: 'https://zwiftinsider.com/route/volcano-climb/',
+    }),
 ];
