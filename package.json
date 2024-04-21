@@ -3,9 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "flask-dev": "set FLASK_DEBUG=1 && pip install -r requirements.txt && python -m flask --app api/python/index run -p 5328",
-    "next-dev": "next dev",
-    "dev": "concurrently \"pnpm run next-dev\" \"pnpm run flask-dev\"",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -29,7 +27,6 @@
     "gsap": "^3.12.5",
     "next": "^14.1.4",
     "papaparse": "^5.4.1",
-    "python": "^0.0.4",
     "react": "^18",
     "react-dom": "^18",
     "react-icons": "^5.0.1",

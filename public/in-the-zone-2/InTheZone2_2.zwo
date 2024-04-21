@@ -1,42 +1,84 @@
 <workout_file>
-    <author>Copilot AI</author>
-    <name>AI-Generated Zone 2 Workout</name>
-    <description>This is a 2-hour Zone 2 focused indoor cycling workout, designed by AI to help you improve your endurance and aerobic capacity.</description>
+    <author>DZR</author>
+    <name>In The Zone 2 #2</name>
+    <description>In The Zone 2 #2 is designed to improve your cardiovascular endurance and build a strong foundation for higher intensity training. It features multiple intervals of sustained moderate effort (Zone 2) interspersed with recovery periods and short bursts of high intensity. </description>
     <sportType>bike</sportType>
+    <tags>
+        <tag name="RECOVERY"/>
+        <tag name="zone2"/>
+    </tags>
     <workout>
-        <Warmup Duration="600" PowerLow="0.4" PowerHigh="0.7" pace="ramp">
-            <textevent timeoffset="0" message="Welcome to your AI-generated 2-hour Zone 2 workout! Let's start with a ramp-style warm-up." />
-            <textevent timeoffset="300" message="Zone 2 training enhances endurance and efficiency. It's 60-70% of max HR." />
+        <Warmup Duration="660" PowerLow="0.50" PowerHigh="0.67" pace="0">
+            <textevent timeoffset="30" message="Warm up for Zone 2 training."/>
+            <textevent timeoffset="60" message="Zone 2 training targets a specific intensity range."/>
+            <textevent timeoffset="90" message="This range offers benefits like improved endurance."/>
+            <textevent timeoffset="120" message="Another benefit is increased fat burning."/>
+            <textevent timeoffset="150" message="Not sure you are at the right intensity?"/>
+            <textevent timeoffset="180" message="The Talk Test might come in handy!"/>  <textevent timeoffset="210" message="The Talk Test is simple: Can you chat comfortably?"/>
+            <textevent timeoffset="240" message="Speak in complete sentences during your ride."/>
+            <textevent timeoffset="270" message="If you struggle, the effort might be too high."/>
+            <textevent timeoffset="300" message="Adjust intensity slightly until conversation feels easy."/>
+            <textevent timeoffset="330" message="Conversational pace, not singing!"/>
+            <textevent timeoffset="360" message="Ready to put Zone 2 training to the test!"/>  
         </Warmup>
-        <SteadyState Duration="3000" Power="0.65">
-            <textevent timeoffset="0" message="Settle into a comfortable pace. You're in Zone 2, ideal for aerobic development." />
-            <textevent timeoffset="600" message="Quiz: True or False? Zone 2 training can prevent injury." />
-            <textevent timeoffset="900" message="Answer: True. It helps in preventing overtraining and injuries." />
-            <textevent timeoffset="1200" message="Maintain your effort. Zone 2 improves energy efficiency and recovery." />
-            <textevent timeoffset="1800" message="Keep going! Did you know? Zone 2 training is also great for weight management." />
-            <textevent timeoffset="2400" message="You're doing great! Zone 2 workouts build a strong aerobic base." />
+        <SteadyState Duration="900" Power="0.67" pace="0">
+            <textevent timeoffset="30" message="This is a long steady segment. Let's not waste a perfect opportunity for a challenging cycling quiz!"/>
+            <textevent timeoffset="60" message="So get ready to test your deep knowledge of pro cycling!"/>
+            <textevent timeoffset="90" message="**Question #1**"/>
+            <textevent timeoffset="150" message="Who was the first rider to win what is now know as the 5 monuments?"/>
+            <textevent timeoffset="210" message="Answer: Rik Van Looy"/>  
+            <textevent timeoffset="240" message="**Question #2**"/>
+            <textevent timeoffset="300" message="Only two male cyclists have won all three Grand Tours (Giro d'Italia, Tour de France, Vuelta a España). Who?"/>
+            <textevent timeoffset="360" message="Answer: Eddy Merckx and Stephen Roche"/>
+            <textevent timeoffset="390" message="**Question #3**"/>
+            <textevent timeoffset="450" message="The 'flamme rouge' is a red flag displayed in a cycling race. How many kilometers before the finish line does it typically signal?"/>
+            <textevent timeoffset="510" message="Answer: 1 kilometer"/>  
+            <textevent timeoffset="540" message="**Question #4**"/>
+            <textevent timeoffset="600" message="Paris-Roubaix is a one-day classic known for its cobblestone sections. What is the nickname for these challenging stretches of road?"/>
+            <textevent timeoffset="660" message="Answer: The Hell of the North"/>  
+            <textevent timeoffset="690" message="**Question #5**"/>
+            <textevent timeoffset="750" message="The term 'grupetto' refers to a specific group of riders in a cycling stage race. Who are typically the riders in a grupetto?"/>
+            <textevent timeoffset="810" message="Answer: Riders who are no longer competing for the overall race win, often focusing on finishing within the time limit."/>  
         </SteadyState>
-        <IntervalsT Repeat="12" OnDuration="300" OffDuration="300" OnPower="0.65" OffPower="0.65">
-            <textevent timeoffset="0" message="Start interval with low cadence. Focus on your breathing." />
-            <textevent timeoffset="900" message="Now, increase cadence. Can you feel the difference?" />
-            <textevent timeoffset="1800" message="Quiz: Who won the Tour de France in 1990?" />
-            <textevent timeoffset="2100" message="Answer: Greg LeMond." />
-            <textevent timeoffset="2700" message="Quiz: Name three Tour de France winners who have also won the Criterium Du Dauphine." />
-            <textevent timeoffset="3000" message="Answer: Chris Froome, Bradley Wiggins, and Geraint Thomas." />
-            <textevent timeoffset="3600" message="Quiz: How many switchbacks are on the Alpe d’Huez climb?" />
-            <textevent timeoffset="3900" message="Answer: 21." />
-            <textevent timeoffset="4500" message="Quiz: What bike manufacturer did Tadej Pogacar ride for his first Tour de France win?" />
-            <textevent timeoffset="4800" message="Answer: Colnago." />
-            <textevent timeoffset="5400" message="Quiz: Which rider is known as 'The Shark of Messina'?" />
-            <textevent timeoffset="5700" message="Answer: Vincenzo Nibali." />
-            <textevent timeoffset="6300" message="Quiz: Name the first British cyclist to win the Tour de France." />
-            <textevent timeoffset="6600" message="Answer: Bradley Wiggins." />
-            <textevent timeoffset="7200" message="Quiz: Which country has produced the most Tour de France winners?" />
-            <textevent timeoffset="7500" message="Answer: France." />
-        </IntervalsT>
-        <Cooldown Duration="600" PowerLow="0.5" PowerHigh="0.4">
-            <textevent timeoffset="0" message="Time to cool down. Great job today!" />
-            <textevent timeoffset="300" message="Reflect on your workout. How did the Zone 2 training feel?" />
-        </Cooldown>
+        <Ramp Duration="60" PowerLow="0.67" PowerHigh="0.735" pace="0"/>
+        <SteadyState Duration="540" Power="0.735" pace="0"/>
+        <Ramp Duration="60" PowerLow="0.735" PowerHigh="0.70" pace="0"/>
+        <SteadyState Duration="900" Power="0.70" pace="0">
+            <textevent timeoffset="30" message="Another long steady segment. Let's make it interesting with a Giro d'Italia quiz!"/>
+            <textevent timeoffset="60" message="Test your knowledge of the Corsa Rosa (Pink Race)!"/>
+            <textevent timeoffset="90" message="**Giro d'Italia #1**"/>
+            <textevent timeoffset="150" message="Which iconic volcano is frequently included in the Giro d'Italia route, known for its challenging climbs?"/>
+            <textevent timeoffset="210" message="Answer: Mount Etna"/>  
+            <textevent timeoffset="240" message="**Giro d'Italia #2**"/>
+            <textevent timeoffset="300" message="Besides the Maglia Rosa (Pink Jersey) for the overall leader, which jersey identifies the leader in the points classification of the Giro d'Italia?"/>
+            <textevent timeoffset="360" message="Answer: Maglia Ciclamino (Cyclamen Jersey)"/>  
+            <textevent timeoffset="390" message="**Giro d'Italia #3**"/>
+            <textevent timeoffset="450" message="A rider wins the 'Trofeo Senza Fine' (Trophy Without End) upon achieving what feat in the Giro d'Italia?"/>
+            <textevent timeoffset="510" message="Answer: Winning the Giro d'Italia"/>
+            <textevent timeoffset="540" message="**Giro d'Italia #4**"/>
+            <textevent timeoffset="600" message="First introduced in 1946, the 'Maglia Nera' (Black Jersey) was awarded to the last-placed finisher in the Giro d'Italia. When was this tradition discontinued?"/>
+            <textevent timeoffset="660" message="Answer: Giovanni Pinarello was the last 'winner' in 1951"/>  
+            <textevent timeoffset="690" message="**Giro d'Italia #5**"/>
+            <textevent timeoffset="750" message="The 'cronometro individuale' is an Italian term used to describe what type of stage in the Giro d'Italia?"/>
+            <textevent timeoffset="810" message="Answer: Individual time trial stage"/>  
+            <textevent timeoffset="840" message="**Continue your steady state effort!**"/>  
+        </SteadyState>
+        <Ramp Duration="60" PowerLow="0.70" PowerHigh="0.75" pace="0"/>
+        <IntervalsT Repeat="5" OnDuration="180" OffDuration="180" OnPower="0.75" OffPower="0.65" pace="0" OverUnder="1"/>
+        <Ramp Duration="60" PowerLow="0.65" PowerHigh="0.70" pace="0"/>
+        <SteadyState Duration="240" Power="0.70" pace="0"/>
+        <SteadyState Duration="20" Power="1.8" pace="0"/>
+        <SteadyState Duration="330" Power="0.62" pace="0"/>
+        <SteadyState Duration="20" Power="1.8" pace="0"/>
+        <SteadyState Duration="270" Power="0.62" pace="0"/>
+        <Ramp Duration="60" PowerLow="0.62" PowerHigh="0.65" pace="0"/>
+        <SteadyState Duration="180" Power="0.65" pace="0"/>
+        <SteadyState Duration="20" Power="1.8" pace="0"/>
+        <SteadyState Duration="150" Power="0.62" pace="0"/>
+        <Ramp Duration="60" PowerLow="0.62" PowerHigh="0.70" pace="0"/>
+        <SteadyState Duration="180" Power="0.70" pace="0"/>
+        <SteadyState Duration="20" Power="1.8" pace="0"/>
+        <Ramp Duration="370" PowerLow="0.60" PowerHigh="0.75" pace="0"/>
+        <Cooldown Duration="240" PowerLow="0.75" PowerHigh="0.50" pace="0"/>
     </workout>
 </workout_file>
