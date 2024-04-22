@@ -244,9 +244,9 @@ export const ZwiftyFiftyCalender = [
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday April 28",
-    postDate: "01-00-1900",
+    postDate: "04-22-2024",
     route: "Island Hopper",
-    raceID: "",
+    raceID: "4354938",
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday May 5",
