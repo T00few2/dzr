@@ -128,4 +128,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner second time on Volcano KOM',
       linkRoute: 'https://zwiftinsider.com/route/volcano-climb/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Big Foot Hills',
+      world: 'Watopia',
+      laps: '<1',
+      distance: '35.151',
+      elevation: '409',
+      finish: 'Blue banner on Volcano KOM',
+      linkRoute: 'https://zwiftinsider.com/route/big-foot-hills/',
+    }),
 ];
