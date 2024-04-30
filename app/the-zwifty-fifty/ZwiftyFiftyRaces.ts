@@ -122,4 +122,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1,2,3'],
     bonus: ['2.0','1.5','1.0'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'RGV',
+    world: 'France',
+    linkRoute: 'https://zwiftinsider.com/route/rgv/',
+    laps: '2',
+    length: '49.8',
+    hm: '267',
+    climbs: [],
+    sprints: ['Aqueduc KOM Reverse','Ballon Sprint Reverse'],
+    sprintLaps: ['1,2'],
+    bonus: ['3.0','2.0','1.0'],
+  }),
 ];
