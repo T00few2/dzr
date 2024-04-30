@@ -250,9 +250,9 @@ export const ZwiftyFiftyCalender = [
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday May 5",
-    postDate: "01-00-1900",
-    route: "R.G.V",
-    raceID: "",
+    postDate: "04-30-2024",
+    route: "RGV",
+    raceID: "4365735",
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday May 12",
