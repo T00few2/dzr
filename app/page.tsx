@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     siteName: 'DZR',
     images: [
       {
-        url: '/general/DZR_logo.svg',
+        url: 'https://www.dzrracingseries.com/general/DZR_logo.svg',
       },
     ],
     type: 'website',
