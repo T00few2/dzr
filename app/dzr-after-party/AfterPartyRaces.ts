@@ -137,4 +137,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner on Volcano KOM',
       linkRoute: 'https://zwiftinsider.com/route/big-foot-hills/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Rolling Highlands',
+      world: 'Scotland',
+      laps: '3',
+      distance: '32',
+      elevation: '261',
+      finish: 'Banner fourth time on Breakaway Brae',
+      linkRoute: 'https://zwiftinsider.com/route/rolling-highlands/',
+    }),
 ];
