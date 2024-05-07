@@ -134,4 +134,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1,2','1,2'],
     bonus: ['3.0','2.0','1.0'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Innsbruckring',
+    world: 'Innsbruck',
+    linkRoute: 'https://zwiftinsider.com/route/innsbruckring/',
+    laps: '6',
+    length: '53',
+    hm: '463',
+    climbs: ['Leg Snapper KOM'],
+    sprints: ['Leg Snapper KOM'],
+    sprintLaps: ['1,2,3,4,5,6'],
+    bonus: ['1.5','1.0','0.5'],
+  }),
 ];
