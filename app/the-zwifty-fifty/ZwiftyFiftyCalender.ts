@@ -256,9 +256,9 @@ export const ZwiftyFiftyCalender = [
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday May 12",
-    postDate: "01-00-1900",
+    postDate: "05-07-2024",
     route: "Innsbruckring",
-    raceID: "",
+    raceID: "4375488",
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday May 19",
