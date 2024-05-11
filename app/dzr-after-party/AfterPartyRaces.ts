@@ -146,4 +146,13 @@ export const AfterPartyRacesData = [
       finish: 'Banner fourth time on Breakaway Brae',
       linkRoute: 'https://zwiftinsider.com/route/rolling-highlands/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Downtown Titans',
+      world: 'Watopia',
+      laps: '1+',
+      distance: '31.455',
+      elevation: '428',
+      finish: 'Blue Banner second time on Titans Grove KOM Reverse',
+      linkRoute: 'https://zwiftinsider.com/route/downtown-titans/',
+    }),
 ];
