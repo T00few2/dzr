@@ -30,6 +30,7 @@ import { motion } from 'framer-motion';
 import { LiaMountainSolid } from "react-icons/lia";
 import { Im500Px } from "react-icons/im";
 import { AiOutlineAim } from "react-icons/ai";
+import { RiBoxingFill } from "react-icons/ri";
 
 
 interface Props {
@@ -74,9 +75,10 @@ export default function Features() {
       </Stack>
       <Stack  spacing={4} as={Container} maxW={'5xl'} mt={12} mb={20} align={'center'}>
         <SimpleGrid spacing={8} minChildWidth='290px' maxWidth='90%'>
-          <CustomCard href='dzr-after-party' icon = {LiaMountainSolid} heading = 'DZR After Party Series' text1 = 'Uphill finishes' text2= 'Thursdays 17:15 CET | 11:15 AM EST' />
-          <CustomCard href='in-the-zone-2' icon = {AiOutlineAim} heading = 'In The Zone 2' text1 = 'Structured zone 2 group workouts' text2= 'Saturdays 9:30 CET & 14:30 CET' />
-          <CustomCard href='the-zwifty-fifty' icon = {Im500Px} heading = 'The Zwifty Fifty' text1 = '50km (ish) races with sprints for bonus seconds' text2= 'Sundays 14:14 CET | 8:45 AM EST' />
+        <CustomCard href='puncheurs-summer-cup' icon = {RiBoxingFill} heading = 'Puncheurs Summer Cup' text1 = 'Puncheurs Summer Battle' text2= 'Tuesdays in June 19:20 CEST | 1:20 PM EDT' />
+        <CustomCard href='dzr-after-party' icon = {LiaMountainSolid} heading = 'DZR After Party Series' text1 = 'Uphill finishes' text2= 'Thursdays 17:15 CET | 11:15 AM EST' />
+        <CustomCard href='in-the-zone-2' icon = {AiOutlineAim} heading = 'In The Zone 2' text1 = 'Structured zone 2 group workouts' text2= 'Saturdays 9:30 CET & 14:30 CET' />
+        <CustomCard href='the-zwifty-fifty' icon = {Im500Px} heading = 'The Zwifty Fifty' text1 = '50km (ish) races with sprints for bonus seconds' text2= 'Sundays 14:14 CET | 8:45 AM EST' />
         </SimpleGrid>
       </Stack>
     </Box>

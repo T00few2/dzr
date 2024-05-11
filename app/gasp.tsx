@@ -60,7 +60,7 @@ export const DZR_logo = () => {
       }, []); 
   
     return (
-        <Text ref={textRef} color='black' maxW={'5xl'} fontSize={{ base: '5xl', sm: '5xl', md: '7xl' }} fontWeight={900} >
+        <Text ref={textRef} color='floralwhite' maxW={'5xl'} fontSize={{ base: '5xl', sm: '5xl', md: '7xl' }} fontWeight={900} >
             DANISH ZWIFT RACERS
         </Text>
     );
