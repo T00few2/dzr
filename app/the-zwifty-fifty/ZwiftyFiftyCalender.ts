@@ -262,9 +262,9 @@ export const ZwiftyFiftyCalender = [
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday May 19",
-    postDate: "01-00-1900",
+    postDate: "05-17-2024",
     route: "Spiral Into The Volcano",
-    raceID: "",
+    raceID: "4383092",
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday May 26",
