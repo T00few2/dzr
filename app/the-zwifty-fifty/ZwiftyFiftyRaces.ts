@@ -146,4 +146,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1,2,3,4,5,6'],
     bonus: ['1.5','1.0','0.5'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Spiral Into The Volcano',
+    world: 'Watopia',
+    linkRoute: 'https://zwiftinsider.com/route/spiral-into-the-volcano/',
+    laps: '1',
+    length: '55.8',
+    hm: '355',
+    climbs: ['Volcano KOM'],
+    sprints: ['Fuego Flats','Watopia Sprint'],
+    sprintLaps: ['1','1'],
+    bonus: ['6','4','2'],
+  }),
 ];
