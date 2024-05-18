@@ -155,4 +155,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue Banner second time on Titans Grove KOM Reverse',
       linkRoute: 'https://zwiftinsider.com/route/downtown-titans/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'New York KOM After Party',
+      world: 'New York',
+      laps: '1',
+      distance: '37',
+      elevation: '476',
+      finish: 'New York KOM Banner',
+      linkRoute: 'https://zwiftinsider.com/route/nyc-kom-after-party/',
+    }),
 ];
