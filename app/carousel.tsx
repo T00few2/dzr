@@ -31,7 +31,6 @@ export default function Carousel({cards}: ImagesProps) {
   // As we have used custom buttons, we need a reference variable to
   // change the state
   const [slider, setSlider] = React.useState<Slider | null>(null)
-  console.log(cards)
 
   // These are the breakpoints which changes the position of the
   // buttons as the screen size changes
