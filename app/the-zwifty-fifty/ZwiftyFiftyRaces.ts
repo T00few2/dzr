@@ -158,4 +158,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1','1'],
     bonus: ['6','4','2'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Sukis Playground',
+    world: 'Makuri Islands',
+    linkRoute: 'https://zwiftinsider.com/route/sukis-playground/',
+    laps: '3',
+    length: '55.1',
+    hm: '450',
+    climbs: ['Sukis Playground'],
+    sprints: ['Country Sprint'],
+    sprintLaps: ['1,2,3'],
+    bonus: ['3','2','1'],
+  }),
 ];
