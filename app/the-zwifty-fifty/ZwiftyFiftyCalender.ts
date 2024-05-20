@@ -119,7 +119,7 @@ export const ZwiftyFiftyCalender = [
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday December 3",
     postDate: "11-27-2023",
-    route: "Suki's Playground",
+    route: "Sukis Playground",
     raceID: "",
   }),
   new ZwiftyFiftyCalenderTemplate({
@@ -191,7 +191,7 @@ export const ZwiftyFiftyCalender = [
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday February 25",
     postDate: "02-19-2024",
-    route: "Suki's Playground",
+    route: "Sukis Playground",
     raceID: "",
   }),
   new ZwiftyFiftyCalenderTemplate({
@@ -269,7 +269,7 @@ export const ZwiftyFiftyCalender = [
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday May 26",
     postDate: "05-20-2024",
-    route: "Suki's Playground",
+    route: "Sukis Playground",
     raceID: "4390363",
   }),
   new ZwiftyFiftyCalenderTemplate({
