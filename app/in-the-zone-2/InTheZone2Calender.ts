@@ -55,6 +55,15 @@ export class InTheZone2CalenderTemplate {
       stressPoints: '98',
       eventID1: "4353358",
       eventID2: "4353450",
-    })
+    }),
+    new InTheZone2CalenderTemplate({
+      date: "Saturday May 25",
+      postDate: "05-20-2024",
+      workout: "gravel-grinder/week-9-building-base",
+      duration: '2h',
+      stressPoints: '101',
+      eventID1: "4389416",
+      eventID2: "4389511",
+    }),
   ];
   
