@@ -79,5 +79,11 @@ export const AfterPartyCalender = [
     postDate: "05-18-2024",
     route: "New York KOM After Party",
     raceID: "4387785",
+  }),
+  new AfterPartyCalenderTemplate({
+    date: "Thursday May 30",
+    postDate: "05-25-2024",
+    route: "Figure 8 Reverse",
+    raceID: "4395039",
   })
 ];
