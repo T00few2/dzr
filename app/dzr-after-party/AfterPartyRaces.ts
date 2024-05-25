@@ -164,4 +164,13 @@ export const AfterPartyRacesData = [
       finish: 'New York KOM Banner',
       linkRoute: 'https://zwiftinsider.com/route/nyc-kom-after-party/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Figure 8 Reverse',
+      world: 'Watopia',
+      laps: '1+',
+      distance: '37.215',
+      elevation: '362',
+      finish: 'Blue banner second time on Zwift KOM reverse',
+      linkRoute: 'https://zwiftinsider.com/route/figure-8-reverse/',
+    }),
 ];
