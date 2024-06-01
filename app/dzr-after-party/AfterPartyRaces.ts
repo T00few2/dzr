@@ -173,4 +173,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner second time on Zwift KOM reverse',
       linkRoute: 'https://zwiftinsider.com/route/figure-8-reverse/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Innsbruckring',
+      world: 'Innsbruck',
+      laps: '3+',
+      distance: '31.83',
+      elevation: '287',
+      finish: 'Blue banner fourth time on Leg Snapper',
+      linkRoute: 'https://zwiftinsider.com/route/innsbruckring/',
+    }),
 ];
