@@ -173,7 +173,7 @@ export const ZwiftyFiftyCalender = [
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday February 4",
     postDate: "01-29-2024",
-    route: "R.G.V",
+    route: "RGV",
     raceID: "",
   }),
   new ZwiftyFiftyCalenderTemplate({
@@ -274,8 +274,14 @@ export const ZwiftyFiftyCalender = [
   }),
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday June 2",
-    postDate: "01-00-1900",
-    route: "2022 UCI Worlds",
-    raceID: "",
+    postDate: "06-03-2024",
+    route: "Sukis Playground",
+    raceID: "4397897",
+  }),
+  new ZwiftyFiftyCalenderTemplate({
+    date: "Sunday June 9",
+    postDate: "06-03-2024",
+    route: "Bambino Fondo",
+    raceID: "4406237",
   })
 ];
