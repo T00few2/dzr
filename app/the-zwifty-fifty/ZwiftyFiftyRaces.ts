@@ -170,4 +170,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1,2,3'],
     bonus: ['3','2','1'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Bambino Fondo',
+    world: 'Watopia',
+    linkRoute: 'https://zwiftinsider.com/route/bambino-fondo/',
+    laps: '1',
+    length: '52.4',
+    hm: '580',
+    climbs: ['Zwift KOM','EPIC KOM start to Windmills','Jungle Banner to Windmills','Volcano KOM'],
+    sprints: ['JWB Sprint'],
+    sprintLaps: ['1,2'],
+    bonus: ['6','4','2'],
+  }),
 ];
