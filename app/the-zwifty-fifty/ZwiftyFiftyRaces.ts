@@ -177,7 +177,7 @@ export const ZwiftyFiftyRacesData = [
     laps: '1',
     length: '52.4',
     hm: '580',
-    climbs: ['Zwift KOM','EPIC KOM start to Windmills','Jungle Banner to Windmills','Volcano KOM'],
+    climbs: ['Zwift KOM','Epic KOM start to Windmills','Jungle Banner to Windmills','Volcano KOM'],
     sprints: ['JWB Sprint'],
     sprintLaps: ['1,2'],
     bonus: ['6','4','2'],
