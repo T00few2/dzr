@@ -182,4 +182,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1,2'],
     bonus: ['6','4','2'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: '2022 Cycling Esports World Championships Route',
+    world: 'New York',
+    linkRoute: 'https://zwiftinsider.com/route/2022-cycling-esports-world-championships-route/',
+    laps: '1',
+    length: '55',
+    hm: '943',
+    climbs: ['NY KOM'],
+    sprints: ['NY Sprint'],
+    sprintLaps: ['1,2,3'],
+    bonus: ['4','2','1'],
+  }),
 ];
