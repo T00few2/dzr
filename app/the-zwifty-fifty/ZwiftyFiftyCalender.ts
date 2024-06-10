@@ -288,6 +288,6 @@ export const ZwiftyFiftyCalender = [
     date: "Sunday June 16",
     postDate: "06-10-2024",
     route: "2022 Cycling Esports World Championships Route",
-    raceID: "",
+    raceID: "4413175",
   })
 ];
