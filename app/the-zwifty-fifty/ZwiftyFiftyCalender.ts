@@ -47,7 +47,7 @@ export const ZwiftyFiftyCalender = [
   new ZwiftyFiftyCalenderTemplate({
     date: "Sunday September 10",
     postDate: "09-04-2023",
-    route: "Zwift Bambino Fondo",
+    route: "Bambino Fondo",
     raceID: "",
   }),
   new ZwiftyFiftyCalenderTemplate({
@@ -283,5 +283,11 @@ export const ZwiftyFiftyCalender = [
     postDate: "06-03-2024",
     route: "Bambino Fondo",
     raceID: "4406237",
+  }),
+  new ZwiftyFiftyCalenderTemplate({
+    date: "Sunday June 16",
+    postDate: "06-10-2024",
+    route: "2022 Cycling Esports World Championships Route",
+    raceID: "",
   })
 ];
