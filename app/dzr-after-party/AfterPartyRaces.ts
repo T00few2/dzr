@@ -173,4 +173,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner second time on Zwift KOM reverse',
       linkRoute: 'https://zwiftinsider.com/route/figure-8-reverse/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Coastal Crown Loop',
+      world: 'Watopia',
+      laps: '2',
+      distance: '38.8',
+      elevation: '450',
+      finish: 'Banner third time on Mayan Mountainside KOM',
+      linkRoute: 'https://zwiftinsider.com/route/coastal-crown-loop/',
+    }),
 ];
