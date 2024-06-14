@@ -203,7 +203,7 @@ export const ZwiftyFiftyRacesData = [
     hm: '579',
     climbs: ['Mayan Itza The Grade Final Part'],
     sprints: ['Mayan Mountainside KOM','Itza KOM'],
-    sprintLaps: ['1'],
+    sprintLaps: ['1','1'],
     bonus: ['3','2','1'],
   }),
 ];
