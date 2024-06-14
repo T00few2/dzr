@@ -194,4 +194,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1,2,3'],
     bonus: ['4','2','1'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Snowman',
+    world: 'Watopia',
+    linkRoute: 'https://zwiftinsider.com/route/snowman/',
+    laps: '1',
+    length: '44.2',
+    hm: '579',
+    climbs: ['Mayan Itza The Grade Final Part'],
+    sprints: ['Mayan Mountainside KOM','Itza KOM'],
+    sprintLaps: ['1'],
+    bonus: ['3','2','1'],
+  }),
 ];
