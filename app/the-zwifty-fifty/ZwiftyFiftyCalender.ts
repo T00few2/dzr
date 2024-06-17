@@ -289,5 +289,11 @@ export const ZwiftyFiftyCalender = [
     postDate: "06-10-2024",
     route: "Snowman",
     raceID: "4413175",
+  }),
+  new ZwiftyFiftyCalenderTemplate({
+    date: "Sunday June 23",
+    postDate: "06-17-2024",
+    route: "The London Pretzel",
+    raceID: "4420324",
   })
 ];
