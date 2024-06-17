@@ -206,4 +206,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1','1'],
     bonus: ['3','2','1'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Itza Party',
+    world: 'Watopia',
+    linkRoute: 'https://zwiftinsider.com/route/itza-party/',
+    laps: '1',
+    length: '45.7',
+    hm: '506',
+    climbs: ['Zwift KOM','Titans Groove KOM Reverse','Mayan Mountainside KOM Itza KOM'],
+    sprints: ['Woodland Sprint','Sasquatch Sprint','Acropolis Sprint'],
+    sprintLaps: ['1','1','1'],
+    bonus: ['3','2','1'],
+  }),
 ];
