@@ -103,5 +103,11 @@ export const AfterPartyCalender = [
     postDate: "06-14-2024",
     route: "Coastal Crown Loop",
     raceID: "4417558",
+  }),
+  new AfterPartyCalenderTemplate({
+    date: "Thursday June 27",
+    postDate: "06-22-2024",
+    route: "Roule Ma Poule",
+    raceID: "4424598",
   })
 ];
