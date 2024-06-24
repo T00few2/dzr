@@ -295,5 +295,11 @@ export const ZwiftyFiftyCalender = [
     postDate: "06-17-2024",
     route: "The London Pretzel",
     raceID: "4420324",
+  }),
+  new ZwiftyFiftyCalenderTemplate({
+    date: "Sunday June 30",
+    postDate: "06-24-2024",
+    route: "2022 Bambino Fondo",
+    raceID: "4427204",
   })
 ];
