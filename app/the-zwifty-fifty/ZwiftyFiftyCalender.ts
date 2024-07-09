@@ -308,4 +308,10 @@ export const ZwiftyFiftyCalender = [
     route: "Downtown Titans",
     raceID: "4435376",
   }),
+    new ZwiftyFiftyCalenderTemplate({
+    date: "Sunday July 14",
+    postDate: "07-09-2024",
+    route: "Turf N Surf",
+    raceID: "4442224",
+  }),
 ];
