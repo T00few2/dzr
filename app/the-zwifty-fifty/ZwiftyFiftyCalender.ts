@@ -302,16 +302,16 @@ export const ZwiftyFiftyCalender = [
     route: "2022 Bambino Fondo",
     raceID: "4427204",
   }),
-    new ZwiftyFiftyCalenderTemplate({
+  new ZwiftyFiftyCalenderTemplate({
     date: "Sunday July 7",
-    postDate: "07-04-2024",
+    postDate: "04-07-2024",
     route: "Downtown Titans",
     raceID: "4435376",
   }),
-    new ZwiftyFiftyCalenderTemplate({
+  new ZwiftyFiftyCalenderTemplate({
     date: "Sunday July 14",
     postDate: "07-09-2024",
     route: "Turf N Surf",
     raceID: "4442224",
-  }),
+  })
 ];
