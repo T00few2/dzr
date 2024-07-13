@@ -116,23 +116,16 @@ export const AfterPartyCalender = [
     route: "Roule Ma Poule",
     raceID: "4432975",
   }),
-<<<<<<< HEAD
   new AfterPartyCalenderTemplate({
-=======
-    new AfterPartyCalenderTemplate({
->>>>>>> 4d221aca890add3ab0556c8f1a302a0649106638
     date: "Thursday July 11",
     postDate: "07-08-2024",
     route: "Libby Hill After Party+",
     raceID: "4439678",
   }),
-<<<<<<< HEAD
   new AfterPartyCalenderTemplate({
     date: "Thursday July 18",
     postDate: "07-13-2024",
     route: "Country To Coastal",
     raceID: "4446187",
   })
-=======
->>>>>>> 4d221aca890add3ab0556c8f1a302a0649106638
 ];
