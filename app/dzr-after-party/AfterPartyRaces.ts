@@ -182,4 +182,13 @@ export const AfterPartyRacesData = [
       finish: 'Banner third time on Mayan Mountainside KOM',
       linkRoute: 'https://zwiftinsider.com/route/coastal-crown-loop/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Itza Climb Finish',
+      world: 'Watopia',
+      laps: '1',
+      distance: '31',
+      elevation: '293',
+      finish: 'Banner on Itza KOM',
+      linkRoute: 'https://zwiftinsider.com/route/itza-climb-finish/',
+    }),
 ];
