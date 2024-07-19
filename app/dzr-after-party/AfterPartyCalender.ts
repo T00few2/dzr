@@ -131,7 +131,7 @@ export const AfterPartyCalender = [
   new AfterPartyCalenderTemplate({
     date: "Thursday July 25",
     postDate: "07-19-2024",
-    route: "Temples And Towers",
+    route: "Itza Party",
     raceID: "4453026",
   })
 ];
