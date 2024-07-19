@@ -313,5 +313,11 @@ export const ZwiftyFiftyCalender = [
     postDate: "07-09-2024",
     route: "Turf N Surf",
     raceID: "4442224",
+  }),
+  new ZwiftyFiftyCalenderTemplate({
+    date: "Sunday July 21",
+    postDate: "07-19-2024",
+    route: "The Muckle Yin",
+    raceID: "",
   })
 ];
