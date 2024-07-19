@@ -75,7 +75,7 @@ export const AfterPartyRacesData = [
       linkRoute: 'https://zwiftinsider.com/route/out-and-back-again/',
     }),
     new AfterPartyRacesTemplate({
-      route: 'Temples and Towers',
+      route: 'Temples And Towers',
       world: 'Makuri Islands',
       laps: '1+',
       distance: '37.882',
