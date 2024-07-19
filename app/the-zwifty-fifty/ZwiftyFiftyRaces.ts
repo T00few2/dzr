@@ -214,7 +214,7 @@ export const ZwiftyFiftyRacesData = [
     length: '45.7',
     hm: '506',
     climbs: ['Zwift KOM','Titans Groove KOM Reverse','Mayan Mountainside KOM Itza KOM'],
-    sprints: ['Woodland Sprint','Sasquatch Sprint','Acropolis Sprint'],
+    sprints: ['Woodland Sprint Reverse','Sasquatch Sprint Reverse','Acropolis Sprint Reverse'],
     sprintLaps: ['1','1','1'],
     bonus: ['3','2','1'],
   }),
