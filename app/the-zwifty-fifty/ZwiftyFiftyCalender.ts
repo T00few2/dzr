@@ -319,5 +319,11 @@ export const ZwiftyFiftyCalender = [
     postDate: "07-19-2024",
     route: "Itza Party",
     raceID: "4448546",
+  }),
+  new ZwiftyFiftyCalenderTemplate({
+    date: "Sunday July 28",
+    postDate: "07-22-2024",
+    route: "The Muckle Yin",
+    raceID: "4455272",
   })
 ];
