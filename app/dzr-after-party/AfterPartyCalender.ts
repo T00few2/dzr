@@ -133,5 +133,11 @@ export const AfterPartyCalender = [
     postDate: "07-19-2024",
     route: "Itza Climb Finish",
     raceID: "4453026",
+  }),
+  new AfterPartyCalenderTemplate({
+    date: "Thursday August 1",
+    postDate: "07-27-2024",
+    route: "Queens Highway After Party",
+    raceID: "4461644",
   })
 ];
