@@ -191,4 +191,13 @@ export const AfterPartyRacesData = [
       finish: 'Banner on Itza KOM',
       linkRoute: 'https://zwiftinsider.com/route/itza-climb-finish/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Queens Highway After Party',
+      world: 'Yorkshire',
+      laps: '1',
+      distance: '19.9',
+      elevation: '301',
+      finish: 'Banner on Yorkshire KOM Reverse',
+      linkRoute: 'https://zwiftinsider.com/route/queens-highway-after-party/',
+    }),
 ];
