@@ -330,6 +330,6 @@ export const ZwiftyFiftyCalender = [
     date: "Sunday August 4",
     postDate: "07-29-2024",
     route: "2015 UCI Worlds Course",
-    raceID: "",
+    raceID: "4464048",
   })
 ];
