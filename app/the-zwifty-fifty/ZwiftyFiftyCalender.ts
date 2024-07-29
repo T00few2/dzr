@@ -325,5 +325,11 @@ export const ZwiftyFiftyCalender = [
     postDate: "07-22-2024",
     route: "The Muckle Yin",
     raceID: "4455272",
+  }),
+  new ZwiftyFiftyCalenderTemplate({
+    date: "Sunday August 4",
+    postDate: "07-29-2024",
+    route: "2015 UCI Worlds Course",
+    raceID: "",
   })
 ];
