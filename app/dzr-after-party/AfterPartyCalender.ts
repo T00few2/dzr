@@ -139,5 +139,11 @@ export const AfterPartyCalender = [
     postDate: "07-27-2024",
     route: "Queens Highway After Party",
     raceID: "4461644",
+  }),
+  new AfterPartyCalenderTemplate({
+    date: "Thursday August 8",
+    postDate: "08-03-2024",
+    route: "London 8",
+    raceID: "4467958",
   })
 ];
