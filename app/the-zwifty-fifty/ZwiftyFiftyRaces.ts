@@ -96,7 +96,7 @@ export const ZwiftyFiftyRacesData = [
     climbs: ['Libby 23rd Governor'],
     sprints: ['Broad St'],
     sprintLaps: ['1,2,3'],
-    bonus: ['3.0','1.5','1.0'],
+    bonus: ['3.0','2.0','1.0'],
   }),
   new ZwiftyFiftyRacesTemplate({
     route: 'Roule Ma Poule',
