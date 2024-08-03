@@ -200,4 +200,13 @@ export const AfterPartyRacesData = [
       finish: 'Banner on Yorkshire KOM Reverse',
       linkRoute: 'https://zwiftinsider.com/route/queens-highway-after-party/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'London 8',
+      world: 'London',
+      laps: '1+',
+      distance: '35.587',
+      elevation: '408',
+      finish: 'Blue banner second time on Box Hill',
+      linkRoute: 'https://zwiftinsider.com/route/london-8/',
+    }),
 ];
