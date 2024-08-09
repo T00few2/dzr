@@ -331,5 +331,11 @@ export const ZwiftyFiftyCalender = [
     postDate: "07-29-2024",
     route: "2015 UCI Worlds Course",
     raceID: "4464048",
+  }),
+  new ZwiftyFiftyCalenderTemplate({
+    date: "Sunday August 11",
+    postDate: "08-09-2024",
+    route: "Roule Ma Poule",
+    raceID: "4470437",
   })
 ];
