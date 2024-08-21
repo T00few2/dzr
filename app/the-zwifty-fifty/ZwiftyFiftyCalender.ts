@@ -343,5 +343,11 @@ export const ZwiftyFiftyCalender = [
     postDate: "08-15-2024",
     route: "Island Hopper",
     raceID: "4476440",
+  }),
+  new ZwiftyFiftyCalenderTemplate({
+    date: "Sunday August 25",
+    postDate: "08-21-2024",
+    route: "RGV",
+    raceID: "",
   })
 ];
