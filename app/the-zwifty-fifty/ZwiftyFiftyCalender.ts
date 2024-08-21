@@ -348,6 +348,6 @@ export const ZwiftyFiftyCalender = [
     date: "Sunday August 25",
     postDate: "08-21-2024",
     route: "RGV",
-    raceID: "",
+    raceID: "4482601",
   })
 ];
