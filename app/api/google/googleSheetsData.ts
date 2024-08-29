@@ -1,38 +1,8 @@
 "use client"
-
 import { useState, useEffect } from "react";
 import { getSheetData } from "../../../services/google-sheets.action";
-import { ZwiftyFiftyCalenderTemplate } from "@/app/the-zwifty-fifty/ZwiftyFiftyCalender";
+import { CalenderTemplate } from "./calendarTemplate";
 
-
-export class CalenderTemplate {
-  date: string = ''; // Store the formatted date as a string
-  route: string = '';
-  raceID: string = '';
-
-  constructor(initializer?: any) {
-    if (!initializer) return;
-    
-    // Convert the date to a Date object and format it
-    if (initializer.date) {
-      const dateObj = new Date(initializer.date);
-      this.date = this.formatDate(dateObj);
-    }
-
-    if (initializer.route) this.route = initializer.route;
-    if (initializer.raceID) this.raceID = initializer.raceID;
-  }
-
-  // Method to format the date
-  private formatDate(date: Date): string {
-    const options: Intl.DateTimeFormatOptions = { 
-      weekday: 'long', 
-      month: 'long', 
-      day: 'numeric' 
-    };
-    return new Intl.DateTimeFormat('en-US', options).format(date).replace(',', '')
-  }
-}
 
 export function useRaceCalendarAPS() {
   const [sheetData, setSheetData] = useState<any[][] | null>(null); // Initialize state to handle array of arrays or null

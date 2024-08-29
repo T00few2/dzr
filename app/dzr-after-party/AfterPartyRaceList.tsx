@@ -20,6 +20,7 @@ interface RaceProps {
 
 
 export default function AfterPartyRaceList({ nextDate }: RaceProps) {
+
     const AfterPartyCalender = useRaceCalendarAPS()
     
     const nextRace = AfterPartyCalender.filter(date => date.date === nextDate);

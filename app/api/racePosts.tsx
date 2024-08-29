@@ -1,10 +1,13 @@
+import next from "next";
+import { ZwiftyFiftyCalender } from "../the-zwifty-fifty/ZwiftyFiftyCalender";
+import { AfterPartyCalender } from "../dzr-after-party/AfterPartyCalender";
+import {useRaceCalendarAPS, useRaceCalendarZF} from '../api/google/googleSheetsData';
 import { AfterPartyRacesData } from "../dzr-after-party/AfterPartyRaces";
 import { ZwiftyFiftyRacesData } from "../the-zwifty-fifty/ZwiftyFiftyRaces";
-import { CalenderTemplate } from "./google/googleSheetsData";
 
-export function racePosts(ZwiftyFiftyCalender : CalenderTemplate[], AfterPartyCalender : CalenderTemplate[]) {
-    //const AfterPartyCalender = useRaceCalendarAPS()
-    //const ZwiftyFiftyCalender = useRaceCalendarZF()
+export function racePosts() {
+    const AfterPartyCalender = useRaceCalendarAPS()
+    const ZwiftyFiftyCalender = useRaceCalendarZF()
     const tzfRaces = ZwiftyFiftyCalender.filter(data => data.raceID !== '');
     const dafRaces = AfterPartyCalender.filter(data => data.raceID !== '');
     
