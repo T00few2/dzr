@@ -34,7 +34,7 @@ export class CalenderTemplate {
   }
 }
 
-export function raceCalendarAPS() {
+export function useRaceCalendarAPS() {
   const [sheetData, setSheetData] = useState<any[][] | null>(null); // Initialize state to handle array of arrays or null
   const [calendarDataAPS, setCalendarDataAPS] = useState<CalenderTemplate[]>([]); // State to hold instances of AfterPartyCalenderTemplate
 
@@ -76,7 +76,7 @@ export function raceCalendarAPS() {
   return calendarDataAPS;
 }
 
-export function raceCalendarZF() {
+export function useRaceCalendarZF() {
   const [sheetData, setSheetData] = useState<any[][] | null>(null); // Initialize state to handle array of arrays or null
   const [calendarDataZF, setCalendarDataZF] = useState<CalenderTemplate[]>([]); 
 

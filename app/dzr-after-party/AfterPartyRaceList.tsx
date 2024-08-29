@@ -2,7 +2,7 @@
 import React from 'react';
 import { AfterPartyRacesData } from './AfterPartyRaces';
 import Carousel from '../carousel';
-import {raceCalendarAPS} from '../api/google/googleSheetsData';
+import {useRaceCalendarAPS} from '../api/google/googleSheetsData';
 
 import {
     Heading,
@@ -20,7 +20,7 @@ interface RaceProps {
 
 
 export default function AfterPartyRaceList({ nextDate }: RaceProps) {
-    const AfterPartyCalender = raceCalendarAPS()
+    const AfterPartyCalender = useRaceCalendarAPS()
     
     const nextRace = AfterPartyCalender.filter(date => date.date === nextDate);
     
