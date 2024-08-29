@@ -1,11 +1,18 @@
 import axios from 'axios';
 import { racePosts } from "../racePosts";
+import { useRaceCalendarAPS, useRaceCalendarZF } from '../google/googleSheetsData';
 
 
 
 export async function POST(req: Request) {
   const raceSeries = req.headers.get('raceseries');
-  const Races = racePosts().slice(-5)
+
+  // Fetch data using hooks
+  const afterPartyCalendar = useRaceCalendarAPS();
+  const zwiftyFiftyCalendar = useRaceCalendarZF();
+
+  // Generate the race posts
+  const Races = racePosts(zwiftyFiftyCalendar, afterPartyCalendar).slice(-5);
   const race = Races.filter(race => race.raceSeries === raceSeries).slice(-1)[0];
   const imageUrl1 =`https://www.dzrracingseries.com/${race.raceSeries.toLowerCase().replace(/\s+/g, '-')}/${race.route.toLowerCase().replace(/\s+/g, '-')}/${race.route.split(' ').join('-')}-profile.png`
 
