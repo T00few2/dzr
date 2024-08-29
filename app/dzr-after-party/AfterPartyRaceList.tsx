@@ -1,49 +1,31 @@
 'use client'
 import React from 'react';
-import { AfterPartyCalender } from './AfterPartyCalender';
 import { AfterPartyRacesData } from './AfterPartyRaces';
 import Carousel from '../carousel';
+import {useRaceCalendar} from '../api/google/googleSheetsData';
+
 
 import {
-    Container,
-    SimpleGrid,
-    Image,
-    Flex,
     Heading,
     Text,
     Stack,
-    StackDivider,
-    Icon,
-    useColorModeValue,
-    List,
-    ListItem,
-    ListIcon,
-    Box,
     Link,
-    Table,
-    Thead,
-    Tbody,
-    Tfoot,
-    Tr,
-    Th,
-    Td,
-    TableCaption,
-    TableContainer,
-    Center,
     Divider
   } from '@chakra-ui/react'
 
 import { ExternalLinkIcon } from '@chakra-ui/icons'
-
-import Slider from 'react-slick';
 
 interface RaceProps {
   nextDate: string;
 }
 
 
-function AfterPartyRaceList({ nextDate }: RaceProps) {
+export default function AfterPartyRaceList({ nextDate }: RaceProps) {
+    const AfterPartyCalender = useRaceCalendar()
+    
+
     const nextRace = AfterPartyCalender.filter(date => date.date === nextDate);
+    
     const nextRouteName = nextRace.map((nextRace) =>(nextRace.route));
     const nextRouteDetails = AfterPartyRacesData.filter(race => nextRouteName.includes(race.route));
     
@@ -90,4 +72,3 @@ function AfterPartyRaceList({ nextDate }: RaceProps) {
     );
 }
 
-export default AfterPartyRaceList;
