@@ -1,6 +1,7 @@
 'use client'
 import React from 'react';
 import { ZwiftyFiftyCalender } from './ZwiftyFiftyCalender';
+import { raceCalendarZF } from '../api/google/googleSheetsData';
 import { ZwiftyFiftyRacesData } from './ZwiftyFiftyRaces';
 import Carousel from '../carousel';
 
@@ -24,6 +25,7 @@ interface RaceProps {
 }
 
 function RaceList({ nextDate }: RaceProps) {
+    const ZwiftyFiftyCalender = raceCalendarZF()
     const nextRace = ZwiftyFiftyCalender.filter(date => date.date === nextDate);
     const nextRouteName = nextRace.map((nextRace) =>(nextRace.route));
     const nextRouteDetails = ZwiftyFiftyRacesData.filter(race => nextRouteName.includes(race.route));
