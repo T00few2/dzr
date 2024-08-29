@@ -27,6 +27,6 @@ export async function getSheetData() {
         spreadsheetId: "1lut3HrhO45Lz__-yNgjQMk5crU_eIN7nzc1pzcx2uoQ",
         range: 'Zwifty Fifty!A1:C100',
     });
-    
+        
     return { APSdata: APSdata.data.values, ZFdata: ZFdata.data.values };
 }

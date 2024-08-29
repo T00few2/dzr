@@ -1,12 +1,13 @@
 import next from "next";
 import { ZwiftyFiftyCalender } from "../the-zwifty-fifty/ZwiftyFiftyCalender";
 import { AfterPartyCalender } from "../dzr-after-party/AfterPartyCalender";
-import {useRaceCalendar} from '../api/google/googleSheetsData';
+import {raceCalendarAPS, raceCalendarZF} from '../api/google/googleSheetsData';
 import { AfterPartyRacesData } from "../dzr-after-party/AfterPartyRaces";
 import { ZwiftyFiftyRacesData } from "../the-zwifty-fifty/ZwiftyFiftyRaces";
 
 export function racePosts() {
-    const AfterPartyCalender = useRaceCalendar()
+    const AfterPartyCalender = raceCalendarAPS()
+    const ZwiftyFiftyCalender = raceCalendarZF()
     const tzfRaces = ZwiftyFiftyCalender.filter(data => data.raceID !== '');
     const dafRaces = AfterPartyCalender.filter(data => data.raceID !== '');
     
@@ -25,10 +26,10 @@ export function racePosts() {
             elevation: afterPartyRaceData.elevation,
             finish: afterPartyRaceData.finish,
             linkRoute: afterPartyRaceData.linkRoute,
-            climbs: '',
-            sprints: '',
-            sprintLaps: '',
-            bonus: '',
+            climbs: [''],
+            sprints: [''],
+            sprintLaps: [''],
+            bonus: [''],
             }
         } else {
             return race;
@@ -57,8 +58,10 @@ export function racePosts() {
             return race;
         }
     });
+    
 
     const allRaces = tzfRaces_.concat(dafRaces_);
+    
 
     // Sort allRaces by postDate
     allRaces.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
