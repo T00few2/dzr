@@ -1,13 +1,11 @@
 export class ZwiftyFiftyCalenderTemplate {
   date: string = '';
-  postDate: Date = new Date();
   route: string = '';
   raceID: string = '';
 
   constructor(initializer?: any) {
     if (!initializer) return;
     if (initializer.date) this.date = initializer.date;
-    if (initializer.postDate) this.postDate = initializer.postDate;
     if (initializer.route) this.route = initializer.route;
     if (initializer.raceID) this.raceID = initializer.raceID;
   }
