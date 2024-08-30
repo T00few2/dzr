@@ -10,7 +10,9 @@ import {
     Text,
     Stack,
     Link,
-    Divider
+    Divider,
+    Spinner,
+    Center
   } from '@chakra-ui/react'
 
 import { ExternalLinkIcon } from '@chakra-ui/icons'
@@ -18,8 +20,19 @@ import { CalenderTemplate } from '../api/google/calendarTemplate';
 
 export default function AfterPartyRaceList() {
 
-    const AfterPartyCalender = useRaceCalendarAPS()
-    const nextRace = AfterPartyCalender.filter(data => data.raceID !== '').slice(-1) as CalenderTemplate[]
+    const { calendarDataAPS, loading } = useRaceCalendarAPS();
+
+    // Handle loading state
+    if (loading) {
+        return (
+          <Center height="100vh" flexDirection="column" justifyContent="flex-start" mt="0">
+            <Spinner size="xl" color="orange.500" />
+            <Text color={'white'} mt={4}>Loading race data...</Text>
+          </Center>
+        );
+      }
+
+    const nextRace = calendarDataAPS.filter(data => data.raceID !== '').slice(-1) as CalenderTemplate[]
     const nextRouteName = nextRace.map((nextRace) =>(nextRace.route));
     const nextRouteDetails = AfterPartyRacesData.filter(race => nextRouteName.includes(race.route));
     
