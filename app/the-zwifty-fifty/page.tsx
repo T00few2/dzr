@@ -36,7 +36,7 @@ export const metadata: Metadata = {
 }
 
 export default function thezwiftyfiftypage() {
-  const formattedDate = formatNextSunday();
+  
   return (
     <div style={{backgroundColor:'black'}}>
       <Container maxW={{base: '90%', md: '5xl'}} py={0} mb={20}>
@@ -63,7 +63,7 @@ export default function thezwiftyfiftypage() {
             <ZwiftyFiftyRules />
 
             
-            <RaceList nextDate={formattedDate} />
+            <RaceList/>
           </Stack>
           
         </SimpleGrid>

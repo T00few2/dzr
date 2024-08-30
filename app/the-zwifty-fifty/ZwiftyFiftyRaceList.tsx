@@ -1,9 +1,9 @@
 'use client'
 import React from 'react';
-import { ZwiftyFiftyCalender } from './ZwiftyFiftyCalender';
 import { useRaceCalendarZF } from '../api/google/googleSheetsData';
 import { ZwiftyFiftyRacesData } from './ZwiftyFiftyRaces';
 import Carousel from '../carousel';
+import { CalenderTemplate } from '../api/google/calendarTemplate';
 
 import {
     Heading,
@@ -24,9 +24,9 @@ interface RaceProps {
   nextDate: string;
 }
 
-function RaceList({ nextDate }: RaceProps) {
+function RaceList() {
     const ZwiftyFiftyCalender = useRaceCalendarZF()
-    const nextRace = ZwiftyFiftyCalender.filter(date => date.date === nextDate);
+    const nextRace = ZwiftyFiftyCalender.filter(data => data.raceID !== '').slice(-1) as CalenderTemplate[]
     const nextRouteName = nextRace.map((nextRace) =>(nextRace.route));
     const nextRouteDetails = ZwiftyFiftyRacesData.filter(race => nextRouteName.includes(race.route));
        
@@ -34,8 +34,8 @@ function RaceList({ nextDate }: RaceProps) {
         <Stack spacing={6}>
             {nextRace.map((nextRace)=>(
                 nextRouteDetails.map((nextRouteDetails)=>(
-                    <Stack key={nextDate} spacing={6}>
-                        <Heading as='h1' size ='lg' color={'white'}>{nextDate}</Heading>
+                    <Stack key={nextRace.date} spacing={6}>
+                        <Heading as='h1' size ='lg' color={'white'}>{nextRace.date}</Heading>
                         <Heading as='h2' size ='md' color={'white'}>14:45 CET | 8:45 AM EST</Heading>
                         <TableContainer  textAlign="center">
                             <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>

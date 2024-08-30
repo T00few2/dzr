@@ -4,6 +4,7 @@ import { AfterPartyRacesData } from './AfterPartyRaces';
 import Carousel from '../carousel';
 import {useRaceCalendarAPS} from '../api/google/googleSheetsData';
 
+
 import {
     Heading,
     Text,
@@ -13,26 +14,33 @@ import {
   } from '@chakra-ui/react'
 
 import { ExternalLinkIcon } from '@chakra-ui/icons'
+import { CalenderTemplate } from '../api/google/calendarTemplate';
 
-interface RaceProps {
-  nextDate: string;
-}
-
-
-export default function AfterPartyRaceList({ nextDate }: RaceProps) {
+export default function AfterPartyRaceList() {
 
     const AfterPartyCalender = useRaceCalendarAPS()
-    
-    const nextRace = AfterPartyCalender.filter(date => date.date === nextDate);
-    
+    const nextRace = AfterPartyCalender.filter(data => data.raceID !== '').slice(-1) as CalenderTemplate[]
     const nextRouteName = nextRace.map((nextRace) =>(nextRace.route));
     const nextRouteDetails = AfterPartyRacesData.filter(race => nextRouteName.includes(race.route));
     
     return (
         <Stack spacing={6}>
-            {nextRace.map((nextRace)=>(
+        
+                {nextRace.map((nextRace)=>(
                 nextRouteDetails.map((nextRouteDetails)=>(
-                    <Stack key={nextDate} spacing={6}>
+                    
+                    <Stack key={nextRace.date} spacing={6}>
+                        <Text color={'white'} fontSize={'md'} align={'center'}>A weekly race series with carefully selected routes all finishing uphill (aka after parties).
+                        Check out the coming race below and study the profile to know when to start the sprint. Use Zwift link to join race. Race calendar in menu. <br /><br />
+                        Ride on!</Text>
+                        <center>
+                        <Divider width='50%'/>
+                        <br />
+                        <Heading as='h1' color={'white'}>{nextRace.date}</Heading>
+                        <Heading color={'white'}>17:15 CET | 11:15 AM EST</Heading>
+                        <br />
+                        <Divider width='50%'/>
+                        </center>
                         <center>
                             <Text color={'white'}>World: {nextRouteDetails.world}</Text>  
                             <Text color={'white'}>Route: {nextRouteDetails.route}</Text>  
