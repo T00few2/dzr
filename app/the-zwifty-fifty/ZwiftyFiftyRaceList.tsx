@@ -4,6 +4,7 @@ import { useRaceCalendarZF } from '../api/google/googleSheetsData';
 import { ZwiftyFiftyRacesData } from './ZwiftyFiftyRaces';
 import Carousel from '../carousel';
 import { CalenderTemplate } from '../api/google/calendarTemplate';
+import ZwiftyFiftyRules from './ZwiftyFiftyRules';
 
 import {
     Heading,
@@ -16,6 +17,9 @@ import {
     Th,
     Td,
     TableContainer,
+    Center,
+    Spinner,
+    Text
   } from '@chakra-ui/react'
 
 import { ExternalLinkIcon } from '@chakra-ui/icons'
@@ -25,8 +29,19 @@ interface RaceProps {
 }
 
 function RaceList() {
-    const ZwiftyFiftyCalender = useRaceCalendarZF()
-    const nextRace = ZwiftyFiftyCalender.filter(data => data.raceID !== '').slice(-1) as CalenderTemplate[]
+    const { calendarDataZF, loadingZF } = useRaceCalendarZF();
+
+    // Handle loading state
+    if (loadingZF) {
+        return (
+            <Center height="100vh" flexDirection="column" justifyContent="flex-start" mt="0">
+            <Spinner size="xl" color="orange.500" />
+            <Text color={'white'} mt={4}>Loading race data...</Text>
+            </Center>
+        );
+        }
+
+    const nextRace = calendarDataZF.filter(data => data.raceID !== '').slice(-1) as CalenderTemplate[]
     const nextRouteName = nextRace.map((nextRace) =>(nextRace.route));
     const nextRouteDetails = ZwiftyFiftyRacesData.filter(race => nextRouteName.includes(race.route));
        
@@ -35,6 +50,16 @@ function RaceList() {
             {nextRace.map((nextRace)=>(
                 nextRouteDetails.map((nextRouteDetails)=>(
                     <Stack key={nextRace.date} spacing={6}>
+                        <Heading color={'white'}>The Zwifty Fifty</Heading>
+            <Text color={'white'} fontSize={'lg'} whiteSpace="pre-line">
+            When 25 is too little and 100 is too much. <br /><br />
+            DZR brings to you the Goldilocks of Zwift racing intensity and endurance. With weekly races at about 50km the races are not too short and intensive to build stamina and not too long and time consuming to actually get done. They are just right. And they are on every Sunday 14:45 CET | 8:45 AM EST.
+            </Text>
+            <Heading color={'white'} fontSize={'2xl'}>Rules:</Heading>
+
+            <ZwiftyFiftyRules />
+
+            
                         <Heading as='h1' size ='lg' color={'white'}>{nextRace.date}</Heading>
                         <Heading as='h2' size ='md' color={'white'}>14:45 CET | 8:45 AM EST</Heading>
                         <TableContainer  textAlign="center">
