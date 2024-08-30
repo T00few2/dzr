@@ -12,7 +12,7 @@ import {
     Link,
     Divider,
     Spinner,
-    Center
+    Box
   } from '@chakra-ui/react'
 
 import { ExternalLinkIcon } from '@chakra-ui/icons'
@@ -25,11 +25,23 @@ export default function AfterPartyRaceList() {
     // Handle loading state
     if (loading) {
         return (
-          <Center height="100vh" flexDirection="column" justifyContent="flex-start" mt="0">
-            <Spinner size="xl" color="orange.500" />
-            <Text color={'white'} mt={4}>Loading race data...</Text>
-          </Center>
-        );
+            <>
+              <Box
+                position="fixed"
+                top="50%"
+                left="50%"
+                transform="translate(-50%, -50%)"
+                zIndex="9999" // Ensure the spinner is on top of other content
+                display="flex"
+                flexDirection="column"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Spinner size="xl" color="orange.500"   borderWidth="10px" />
+                <Text color={'white'} mt={4}>Loading race data...</Text>
+              </Box>
+            </>
+          );
       }
 
     const nextRace = calendarDataAPS.filter(data => data.raceID !== '').slice(-1) as CalenderTemplate[]
