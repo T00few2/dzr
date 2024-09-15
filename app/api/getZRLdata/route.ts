@@ -69,7 +69,8 @@ export async function GET() {
     fs.writeFileSync(outputFilePath, JSON.stringify(data, null, 2));
     console.log('Data saved to:', outputFilePath);
 
-    return NextResponse.json(data);
+    // Return a simple success message
+    return NextResponse.json({ message: 'Data saved' });
 
   } catch (error) {
     if (error instanceof Error) {
