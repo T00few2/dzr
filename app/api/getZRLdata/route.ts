@@ -5,12 +5,13 @@ import path from 'path';
 // Define the type for divisionIdList
 type DivisionIdList = { [key: string]: string };
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Parse the race query parameter from the request URL
+  const { searchParams } = new URL(request.url);
+  const race = searchParams.get('race') ? parseInt(searchParams.get('race')!) : 1; // Default to race 1 if not provided
+
   // Path to the division_ids.json file
   const divisionFilePath = path.join(process.cwd(), 'app/api/getZRLdata/division_ids.json');
-
-  // Define the race variable (for demonstration, you might want to parameterize this)
-  const race = 1;
 
   // Path to the output directory and file
   const outputDirPath = path.join(process.cwd(), 'public/ZRLresults');
