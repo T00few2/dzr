@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
+export const maxDuration = 60;
+
 // Define the type for divisionIdList
 type DivisionIdList = { [key: string]: string };
 
