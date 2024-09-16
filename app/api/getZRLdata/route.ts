@@ -32,8 +32,8 @@ export async function GET(request: Request) {
     
     const headers = {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0",
-      "Authorization": "Bearer ZWYzM2RjYTcwZjg3YTA3MzgzM2MzMTU1NzM3YWY2M2Y=", 
-      "Cookie": "wtrl_sid=ef33dca70f87a073833c3155737af63f; wtrl_ouid=eyJpYXQiOjE3MjYzNDk1OTMsImVhdCI6MTcyNjQzNTk5MywicHJvZmlsZV9waWMiOiJodHRwczpcL1wvc3RhdGljLWNkbi56d2lmdC5jb21cL3Byb2RcL3Byb2ZpbGVcLzJkMWM4MTAyLTM4MTA2MSIsImZpcnN0X25hbWUiOiJDaHJpc3RpYW4iLCJsYXN0X25hbWUiOiJLalx1MDBlNnIiLCJlbWFpbCI6ImNocmlzdGlhbi5ramFyQGdtYWlsLmNvbSIsInVzZXJDbGFzcyI6IjEiLCJ6d2lmdElkIjoiMTU2OTAiLCJ1c2VySWQiOiIzNjk1NCIsImNvdW50cnlfaWQiOiIyMDgiLCJnZW5kZXIiOiJNYWxlIiwicmFjZVRlYW0iOiIwIn0%3D.ef33dca70f87a073833c3155737af63f",
+      "Authorization": `Bearer ${process.env.WTRL_AUTH_TOKEN}`,
+      "Cookie": `wtrl_sid=${process.env.WTRL_SID}; wtrl_ouid=${process.env.WTRL_OUID}`,
     };
 
     const response = await fetch(url, { headers });
