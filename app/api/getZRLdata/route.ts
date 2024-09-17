@@ -1,11 +1,20 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 export const maxDuration = 60;
 
 // Define the type for divisionIdList
 type DivisionIdList = { [key: string]: string };
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION, // Set your AWS region
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
 
 export async function GET(request: Request) {
   // Parse the race query parameter from the request URL
@@ -14,10 +23,6 @@ export async function GET(request: Request) {
 
   // Path to the division_ids.json file
   const divisionFilePath = path.join(process.cwd(), 'app/api/getZRLdata/division_ids.json');
-
-  // Path to the output directory and file
-  const outputDirPath = path.join(process.cwd(), 'public/ZRLresults');
-  const outputFilePath = path.join(outputDirPath, `race_${race}.json`);
 
   let divisionIdList: DivisionIdList;
   try {
@@ -63,17 +68,23 @@ export async function GET(request: Request) {
       }
     }
 
-    // Ensure the directory exists
-    if (!fs.existsSync(outputDirPath)) {
-      fs.mkdirSync(outputDirPath, { recursive: true });
-    }
+    // Define the S3 bucket and file path
+    const s3BucketName = process.env.AWS_S3_BUCKET_NAME!;
+    const s3FilePath = `race_${race}.json`;
 
-    // Save the data to a JSON file
-    fs.writeFileSync(outputFilePath, JSON.stringify(data, null, 2));
-    console.log('Data saved to:', outputFilePath);
+    // Save the data to S3
+    const putObjectParams = {
+      Bucket: s3BucketName,
+      Key: s3FilePath,
+      Body: JSON.stringify(data, null, 2),
+      ContentType: 'application/json',
+    };
+
+    await s3Client.send(new PutObjectCommand(putObjectParams));
+    console.log('Data saved to S3:', s3FilePath);
 
     // Return a simple success message
-    return NextResponse.json({ message: 'Data saved' });
+    return NextResponse.json({ message: 'Data saved to S3' });
 
   } catch (error) {
     if (error instanceof Error) {
