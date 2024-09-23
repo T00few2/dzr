@@ -218,4 +218,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1','1','1'],
     bonus: ['3','2','1'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Greater London 8',
+    world: 'London',
+    linkRoute: 'https://zwiftinsider.com/route/greater-london-8/',
+    laps: '2',
+    length: '48.1',
+    hm: '556',
+    climbs: ['Box Hill'],
+    sprints: ['Box Hill'],
+    sprintLaps: ['1,2'],
+    bonus: ['3','2','1'],
+  }),
 ];
