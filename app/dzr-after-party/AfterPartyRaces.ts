@@ -209,4 +209,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner second time on Box Hill',
       linkRoute: 'https://zwiftinsider.com/route/london-8/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Glyph Heights',
+      world: 'Watopia',
+      laps: '1',
+      distance: '34',
+      elevation: '618',
+      finish: 'Banner second time on Mayan Mountainside KOM',
+      linkRoute: 'https://zwiftinsider.com/route/glyph-heights/',
+    }),
 ];
