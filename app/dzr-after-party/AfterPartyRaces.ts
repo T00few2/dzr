@@ -219,8 +219,8 @@ export const AfterPartyRacesData = [
       linkRoute: 'https://zwiftinsider.com/route/glyph-heights/',
     }),
     new AfterPartyRacesTemplate({
-      route: 'Roule Ma Poule',
-      world: 'France',
+      route: 'Cobbled Climbs',
+      world: 'Richmond',
       laps: '3+',
       distance: '33.411',
       elevation: '262',
