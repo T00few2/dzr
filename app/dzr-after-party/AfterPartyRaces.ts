@@ -218,4 +218,13 @@ export const AfterPartyRacesData = [
       finish: 'Banner second time on Mayan Mountainside KOM',
       linkRoute: 'https://zwiftinsider.com/route/glyph-heights/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Roule Ma Poule',
+      world: 'France',
+      laps: '3+',
+      distance: '33.411',
+      elevation: '262',
+      finish: 'Blue banner fourth time on Libby Hill',
+      linkRoute: 'https://zwiftinsider.com/route/cobbled-climbs/',
+    }),
 ];
