@@ -66,7 +66,8 @@ export default function stagespage() {
             Welcome to STAGES by DZR: Stage Racing Done Right. {'\n\n'}
             
 
-            A very challenging stage race where the winner is the rider finishing all four stages using the least time (as it should be). As a new feature, 
+            A very challenging stage race where the winner is the rider finishing all four stages using the least time (as it should be). {'\n\n'}
+            As a new feature, 
             a minimum 3 seconds time gap rule will be applied (iTT excluded) on the finish line. Riders finishing within a 3 seconds time gap will be noted for the same time.{'\n\n'}
             Otherwise, time is won on the initial iTT, on bonus sprints in The Sprint, a proper breakaway in The Break Away, and on the hill finish in The Hill. 
             Bonus seconds are also awarded at the finish line of The Sprint, The Break Away, and The Hill.
@@ -131,17 +132,17 @@ export default function stagespage() {
                 </Tbody>
                 </Table>
             </TableContainer>
-            {/*
+           
             <Heading color={'white'} fontSize={'2xl'}>Route Profiles</Heading>
             <Carousel
               cards={[
-                '/puncheurs-summer-cup/Stage1.png',
-                '/puncheurs-summer-cup/Stage2.png',
-                '/puncheurs-summer-cup/Stage3.png',
-                '/puncheurs-summer-cup/Stage4.png',
+                '/stages/stage1.jpeg',
+                '/stages/stage2.png',
+                '/stages/stage3.jpeg',
+                '/stages/stage4.png',
                   ]}
               />
-
+             {/*
             <Heading color={'white'} fontSize={'2xl'}>Point Structure</Heading>
             <Heading color={'white'} fontSize={'md'}>Most accumulated points in the four stages takes the overall win</Heading>
             <Heading color={'white'} fontSize={'md'}>Points in the stages are divided according to</Heading>
