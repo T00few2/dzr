@@ -1,4 +1,4 @@
-import ZwiftyFiftyRules from '../the-zwifty-fifty/ZwiftyFiftyRules';
+import StagesRules from './stagesrules';
 import Carousel from '../carousel';
 
 import {
@@ -61,14 +61,18 @@ export default function stagespage() {
           </Flex>
           <Stack spacing={4}>
 
-            <Heading color={'white'}>STAGES by DZR</Heading>
+            
             <Text color={'white'} fontSize={'lg'} whiteSpace="pre-line">
-            Welcome to STAGES by DZR: Stage Racing Done Right.
+            Welcome to STAGES by DZR: Stage Racing Done Right. {'\n\n'}
+            
 
-            A very challenging stage race to fill out the gap between ZRL rounds 1 and 2. The winner is the rider finishing all four stages using the least time (as it should be!). As a new feature, riders finishing within 3 seconds will be noted for the same time. Otherwise, time is won on the initial iTT, on bonus sprints in The Sprint, a proper breakaway in The Break Away, and on the hill finish in The Hill. Bonus seconds are also awarded at the finish line of The Sprint, The Break Away, and The Hill.
+            A very challenging stage race where the winner is the rider finishing all four stages using the least time (as it should be). As a new feature, 
+            a minimum 3 seconds time gap rule will be applied (iTT excluded) on the finish line. Riders finishing within a 3 seconds time gap will be noted for the same time.{'\n\n'}
+            Otherwise, time is won on the initial iTT, on bonus sprints in The Sprint, a proper breakaway in The Break Away, and on the hill finish in The Hill. 
+            Bonus seconds are also awarded at the finish line of The Sprint, The Break Away, and The Hill.
             </Text>
             <Heading color={'white'} fontSize={'2xl'}>Rules</Heading>
-            <ZwiftyFiftyRules />
+            <StagesRules />
             <Heading color={'white'} fontSize={'2xl'}>Stages Overview</Heading>
             <Heading color={'white'} fontSize={'md'}>Tuesdays in June @ 19:20 CEST | 1:20 PM EDT</Heading>
             <TableContainer  textAlign="center">
@@ -154,6 +158,80 @@ export default function stagespage() {
                 </Table>
             </TableContainer>
             */}
+            <Heading color={'white'} fontSize={'2xl'}>Bonus Seconds</Heading>
+            <Heading color={'white'} fontSize={'xl'}>Stage 2</Heading>
+            <Heading color={'white'} fontSize={'sm'}>First Across Line (FAL) bonus seconds are awared on segments below</Heading>
+            <TableContainer  textAlign="center">
+                <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
+                <Thead>
+                    <Tr>
+                    <Th textAlign="center" textColor={'white'}>Segment</Th>
+                    <Th textAlign="center" textColor={'white'}>Yorkshire Sprint</Th>
+                    </Tr>
+                </Thead>
+                <Tbody>
+                <Tr>
+                    <Td textAlign="center">Laps</Td>
+                    <Td textAlign="center">2 , 4 , 6 , 8</Td>
+
+                </Tr>
+                </Tbody>
+                </Table>
+            </TableContainer>
+
+            <Heading color={'white'} fontSize={'sm'}>Bonus seconds on each sprint are awarded according to</Heading>
+
+            <TableContainer  textAlign="center">
+                <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
+                <Thead>
+                    <Tr>
+                    <Th textAlign="center" textColor={'white'}>Position</Th>
+                    <Th textAlign="center" textColor={'white'}>1</Th>
+                    <Th textAlign="center" textColor={'white'}>2</Th>
+                    <Th textAlign="center" textColor={'white'}>3</Th>
+                    <Th textAlign="center" textColor={'white'}>4</Th>
+                    <Th textAlign="center" textColor={'white'}>5</Th>
+                    </Tr>
+                </Thead>
+                <Tbody>
+                <Tr>
+                    <Td textAlign="center">Bonus Seconds</Td>
+                    <Td textAlign="center">10</Td>
+                    <Td textAlign="center">8</Td>
+                    <Td textAlign="center">6</Td>
+                    <Td textAlign="center">4</Td>
+                    <Td textAlign="center">2</Td>
+                </Tr>
+                </Tbody>
+                </Table>
+            </TableContainer>
+            <Heading color={'white'} fontSize={'xl'}>Stage 2, 3 & 4</Heading>
+            <Heading color={'white'} fontSize={'sm'}>Bonus seconds are awared to top 5 on the finish line according to</Heading>
+            <TableContainer  textAlign="center">
+                <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
+                <Thead>
+                    <Tr>
+                    <Th textAlign="center" textColor={'white'}>Position</Th>
+                    <Th textAlign="center" textColor={'white'}>1</Th>
+                    <Th textAlign="center" textColor={'white'}>2</Th>
+                    <Th textAlign="center" textColor={'white'}>3</Th>
+                    <Th textAlign="center" textColor={'white'}>4</Th>
+                    <Th textAlign="center" textColor={'white'}>5</Th>
+                    </Tr>
+                </Thead>
+                <Tbody>
+                <Tr>
+                    <Td textAlign="center">Bonus Seconds</Td>
+                    <Td textAlign="center">10</Td>
+                    <Td textAlign="center">8</Td>
+                    <Td textAlign="center">6</Td>
+                    <Td textAlign="center">4</Td>
+                    <Td textAlign="center">2</Td>
+                </Tr>
+                </Tbody>
+                </Table>
+            </TableContainer>
+
             <Heading color={'white'} fontSize={'2xl'}>Results</Heading>
             <Heading color={'white'} fontSize={'md'}>Keep track of your performance and progress throughout the series on : <Link  color={'orange'} href = 'https://zwiftpower.com/league.php?id=2459' target='_Blank' isExternal>ZwiftPower</Link></Heading>
             
