@@ -142,23 +142,7 @@ export default function stagespage() {
                 '/stages/stage4.png',
                   ]}
               />
-             {/*
-            <Heading color={'white'} fontSize={'2xl'}>Point Structure</Heading>
-            <Heading color={'white'} fontSize={'md'}>Most accumulated points in the four stages takes the overall win</Heading>
-            <Heading color={'white'} fontSize={'md'}>Points in the stages are divided according to</Heading>
-
-            <TableContainer  textAlign="center">
-                <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
-
-                <Tbody>
-                <Tr>
-                    <Td textAlign="center">Points per race</Td>
-                    <Td textAlign="center">60, 57, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2 and 1 for everyone else</Td>
-                    </Tr>    
-                </Tbody>
-                </Table>
-            </TableContainer>
-            */}
+             
             <Heading color={'white'} fontSize={'2xl'}>Bonus Seconds</Heading>
             <Heading color={'white'} fontSize={'xl'}>Stage 2</Heading>
             <Heading color={'white'} fontSize={'sm'}>First Across Line (FAL) bonus seconds are awared on segments below</Heading>
