@@ -44,6 +44,7 @@ import { MdDirectionsBike } from "react-icons/md";
 import { IconType } from 'react-icons'
 import { FaPeopleGroup } from "react-icons/fa6";
 import { AiOutlineAim } from "react-icons/ai";
+import { RiBoxingFill } from "react-icons/ri";
 import { MdOutlineTimer } from "react-icons/md";
 
 interface LinkItemProps {
