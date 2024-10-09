@@ -75,7 +75,6 @@ export default function stagespage() {
             <Heading color={'white'} fontSize={'2xl'}>Rules</Heading>
             <StagesRules />
             <Heading color={'white'} fontSize={'2xl'}>Stages Overview</Heading>
-            <Heading color={'white'} fontSize={'md'}>Tuesdays in June @ 19:20 CEST | 1:20 PM EDT</Heading>
             <TableContainer  textAlign="center">
                 <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
                 <Thead >
@@ -91,17 +90,17 @@ export default function stagespage() {
                 </Thead>
                 <Tbody>
                     <Tr>
-                    <Td textAlign="center"><Link  color={'orange'} href = 'https://www.zwift.com/uk/events/' target='_Blank' isExternal>Stage 1 - The iTT</Link></Td>
+                    <Td textAlign="center"><Link  color={'orange'} href = 'https://www.zwift.com/uk/events/tag/stages/view/4544106' target='_Blank' isExternal>Stage 1 - The iTT</Link></Td>
                     <Td textAlign="center">22. October @ 19:20 CEST</Td>
                     <Td textAlign="center">France</Td>
                     <Td textAlign="center"><Link  color={'orange'} href = 'https://zwiftinsider.com/route/champs-elysees/' target='_Blank' isExternal>Champs-Élysées</Link></Td>
                     <Td textAlign="center">1</Td>
-                    <Td textAlign="center">9.7</Td>
-                    <Td textAlign="center">52</Td>
+                    <Td textAlign="center">9.8</Td>
+                    <Td textAlign="center">53</Td>
                     </Tr>    
 
                     <Tr>
-                    <Td textAlign="center"><Link  color={'orange'} href = 'https://www.zwift.com/uk/events/' target='_Blank' isExternal>Stage 2 - The Sprint</Link></Td>
+                    <Td textAlign="center"><Link  color={'orange'} href = 'https://www.zwift.com/uk/events/tag/stages/view/4544110' target='_Blank' isExternal>Stage 2 - The Sprint</Link></Td>
                     <Td textAlign="center">22. October @ 19:45 CEST</Td>
                     <Td textAlign="center">Yorkshire</Td>
                     <Td textAlign="center"><Link  color={'orange'} href = 'https://zwiftinsider.com/route/duchy-estate/' target='_Blank' isExternal>Duchy Estate</Link></Td>
@@ -111,23 +110,23 @@ export default function stagespage() {
                     </Tr>    
 
                     <Tr>
-                    <Td textAlign="center"><Link  color={'orange'} href = 'https://www.zwift.com/uk/events/' target='_Blank' isExternal>Stage 3 - The Break Away</Link></Td>
+                    <Td textAlign="center"><Link  color={'orange'} href = 'https://www.zwift.com/uk/events/tag/stages/view/4544115' target='_Blank' isExternal>Stage 3 - The Break Away</Link></Td>
                     <Td textAlign="center">29. October @ 19:20 CET</Td>
                     <Td textAlign="center">New York</Td>
                     <Td textAlign="center"><Link  color={'orange'} href = 'https://zwiftinsider.com/route/park-perimeter-loop/' target='_Blank' isExternal>Park Perimeter Loop</Link></Td>
                     <Td textAlign="center">4</Td>
-                    <Td textAlign="center">40</Td>
-                    <Td textAlign="center">500</Td>
+                    <Td textAlign="center">39</Td>
+                    <Td textAlign="center">507</Td>
                     </Tr>   
 
                                         <Tr>
-                    <Td textAlign="center"><Link  color={'orange'} href = 'https://www.zwift.com/uk/events/' target='_Blank' isExternal>Stage 4 - The Hill</Link></Td>
+                    <Td textAlign="center"><Link  color={'orange'} href = 'https://www.zwift.com/uk/events/tag/stages/view/4544116' target='_Blank' isExternal>Stage 4 - The Hill</Link></Td>
                     <Td textAlign="center">5. November @ 19:20 CEST</Td>
                     <Td textAlign="center">Watopia</Td>
                     <Td textAlign="center"><Link  color={'orange'} href = 'https://zwiftinsider.com/route/itza-party/' target='_Blank' isExternal>Itza Party</Link></Td>
                     <Td textAlign="center">1</Td>
-                    <Td textAlign="center">46</Td>
-                    <Td textAlign="center">505</Td>
+                    <Td textAlign="center">46.2</Td>
+                    <Td textAlign="center">507</Td>
                     </Tr>    
                 </Tbody>
                 </Table>
