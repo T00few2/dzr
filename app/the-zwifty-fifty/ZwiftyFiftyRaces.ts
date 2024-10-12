@@ -237,7 +237,7 @@ export const ZwiftyFiftyRacesData = [
     laps: '1',
     length: '48.1',
     hm: '556',
-    climbs: [''],
+    climbs: [],
     sprints: ['Shisa Sprint Reverse','Shisa Sprint'],
     sprintLaps: ['1','1'],
     bonus: ['3','2','1'],
