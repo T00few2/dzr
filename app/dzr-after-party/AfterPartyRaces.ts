@@ -227,4 +227,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner fourth time on Libby Hill',
       linkRoute: 'https://zwiftinsider.com/route/cobbled-climbs/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Dust In The Wind',
+      world: 'Watopia',
+      laps: '<1>',
+      distance: '39.591',
+      elevation: '531',
+      finish: 'Blue banner second time on Titans Groove KOM Reverse',
+      linkRoute: 'https://zwiftinsider.com/route/dust-in-the-wind/',
+    }),
 ];
