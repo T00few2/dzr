@@ -230,4 +230,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1,2'],
     bonus: ['3','2','1'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Makuri Pretzel',
+    world: 'Makuri Islands',
+    linkRoute: 'https://zwiftinsider.com/route/makuri-pretzel/',
+    laps: '1',
+    length: '48.1',
+    hm: '556',
+    climbs: [''],
+    sprints: ['Shisa Sprint Reverse','Shisa Sprint'],
+    sprintLaps: ['1','1'],
+    bonus: ['3','2','1'],
+  }),
 ];
