@@ -142,13 +142,13 @@ const ZRL = () => {
         </Text>
       
         <Text mr={4} mt={4} color={'white'}>
-        <strong>• Holdkaptajner</strong> kan registere hold. Detaljer kan ændres af kaptajnen, når holdet er oprettet (Edit) og slettes (Delete). Kryds af i "Looking for riders"
+        <strong>• Holdkaptajner</strong> kan registere hold. Detaljer kan ændres af kaptajnen, når holdet er oprettet &#40;Edit&#41; og slettes &#40;Delete&#41;. Kryds af i "Looking for riders"
           for at vise at I aktivt leder efter flere ryttere.
         </Text>
         <ZRLRegister />
       
         <Text mr={4} mt={4} color={'white'}>
-        <strong>• Ryttere</strong> kan flage interesse i at finde et team. Detaljer kan ændres af rytteren, når interessen er oprettet (Edit) og slettes (Delete).
+        <strong>• Ryttere</strong> kan flage interesse i at finde et team. Detaljer kan ændres af rytteren, når interessen er oprettet &#40;Edit&#41; og slettes &#40;Delete&#41;.
         </Text>
         <ZRLRider />
 
