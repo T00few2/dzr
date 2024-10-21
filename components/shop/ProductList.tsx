@@ -149,10 +149,11 @@ const ProductList: React.FC<ProductListProps> = ({ addToCart }) => {
     <Center>
       <Box width={'90%'}>
         
-          <Text mt={4} mb={4} color={'white'}>Bestil dit nye IRL DZR kit her! Når vi har omkring 20 bestillinger &#40;suit og bibs&#41;, kontakter vi dig for betaling 
+          <Text mt={4} mb={4} color={'white'}>Bestil dit nye IRL DZR kit her! Når vi har omkring 20 bestillinger &#40;suit og bibs i alt&#41;, kontakter vi dig for betaling 
             og sætter derefter tøjet i produktion. Det er mulig at ændre bestillingen her på websiden, indtil tøjet er betalt og sat i produktion. 
-            Du kan vælge at afhente det på Frederiksberg eller få det leveret direkte til din adresse med DAO.<br/><br/>
-            
+            Du kan vælge at afhente det på Frederiksberg eller få det leveret direkte til din adresse med DAO. Priserne er sat, så det hele forventes at løbe i nul. 
+            Skulle der komme et lille plus på kontoen, vil det gå til fremtidige DZR initiativer. Eventuelt underskud vil blive dækket at styregruppen.<br/><br/>
+
             Tøjet er en replika af vores in-game DZR-kit og bliver produceret af Nopinz, der har udviklet bibs og suit &#40;et suit er grundlæggende bibs med &quot;indbygget&quot; svedtrøje&#41; 
             specifikt til indendørscykling. Materialet er ultralet og åndbart for at maksimere køleeffekten, og puden er optimeret til indendørs cykling 
             med bedre komfort og fugtstyring. Der er lommer til køleelementer &#40;købes separat&#41; på øvre og nedre ryg, der reducerer kropstemperaturen, 

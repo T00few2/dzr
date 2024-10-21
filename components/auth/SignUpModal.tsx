@@ -11,6 +11,7 @@ import {
   useDisclosure,
   Text,
   useToast,
+  FormLabel,
 } from '@chakra-ui/react';
 import { AuthContext } from '@/components/auth/AuthContext';
 
@@ -66,18 +67,21 @@ export default function SignUpModal() {
         <ModalContent>
           <ModalHeader>Sign Up</ModalHeader>
           <ModalBody>
+          <FormLabel >Display Name</FormLabel>
             <Input
               placeholder="Display Name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               mb={3}
             />
+          <FormLabel >E-mail</FormLabel>
             <Input
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               mb={3}
             />
+          <FormLabel >Password</FormLabel>
             <Input
               placeholder="Password"
               type="password"
@@ -85,6 +89,7 @@ export default function SignUpModal() {
               onChange={(e) => setPassword(e.target.value)}
               mb={3}
             />
+          <FormLabel >DZR Secret</FormLabel>
             <Input
               placeholder="DZR Secret"
               type='password'
