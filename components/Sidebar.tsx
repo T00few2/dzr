@@ -70,11 +70,11 @@ interface SidebarProps extends BoxProps {
 const LinkItems: Array<LinkItemProps> = [
   { name: 'Home', href: '/', icon: MdDirectionsBike },
   // { name: 'Puncheurs Summer Cup', href: 'puncheurs-summer-cup', icon: RiBoxingFill },
-  { name: 'STAGES by DZR', href: 'stages', icon: MdOutlineTimer },
-  { name: 'DZR After Party Series', href: 'dzr-after-party', icon: LiaMountainSolid },
-  { name: 'In The Zone 2', href: 'in-the-zone-2', icon: AiOutlineAim },
-  { name: 'The Zwifty Fifty', href: 'the-zwifty-fifty', icon: Im500Px },
-  { name: 'Members Zone', href: 'members', icon: FaPeopleGroup },
+  { name: 'STAGES by DZR', href: '/stages', icon: MdOutlineTimer },
+  { name: 'DZR After Party Series', href: '/dzr-after-party', icon: LiaMountainSolid },
+  { name: 'In The Zone 2', href: '/in-the-zone-2', icon: AiOutlineAim },
+  { name: 'The Zwifty Fifty', href: '/the-zwifty-fifty', icon: Im500Px },
+  { name: 'Members Zone', href: '/members-zone', icon: FaPeopleGroup },
 ]
 
 const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
