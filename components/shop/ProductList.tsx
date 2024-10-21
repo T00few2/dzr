@@ -153,7 +153,7 @@ const ProductList: React.FC<ProductListProps> = ({ addToCart }) => {
             og sætter derefter tøjet i produktion. Det er mulig at ændre bestillingen her på websiden, indtil tøjet er betalt og sat i produktion. 
             Du kan vælge at afhente det på Frederiksberg eller få det leveret direkte til din adresse med DAO.<br/><br/>
             
-            Tøjet er en replika af vores in-game DZR-kit og bliver produceret af Nopinz, der har udviklet bibs og suit &#40;et suit er grundlæggende bibs med "indbygget" svedtrøje&#41; 
+            Tøjet er en replika af vores in-game DZR-kit og bliver produceret af Nopinz, der har udviklet bibs og suit &#40;et suit er grundlæggende bibs med &quot;indbygget&quot; svedtrøje&#41; 
             specifikt til indendørscykling. Materialet er ultralet og åndbart for at maksimere køleeffekten, og puden er optimeret til indendørs cykling 
             med bedre komfort og fugtstyring. Der er lommer til køleelementer &#40;købes separat&#41; på øvre og nedre ryg, der reducerer kropstemperaturen, 
             så du kan præstere bedre i længere tid! <br/><br/>Du kan læse reviews her:
