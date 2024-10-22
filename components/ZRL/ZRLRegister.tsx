@@ -35,6 +35,14 @@ const ZRLRegister = () => {
   const handleTeamRegister = async () => {
     if (!newTeamName || !auth.currentUser || !rideTime || !division) return;
 
+      // Regular expression to match HH:MM format (24-hour clock)
+    const timeFormat = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+    if (!timeFormat.test(rideTime)) {
+      alert('Brug venligst formatet HH:MM for Race Time');
+      return;
+    }
+
     try {
       const teamData: Team = {
         name: newTeamName,
