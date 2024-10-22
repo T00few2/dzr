@@ -60,8 +60,7 @@ export default function stagespage() {
             />
           </Flex>
           <Stack spacing={4}>
-
-            
+            <Heading color={'white'} fontWeight={'bold'}>🚨 NOTICE: TT Bikes are allowed in Stage 1 - The iTT 🚨</Heading>            
             <Text color={'white'} fontSize={'lg'} whiteSpace="pre-line">
             Welcome to STAGES by DZR: Stage Racing Done Right. {'\n\n'}
             
