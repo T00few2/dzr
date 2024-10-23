@@ -34,15 +34,23 @@ const ZRLRegister = () => {
 
   const handleTeamRegister = async () => {
     if (!newTeamName || !auth.currentUser || !rideTime || !division) return;
-
-      // Regular expression to match HH:MM format (24-hour clock)
+  
+    // Regular expression to match HH:MM format (24-hour clock)
     const timeFormat = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
+  
+    // Regular expression to match division format (A, B, C, D followed by exactly one digit)
+    const divisionFormat = /^[ABCD]\d$/;
+  
     if (!timeFormat.test(rideTime)) {
       alert('Brug venligst formatet HH:MM for Race Time');
       return;
     }
-
+  
+    if (!divisionFormat.test(division)) {
+      alert('Brug venligst formatet: A, B, C eller D efterfulgt af præcis et tal (f.eks. A1, B3)');
+      return;
+    }
+  
     try {
       const teamData: Team = {
         name: newTeamName,
@@ -52,13 +60,14 @@ const ZRLRegister = () => {
         rideTime,
         division,
       };
-
+  
       await addDoc(collection(db, 'teams'), teamData);
       resetForm();
     } catch (error) {
       console.error('Error registering team:', error);
     }
   };
+  
 
   const resetForm = () => {
     setNewTeamName('');
