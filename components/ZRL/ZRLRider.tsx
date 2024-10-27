@@ -15,6 +15,7 @@ import {
 } from '@chakra-ui/react';
 import { auth, db } from '@/app/utils/firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
+import SendMessage from '../discord-bot/SendMessage';
 
 interface Rider {
   id?: string; // Optional ID for the rider
@@ -41,10 +42,15 @@ const ZRLRider = () => {
         rideTime,
       };
 
-      await addDoc(collection(db, 'riders'), riderData);
+      await addDoc(collection(db, 'riders'), riderData)
+      
+      const roleId = '1195878349617250405'
+      const messageContent = `🚴 Ny rytter i gården 🚴\n\n${name} er på fri transfer.\nKører gerne ${division} klokken ${rideTime}.\nAttention <@&${roleId}>`
+      await SendMessage('1297934562558611526', messageContent)
+    
       resetForm();
     } catch (error) {
-      console.error('Error registering interest:', error);
+      console.error('Error registering interest:', error)
     }
   };
 
