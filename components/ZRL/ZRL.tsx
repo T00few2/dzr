@@ -220,7 +220,6 @@ const ZRL = () => {
         )}
           </SimpleGrid>
       </Box>
-
       {/* Edit Team Component (conditionally rendered if a team is selected for editing) */}
       {editMode && currentTeam && (
         <ZRLEditDelete

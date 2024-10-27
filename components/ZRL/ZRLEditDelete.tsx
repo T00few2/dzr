@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Box, Button, FormControl, FormLabel, Input, Checkbox, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton, ModalFooter } from '@chakra-ui/react';
 import { db } from '@/app/utils/firebaseConfig'; 
 import { doc, updateDoc } from 'firebase/firestore';
+import SendMessage from '../discord-bot/SendMessage';
 
 interface Team {
   id?: string;
@@ -59,7 +60,13 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
         captainName,
         lookingForRiders, // Save the checkbox value
       });
-      onClose(); // Close the modal after update
+      
+      if (lookingForRiders) {
+        const messageContent = '🚨BREAKING🚨\n \n' + newTeamName + " leder efter nye ryttere.\n" + newTeamName + ' kører i ' + division + ' klokken ' + rideTime + '.\nKontakt holdkaptajn ' + captainName + '.' ;
+        await SendMessage('1297934562558611526', messageContent);
+      }
+      onClose();
+       // Close the modal after update
     } catch (error) {
       console.error('Error updating team:', error);
     }
