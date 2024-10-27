@@ -120,7 +120,7 @@ export const ZwiftyFiftyRacesData = [
     climbs: ['Shisa Sprint Hill'],
     sprints: ['Shisa Sprint'],
     sprintLaps: ['1,2,3'],
-    bonus: ['2.0','1.5','1.0'],
+    bonus: ['3.0','2.0','1.0'],
   }),
   new ZwiftyFiftyRacesTemplate({
     route: 'RGV',
