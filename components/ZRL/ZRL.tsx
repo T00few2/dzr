@@ -156,10 +156,10 @@ const ZRL = () => {
       <Divider mb={4} />
       <Heading size="lg" color="white" mb={4}>
           Current Teams
-        </Heading>
-      <Grid templateColumns="repeat(4, 1fr)" gap={4}>
+      </Heading>
+      <SimpleGrid spacing={4} minChildWidth={'250px'} marginBlockEnd={4}>
         {['A', 'B', 'C', 'D'].map((division) => (
-          <GridItem key={division}>
+          <Box key={division}>
             <Heading size="md" color="white" mb={2}>{`Division ${division}`}</Heading>
             {divisionGroups[division]?.map((team) => (
               <Box key={team.id} borderWidth="1px" borderRadius="lg" p={4} color="white" mb={2}>
@@ -181,9 +181,9 @@ const ZRL = () => {
                 )}
               </Box>
             ))} 
-          </GridItem>
+          </Box>
         ))}
-      </Grid>
+      </SimpleGrid>
       <Divider mb={4} mt={4}/>
       {/* Interested Riders Section */}
       <Box mt={4}>
