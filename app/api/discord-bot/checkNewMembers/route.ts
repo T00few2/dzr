@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       const memberMentions = newMembers.map((member: any) => `<@${member.user.id}>`).join(', ');
       const messageContent = `A very warm welcome to our new members who joined last week 🎉🎉\n ${memberMentions}!`;
 
-      const response = await fetch(`/api/discord-bot/sendMessage`, {
+      const response = await fetch(`https://www.dzrracingseries.com/api/discord-bot/sendMessage`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
