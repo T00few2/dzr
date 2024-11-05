@@ -60,14 +60,12 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
         captainName,
         lookingForRiders, // Save the checkbox value
       });
-      
+      onClose();
       if (lookingForRiders) {
         const messageContent = '🚨BREAKING🚨\n\n@everyone\n\n' + newTeamName + " leder efter nye ryttere.\n" + newTeamName + ' kører i ' + division + ' klokken ' + rideTime + '.\nKontakt holdkaptajn ' + captainName + '.';
         await SendMessage('1297934562558611526', messageContent);
       }
-      
-      onClose();
-       // Close the modal after update
+   
     } catch (error) {
       console.error('Error updating team:', error);
     }

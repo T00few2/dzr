@@ -46,9 +46,9 @@ const ZRLRider = () => {
       
       const roleId = '1195878349617250405'
       const messageContent = `🚴 Ny rytter i gården 🚴\n\n${name} er på fri transfer.\nKører gerne ${division} klokken ${rideTime}.\nAttention <@&${roleId}>`
+      resetForm();
       await SendMessage('1297934562558611526', messageContent)
     
-      resetForm();
     } catch (error) {
       console.error('Error registering interest:', error)
     }
