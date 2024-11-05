@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 
     const messageContent = `Link til næste ${matchedEvent.name}: https://www.zwift.com/events/view/${matchedEvent.id}`;
 
-    const responseBot = await fetch(`http://localhost:3000/api/discord-bot/sendMessage`, {
+    const responseBot = await fetch(`https://www.dzrracingseries.com/api/discord-bot/sendMessage`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
