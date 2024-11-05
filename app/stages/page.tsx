@@ -60,7 +60,7 @@ export default function stagespage() {
             />
           </Flex>
           <Stack spacing={4}>
-            <Heading color={'white'} fontWeight={'bold'}>🚨 Results from stage 3 are ready on ZwiftPower 🚨</Heading>            
+            <Heading color={'white'} fontWeight={'bold'}>🚨 Results from stage 4 are ready on ZwiftPower 🚨</Heading>            
             <Text color={'white'} fontSize={'lg'} whiteSpace="pre-line">
             Welcome to STAGES by DZR: Stage Racing Done Right. {'\n\n'}
             
