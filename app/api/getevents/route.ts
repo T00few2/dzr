@@ -1,8 +1,4 @@
-// app/api/getevents/route.ts
-
 import axios from 'axios';
-import fs from 'fs';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
 type Event = {
@@ -11,7 +7,19 @@ type Event = {
   eventStart: string;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const eventName = searchParams.get("eventName");
+  const channelId = searchParams.get("channelId");
+  
+  if (!eventName) {
+    return NextResponse.json({ error: 'Event name is required' }, { status: 400 });
+  }
+
+  if (!channelId) {
+    return NextResponse.json({ error: 'Channel ID is required' }, { status: 400 });
+  }
+
   const url = "https://us-or-rly101.zwift.com/api/public/events/upcoming?limit=200&tags=dzr";
 
   try {
@@ -25,16 +33,16 @@ export async function GET() {
       eventStart: event.eventStart,
     }));
 
-    // Define the path to save the file
-    const filePath = path.join(process.cwd(), 'app', 'api', 'getevents', 'events.json');
+    // Find the event with the matching name
+    const matchedEvent = events.find(event => event.name.toLowerCase() === eventName.toLowerCase());
 
-    // Write the data to the file
-    fs.writeFileSync(filePath, JSON.stringify(events, null, 2));
+    if (!matchedEvent) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
 
-    const messageContent = `${events}`;
-    const channelId = '1196470145493774446'
+    const messageContent = `Link til næste ${matchedEvent.name}: https://www.zwift.com/events/view/${matchedEvent.id}`;
 
-    const responseBot = await fetch(`https://www.dzrracingseries.com/api/discord-bot/sendMessage`, {
+    const responseBot = await fetch(`http://localhost:3000/api/discord-bot/sendMessage`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -42,8 +50,12 @@ export async function GET() {
       body: JSON.stringify({ channelId, messageContent }),
     });
 
-    return NextResponse.json({ message: 'Events data saved successfully', events });
+    if (!responseBot.ok) {
+      return NextResponse.json({ error: 'Failed to send message to Discord' }, { status: 500 });
+    }
+
+    return NextResponse.json({ message: 'Event link sent successfully', eventName: matchedEvent.name });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch or save events data' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch events data' }, { status: 500 });
   }
 }
