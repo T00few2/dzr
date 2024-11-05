@@ -31,6 +31,17 @@ export async function GET() {
     // Write the data to the file
     fs.writeFileSync(filePath, JSON.stringify(events, null, 2));
 
+    const messageContent = `${events}`;
+    const channelId = '1196470145493774446'
+
+    const responseBot = await fetch(`https://www.dzrracingseries.com/api/discord-bot/sendMessage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ channelId, messageContent }),
+    });
+
     return NextResponse.json({ message: 'Events data saved successfully', events });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch or save events data' }, { status: 500 });
