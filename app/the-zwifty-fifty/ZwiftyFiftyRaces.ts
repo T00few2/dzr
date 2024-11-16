@@ -242,4 +242,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1','1'],
     bonus: ['3','2','1'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Deca Dash',
+    world: 'Watopia',
+    linkRoute: 'https://zwiftinsider.com/route/deca-dash/',
+    laps: '1',
+    length: '52.6',
+    hm: '500',
+    climbs: ['Jarvis KOM Reverse'],
+    sprints: [],
+    sprintLaps: [],
+    bonus: [],
+  }),
 ];
