@@ -160,6 +160,8 @@ const ProductList: React.FC<ProductListProps> = ({ addToCart }) => {
             så du kan præstere bedre i længere tid! <br/><br/>Du kan læse reviews her:
             <Link href="https://zwiftinsider.com/nopinz-subzero-review/" isExternal color="blue.300"> ZwiftInsider</Link> og 
             <Link href="https://road.cc/content/review/nopinz-subzero-mens-shorts-281337" isExternal color="blue.300"> Road.cc</Link>
+            <br/><br/>
+            Tøjet er sat i produktion og du kan derfor ikke lave nye bestillinger eller slette eksisterende bestillinger.
           </Text>    
         <SimpleGrid spacing={4} minChildWidth={'250px'} marginBlockEnd={4}>
   {products.map((product) => (
@@ -234,7 +236,7 @@ const ProductList: React.FC<ProductListProps> = ({ addToCart }) => {
             color={'white'}
             onChange={(e) => handleQuantityChange(product.id, e.target.value)}
           />
-          <Button
+          {/*<Button
             mt={2}
             ml={4}
             mb={2}
@@ -245,7 +247,7 @@ const ProductList: React.FC<ProductListProps> = ({ addToCart }) => {
             isDisabled={!selectedSizes[product.id] || !selectedFit[product.id]}
           >
             Tilføj
-          </Button>
+          </Button>*/}
         </Flex>
       </Box>
     </Box>

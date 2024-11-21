@@ -172,7 +172,7 @@ const Checkout = ({ cartItems, clearCart, onClose }: CheckoutProps) => {
               </UnorderedList>
               <Text fontWeight="bold">Total: {totalAmount.toFixed(2)} kr</Text>
 
-            <Button 
+            {/*<Button 
               mt={4}
               mb={4}
               colorScheme="blue" 
@@ -181,7 +181,7 @@ const Checkout = ({ cartItems, clearCart, onClose }: CheckoutProps) => {
               isDisabled={!name || (!isPickup && (!address || !postalCode || !city || !phone))} // Disable if fields are empty
             >
               Afgiv bestilling
-            </Button>
+            </Button>*/}
     </Box>
     
   );

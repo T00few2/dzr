@@ -91,9 +91,10 @@ const ActiveOrders = () => {
               </UnorderedList>
               <Text fontWeight={'bold'}>Total: {order.totalAmount.toFixed(2)} kr</Text>
               <Center>
+                {/*
               <Button colorScheme="red" onClick={() => handleDeleteOrder(order.id)} mt={4}>
                 Slet bestilling
-              </Button>
+              </Button> */}
               </Center>
             </Box>
             ))}
