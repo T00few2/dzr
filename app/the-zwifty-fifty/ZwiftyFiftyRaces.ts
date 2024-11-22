@@ -254,4 +254,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: [],
     bonus: [],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Mighty Metropolitan',
+    world: 'New York',
+    linkRoute: 'https://zwiftinsider.com/route/mighty-metropolitan/',
+    laps: '2',
+    length: '40.6',
+    hm: '639',
+    climbs: ['New York KOM Reverse'],
+    sprints: ['New York KOM Reverse'],
+    sprintLaps: ['1,2'],
+    bonus: ['6','4','2'],
+  }),
 ];
