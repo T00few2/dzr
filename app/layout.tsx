@@ -1,17 +1,18 @@
 // app/layout.tsx
 "use client";
 
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import SidebarWithHeader from "@/components/Sidebar";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { AuthProvider } from "@/components/auth/AuthContext";
-import SnowfallClient from "@/components/SnowfallClient";
+
+import Sparkles from 'react-sparkle'
+import Snowfall from "react-snowfall";
 
 require("dotenv").config();
 
 import { Providers } from "./providers";
+
 
 export default function RootLayout({
   children,
@@ -23,15 +24,17 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <Providers>
-            {/* Snowfall effect */}
+            {/* Background Effects */}
             <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: -1 }}>
-              <SnowfallClient />
+              <Snowfall />
+              <Sparkles/>
             </div>
-            {/* Sidebar and content */}
+
+            {/* Sidebar and Content */}
             <SidebarWithHeader />
-            <div style={{ position: "relative", minHeight: "100vh" }}>
-              {children}
-            </div>
+            <div style={{ position: "relative", minHeight: "100vh" }}>{children}</div>
+
+            {/* Analytics and Performance */}
             <Analytics />
             <SpeedInsights />
           </Providers>
