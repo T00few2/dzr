@@ -47,7 +47,7 @@ export default function LoginPage() {
   };
 
   return (
-    <Container maxW={'5xl'} centerContent bg="black" p={4} borderRadius="md" h="80vh" display="flex" flexDirection="column" justifyContent="center">
+    <Container maxW={'5xl'} centerContent  p={4} borderRadius="md" h="80vh" display="flex" flexDirection="column" justifyContent="center">
       <Grid templateColumns="1fr" gap={4} justifyItems="left" alignItems="start">
         <Flex alignItems="center">
           <Image 

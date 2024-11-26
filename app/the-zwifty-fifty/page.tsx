@@ -36,7 +36,7 @@ export const metadata: Metadata = {
 export default function thezwiftyfiftypage() {
   
   return (
-    <div style={{backgroundColor:'black'}}>
+    <div >
       <Container maxW={{base: '90%', md: '5xl'}} py={0} mb={20}>
         <SimpleGrid columns={{ base: 1, md: 1 }} spacing={10}>
         <Flex>

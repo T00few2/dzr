@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <>
-    <div style={{backgroundColor:'black'}}>
+    <div >
     <HeroSection />
     <Features />
     </div>

@@ -1,14 +1,17 @@
+// app/layout.tsx
+"use client";
+
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import SidebarWithHeader from "@/components/Sidebar";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { AuthProvider } from '@/components/auth/AuthContext';
+import { AuthProvider } from "@/components/auth/AuthContext";
+import SnowfallClient from "@/components/SnowfallClient";
 
-require('dotenv').config();
+require("dotenv").config();
 
-// app/layout.tsx
-import { Providers } from './providers';
+import { Providers } from "./providers";
 
 export default function RootLayout({
   children,
@@ -18,11 +21,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {/* Wrap the app with AuthProvider to enable authentication */}
         <AuthProvider>
           <Providers>
+            {/* Snowfall effect */}
+            <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: -1 }}>
+              <SnowfallClient />
+            </div>
+            {/* Sidebar and content */}
             <SidebarWithHeader />
-            {children}
+            <div style={{ position: "relative", minHeight: "100vh" }}>
+              {children}
+            </div>
             <Analytics />
             <SpeedInsights />
           </Providers>

@@ -28,7 +28,7 @@ import { ReactNode } from 'react'
 export default function HeroSection() {
   return (
     <Container maxW={'5xl'}
-    bg={('black')}
+    
     >
       <Stack
         textAlign={'center'}

@@ -45,7 +45,7 @@ const MembersZone = () => {
     }
 
     return (
-    <div style={{backgroundColor:'black'}}>
+    <div >
         <Container maxW={{base:'95vw', sm:'80vw', md:'70vw'}}  display="flex" flexDirection="column">
         
             {currentUser ? (
