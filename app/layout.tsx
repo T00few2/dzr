@@ -27,7 +27,7 @@ export default function RootLayout({
             {/* Background Effects */}
             <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: -1 }}>
               <Snowfall />
-              <Sparkles/>
+              <Sparkles flicker={false} minSize={7} maxSize={12}/>
             </div>
 
             {/* Sidebar and Content */}

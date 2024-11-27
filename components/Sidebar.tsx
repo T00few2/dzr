@@ -46,6 +46,7 @@ import { FaPeopleGroup } from "react-icons/fa6";
 import { AiOutlineAim } from "react-icons/ai";
 import { RiBoxingFill } from "react-icons/ri";
 import { MdOutlineTimer } from "react-icons/md";
+import Sparkles from 'react-sparkle'
 
 interface LinkItemProps {
   name: string
@@ -70,7 +71,7 @@ interface SidebarProps extends BoxProps {
 const LinkItems: Array<LinkItemProps> = [
   { name: 'Home', href: '/', icon: MdDirectionsBike },
   // { name: 'Puncheurs Summer Cup', href: 'puncheurs-summer-cup', icon: RiBoxingFill },
-  { name: 'STAGES by DZR', href: '/stages', icon: MdOutlineTimer },
+  // { name: 'STAGES by DZR', href: '/stages', icon: MdOutlineTimer },
   { name: 'DZR After Party Series', href: '/dzr-after-party', icon: LiaMountainSolid },
   { name: 'In The Zone 2', href: '/in-the-zone-2', icon: AiOutlineAim },
   { name: 'The Zwifty Fifty', href: '/the-zwifty-fifty', icon: Im500Px },
@@ -152,13 +153,14 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
       px={4}
       height="20"
       alignItems="center"
-      bg={('black')}
+      
       borderBottomWidth="1px"
       borderBottomColor={('black')}
       
       justifyContent={'space-between'}
       
       >
+        
       <IconButton
         display={'flex'}
         onClick={onOpen}
@@ -192,7 +194,7 @@ const SidebarWithHeader = () => {
   const { isOpen, onOpen, onClose } = useDisclosure()
   
   return (
-    <Box  bg={('black')}>
+    <Box>
       <SidebarContent onClose={() => onClose} display={'none'} />
       <Drawer
         isOpen={isOpen}
