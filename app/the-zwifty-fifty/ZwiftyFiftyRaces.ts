@@ -266,4 +266,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1,2'],
     bonus: ['6','4','2'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Shisa Shakedown',
+    world: 'Watopia',
+    linkRoute: 'https://zwiftinsider.com/route/shisa-shakedown/',
+    laps: '1',
+    length: '53.5',
+    hm: '556',
+    climbs: ['Castle KOM Temple KOM'],
+    sprints: ['Railway Sprint','Castle KOM','Temple KOM'],
+    sprintLaps: ['1','1','1'],
+    bonus: ['3','2','1'],
+  }),
 ];
