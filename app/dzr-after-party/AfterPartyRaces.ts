@@ -230,10 +230,19 @@ export const AfterPartyRacesData = [
     new AfterPartyRacesTemplate({
       route: 'Dust In The Wind',
       world: 'Watopia',
-      laps: '<1>',
+      laps: '<1',
       distance: '39.591',
       elevation: '531',
       finish: 'Blue banner second time on Titans Groove KOM Reverse',
       linkRoute: 'https://zwiftinsider.com/route/dust-in-the-wind/',
+    }),
+    new AfterPartyRacesTemplate({
+      route: 'Three Little Sisters',
+      world: 'Watopia',
+      laps: '1+',
+      distance: '39.676',
+      elevation: '488',
+      finish: 'Blue banner second time on Zwift KOM',
+      linkRoute: 'https://zwiftinsider.com/route/three-little-sisters/',
     }),
 ];
