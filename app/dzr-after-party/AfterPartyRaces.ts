@@ -245,4 +245,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner second time on Zwift KOM',
       linkRoute: 'https://zwiftinsider.com/route/three-little-sisters/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Everything Bagel',
+      world: 'New York',
+      laps: '<1',
+      distance: '25.714',
+      elevation: '466',
+      finish: 'Blue banner on New York KOM',
+      linkRoute: 'https://zwiftinsider.com/route/everything-bagel/',
+    }),
 ];
