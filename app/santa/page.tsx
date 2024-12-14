@@ -25,13 +25,11 @@ import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: 'The SANTA league',
-  description: "DZR Christmas Special: Zwifting Home on Christmas. Get a head start on your New Year's resolution and boost your training during the holidays with the 5-stage neck-and-neck scratch races of the SANTA league.",
-
+  description: "DZR Christmas Special: Zwifting Home on Christmas. Get a head start on your New Year&#39;s resolution and boost your training during the holidays with the 5-stage neck-and-neck scratch races of the SANTA league.",
   metadataBase: new URL('https://www.dzrracingseries.com/santa/'),
-
   openGraph: {
     title: 'The SANTA league',
-  description: "DZR Christmas Special: Zwifting Home on Christmas. Get a head start on your New Year's resolution and boost your training during the holidays with the 5-stage neck-and-neck scratch races of the SANTA league.",
+    description: "DZR Christmas Special: Zwifting Home on Christmas. Get a head start on your New Year&#39;s resolution and boost your training during the holidays with the 5-stage neck-and-neck scratch races of the SANTA league.",
     url: 'https://www.dzrracingseries.com/santa/',
     siteName: 'DZR',
     images: [
@@ -41,8 +39,8 @@ export const metadata: Metadata = {
     ],
     type: 'website',
     locale: 'en_US',
-  }
-}
+  },
+};
 
 export default function santapage() {
   
