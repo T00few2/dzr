@@ -63,12 +63,11 @@ export default function santapage() {
           <Stack spacing={4}>
 
             <Heading color={'white'}>The SANTA league</Heading>
-            <Text color={'white'} fontSize={'lg'} whiteSpace="pre-line">
-            DZR Christmas Special: Zwifting Home on Christmas.
+            <Text color={'white'} fontSize={'lg'} whiteSpace="pre-line">DZR Christmas Special: Zwifting Home on Christmas.
             Get a head start on your New Year's resolution and boost your training during the holidays with the 5-stage neck-and-neck scratch races of the SANTA league:
-            <br/> <br/>
+            </Text>
 
-            <Flex direction="column" justify="flex-start" gap="0">
+            <Flex direction="column" justify="flex-start" gap="0" color={'white'}>
               <Flex align="center">
                 <Text textAlign="left" width="125px" fontWeight={'bold'}>December 27</Text>
                 <Text textAlign="left" width="150px"></Text>
@@ -100,9 +99,7 @@ export default function santapage() {
                 <Text textAlign="left" width="300px">ccelerate to Elevate</Text>
               </Flex>
             </Flex>
-            <br/>
-            Each stage is rideable at 9:20 AM UTC, 3:20 PM UTC, and 9:20 PM UTC. <br/>
-            </Text>
+            <Text color={'white'}>Each stage is rideable at 9:20 AM UTC, 3:20 PM UTC, and 9:20 PM UTC.</Text>
             <Heading color={'white'} fontSize={'2xl'}>Rules</Heading>
             <ZwiftyFiftyRules />
             <Heading color={'white'} fontSize={'2xl'} mt={4}>Stages Overview & Race Passes</Heading>
