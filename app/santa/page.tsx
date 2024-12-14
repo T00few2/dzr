@@ -61,8 +61,9 @@ export default function santapage() {
           <Stack spacing={4}>
 
             <Heading color={'white'}>The SANTA league</Heading>
-            <Text color={'white'} fontSize={'lg'} whiteSpace="pre-line">DZR Christmas Special: Zwifting Home on Christmas.
-            Get a head start on your New Year's resolution and boost your training during the holidays with the 5-stage neck-and-neck scratch races of the SANTA league:
+            <Text color={'white'} fontSize={'lg'} whiteSpace="pre-line">
+              DZR Christmas Special: Zwifting Home on Christmas.
+              Get a head start on your New Year&#39;s resolution and boost your training during the holidays with the 5-stage neck-and-neck scratch races of the SANTA league:
             </Text>
 
             <Flex direction="column" justify="flex-start" gap="0" color={'white'}>

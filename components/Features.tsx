@@ -84,7 +84,7 @@ export default function Features() {
       <Box width={'100%'}>
       <SimpleGrid spacing={4} minChildWidth={'280px'} marginBlockEnd={4}>
         {/* <CustomCard href='puncheurs-summer-cup' icon = {RiBoxingFill} heading = 'Puncheurs Summer Cup' text1 = 'Puncheurs Summer Battle' text2= 'Tuesdays in June 19:20 CEST | 1:20 PM EDT' /> */}
-        <CustomCard href='santa' icon = {LiaMountainSolid} heading = 'The SANTA league' text1 = "Head start your New Year's resolution" text2= '9:20 AM UTC | 3:20 PM UTC | 9:20 PM UTC' />
+        <CustomCard href='santa' icon = {LiaMountainSolid} heading = 'The SANTA league' text1 = "Head start your New Year&#39;s resolution" text2= '9:20 AM UTC | 3:20 PM UTC | 9:20 PM UTC' />
         <CustomCard href='dzr-after-party' icon = {LiaMountainSolid} heading = 'DZR After Party Series' text1 = 'Uphill finishes' text2= 'Thursdays 17:15 CET | 11:15 AM EST' />
         {/*<CustomCard href='stages' icon = {MdOutlineTimer} heading = 'STAGES by DZR' text1 = 'Stage racing done right' text2= 'Tuesdays in ZRL break 19:20 CET | 1:20 PM EST' /> */}
         <CustomCard href='in-the-zone-2' icon = {AiOutlineAim} heading = 'In The Zone 2' text1 = 'Structured zone 2 group workouts' text2= 'Saturdays 9:30 CET & 14:30 CET' />
