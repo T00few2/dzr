@@ -278,4 +278,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1','1','1'],
     bonus: ['3','2','1'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Navig8',
+    world: 'Watopia',
+    linkRoute: 'https://zwiftinsider.com/route/navig8/',
+    laps: '1',
+    length: '66.1',
+    hm: '423',
+    climbs: ['Mayan Mountainside KOM Itza KOM'],
+    sprints: ['Mayan Mountainside KOM','Itza KOM'],
+    sprintLaps: ['1','1'],
+    bonus: ['6','4','2'],
+  }),
 ];
