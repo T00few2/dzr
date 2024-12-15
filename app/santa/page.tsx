@@ -53,9 +53,11 @@ export default function santapage() {
               rounded={'md'}
               alt={'feature image'}
               src={
-                '/santa/santa.png'
+                '/santa/santa.jpg'
               }
-              objectFit={'contain'}
+              objectFit={'cover'} // Ensures proportions are maintained
+              width="100%" // Image spans the full width of its container
+              height="auto" // Maintains aspect ratio
             />
           </Flex>
           <Stack spacing={4}>
@@ -83,7 +85,7 @@ export default function santapage() {
                 <Text textAlign="left" width="125px" fontWeight={'bold'}>December 29</Text>
                 <Text textAlign="right" width="80px"></Text>
                 <Text textAlign="center" width="25px" fontSize="xx-large" fontWeight={'bold'} color={'red'}>N</Text> {/* Align A vertically */}
-                <Text textAlign="left" width="300px">Y KOM After Party</Text>
+                <Text textAlign="left" width="150px">Y KOM After Party</Text>
               </Flex>
               <Flex align="center">
                 <Text textAlign="left" width="125px" fontWeight={'bold'}>December 30</Text>
@@ -95,7 +97,7 @@ export default function santapage() {
                 <Text textAlign="left" width="125px" fontWeight={'bold'}>December 31</Text>
                 <Text textAlign="right" width="80px"></Text>
                 <Text textAlign="center" width="25px" fontSize="xx-large" fontWeight={'bold'} color={'red'}>A</Text> {/* Align A vertically */}
-                <Text textAlign="left" width="300px">ccelerate to Elevate</Text>
+                <Text textAlign="left" width="150px">ccelerate to Elevate</Text>
               </Flex>
             </Flex>
             <Text color={'white'}>Each stage is rideable at 9:20 AM UTC, 3:20 PM UTC, and 9:20 PM UTC.</Text>
