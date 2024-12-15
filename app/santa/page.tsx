@@ -45,7 +45,7 @@ export const metadata: Metadata = {
 export default function santapage() {
   
   return (
-    <div style={{backgroundColor:'black'}}>
+    <div>
       <Container maxW={{base: '90%', md: '5xl'}} py={0} mb={20}>
         <SimpleGrid columns={{ base: 1, md: 1 }} spacing={10}>
         <Flex>
@@ -69,31 +69,31 @@ export default function santapage() {
             <Flex direction="column" justify="flex-start" gap="0" color={'white'}>
               <Flex align="center">
                 <Text textAlign="left" width="125px" fontWeight={'bold'}>December 27</Text>
-                <Text textAlign="left" width="150px"></Text>
+                <Text textAlign="left" width="80px"></Text>
                 <Text textAlign="center" width="25px" fontSize="xx-large" fontWeight={'bold'} color={'red'}>S</Text> {/* Align S vertically */}
                 <Text textAlign="left" width="150px">hisa Shakedown</Text>
               </Flex>
               <Flex align="center">
               <Text textAlign="left" width="125px" fontWeight={'bold'}>December 28</Text>
-                <Text textAlign="right" width="150px">Loopin Lav</Text>
+                <Text textAlign="right" width="80px">Loopin Lav</Text>
                 <Text textAlign="center" width="25px" fontSize="xx-large" fontWeight={'bold'} color={'red'}>A</Text> {/* Align A vertically */}
                 <Text textAlign="left" width="150px"></Text>
               </Flex>
               <Flex align="center">
                 <Text textAlign="left" width="125px" fontWeight={'bold'}>December 29</Text>
-                <Text textAlign="right" width="150px"></Text>
+                <Text textAlign="right" width="80px"></Text>
                 <Text textAlign="center" width="25px" fontSize="xx-large" fontWeight={'bold'} color={'red'}>N</Text> {/* Align A vertically */}
-                <Text textAlign="left" width="300px">ew York KOM After Party</Text>
+                <Text textAlign="left" width="300px">Y KOM After Party</Text>
               </Flex>
               <Flex align="center">
                 <Text textAlign="left" width="125px" fontWeight={'bold'}>December 30</Text>
-                <Text textAlign="right" width="150px">Triple Twis</Text>
+                <Text textAlign="right" width="80px">Triple Twis</Text>
                 <Text textAlign="center" width="25px" fontSize="xx-large" fontWeight={'bold'} color={'red'}>T</Text> {/* Align A vertically */}
                 <Text textAlign="left" width="150px"></Text>
               </Flex>
               <Flex align="center">
                 <Text textAlign="left" width="125px" fontWeight={'bold'}>December 31</Text>
-                <Text textAlign="right" width="150px"></Text>
+                <Text textAlign="right" width="80px"></Text>
                 <Text textAlign="center" width="25px" fontSize="xx-large" fontWeight={'bold'} color={'red'}>A</Text> {/* Align A vertically */}
                 <Text textAlign="left" width="300px">ccelerate to Elevate</Text>
               </Flex>
