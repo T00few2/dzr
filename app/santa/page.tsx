@@ -184,9 +184,10 @@ export default function santapage() {
             <Carousel
               cards={[
                 '/santa/stage1.png',
+                '/santa/stage2.png',
                 '/santa/stage3.png',
+                '/santa/stage4.png',
                 '/santa/stage5.png',
-  
                   ]}
               />
 
