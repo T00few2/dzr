@@ -254,4 +254,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner on New York KOM',
       linkRoute: 'https://zwiftinsider.com/route/everything-bagel/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Tair Dringfa Fechan',
+      world: 'Watopia',
+      laps: '1',
+      distance: '36.8',
+      elevation: '375',
+      finish: 'Banner on Titans Groove KOM Reverse',
+      linkRoute: 'https://zwiftinsider.com/route/tair-dringfa-fechan/',
+    }),
 ];
