@@ -290,4 +290,17 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1','1'],
     bonus: ['6','4','2'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Big Foot Hills',
+    world: 'Watopia',
+    linkRoute: 'https://zwiftinsider.com/route/big-foot-hills/',
+    laps: '1',
+    length: '69.9',
+    hm: '714',
+    climbs: ['Titans Groove KOM','Zwift KOM','Volcano KOM','Titans Groove KOM Reverse','Zwift KOM Reverse'],
+    sprints: ['Titans Groove KOM','Zwift KOM','Volcano KOM','Titans Groove KOM Reverse','Zwift KOM Reverse'],
+    sprintLaps: ['1','1','1','1','1'],
+    bonus: ['3.0','2.0','1.0'],
+  }),
+
 ];
