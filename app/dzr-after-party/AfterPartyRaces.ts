@@ -263,4 +263,13 @@ export const AfterPartyRacesData = [
       finish: 'Banner on Titans Groove KOM Reverse',
       linkRoute: 'https://zwiftinsider.com/route/tair-dringfa-fechan/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Waisted 8',
+      world: 'Watopia',
+      laps: '1+',
+      distance: '36.453',
+      elevation: '204',
+      finish: 'Banner second time on Jarvis KOM Reverse',
+      linkRoute: 'https://zwiftinsider.com/route/waisted-8/',
+    }),
 ];
