@@ -24,6 +24,7 @@
     "dotenv": "^16.4.5",
     "feed": "^4.2.2",
     "firebase": "^10.14.1",
+    "firebase-admin": "^13.0.2",
     "flask": "^0.2.10",
     "framer-motion": "^11.0.8",
     "googleapis": "^142.0.0",
