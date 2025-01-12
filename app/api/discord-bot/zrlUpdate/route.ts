@@ -1,6 +1,5 @@
-// app/api/discord-bot/zrlUpdate/route.ts
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/app/utils/firebaseAdminConfig'; // Use Admin SDK
+import { adminDb } from '@/app/utils/firebaseAdminConfig';
 import { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 type Rider = {
@@ -19,7 +18,33 @@ type Team = {
   lookingForRiders: boolean;
 };
 
+function isAuthenticated(request: Request): boolean {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Basic ')) {
+    return false;
+  }
+
+  // Decode the Base64 username:password
+  const base64Credentials = authHeader.split(' ')[1];
+  const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
+  const [username, password] = credentials.split(':');
+
+  // Validate against environment variables
+  return (
+    username === process.env.API_USERNAME &&
+    password === process.env.API_PASSWORD
+  );
+}
+
 export async function POST(request: Request) {
+  // Authenticate request
+  if (!isAuthenticated(request)) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+
   const botToken = process.env.DISCORD_BOT_TOKEN;
   const channelId = '1297934562558611526';
 
@@ -39,7 +64,10 @@ export async function POST(request: Request) {
     }));
 
     // Fetch teams looking for riders
-    const teamsSnapshot = await adminDb.collection('teams').where('lookingForRiders', '==', true).get();
+    const teamsSnapshot = await adminDb
+      .collection('teams')
+      .where('lookingForRiders', '==', true)
+      .get();
     const teams: Team[] = teamsSnapshot.docs.map((doc: QueryDocumentSnapshot): Team => ({
       id: doc.id,
       ...(doc.data() as Omit<Team, 'id'>),
@@ -47,9 +75,8 @@ export async function POST(request: Request) {
 
     let messageContent = '';
     if (riders.length > 0 || teams.length > 0) {
-      messageContent += "**🚨 Opsamling 🚨**\n\n"
+      messageContent += '**🚨 Opsamling 🚨**\n\n';
     }
-    // Add riders section if there are riders
     if (riders.length > 0) {
       messageContent += `🚴 **Ryttere der leder efter hold** 🚴\n\n${riders
         .map(
@@ -58,10 +85,8 @@ export async function POST(request: Request) {
         )
         .join('\n\n')}`;
     }
-
-    // Add teams section if there are teams looking for riders
     if (teams.length > 0) {
-      if (messageContent) messageContent += `\n\n`; // Add separator if riders were listed
+      if (messageContent) messageContent += `\n\n`;
       messageContent += `📢 **Hold der leder efter ryttere** 📢\n\n${teams
         .map(
           (team: Team) =>
@@ -69,15 +94,15 @@ export async function POST(request: Request) {
         )
         .join('\n\n')}`;
     }
+    if (messageContent) {
+      messageContent +=
+        '\n\n Hvis du eller dit hold er eller ikke er på listen og status er ændret, må du meget gerne opdatere status på websiden 🫶';
+    }
 
-    if (messageContent) messageContent +='\n\n Hvis du eller dit hold er eller ikke er på listen og status er ændret, må du meget gerne opdatere status på websiden 🫶'
- 
-    // If there's nothing to send, respond with no updates
     if (!messageContent) {
       return NextResponse.json({ success: true, message: 'No updates to send.' });
     }
 
-    // Send the message to Discord
     const response = await fetch(
       `https://www.dzrracingseries.com/api/discord-bot/sendMessage`,
       {
@@ -90,7 +115,10 @@ export async function POST(request: Request) {
     );
 
     if (response.ok) {
-      return NextResponse.json({ success: true, message: 'Updates sent to Discord successfully!' });
+      return NextResponse.json({
+        success: true,
+        message: 'Updates sent to Discord successfully!',
+      });
     } else {
       const errorData = await response.json();
       return NextResponse.json(
