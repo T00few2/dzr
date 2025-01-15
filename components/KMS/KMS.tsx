@@ -36,6 +36,7 @@ interface Signup {
   max30Rating?: number;
   max90Rating?: number;
   group?: number; // 1..5
+  phenotypeValue?: string; 
 }
 
 interface GroupedData {
@@ -196,6 +197,7 @@ const KMS = () => {
       const currentRating = riderData?.race?.current?.rating || 0;
       const max30Rating = riderData?.race?.max30?.rating || 0;
       const max90Rating = riderData?.race?.max90?.rating || 0;
+      const phenotypeValue = riderData?.phenotype?.value || 'Unknown';
 
       const newSignup: Omit<Signup, 'id'> = {
         uid: currentUser.uid,
@@ -203,7 +205,8 @@ const KMS = () => {
         zwiftID,
         currentRating,
         max30Rating,
-        max90Rating
+        max90Rating,
+        phenotypeValue,
       };
 
       // Add the doc to Firestore
@@ -273,6 +276,7 @@ const KMS = () => {
                 <Th color="white">ZwiftID</Th>
                 <Th color="white" textAlign={'center'}>Current vELO Rating</Th>
                 <Th color="white">Group</Th>
+                <Th color="white">Phenotype</Th>
                 <Th color="white">Actions</Th>
                 </Tr>
             </Thead>
@@ -284,6 +288,7 @@ const KMS = () => {
                     {/* Round currentRating to an integer */}
                     <Td textAlign={'center'}>{Math.round(signup.currentRating || 0)}</Td>
                     <Td>{signup.group || 'N/A'}</Td>
+                    <Td>{signup.phenotypeValue ?? 'N/A'}</Td>
                     {/* Conditionally show the "Delete" button */}
                     <Td>
                     {currentUser?.uid === signup.uid && (
