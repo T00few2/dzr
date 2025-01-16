@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     responseDetails.push({
       step: 'Create Test',
-      info: 'Firestore write test failed: ${err}',
+      info: `Firestore write test failed: ${err}`,
     });
   }
 
