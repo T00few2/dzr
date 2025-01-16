@@ -5,6 +5,15 @@ import { adminDb } from '@/app/utils/firebaseAdminConfig';
 import { fetchZPdata, RaceData } from '@/app/utils/fetchZPdata';
 import { groupSignups } from '@/app/utils/groupSignups';
 import { Signup } from '@/app/types/Signup'; // Importing Signup interface
+import * as admin from 'firebase-admin';
+
+if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: process.env.FIREBASE_DATABASE_URL,
+  });
+}
 
 export async function GET(request: NextRequest) {
   const responseDetails: { step: string; info: string }[] = []; // Array to store detailed information
@@ -52,11 +61,15 @@ export async function GET(request: NextRequest) {
       const updatedAt = new Date().toISOString();
 
       try {
-        await adminDb.collection('raceSignups').doc(signup.id).update({
-          currentRating: newCurrentRating,
-          phenotypeValue: phenotypeValue,
-          updatedAt: updatedAt,
-        });
+        // Attempt Firestore update
+        await adminDb.collection('raceSignups').doc(signup.id).set(
+          {
+            currentRating: newCurrentRating,
+            phenotypeValue: phenotypeValue,
+            updatedAt: updatedAt,
+          },
+          { merge: true } // Ensures document is created if it doesn't exist
+        );
 
         responseDetails.push({
           step: 'Update Signup',
@@ -78,18 +91,37 @@ export async function GET(request: NextRequest) {
     }
 
     // 3) Group signups based on updated race data
-    await groupSignups(signups);
-    responseDetails.push({
-      step: 'Group Signups',
-      info: 'Signups grouped successfully based on updated race data.',
-    });
+    try {
+      await groupSignups(signups);
+      responseDetails.push({
+        step: 'Group Signups',
+        info: 'Signups grouped successfully based on updated race data.',
+      });
+    } catch (groupErr) {
+      if (groupErr instanceof Error) {
+        responseDetails.push({
+          step: 'Group Signups',
+          info: `Error grouping signups: ${groupErr.message}`,
+        });
+      } else {
+        responseDetails.push({
+          step: 'Group Signups',
+          info: 'Unknown error during signup grouping.',
+        });
+      }
+    }
 
     // 4) Return a JSON response with detailed logs
-    return NextResponse.json({
-      success: true,
-      message: 'All signups updated with latest race data and regrouped successfully.',
-      details: responseDetails,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'All signups updated with latest race data and regrouped successfully.',
+        details: responseDetails,
+      },
+      {
+        headers: { 'Cache-Control': 'no-store' }, // Disable caching for debugging
+      }
+    );
   } catch (err) {
     // Ensure `err` is narrowed before accessing its properties
     if (err instanceof Error) {
