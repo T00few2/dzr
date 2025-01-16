@@ -2,18 +2,26 @@
 
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
 
-interface GroupedData {
-  [zwift_id: number]: number;
+interface GroupedDataBySignupId {
+  [signupId: string]: number; // Mapping from signup.id to group number
 }
 
-export async function updateGroupsInFirestore(groupedData: GroupedData): Promise<void> {
+export async function updateGroupsInFirestore(groupedData: GroupedDataBySignupId): Promise<void> {
   try {
     const batch = adminDb.batch();
 
-    Object.entries(groupedData).forEach(([zwift_id, group_number]) => {
-      const docRef = adminDb.collection('raceSignups').doc(zwift_id.toString());
-      batch.update(docRef, { group: group_number });
-    });
+    for (const [signupId, groupNumber] of Object.entries(groupedData)) {
+      const docRef = adminDb.collection('raceSignups').doc(signupId);
+      const doc = await docRef.get();
+
+      if (doc.exists) {
+        batch.update(docRef, { group: groupNumber });
+      } else {
+        console.warn(`No document found for Signup ID=${signupId}. Skipping update.`);
+        // Optionally, you can choose to create the document if it doesn't exist:
+        // batch.set(docRef, { group: groupNumber }, { merge: true });
+      }
+    }
 
     await batch.commit();
     console.log('Batch update of groups in Firestore successful.');
