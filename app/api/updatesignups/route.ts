@@ -23,11 +23,6 @@ export async function GET(request: Request) {
     info: `Admin length ${admin.apps.length}`,
   });
 
-  responseDetails.push({
-    step: 'Init',
-    info: `fpi ${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID} fcm ${process.env.NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL} fpk ${process.env.NEXT_PUBLIC_FIREBASE_PRIVATE_KEY}`,
-  });
-
   try {
     await adminDb.collection('test').doc('testDoc').set({ test: 'value' });
     responseDetails.push({
@@ -102,7 +97,7 @@ export async function GET(request: Request) {
 
         responseDetails.push({
           step: 'Update Signup',
-          info: `Updated Signup ID=${signup.id}: currentRating=${newCurrentRating}, phenotypeValue=${phenotypeValue}`,
+          info: `Updated Signup ID=${signup.id}: currentRating=${newCurrentRating}, phenotypeValue=${phenotypeValue}, updatedAt=${updatedAt}`,
         });
       } catch (updateErr) {
         if (updateErr instanceof Error) {
