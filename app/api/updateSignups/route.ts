@@ -19,6 +19,14 @@ export async function GET(request: NextRequest) {
   const responseDetails: { step: string; info: string }[] = []; // Array to store detailed information
 
   try {
+    await adminDb.collection('test').doc('testDoc').set({ test: 'value' });
+    console.log('Firestore write test successful');
+  } catch (err) {
+    console.error('Firestore write test failed:', err);
+  }
+  
+
+  try {
     // 1) Fetch all signups using Admin SDK
     const querySnapshot = await adminDb.collection('raceSignups').get();
     const signups: Signup[] = querySnapshot.docs.map((docSnap) => ({
