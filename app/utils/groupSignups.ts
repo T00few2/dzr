@@ -4,7 +4,7 @@ import { Signup } from '@/app/types/Signup';
 import { updateGroupsInFirestore } from '@/app/utils/updateGroupsInFirestore';
 
 interface GroupedData {
-  [groupName: string]: number[]; // e.g., { "group5": [3511489, 12345], "group6": [15690, 67890] }
+  [groupName: string]: { zwift_id: number; ranking: number }[]; // e.g., { "group5": [{zwift_id:3511489, ranking:1309}, ...], "group6": [...] }
 }
 
 interface GroupedDataBySignupId {
@@ -48,31 +48,31 @@ export async function groupSignups(signups: Signup[]): Promise<void> {
       'group3': 3,
       'group4': 4,
       'group5': 5,
-      // Add more mappings as needed
+      // Add more mappings if there are more groups
     };
 
     // Create a mapping from 'signup.id' to group number
     const groupBySignupId: GroupedDataBySignupId = {};
 
-    signups.forEach((signup) => {
-      const zwiftId = parseInt(signup.zwiftID as string, 10);
-      // Find which group the zwiftId belongs to
-      const groupEntry = Object.entries(groupedData).find(([groupName, zwiftIds]) =>
-        zwiftIds.includes(zwiftId)
-      );
-
-      if (groupEntry) {
-        const [groupName, zwiftIds] = groupEntry;
-        const groupNumber = groupNameToNumber[groupName];
-        if (groupNumber !== undefined) {
-          groupBySignupId[signup.id] = groupNumber;
-        } else {
-          console.warn(`No group number mapping found for groupName=${groupName}`);
-        }
-      } else {
-        console.warn(`No group found for ZwiftID=${zwiftId}`);
+    // Iterate through each group and assign group numbers
+    for (const [groupName, riders] of Object.entries(groupedData)) {
+      const groupNumber = groupNameToNumber[groupName];
+      if (groupNumber === undefined) {
+        console.warn(`No group number mapping found for groupName=${groupName}`);
+        continue;
       }
-    });
+
+      riders.forEach((rider) => {
+        const signupDoc = signups.find(
+          (s) => parseInt(s.zwiftID as string, 10) === rider.zwift_id
+        );
+        if (signupDoc) {
+          groupBySignupId[signupDoc.id] = groupNumber;
+        } else {
+          console.warn(`No signup found for ZwiftID=${rider.zwift_id}`);
+        }
+      });
+    }
 
     console.log('Grouped Data Mapped to Signup IDs:', JSON.stringify(groupBySignupId));
 
