@@ -68,6 +68,11 @@ export async function GET(request: NextRequest) {
 
       const riderData: RaceData | null = await fetchZPdata(signup.zwiftID as string);
 
+      responseDetails.push({
+        step: 'Fetch Race Data',
+        info: `Fetched race data for ZwiftID=${signup.zwiftID}. ${riderData}`,
+      });
+
       if (!riderData) {
         responseDetails.push({
           step: 'Fetch Race Data',
