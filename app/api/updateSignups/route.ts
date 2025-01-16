@@ -18,6 +18,10 @@ if (!admin.apps.length) {
 export async function GET(request: NextRequest) {
   const responseDetails: { step: string; info: string }[] = []; // Array to store detailed information
 
+  responseDetails.push({
+    step: 'Admin',
+    info: `Admin length ${admin.apps.length}`,
+  });
 
   responseDetails.push({
     step: 'Init',
