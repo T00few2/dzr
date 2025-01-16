@@ -1,6 +1,6 @@
 // app/api/updateSignups/route.ts
 
-import { NextRequest, NextResponse } from 'next/server';
+
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
 import { fetchZPdata, RaceData } from '@/app/utils/fetchZPdata';
 import { groupSignups } from '@/app/utils/groupSignups';
@@ -15,7 +15,7 @@ if (!admin.apps.length) {
   });
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   const responseDetails: { step: string; info: string }[] = []; // Array to store detailed information
 
   responseDetails.push({
@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 4) Return a JSON response with detailed logs
-    return NextResponse.json(
+    return Response.json(
       {
         success: true,
         message: 'All signups updated with latest race data and regrouped successfully.',
@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(
+    return Response.json(
       {
         success: false,
         message: 'Server error while updating and regrouping signups.',
