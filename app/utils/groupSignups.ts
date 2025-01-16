@@ -16,8 +16,6 @@ export async function groupSignups(signups: Signup[]): Promise<void> {
       ranking: s.currentRating as number,
     }));
 
-  console.log('Riders Payload:', JSON.stringify(ridersPayload));
-
   try {
     // Call your groupByVELO endpoint (API Gateway)
     const response = await fetch('https://gijpv4f7xe.execute-api.eu-north-1.amazonaws.com/prod/ranking', {
@@ -26,16 +24,11 @@ export async function groupSignups(signups: Signup[]): Promise<void> {
       body: JSON.stringify({ riders: ridersPayload }),
     });
 
-    console.log('groupByVELO Response Status:', response.status);
-
     if (!response.ok) {
-      const responseText = await response.text();
-      throw new Error(`Error grouping signups: ${response.status} - ${responseText}`);
+      throw new Error(`Error grouping signups: ${response.status}`);
     }
 
     const groupedData: GroupedData = await response.json();
-
-    console.log('Grouped Data Received:', JSON.stringify(groupedData));
 
     // Update Firestore with group info
     await updateGroupsInFirestore(groupedData);
@@ -43,6 +36,5 @@ export async function groupSignups(signups: Signup[]): Promise<void> {
     console.log('Grouping of signups completed successfully.');
   } catch (err) {
     console.error('Failed to group signups:', err);
-    throw err; // Re-throw the error to be handled by the calling function
   }
 }
