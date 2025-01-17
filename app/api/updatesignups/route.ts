@@ -115,25 +115,7 @@ export async function GET(request: Request) {
     }
 
     // 3) Group signups based on updated race data
-    try {
-      await groupSignups(signups);
-      responseDetails.push({
-        step: 'Group Signups',
-        info: 'Signups grouped successfully based on updated race data.',
-      });
-    } catch (groupErr) {
-      if (groupErr instanceof Error) {
-        responseDetails.push({
-          step: 'Group Signups',
-          info: `Error grouping signups: ${groupErr.message}`,
-        });
-      } else {
-        responseDetails.push({
-          step: 'Group Signups',
-          info: 'Unknown error during signup grouping.',
-        });
-      }
-    }
+  
 
     // 4) Return a JSON response with detailed logs
     return Response.json(
