@@ -3,7 +3,6 @@
 
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
 import { fetchZPdata, RaceData } from '@/app/utils/fetchZPdata';
-import { groupSignups } from '@/app/utils/groupSignups';
 import { Signup } from '@/app/types/Signup'; // Importing Signup interface
 import * as admin from 'firebase-admin';
 
