@@ -1,20 +1,36 @@
 // app/api/updatesignups/route.ts
 
-
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
 import { fetchZPdata, RaceData } from '@/app/utils/fetchZPdata';
 import { Signup } from '@/app/types/Signup'; // Importing Signup interface
 import * as admin from 'firebase-admin';
 
-if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: process.env.FIREBASE_DATABASE_URL,
-  });
+function isAuthenticated(request: Request): boolean {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Basic ')) {
+    return false;
+  }
+
+  // Decode the Base64 username:password
+  const base64Credentials = authHeader.split(' ')[1];
+  const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
+  const [username, password] = credentials.split(':');
+
+  // Validate against environment variables
+  return (
+    username === process.env.API_USERNAME &&
+    password === process.env.API_PASSWORD
+  );
 }
 
 export async function GET(request: Request) {
+  // Authenticate request
+  if (!isAuthenticated(request)) {
+    return Response.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
   const responseDetails: { step: string; info: string }[] = []; // Array to store detailed information
 
   responseDetails.push({
