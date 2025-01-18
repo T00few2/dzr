@@ -31,26 +31,8 @@ export async function GET(request: Request) {
       { status: 401 }
     );
   }
+  
   const responseDetails: { step: string; info: string }[] = []; // Array to store detailed information
-
-  responseDetails.push({
-    step: 'Admin',
-    info: `Admin length ${admin.apps.length}`,
-  });
-
-  try {
-    await adminDb.collection('test').doc('testDoc').set({ test: 'value' });
-    responseDetails.push({
-      step: 'Create Test',
-      info: `Firestore write test successful.`,
-    });
-    
-  } catch (err) {
-    responseDetails.push({
-      step: 'Create Test',
-      info: `Firestore write test failed: ${err}`,
-    });
-  }
 
   try {
     // 1) Fetch all signups using Admin SDK
@@ -59,11 +41,6 @@ export async function GET(request: Request) {
       id: docSnap.id,
       ...docSnap.data(),
     })) as Signup[];
-
-    responseDetails.push({
-      step: 'Fetch Signups',
-      info: `Fetched ${signups.length} signups.`,
-    });
 
     // 2) For each signup, fetch updated race data and update Firestore
     for (const signup of signups) {
@@ -75,27 +52,15 @@ export async function GET(request: Request) {
         continue;
       }
 
-      responseDetails.push({
-        step: 'Fetch Race Data',
-        info: `Fetching data for Signup ID=${signup.id} with ZwiftID=${signup.zwiftID}`,
-      });
-
       const riderData: RaceData | null = await fetchZPdata(signup.zwiftID as string);
 
-      responseDetails.push({
-        step: 'Fetch Race Data',
-        info: `Fetched race data for ZwiftID=${signup.zwiftID}. ${riderData}`,
-      });
-
       if (!riderData) {
-        responseDetails.push({
-          step: 'Fetch Race Data',
-          info: `Failed to fetch race data for ZwiftID=${signup.zwiftID}. Skipping update...`,
-        });
         continue;
       }
 
       const newCurrentRating = riderData.race.current.rating;
+      const newMax30Rating = riderData.race.max30.rating;
+      const newMax90Rating = riderData.race.max90.rating;
       const phenotypeValue = riderData.phenotype.value;
       const updatedAt = new Date().toISOString();
 
@@ -104,16 +69,14 @@ export async function GET(request: Request) {
         await adminDb.collection('raceSignups').doc(signup.id).set(
           {
             currentRating: newCurrentRating,
+            max30Rating: newMax30Rating,
+            max90Rating: newMax90Rating,
             phenotypeValue: phenotypeValue,
             updatedAt: updatedAt,
           },
           { merge: true } // Ensures document is created if it doesn't exist
         );
 
-        responseDetails.push({
-          step: 'Update Signup',
-          info: `Updated Signup ID=${signup.id}: currentRating=${newCurrentRating}, phenotypeValue=${phenotypeValue}, updatedAt=${updatedAt}`,
-        });
       } catch (updateErr) {
         if (updateErr instanceof Error) {
           responseDetails.push({

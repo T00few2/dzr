@@ -2,11 +2,15 @@
 
 export interface Signup {
     id: string;
-    zwiftID?: string;
+    uid: string;
+    displayName: string;
+    zwiftID: string;
     currentRating?: number;
-    phenotypeValue?: string;
-    group?: number;
-    updatedAt?: string;
+    max30Rating?: number;
+    max90Rating?: number;
+    group?: number; // 1..5
+    phenotypeValue?: string; 
     // Add any other fields you use in 'raceSignups'...
   }
+
   

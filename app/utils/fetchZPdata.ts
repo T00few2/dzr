@@ -5,6 +5,12 @@ export interface RaceData {
       current: {
         rating: number;
       };
+      max30: {
+        rating: number;
+      }
+      max90: {
+        rating: number;
+      }
     };
     phenotype: {
       value: string;
