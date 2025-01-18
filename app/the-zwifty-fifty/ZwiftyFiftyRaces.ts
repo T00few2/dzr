@@ -302,5 +302,17 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1','1','1','1','1'],
     bonus: ['3.0','2.0','1.0'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Douce France',
+    world: 'France',
+    linkRoute: 'https://zwiftinsider.com/route/douce-france/',
+    laps: '2',
+    length: '48.8',
+    hm: '270',
+    climbs: [],
+    sprints: ['Ballon Sprint','Aqueduc KOM','Pavé Sprint','Marina Sprint'],
+    sprintLaps: ['1,2','1,2','1,2','1,2'],
+    bonus: ['1.5','1.0','0.5'],
+  }),
 
 ];

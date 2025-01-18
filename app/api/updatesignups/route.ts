@@ -49,69 +49,7 @@ export async function GET(request: Request) {
       info: `Fetched ${signups.length} signups.`,
     });
 
-    // 2) For each signup, fetch updated race data and update Firestore
-    for (const signup of signups) {
-      if (!signup.zwiftID) {
-        responseDetails.push({
-          step: 'Validate Signup',
-          info: `Signup ID=${signup.id} has no ZwiftID. Skipping...`,
-        });
-        continue;
-      }
-
-      responseDetails.push({
-        step: 'Fetch Race Data',
-        info: `Fetching data for Signup ID=${signup.id} with ZwiftID=${signup.zwiftID}`,
-      });
-
-      const riderData: RaceData | null = await fetchZPdata(signup.zwiftID as string);
-
-      responseDetails.push({
-        step: 'Fetch Race Data',
-        info: `Fetched race data for ZwiftID=${signup.zwiftID}. ${riderData}`,
-      });
-
-      if (!riderData) {
-        responseDetails.push({
-          step: 'Fetch Race Data',
-          info: `Failed to fetch race data for ZwiftID=${signup.zwiftID}. Skipping update...`,
-        });
-        continue;
-      }
-
-      const newCurrentRating = riderData.race.current.rating;
-      const phenotypeValue = riderData.phenotype.value;
-      const updatedAt = new Date().toISOString();
-
-      try {
-        // Attempt Firestore update
-        await adminDb.collection('raceSignups').doc(signup.id).set(
-          {
-            currentRating: newCurrentRating,
-            phenotypeValue: phenotypeValue,
-            updatedAt: updatedAt,
-          },
-          { merge: true } // Ensures document is created if it doesn't exist
-        );
-
-        responseDetails.push({
-          step: 'Update Signup',
-          info: `Updated Signup ID=${signup.id}: currentRating=${newCurrentRating}, phenotypeValue=${phenotypeValue}, updatedAt=${updatedAt}`,
-        });
-      } catch (updateErr) {
-        if (updateErr instanceof Error) {
-          responseDetails.push({
-            step: 'Update Signup',
-            info: `Error updating Signup ID=${signup.id}: ${updateErr.message}`,
-          });
-        } else {
-          responseDetails.push({
-            step: 'Update Signup',
-            info: `Unknown error updating Signup ID=${signup.id}`,
-          });
-        }
-      }
-    }
+    
 
     // 3) Group signups based on updated race data
   
