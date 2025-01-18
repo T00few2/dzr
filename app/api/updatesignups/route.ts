@@ -237,3 +237,14 @@ export async function GET(request: Request) {
     );
   }
 }
+
+/**
+ * Assigns groups to signups based on their currentRating via external API.
+ * @param signups - Array of Signup objects with updated ratings.
+ * @param responseDetails - Array to log detailed information.
+ */
+async function groupSignups(signups: Signup[], responseDetails: { step: string; info: string }[]) {
+  // This function is now integrated within the GET handler for clarity and better flow.
+  // If you prefer to keep it separate, you can move the group assignment logic here.
+  // For this implementation, the group assignment is handled directly in the GET function.
+}
