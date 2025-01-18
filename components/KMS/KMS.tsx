@@ -1,13 +1,13 @@
 // components/KMS/KMS.tsx
 
-import { useState, useEffect, useContext, useRef } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import {
   collection,
   addDoc,
   getDocs,
   deleteDoc,
   doc,
-  updateDoc
+  writeBatch // Import writeBatch
 } from 'firebase/firestore';
 
 import { db } from '@/app/utils/firebaseConfig';
@@ -24,23 +24,24 @@ import {
   Tr,
   Th,
   Td,
-  Text
+  Text,
+  Spinner,
+  useToast // Import useToast
 } from '@chakra-ui/react';
 import { Signup } from '@/app/types/Signup'; // Importing Signup interface
 
 interface GroupedData {
-  riders: { zwift_id: number; ranking: number; group: string }[];
+  riders: { zwift_id: number; ranking: number; group: number }[]; // Ensure group is a number
 }
 
 const KMS = () => {
   const { currentUser } = useContext(AuthContext);
+  const toast = useToast(); // Initialize toast
 
   const [zwiftID, setZwiftID] = useState('');
   const [signups, setSignups] = useState<Signup[]>([]);
   const [loadingSignups, setLoadingSignups] = useState(false);
-
-  // We'll store the previous signups in a ref, so we can compare doc IDs
-  const prevSignupsRef = useRef<Signup[]>([]);
+  const [processing, setProcessing] = useState(false); // To handle processing state
 
   useEffect(() => {
     const fetchSignups = async () => {
@@ -54,42 +55,57 @@ const KMS = () => {
         setSignups(data);
       } catch (error) {
         console.error('Error fetching signups:', error);
+        toast({
+          title: 'Fejl ved hentning af tilmeldinger',
+          description: 'Der opstod en fejl under hentning af tilmeldinger. Prøv igen senere.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+          position: 'top-right',
+        });
       } finally {
         setLoadingSignups(false);
       }
     };
 
     fetchSignups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Only re-group if there's a doc in `signups` not present in `prevSignupsRef`
-  useEffect(() => {
-    if (signups.length === 0) return;
-
-    // Build sets of doc IDs for old and new signups
-    const oldIDs = new Set(prevSignupsRef.current.map((s) => s.id));
-    const newIDs = new Set(signups.map((s) => s.id));
-
-    // Check if there's at least one new ID
-    const foundNewDoc = Array.from(newIDs).some((id) => !oldIDs.has(id));
-    if (foundNewDoc) {
-      // We found a new signup doc => run grouping
-      groupSignups();
-    }
-
-    // Update our ref so we remember these signups
-    prevSignupsRef.current = signups;
-  }, [signups]);
-
+  /**
+   * Assigns groups to signups based on their currentRating via external API.
+   * @returns Promise<void>
+   */
   const groupSignups = async () => {
-    // Build the payload for groupByVELO
-    const ridersPayload = signups.map((s) => ({
-      zwift_id: parseInt(s.zwiftID, 10),
-      ranking: s.currentRating ?? 0
-    }));
-
+    setProcessing(true);
     try {
-      // Call your groupByVELO endpoint (API Gateway)
+      // 1. Fetch the latest signups from Firestore
+      const querySnapshot = await getDocs(collection(db, 'raceSignups'));
+      const latestSignups: Signup[] = [];
+      querySnapshot.forEach((docSnap) => {
+        latestSignups.push({ id: docSnap.id, ...docSnap.data() } as Signup);
+      });
+
+      if (latestSignups.length === 0) {
+        console.warn('No signups available for grouping.');
+        toast({
+          title: 'Ingen tilmeldinger at gruppere.',
+          status: 'warning',
+          duration: 5000,
+          isClosable: true,
+          position: 'top-right',
+        });
+        setProcessing(false);
+        return;
+      }
+
+      // 2. Build the payload for groupByVELO
+      const ridersPayload = latestSignups.map((s) => ({
+        zwift_id: parseInt(s.zwiftID, 10),
+        ranking: s.currentRating ?? 0
+      }));
+
+      // 3. Call your groupByVELO endpoint (API Gateway)
       const response = await fetch(
         'https://gijpv4f7xe.execute-api.eu-north-1.amazonaws.com/prod/ranking',
         {
@@ -98,43 +114,76 @@ const KMS = () => {
           body: JSON.stringify({ riders: ridersPayload })
         }
       );
+
       if (!response.ok) {
-        throw new Error(`Error grouping signups: ${response.status}`);
+        throw new Error(`Error grouping signups: ${response.status} ${response.statusText}`);
       }
 
       const groupedData: GroupedData = await response.json();
-      
-      // 2. Update Firestore with group info
-      await updateGroupsInFirestore(groupedData);
 
-      // 3. Optionally refetch or just patch local state if you want to see group changes
-      // We'll do a quick refetch to see the newly-updated group fields:
+      console.log(`Received group assignments for ${groupedData.riders.length} riders.`);
+
+      // 4. Update Firestore with group assignments
+      await updateGroupsInFirestore(groupedData, latestSignups);
+
+      // 5. Refetch signups to update local state
       await refetchSignups();
+
+      // Show success toast
+      toast({
+        title: 'Gruppeinddeling opdateret!',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
     } catch (err) {
       console.error('Failed to group signups:', err);
+      toast({
+        title: 'Fejl ved gruppering',
+        description: err instanceof Error ? err.message : 'Ukendt fejl',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
+    } finally {
+      setProcessing(false);
     }
   };
 
-  // Helper function to update each doc in Firestore with `group`
-  const updateGroupsInFirestore = async (groupedData: GroupedData) => {
-    await Promise.all(
-      groupedData.riders.map((rider) => setGroupForRider(rider.zwift_id, rider.group))
-    );
+  /**
+   * Updates Firestore with the assigned groups for each rider.
+   * @param groupedData - The grouped data received from the external API.
+   * @param latestSignups - The latest signups fetched from Firestore.
+   */
+  const updateGroupsInFirestore = async (groupedData: GroupedData, latestSignups: Signup[]) => {
+    const groupBatch = writeBatch(db); // Correct usage with writeBatch
+    let updatedGroupCount = 0;
+
+    groupedData.riders.forEach((rider) => {
+      const signup = latestSignups.find((s) => parseInt(s.zwiftID, 10) === rider.zwift_id);
+      if (signup) {
+        const docRef = doc(db, 'raceSignups', signup.id);
+        groupBatch.set(docRef, { group: rider.group }, { merge: true });
+        updatedGroupCount++;
+      } else {
+        console.warn(`No matching signup found for ZwiftID=${rider.zwift_id}.`);
+      }
+    });
+
+    if (updatedGroupCount > 0) {
+      await groupBatch.commit();
+      console.log(`Committed group assignments for ${updatedGroupCount} signups.`);
+    } else {
+      console.warn('No group assignments were updated.');
+    }
   };
 
-  // Helper to update a single doc in Firestore
-  const setGroupForRider = async (zwiftId: number, groupName: string) => {
-    // 1) Find the doc in our `signups` array
-    const signupDoc = signups.find(
-      (s) => parseInt(s.zwiftID, 10) === zwiftId
-    );
-    if (!signupDoc) return;
-
-    // 2) Update Firestore doc
-    const docRef = doc(db, 'raceSignups', signupDoc.id);
-    await updateDoc(docRef, { group: groupName });
-  };
-
+  /**
+   * Refetches signups from Firestore to update the local state.
+   * @returns Promise<void>
+   */
   const refetchSignups = async () => {
     setLoadingSignups(true);
     try {
@@ -146,6 +195,14 @@ const KMS = () => {
       setSignups(data);
     } catch (error) {
       console.error('Error refetching signups:', error);
+      toast({
+        title: 'Fejl ved opdatering af tilmeldinger',
+        description: 'Der opstod en fejl under opdatering af tilmeldinger. Prøv igen senere.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
     } finally {
       setLoadingSignups(false);
     }
@@ -155,7 +212,14 @@ const KMS = () => {
   const handleSignup = async () => {
     if (!currentUser) return;
     if (!zwiftID) {
-      alert('Please enter your ZwiftID.');
+      toast({
+        title: 'Manglende ZwiftID',
+        description: 'Vær venlig at indtaste dit ZwiftID.',
+        status: 'warning',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
       return;
     }
 
@@ -163,11 +227,19 @@ const KMS = () => {
       (signup) => signup.uid === currentUser.uid
     );
     if (alreadySignedUp) {
-      alert('You have already signed up!');
+      toast({
+        title: 'Tilmelding allerede foretaget',
+        description: 'Du har allerede tilmeldt dig!',
+        status: 'info',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
       return;
     }
 
     try {
+      setProcessing(true);
       // Fetch from your /api/zr/ endpoint
       const response = await fetch(`/api/zr/${zwiftID}`);
       if (!response.ok) {
@@ -197,25 +269,58 @@ const KMS = () => {
       // Update local state
       setSignups((prev) => [...prev, { ...newSignup, id: docRef.id }]);
       setZwiftID('');
+
+      // Trigger group assignments after successful signup
+      await groupSignups();
     } catch (error) {
       console.error('Error adding signup:', error);
-      alert('There was an error signing up. Please check the console for details.');
+      toast({
+        title: 'Fejl ved tilmelding',
+        description: 'Der opstod en fejl under tilmelding. Prøv igen senere.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
+    } finally {
+      setProcessing(false);
     }
   };
 
-  // Delete
+  // Handle deletion
   const handleDelete = async (signupId: string, signupUid: string) => {
     if (!currentUser) return;
     if (currentUser.uid !== signupUid) {
-      alert('You can only delete your own signup.');
+      toast({
+        title: 'Adgang nægtet',
+        description: 'Du kan kun slette dine egne tilmeldinger.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
       return;
     }
 
     try {
+      setProcessing(true);
       await deleteDoc(doc(db, 'raceSignups', signupId));
       setSignups((prev) => prev.filter((s) => s.id !== signupId));
+
+      // Trigger group assignments after successful deletion
+      await groupSignups();
     } catch (error) {
       console.error('Error deleting signup:', error);
+      toast({
+        title: 'Fejl ved sletning',
+        description: 'Der opstod en fejl under sletning af din tilmelding. Prøv igen senere.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right',
+      });
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -235,7 +340,7 @@ const KMS = () => {
               onChange={(e) => setZwiftID(e.target.value)}
               mb={2}
             />
-            <Button onClick={handleSignup} colorScheme="teal">
+            <Button onClick={handleSignup} colorScheme="teal" isLoading={processing}>
               Tilmeld
             </Button>
           </Box>
@@ -247,7 +352,7 @@ const KMS = () => {
       </Heading>
 
       {loadingSignups ? (
-        <Text>Loader tilmeldinger...</Text>
+        <Spinner color="teal.500" />
       ) : signups.length === 0 ? (
         <Text>Ingen tilmeldinger endnu.</Text>
       ) : (
@@ -257,6 +362,8 @@ const KMS = () => {
               <Th color="white">Navn</Th>
               <Th color="white">ZwiftID</Th>
               <Th color="white" textAlign={'center'}>Current vELO Rating</Th>
+              <Th color="white" textAlign={'center'}>Max 30 day vELO Rating</Th>
+              <Th color="white" textAlign={'center'}>Max 90 day vELO Rating</Th>
               <Th color="white">Group</Th>
               <Th color="white">Phenotype</Th>
               <Th color="white">Actions</Th>
@@ -269,7 +376,9 @@ const KMS = () => {
                 <Td>{signup.zwiftID}</Td>
                 {/* Round currentRating to an integer */}
                 <Td textAlign={'center'}>{Math.round(signup.currentRating || 0)}</Td>
-                <Td>{signup.group || 'N/A'}</Td>
+                <Td textAlign={'center'}>{Math.round(signup.max30Rating || 0)}</Td>
+                <Td textAlign={'center'}>{Math.round(signup.max90Rating || 0)}</Td>
+                <Td>{signup.group !== undefined ? signup.group : 'N/A'}</Td>
                 <Td>{signup.phenotypeValue ?? 'N/A'}</Td>
                 {/* Conditionally show the "Delete" button */}
                 <Td>
@@ -278,6 +387,7 @@ const KMS = () => {
                       size="sm"
                       colorScheme="red"
                       onClick={() => handleDelete(signup.id, signup.uid)}
+                      isLoading={processing}
                     >
                       Delete
                     </Button>
