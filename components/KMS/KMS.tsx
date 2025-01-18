@@ -26,25 +26,10 @@ import {
   Td,
   Text
 } from '@chakra-ui/react';
-
-interface Signup {
-  id: string;
-  uid: string;
-  displayName: string;
-  zwiftID: string;
-  currentRating?: number;
-  max30Rating?: number;
-  max90Rating?: number;
-  group?: number; // 1..5
-  phenotypeValue?: string; 
-}
+import { Signup } from '@/app/types/Signup'; // Importing Signup interface
 
 interface GroupedData {
-  group1: { zwift_id: number; ranking: number }[];
-  group2: { zwift_id: number; ranking: number }[];
-  group3: { zwift_id: number; ranking: number }[];
-  group4: { zwift_id: number; ranking: number }[];
-  group5: { zwift_id: number; ranking: number }[];
+  riders: { zwift_id: number; ranking: number; group: string }[];
 }
 
 const KMS = () => {
@@ -118,6 +103,7 @@ const KMS = () => {
       }
 
       const groupedData: GroupedData = await response.json();
+      console.log(groupedData)
       // 2. Update Firestore with group info
       await updateGroupsInFirestore(groupedData);
 
@@ -131,17 +117,13 @@ const KMS = () => {
 
   // Helper function to update each doc in Firestore with `group`
   const updateGroupsInFirestore = async (groupedData: GroupedData) => {
-    await Promise.all([
-      ...groupedData.group1.map((rider) => setGroupForRider(rider.zwift_id, 1)),
-      ...groupedData.group2.map((rider) => setGroupForRider(rider.zwift_id, 2)),
-      ...groupedData.group3.map((rider) => setGroupForRider(rider.zwift_id, 3)),
-      ...groupedData.group4.map((rider) => setGroupForRider(rider.zwift_id, 4)),
-      ...groupedData.group5.map((rider) => setGroupForRider(rider.zwift_id, 5))
-    ]);
+    await Promise.all(
+      groupedData.riders.map((rider) => setGroupForRider(rider.zwift_id, rider.group))
+    );
   };
 
   // Helper to update a single doc in Firestore
-  const setGroupForRider = async (zwiftId: number, groupNumber: number) => {
+  const setGroupForRider = async (zwiftId: number, groupName: string) => {
     // 1) Find the doc in our `signups` array
     const signupDoc = signups.find(
       (s) => parseInt(s.zwiftID, 10) === zwiftId
@@ -150,7 +132,7 @@ const KMS = () => {
 
     // 2) Update Firestore doc
     const docRef = doc(db, 'raceSignups', signupDoc.id);
-    await updateDoc(docRef, { group: groupNumber });
+    await updateDoc(docRef, { group: groupName });
   };
 
   const refetchSignups = async () => {
@@ -270,40 +252,40 @@ const KMS = () => {
         <Text>Ingen tilmeldinger endnu.</Text>
       ) : (
         <Table variant="simple">
-            <Thead>
-                <Tr>
-                <Th color="white">Navn</Th>
-                <Th color="white">ZwiftID</Th>
-                <Th color="white" textAlign={'center'}>Current vELO Rating</Th>
-                <Th color="white">Group</Th>
-                <Th color="white">Phenotype</Th>
-                <Th color="white">Actions</Th>
-                </Tr>
-            </Thead>
-            <Tbody>
-                {signups.map((signup) => (
-                <Tr key={signup.id}>
-                    <Td>{signup.displayName}</Td>
-                    <Td>{signup.zwiftID}</Td>
-                    {/* Round currentRating to an integer */}
-                    <Td textAlign={'center'}>{Math.round(signup.currentRating || 0)}</Td>
-                    <Td>{signup.group || 'N/A'}</Td>
-                    <Td>{signup.phenotypeValue ?? 'N/A'}</Td>
-                    {/* Conditionally show the "Delete" button */}
-                    <Td>
-                    {currentUser?.uid === signup.uid && (
-                        <Button
-                        size="sm"
-                        colorScheme="red"
-                        onClick={() => handleDelete(signup.id, signup.uid)}
-                        >
-                        Delete
-                        </Button>
-                    )}
-                    </Td>
-                </Tr>
-                ))}
-            </Tbody>
+          <Thead>
+            <Tr>
+              <Th color="white">Navn</Th>
+              <Th color="white">ZwiftID</Th>
+              <Th color="white" textAlign={'center'}>Current vELO Rating</Th>
+              <Th color="white">Group</Th>
+              <Th color="white">Phenotype</Th>
+              <Th color="white">Actions</Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            {signups.map((signup) => (
+              <Tr key={signup.id}>
+                <Td>{signup.displayName}</Td>
+                <Td>{signup.zwiftID}</Td>
+                {/* Round currentRating to an integer */}
+                <Td textAlign={'center'}>{Math.round(signup.currentRating || 0)}</Td>
+                <Td>{signup.group || 'N/A'}</Td>
+                <Td>{signup.phenotypeValue ?? 'N/A'}</Td>
+                {/* Conditionally show the "Delete" button */}
+                <Td>
+                  {currentUser?.uid === signup.uid && (
+                    <Button
+                      size="sm"
+                      colorScheme="red"
+                      onClick={() => handleDelete(signup.id, signup.uid)}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
         </Table>
       )}
     </Box>
