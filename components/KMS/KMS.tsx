@@ -103,7 +103,7 @@ const KMS = () => {
       }
 
       const groupedData: GroupedData = await response.json();
-      console.log(groupedData)
+      
       // 2. Update Firestore with group info
       await updateGroupsInFirestore(groupedData);
 

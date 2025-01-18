@@ -15,6 +15,18 @@ function hasValidCurrentRating(signup: Signup): signup is Signup & { currentRati
   return typeof signup.currentRating === 'number' && !isNaN(signup.currentRating);
 }
 
+/**
+ * Interface representing the structure of grouped data returned by the groupByVELO API.
+ */
+interface GroupedData {
+  riders: { zwift_id: number; ranking: number; group: number }[];
+}
+
+/**
+ * Authenticates the incoming request using Basic Authentication.
+ * @param request - The incoming HTTP request.
+ * @returns True if authenticated, false otherwise.
+ */
 function isAuthenticated(request: Request): boolean {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Basic ')) {
@@ -33,12 +45,17 @@ function isAuthenticated(request: Request): boolean {
   );
 }
 
+/**
+ * Handles the GET request to update signups with latest race data and assign groups.
+ * @param request - The incoming HTTP request.
+ * @returns A JSON response indicating success or failure with detailed logs.
+ */
 export async function GET(request: Request) {
   // Authenticate request
   if (!isAuthenticated(request)) {
-    return Response.json(
-      { success: false, error: 'Unauthorized' },
-      { status: 401 }
+    return new Response(
+      JSON.stringify({ success: false, error: 'Unauthorized' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
     );
   }
   
@@ -52,7 +69,15 @@ export async function GET(request: Request) {
       ...docSnap.data(),
     })) as Signup[];
 
-    // 2) For each signup, fetch updated race data and update Firestore
+    responseDetails.push({
+      step: 'Fetch Signups',
+      info: `Fetched ${signups.length} signups from Firestore.`,
+    });
+
+    // 2) Update each signup with the latest race data
+    const updatedSignups: Signup[] = [];
+    const raceDataBatch: WriteBatch = adminDb.batch();
+
     for (const signup of signups) {
       if (!signup.zwiftID) {
         responseDetails.push({
@@ -78,55 +103,118 @@ export async function GET(request: Request) {
       const phenotypeValue = riderData.phenotype.value;
       const updatedAt = new Date().toISOString();
 
-      try {
-        // Attempt Firestore update
-        await adminDb.collection('raceSignups').doc(signup.id).set(
-          {
-            currentRating: newCurrentRating,
-            max30Rating: newMax30Rating,
-            max90Rating: newMax90Rating,
-            phenotypeValue: phenotypeValue,
-            updatedAt: updatedAt,
-          },
-          { merge: true } // Ensures document is updated without overwriting existing fields
-        );
+      // Prepare the update
+      const docRef = adminDb.collection('raceSignups').doc(signup.id);
+      raceDataBatch.set(docRef, {
+        currentRating: newCurrentRating,
+        max30Rating: newMax30Rating,
+        max90Rating: newMax90Rating,
+        phenotypeValue: phenotypeValue,
+        updatedAt: updatedAt,
+      }, { merge: true });
 
-        responseDetails.push({
-          step: 'Update Signup',
-          info: `Successfully updated Signup ID=${signup.id}.`,
-        });
+      updatedSignups.push({
+        ...signup,
+        currentRating: newCurrentRating,
+        max30Rating: newMax30Rating,
+        max90Rating: newMax90Rating,
+        phenotypeValue: phenotypeValue,
+        updatedAt: updatedAt,
+      });
 
-      } catch (updateErr) {
-        if (updateErr instanceof Error) {
-          responseDetails.push({
-            step: 'Update Signup',
-            info: `Error updating Signup ID=${signup.id}: ${updateErr.message}`,
-          });
+      responseDetails.push({
+        step: 'Prepare Race Data Update',
+        info: `Prepared update for Signup ID=${signup.id}.`,
+      });
+    }
+
+    // Commit the batch update for race data
+    await raceDataBatch.commit();
+    responseDetails.push({
+      step: 'Commit Race Data Updates',
+      info: `Committed updates for ${updatedSignups.length} signups.`,
+    });
+
+    // 3) Assign groups based on updated currentRating via external API
+    const ridersPayload = updatedSignups.map((s) => ({
+      zwift_id: parseInt(s.zwiftID, 10),
+      ranking: s.currentRating ?? 0
+    }));
+
+    try {
+      // Call your groupByVELO endpoint (API Gateway)
+      const response = await fetch(
+        'https://gijpv4f7xe.execute-api.eu-north-1.amazonaws.com/prod/ranking',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ riders: ridersPayload })
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`Error grouping signups: ${response.status} ${response.statusText}`);
+      }
+
+      const groupedData: GroupedData = await response.json();
+
+      responseDetails.push({
+        step: 'Fetch Group Assignments',
+        info: `Received group assignments for ${groupedData.riders.length} riders.`,
+      });
+
+      // 4) Update Firestore with group assignments using batch writes
+      const groupBatch: WriteBatch = adminDb.batch();
+      let updatedGroupCount = 0;
+
+      groupedData.riders.forEach((rider) => {
+        const signup = signups.find((s) => parseInt(s.zwiftID, 10) === rider.zwift_id);
+        if (signup) {
+          const docRef = adminDb.collection('raceSignups').doc(signup.id);
+          groupBatch.set(docRef, { group: rider.group }, { merge: true });
+          updatedGroupCount++;
         } else {
           responseDetails.push({
-            step: 'Update Signup',
-            info: `Unknown error updating Signup ID=${signup.id}`,
+            step: 'Group Assignment',
+            info: `No matching signup found for ZwiftID=${rider.zwift_id}.`,
           });
         }
+      });
+
+      await groupBatch.commit();
+      responseDetails.push({
+        step: 'Commit Group Assignments',
+        info: `Committed group assignments for ${updatedGroupCount} signups.`,
+      });
+
+    } catch (groupErr) {
+      if (groupErr instanceof Error) {
+        responseDetails.push({
+          step: 'Group Assign Error',
+          info: `Error during grouping: ${groupErr.message}`,
+        });
+      } else {
+        responseDetails.push({
+          step: 'Group Assign Error',
+          info: 'Unknown error during grouping.',
+        });
       }
     }
 
-    // 3) Group signups based on updated race data
-    await groupSignups(signups, responseDetails);
-
-    // 4) Return a JSON response with detailed logs
-    return Response.json(
-      {
+    // 5) Return a JSON response with detailed logs
+    return new Response(
+      JSON.stringify({
         success: true,
         message: 'All signups updated with latest race data and regrouped successfully.',
         details: responseDetails,
-      },
+      }),
       {
-        headers: { 'Cache-Control': 'no-store' }, // Disable caching for debugging
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
       }
     );
+
   } catch (err) {
-    // Ensure `err` is narrowed before accessing its properties
+    // Handle unexpected errors
     if (err instanceof Error) {
       responseDetails.push({
         step: 'Error Handling',
@@ -139,89 +227,13 @@ export async function GET(request: Request) {
       });
     }
 
-    return Response.json(
-      {
+    return new Response(
+      JSON.stringify({
         success: false,
         message: 'Server error while updating and regrouping signups.',
         details: responseDetails,
-      },
-      { status: 500 }
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
-  }
-}
-
-/**
- * Groups the signups into 5 groups based on currentRating and updates Firestore.
- * @param signups Array of Signup objects.
- * @param responseDetails Array to log detailed information.
- */
-async function groupSignups(signups: Signup[], responseDetails: { step: string; info: string }[]) {
-  try {
-    // 1. Filter out signups without a valid currentRating using the type guard
-    const validSignups = signups.filter(hasValidCurrentRating);
-
-    if (validSignups.length === 0) {
-      responseDetails.push({
-        step: 'Grouping',
-        info: 'No valid signups available for grouping.',
-      });
-      return;
-    }
-
-    // 2. Sort signups by currentRating in descending order
-    const sortedSignups = validSignups.sort(
-      (a, b) => b.currentRating - a.currentRating
-    );
-
-    // 3. Determine group size
-    const total = sortedSignups.length;
-    const GROUP_COUNT = 5;
-    const groupSize = Math.max(1, Math.floor(total / GROUP_COUNT));
-
-    // 4. Assign group to each signup
-    const groupedSignups: { signup: Signup; group: string }[] = sortedSignups.map(
-      (signup, index) => {
-        let groupNumber = Math.floor(index / groupSize) + 1;
-        groupNumber = Math.min(groupNumber, GROUP_COUNT); // Ensure groupNumber does not exceed GROUP_COUNT
-        return {
-          signup,
-          group: `group${groupNumber}`,
-        };
-      }
-    );
-
-    // 5. Use batch writes for efficient Firestore updates
-    const batch: WriteBatch = adminDb.batch();
-
-    groupedSignups.forEach(({ signup, group }) => {
-      const docRef = adminDb.collection('raceSignups').doc(signup.id);
-      batch.set(docRef, { group: group }, { merge: true });
-    });
-
-    // 6. Commit the batch
-    await batch.commit();
-
-    responseDetails.push({
-      step: 'Grouping',
-      info: `Successfully grouped ${groupedSignups.length} signups into ${GROUP_COUNT} groups using batch write.`,
-    });
-
-  } catch (groupErr) {
-    if (groupErr instanceof Error) {
-      responseDetails.push({
-        step: 'Grouping Error',
-        info: `Error during grouping: ${groupErr.message}`,
-      });
-    } else {
-      responseDetails.push({
-        step: 'Grouping Error',
-        info: 'Unknown error during grouping.',
-      });
-    }
-  }
-
-  // Optionally, log the grouping details
-  if (responseDetails.length > 0) {
-    console.log('Grouping Details:', responseDetails);
   }
 }

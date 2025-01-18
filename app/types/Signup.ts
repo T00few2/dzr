@@ -10,6 +10,7 @@ export interface Signup {
     max90Rating?: number;
     group?: number; // 1..5
     phenotypeValue?: string; 
+    updatedAt?: string;
     // Add any other fields you use in 'raceSignups'...
   }
 
