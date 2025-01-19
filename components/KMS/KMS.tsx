@@ -14,20 +14,16 @@ import { db } from '@/app/utils/firebaseConfig';
 import { AuthContext } from '@/components/auth/AuthContext';
 
 import {
-  Box,
-  Heading,
-  Input,
-  Button,
-  Table,
-  Thead,
-  Tbody,
+  Box,Heading,Input,Button,Table,Thead, TableContainer,Tbody,InputGroup, Link,
   Tr,
   Th,
   Td,
   Text,
   Spinner,
-  useToast // Import useToast
+  useToast,
+  Container
 } from '@chakra-ui/react';
+import { ExternalLinkIcon } from '@chakra-ui/icons'
 import { Signup } from '@/app/types/Signup'; // Importing Signup interface
 
 interface GroupedData {
@@ -325,7 +321,7 @@ const KMS = () => {
   };
 
   return (
-    <Box p={4} bg="gray.800" color="white">
+    <Container maxW={{base: '90%', md: '5xl'}} py={0} mb={20} color={'white'}>
       <Heading size="lg" mb={4}>
         Klubmesterskab tilmelding
       </Heading>
@@ -334,15 +330,19 @@ const KMS = () => {
         <>
           <Text mb={2}>Hej {currentUser.displayName || 'Unnamed User'}!</Text>
           <Box mb={4}>
+          <InputGroup size='md'>
             <Input
+              width='xs' 
               placeholder="Indtast dit ZwiftID"
               value={zwiftID}
               onChange={(e) => setZwiftID(e.target.value)}
               mb={2}
+              mr={2}
             />
             <Button onClick={handleSignup} colorScheme="teal" isLoading={processing}>
               Tilmeld
             </Button>
+            </InputGroup>
           </Box>
         </>
       )}
@@ -356,11 +356,12 @@ const KMS = () => {
       ) : signups.length === 0 ? (
         <Text>Ingen tilmeldinger endnu.</Text>
       ) : (
+        <TableContainer  textAlign="center">
         <Table variant="simple">
           <Thead>
             <Tr>
               <Th color="white">Navn</Th>
-              <Th color="white">ZwiftID</Th>
+              <Th color="white">ZP profile</Th>
               <Th color="white" textAlign={'center'}>Current vELO Rating</Th>
               <Th color="white" textAlign={'center'}>Max 30 day vELO Rating</Th>
               <Th color="white" textAlign={'center'}>Max 90 day vELO Rating</Th>
@@ -373,7 +374,7 @@ const KMS = () => {
             {signups.map((signup) => (
               <Tr key={signup.id}>
                 <Td>{signup.displayName}</Td>
-                <Td>{signup.zwiftID}</Td>
+                <Td textAlign="center"><Link  color={'orange'} href = {`https://zwiftpower.com/profile.php?z=${signup.zwiftID}`} target='_Blank' isExternal>ZwiftPower<ExternalLinkIcon mx='2px' /></Link></Td>
                 {/* Round currentRating to an integer */}
                 <Td textAlign={'center'}>{Math.round(signup.currentRating || 0)}</Td>
                 <Td textAlign={'center'}>{Math.round(signup.max30Rating || 0)}</Td>
@@ -397,8 +398,9 @@ const KMS = () => {
             ))}
           </Tbody>
         </Table>
+        </TableContainer>
       )}
-    </Box>
+    </Container>
   );
 };
 
