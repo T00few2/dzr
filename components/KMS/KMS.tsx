@@ -330,20 +330,42 @@ const KMS = () => {
         <>
           <Text mb={2}>Hej {currentUser.displayName || 'Unnamed User'}!</Text>
           <Box mb={4}>
-          <InputGroup size='md'>
-            <Input
-              width='xs' 
-              placeholder="Indtast dit ZwiftID"
-              value={zwiftID}
-              onChange={(e) => setZwiftID(e.target.value)}
-              mb={2}
-              mr={2}
-            />
-            <Button onClick={handleSignup} colorScheme="teal" isLoading={processing}>
-              Tilmeld
-            </Button>
-            </InputGroup>
-          </Box>
+      {signups.some((signup) => signup.uid === currentUser.uid) ? (
+        // User is signed up
+        <Box display="flex" alignItems="center">
+          <Text>Du er tilmeldt</Text>
+          <Button
+            size="sm"
+            colorScheme="red"
+            ml={4}
+            onClick={() => {
+              const signup = signups.find((s) => s.uid === currentUser.uid);
+              if (signup) {
+                handleDelete(signup.id, signup.uid);
+              }
+            }}
+            isLoading={processing}
+          >
+            Afmeld
+          </Button>
+        </Box>
+      ) : (
+        // User is not signed up
+        <InputGroup size="md">
+          <Input
+            width="xs"
+            placeholder="Indtast dit ZwiftID"
+            value={zwiftID}
+            onChange={(e) => setZwiftID(e.target.value)}
+            mb={2}
+            mr={2}
+          />
+          <Button onClick={handleSignup} colorScheme="teal" isLoading={processing}>
+            Tilmeld
+          </Button>
+        </InputGroup>
+      )}
+    </Box>
         </>
       )}
 
@@ -361,39 +383,24 @@ const KMS = () => {
           <Thead>
             <Tr>
               <Th color="white">Navn</Th>
-              <Th color="white">ZP profile</Th>
+              <Th color="white">Phenotype</Th>
               <Th color="white" textAlign={'center'}>Current vELO Rating</Th>
               <Th color="white" textAlign={'center'}>Max 30 day vELO Rating</Th>
               <Th color="white" textAlign={'center'}>Max 90 day vELO Rating</Th>
+              <Th color="white">ZP profile</Th>
               <Th color="white">Group</Th>
-              <Th color="white">Phenotype</Th>
-              <Th color="white">Actions</Th>
             </Tr>
           </Thead>
           <Tbody>
             {signups.map((signup) => (
               <Tr key={signup.id}>
                 <Td>{signup.displayName}</Td>
-                <Td textAlign="center"><Link  color={'orange'} href = {`https://zwiftpower.com/profile.php?z=${signup.zwiftID}`} target='_Blank' isExternal>ZwiftPower<ExternalLinkIcon mx='2px' /></Link></Td>
-                {/* Round currentRating to an integer */}
+                <Td>{signup.phenotypeValue ?? 'N/A'}</Td>
                 <Td textAlign={'center'}>{Math.round(signup.currentRating || 0)}</Td>
                 <Td textAlign={'center'}>{Math.round(signup.max30Rating || 0)}</Td>
                 <Td textAlign={'center'}>{Math.round(signup.max90Rating || 0)}</Td>
+                <Td textAlign="center"><Link  color={'orange'} href = {`https://zwiftpower.com/profile.php?z=${signup.zwiftID}`} target='_Blank' isExternal>ZwiftPower<ExternalLinkIcon mx='2px' /></Link></Td>
                 <Td>{signup.group !== undefined ? signup.group : 'N/A'}</Td>
-                <Td>{signup.phenotypeValue ?? 'N/A'}</Td>
-                {/* Conditionally show the "Delete" button */}
-                <Td>
-                  {currentUser?.uid === signup.uid && (
-                    <Button
-                      size="sm"
-                      colorScheme="red"
-                      onClick={() => handleDelete(signup.id, signup.uid)}
-                      isLoading={processing}
-                    >
-                      Delete
-                    </Button>
-                  )}
-                </Td>
               </Tr>
             ))}
           </Tbody>
