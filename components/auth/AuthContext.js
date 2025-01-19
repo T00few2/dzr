@@ -25,38 +25,32 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     /**
-     * Initializes Firebase Auth persistence and sets up the auth state listener.
+     * Initializes Firebase Auth and sets up the auth state listener.
      */
-    const initializeAuth = async () => {
-      try {
-        // Set persistence to session so the user stays logged in until the browser is closed
-        await setPersistence(auth, browserSessionPersistence);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setLoading(false); // Auth state has been determined
+    });
 
-        // Listen for auth state changes
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-          setCurrentUser(user);
-          setLoading(false); // Auth state has been determined
-        });
-
-        // Cleanup the listener on unmount
-        return () => unsubscribe();
-      } catch (error) {
-        console.error('Error setting persistence or initializing auth:', error);
-        setLoading(false); // Even on error, stop the loading state
-      }
-    };
-
-    initializeAuth();
+    // Cleanup the listener on unmount
+    return () => unsubscribe();
   }, []);
 
   /**
    * Logs in a user with email and password.
+   * Sets the persistence to session before signing in.
    * @param {string} email - User's email.
    * @param {string} password - User's password.
    */
   const login = async (email, password) => {
     try {
+      // Set persistence to session for the login operation
+      await setPersistence(auth, browserSessionPersistence);
+      console.log('Persistence set to browserSessionPersistence for login');
+
+      // Perform the sign-in operation
       await signInWithEmailAndPassword(auth, email, password);
+      console.log('User logged in:', email);
     } catch (error) {
       console.error('Login failed:', error.message);
       throw error;
@@ -65,6 +59,7 @@ export const AuthProvider = ({ children }) => {
 
   /**
    * Signs up a new user with email, password, and display name.
+   * Sets the persistence to session before signing up.
    * @param {string} email - User's email.
    * @param {string} password - User's password.
    * @param {string} displayName - User's display name.
@@ -72,6 +67,10 @@ export const AuthProvider = ({ children }) => {
    */
   const signup = async (email, password, displayName) => {
     try {
+      // Set persistence to session for the signup operation
+      await setPersistence(auth, browserSessionPersistence);
+      console.log('Persistence set to browserSessionPersistence for signup');
+
       // Create user with email and password
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user; // Get the user object
@@ -79,6 +78,7 @@ export const AuthProvider = ({ children }) => {
       // Update the user's profile with the display name
       await updateProfile(user, { displayName });
 
+      console.log('User signed up:', email);
       return user; // Return user object after successful signup
     } catch (error) {
       console.error('Signup failed:', error.message);
