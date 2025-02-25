@@ -272,4 +272,13 @@ export const AfterPartyRacesData = [
       finish: 'Banner second time on Jarvis KOM Reverse',
       linkRoute: 'https://zwiftinsider.com/route/waisted-8/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Yorkshire Double Loop',
+      world: 'Yorkshire',
+      laps: '1',
+      distance: '29.7',
+      elevation: '547',
+      finish: 'Banner third time on Yorkshire KOM Reverse',
+      linkRoute: 'https://zwiftinsider.com/route/yorkshire-double-loops/',
+    }),
 ];
