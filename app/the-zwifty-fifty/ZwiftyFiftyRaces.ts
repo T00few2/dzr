@@ -314,5 +314,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1,2','1,2','1,2','1,2'],
     bonus: ['1.5','1.0','0.5'],
   }),
-
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Zwift Games 2024 Epic',
+    world: 'Watopia',
+    linkRoute: 'https://zwiftinsider.com/route/zwift-games-2024-epic/',
+    laps: '1',
+    length: '81.7',
+    hm: '878',
+    climbs: ['Zwift KOM','Titans Groove KOM Reverse','Titans Groove KOM','Zwift KOM Reverse'],
+    sprints: ['Woodland Sprint Reverse','Sasquatch Sprint Reverse','Acropolis Sprint Reverse'],
+    sprintLaps: ['1','1','1'],
+    bonus: ['3','2','1'],
+  }),
 ];
