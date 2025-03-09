@@ -1,7 +1,7 @@
 // app/api/updatesignups/route.ts
 
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
-import { fetchZPdata, RaceData } from '@/app/utils/fetchZPdata';
+import { fetchRiderdata, RiderData } from '@/app/utils/fetchZPdata';
 import { Signup } from '@/app/types/Signup'; // Importing Signup interface
 import * as admin from 'firebase-admin';
 import { WriteBatch } from 'firebase-admin/firestore';
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
         continue;
       }
 
-      const riderData: RaceData | null = await fetchZPdata(signup.zwiftID as string);
+      const riderData: RiderData | null = await fetchRiderdata(signup.zwiftID as string);
 
       if (!riderData) {
         responseDetails.push({

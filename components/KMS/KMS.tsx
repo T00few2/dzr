@@ -237,7 +237,7 @@ const KMS = () => {
     try {
       setProcessing(true);
       // Fetch from your /api/zr/ endpoint
-      const response = await fetch(`/api/zr/${zwiftID}`);
+      const response = await fetch(`/api/zr/rider/${zwiftID}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch rider data. Status: ${response.status}`);
       }

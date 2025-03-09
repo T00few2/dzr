@@ -1,7 +1,7 @@
 // app/api/zr/[id]/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchZPdata, RaceData } from '@/app/utils/fetchZPdata';
+import { fetchRiderdata, RiderData } from '@/app/utils/fetchZPdata';
 
 /**
  * Example: GET /api/zr/15690
@@ -20,14 +20,14 @@ export async function GET(
     );
   }
 
-  const raceData: RaceData | null = await fetchZPdata(id);
+  const riderData: RiderData | null = await fetchRiderdata(id);
 
-  if (!raceData) {
+  if (!riderData) {
     return NextResponse.json(
       { error: 'Unable to fetch race data' },
       { status: 500 }
     );
   }
 
-  return NextResponse.json(raceData, { status: 200 });
+  return NextResponse.json(riderData, { status: 200 });
 }
