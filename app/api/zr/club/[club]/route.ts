@@ -68,7 +68,7 @@ export async function GET(
 
     // 5. Chunk the riders array into multiple docs in a "files" subcollection.
     //    each doc must stay well below 1MB
-    const chunkSize = 200;  // choose a size that keeps each doc under 1MB
+    const chunkSize = 100;  // choose a size that keeps each doc under 1MB
     let fileIndex = 1;
 
     for (let i = 0; i < riders.length; i += chunkSize) {
