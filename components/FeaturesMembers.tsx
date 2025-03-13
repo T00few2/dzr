@@ -96,7 +96,7 @@ export default function FeaturesMembers() {
         <CustomCard href='members-zone/race-calendar' icon = {MdCalendarMonth} heading = 'Race Calendar' text1 = 'When we race' text2 = 'Join us'/>
         <CustomCard href='members-zone/shop' icon = {BsShopWindow} heading = 'Shop' text1 = 'Get the DZR kit IRL' text2={`Suits & bibs orders: ${totalQuantity}/20`} />
         {/*<CustomCard href='members-zone/dzr-team-race' icon = {MdOutlineDirectionsBike} heading = 'DZR Team Race' text1 = 'Join a team race' text2= 'and let the fun begin' />*/}
-        <CustomCard href='members-zone/zrl' icon = {FaTrophy} heading = 'Zwift Racing League' text1 = 'Overview of DZR ZRL teams' text2= 'Find a team that suits' />
+        <CustomCard href='members-zone/zrl' icon = {FaTrophy} heading = 'DZR Racing Teams' text1 = 'Overview of DZR teams across race series' text2= 'Find a race series and team that suits' />
         </SimpleGrid>
       </Box>
    </>
