@@ -128,7 +128,7 @@ const ZRL = () => {
     <Box p={4}>
       <Center>
         <Heading as="h2" size="lg" mb={4} color="white">
-          DZR Zwift Racing League Teams
+          DZR Zwift Racing Teams
         </Heading>
       </Center>
       <Divider mt={4} />
