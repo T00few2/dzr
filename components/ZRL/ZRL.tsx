@@ -363,7 +363,7 @@ const ZRL = () => {
     <Box p={4} textColor="white">
       <Center>
         <Heading as="h2" size="lg" mb={4}>
-          DZR Zwift Racing Teams
+          DZR Racing Teams
         </Heading>
       </Center>
       <Divider mt={4} />
