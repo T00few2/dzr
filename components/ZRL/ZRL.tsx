@@ -48,7 +48,7 @@ interface Team {
   captainName: string;
   createdAt: string;
   rideTime: string;
-  division: string;
+  division: string; // For Club Ladder, it's often an empty string or undefined
   lookingForRiders?: boolean;
   raceSeries?: string; // The team's chosen race series
 }
@@ -70,20 +70,30 @@ const raceSeriesDivisionOrder: Record<string, string[]> = {
     'Platinum',
     'Silver',
   ],
-  'Club Ladder': [],
+  // For Club Ladder, we can show a single column named "No Division"
+  'Club Ladder': [''],
 };
 
 // -----------------------------------------------------------
 // HELPER: GROUP TEAMS BY DIVISION
 // -----------------------------------------------------------
 /**
- * If raceSeries === 'WTRL ZRL', then A1/A2/A3 become group "A", etc.
- * Otherwise, group by the entire division string (e.g., "Doppio", "Latte", etc.).
+ * 1) If raceSeries === 'WTRL ZRL', then A1/A2/A3 => group "A", B1/B2/B3 => group "B", etc.
+ * 2) If raceSeries === 'Club Ladder', teams have no division, so put them in a single "No Division" column.
+ * 3) Otherwise (WTRL TTT, DRS, etc.), group by the entire division string (e.g. "Doppio", "Espresso", etc.).
  */
 function groupTeamsByDivision(teams: Team[], raceSeries: string): Record<string, Team[]> {
+  // Special case for "Club Ladder" – just put all teams in "No Division"
+  if (raceSeries === 'Club Ladder') {
+    return {
+      '': teams,
+    };
+  }
+
   const divisionGroups: Record<string, Team[]> = {};
 
   teams.forEach((team) => {
+    // By default, group by full division string
     let groupKey = team.division;
 
     // For WTRL ZRL, reduce A1/A2/A3 => "A", B1/B2/B3 => "B", etc.
@@ -92,10 +102,9 @@ function groupTeamsByDivision(teams: Team[], raceSeries: string): Record<string,
       if (['A', 'B', 'C', 'D'].includes(firstLetter)) {
         groupKey = firstLetter;
       } else {
-        // If you want to handle "Other" or skip unexpected divisions:
-        // groupKey = 'Other'; 
-        // or skip them entirely:
-        return; 
+        // If you want to skip unexpected divisions (like "") or something else:
+        // groupKey = 'Other'; // or skip them:
+        return;
       }
     }
 
@@ -221,6 +230,7 @@ const ZRL = () => {
   const renderTeams = (filteredTeams: Team[], raceSeries: string) => {
     // 1) Group them
     const divisionGroups = groupTeamsByDivision(filteredTeams, raceSeries);
+
     // 2) We have a specific order for columns
     const order = raceSeriesDivisionOrder[raceSeries] || [];
 
@@ -239,8 +249,11 @@ const ZRL = () => {
           const teamsInGroup = divisionGroups[divisionKey];
           return (
             <Box key={divisionKey}>
-              {/* If it's WTRL ZRL, user sees "Division A", "Division B", etc. 
-                  Otherwise, the full string (like "Doppio"). */}
+              {/* 
+                For ZRL: "Division A", "Division B" etc.
+                For TTT/DRS: the full string (e.g. "Doppio")
+                For Club Ladder: "No Division"
+              */}
               {raceSeries === 'WTRL ZRL' ? (
                 <Heading size="lg" mb={2}>
                   Division {divisionKey}
@@ -265,7 +278,7 @@ const ZRL = () => {
                   <Text>
                     Captain: {team.captainName}
                     <br />
-                    Division: {team.division}
+                    Division: {team.division || '(none)'}
                   </Text>
                   {team.lookingForRiders && (
                     <Text color="yellow">Looking for riders</Text>
