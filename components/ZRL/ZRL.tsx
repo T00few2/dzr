@@ -2,13 +2,10 @@ import { useState, useEffect } from 'react';
 import {
   Box,
   Heading,
-  Grid,
-  GridItem,
   Text,
   Stack,
   Button,
   Center,
-  Flex,
   Divider,
   SimpleGrid,
   Link,

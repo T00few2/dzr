@@ -1,7 +1,7 @@
 // ZRLEditDelete.tsx
 
 import { useState, useEffect } from 'react';
-import { Box, Button, FormControl, FormLabel, Input, Checkbox, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton, ModalFooter } from '@chakra-ui/react';
+import { Button, FormControl, FormLabel, Input, Checkbox, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton, ModalFooter } from '@chakra-ui/react';
 import { db } from '@/app/utils/firebaseConfig'; 
 import { doc, updateDoc } from 'firebase/firestore';
 import SendMessage from '../discord-bot/SendMessage';

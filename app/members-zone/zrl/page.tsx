@@ -1,22 +1,12 @@
 // app/members-zone/ZRL/page.tsx
 'use client';
 
-import ComingSoon from "@/components/ComingSoon";
 import { useContext, useEffect } from 'react';
 import { AuthContext } from '@/components/auth/AuthContext';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/app/utils/firebaseConfig'; // Adjust path if necessary
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
 import ZRL from "@/components/ZRL/ZRL";
-
-import {
-  Container,
-  Heading,
-  Text,
-  Stack,
-  Button,
-  Center, // Import Button
-} from '@chakra-ui/react';
+import {Text} from '@chakra-ui/react';
 
 const ZRLpage = () => {
     const { currentUser, loading } = useContext(AuthContext);
