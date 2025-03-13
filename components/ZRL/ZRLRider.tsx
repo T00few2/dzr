@@ -12,27 +12,46 @@ import {
   ModalBody,
   ModalCloseButton,
   ModalFooter,
+  Select,
 } from '@chakra-ui/react';
 import { auth, db } from '@/app/utils/firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
 import SendMessage from '../discord-bot/SendMessage';
 
 interface Rider {
-  id?: string; // Optional ID for the rider
-  userId: string; // Field to store the user ID of the rider
-  name: string; // Rider's name
-  division: string; // Rider's division
-  rideTime: string; // Preferred race time
+  id?: string;     // Optional ID for the rider
+  userId: string;  // Field to store the user ID of the rider
+  name: string;    // Rider's name
+  division: string;// Rider's division (free text)
+  rideTime: string;// Preferred race time
+  raceSeries: string; // New field for Race Series
 }
 
 const ZRLRider = () => {
-  const [name, setName] = useState(auth.currentUser?.displayName || ''); // Default to user's display name
+  const [name, setName] = useState(auth.currentUser?.displayName || '');
   const [division, setDivision] = useState('');
   const [rideTime, setRideTime] = useState('');
+  const [raceSeries, setRaceSeries] = useState('');
   const [isOpen, setIsOpen] = useState(false);
 
+  const openRegisterModal = () => {
+    setIsOpen(true);
+  };
+
+  const resetForm = () => {
+    setName(auth.currentUser?.displayName || '');
+    setDivision('');
+    setRideTime('');
+    setRaceSeries('');
+    setIsOpen(false);
+  };
+
   const handleRegisterInterest = async () => {
-    if (!rideTime || !auth.currentUser || !division) return;
+    // Basic validation
+    if (!rideTime || !auth.currentUser || !division || !raceSeries) {
+      alert('Please complete all fields before submitting.');
+      return;
+    }
 
     try {
       const riderData: Rider = {
@@ -40,42 +59,43 @@ const ZRLRider = () => {
         name,
         division,
         rideTime,
+        raceSeries,
       };
 
-      await addDoc(collection(db, 'riders'), riderData)
-      
-      const roleId = '1195878349617250405'
-      const messageContent = `🚴 Ny rytter i gården 🚴\n\n${name} er på fri transfer.\nKører gerne ${division} klokken ${rideTime}.\nAttention <@&${roleId}>`
+      // Add the new rider doc to Firestore
+      await addDoc(collection(db, 'riders'), riderData);
+
+      // Post a message to Discord
+      const roleId = '1195878349617250405'; // The Discord role ID to mention
+      const messageContent = `🚴 Ny rytter i gården 🚴\n\n${name} er på fri transfer i ${raceSeries}.\nKører gerne ${division} klokken ${rideTime}.\nAttention <@&${roleId}>`;
+
+      await SendMessage('1297934562558611526', messageContent);
       resetForm();
-      await SendMessage('1297934562558611526', messageContent)
-    
+
     } catch (error) {
-      console.error('Error registering interest:', error)
+      console.error('Error registering rider:', error);
     }
-  };
-
-  const resetForm = () => {
-    setName(auth.currentUser?.displayName || ''); // Reset name to display name
-    setDivision('');
-    setRideTime('');
-    setIsOpen(false);
-  };
-
-  const openRegisterModal = () => {
-    setIsOpen(true);
   };
 
   return (
     <Box>
-      <Button mt={4} mb={4} colorScheme="purple" variant='outline' onClick={openRegisterModal}>
+      <Button
+        mt={4}
+        mb={4}
+        colorScheme="purple"
+        variant="outline"
+        onClick={openRegisterModal}
+      >
         Efterspørg Team
       </Button>
+
       <Modal isOpen={isOpen} onClose={resetForm}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Register Interest</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
+            {/* Rider Name */}
             <FormControl id="name" mb={4}>
               <FormLabel>Name</FormLabel>
               <Input
@@ -86,27 +106,48 @@ const ZRLRider = () => {
                 bg="white"
               />
             </FormControl>
+
+            {/* Race Series (Dropdown) */}
+            <FormControl id="raceSeries" mb={4}>
+              <FormLabel>Race Series</FormLabel>
+              <Select
+                placeholder="Select race series"
+                value={raceSeries}
+                onChange={(e) => setRaceSeries(e.target.value)}
+                bg="white"
+              >
+                <option value="WTRL ZRL">WTRL ZRL</option>
+                <option value="WTRL TTT">WTRL TTT</option>
+                <option value="DRS">DRS</option>
+                <option value="Club Ladder">Club Ladder</option>
+              </Select>
+            </FormControl>
+
+            {/* Division (Free text) */}
             <FormControl id="division" mb={4}>
               <FormLabel>Preferred Division</FormLabel>
               <Input
                 type="text"
                 value={division}
                 onChange={(e) => setDivision(e.target.value)}
-                placeholder="Enter division (eg. A1-A2, C3, D2, ...)"
+                placeholder="Enter your division (e.g., A1, B2, etc.)"
                 bg="white"
               />
             </FormControl>
+
+            {/* Race Time (Free text) */}
             <FormControl id="rideTime" mb={4}>
               <FormLabel>Preferred Race Time</FormLabel>
               <Input
                 type="text"
                 value={rideTime}
                 onChange={(e) => setRideTime(e.target.value)}
-                placeholder="Enter preferred race time (eg. 19:15-20:00)"
+                placeholder="Enter preferred race time (e.g., 19:15)"
                 bg="white"
               />
             </FormControl>
           </ModalBody>
+
           <ModalFooter>
             <Button colorScheme="blue" onClick={handleRegisterInterest}>
               Register Interest

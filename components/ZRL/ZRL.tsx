@@ -9,21 +9,36 @@ import {
   Divider,
   SimpleGrid,
   Link,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
 } from '@chakra-ui/react';
-import { auth, db } from '@/app/utils/firebaseConfig'; 
-import { collection, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { ExternalLinkIcon } from '@chakra-ui/icons';
+import { auth, db } from '@/app/utils/firebaseConfig';
+import {
+  collection,
+  onSnapshot,
+  deleteDoc,
+  doc,
+} from 'firebase/firestore';
+
 import ZRLRegister from './ZRLRegister';
 import ZRLEditDelete from './ZRLEditDelete';
-import ZRLRider from './ZRLRider'; // Import the new ZRLRider component
+import ZRLRider from './ZRLRider';
 import ZRLRiderEditDelete from './ZRLRiderEditDelete';
-import { ExternalLinkIcon } from '@chakra-ui/icons'
 
+// -----------------------------------------------------------
+// TYPES
+// -----------------------------------------------------------
 interface Rider {
-  id?: string; // Optional ID for the rider
-  userId: string; // Field to store the user ID of the rider
-  name: string; // Rider's name
-  division: string; // Rider's division
-  rideTime: string; // Preferred race time
+  id?: string;
+  userId: string;
+  name: string;
+  division: string;
+  rideTime: string;
+  raceSeries?: string; // The rider's chosen race series
 }
 
 interface Team {
@@ -34,38 +49,131 @@ interface Team {
   createdAt: string;
   rideTime: string;
   division: string;
-  lookingForRiders?: boolean; // New field for looking for riders
+  lookingForRiders?: boolean;
+  raceSeries?: string; // The team's chosen race series
 }
 
+// -----------------------------------------------------------
+// ORDER SETTINGS FOR EACH RACE SERIES
+// -----------------------------------------------------------
+const raceSeriesDivisionOrder: Record<string, string[]> = {
+  'WTRL ZRL': ['A', 'B', 'C', 'D'],
+  'WTRL TTT': ['Doppio', 'Espresso', 'Frappe', 'Latte', 'Mocha'],
+  'DRS': [
+    'Diamond',
+    'Ruby',
+    'Emerald',
+    'Sapphire',
+    'Amethyst',
+    'Gold',
+    'Bronze',
+    'Platinum',
+    'Silver',
+  ],
+  'Club Ladder': [],
+};
+
+// -----------------------------------------------------------
+// HELPER: GROUP TEAMS BY DIVISION
+// -----------------------------------------------------------
+/**
+ * If raceSeries === 'WTRL ZRL', then A1/A2/A3 become group "A", etc.
+ * Otherwise, group by the entire division string (e.g., "Doppio", "Latte", etc.).
+ */
+function groupTeamsByDivision(teams: Team[], raceSeries: string): Record<string, Team[]> {
+  const divisionGroups: Record<string, Team[]> = {};
+
+  teams.forEach((team) => {
+    let groupKey = team.division;
+
+    // For WTRL ZRL, reduce A1/A2/A3 => "A", B1/B2/B3 => "B", etc.
+    if (raceSeries === 'WTRL ZRL') {
+      const firstLetter = team.division?.charAt(0).toUpperCase() || '';
+      if (['A', 'B', 'C', 'D'].includes(firstLetter)) {
+        groupKey = firstLetter;
+      } else {
+        // If you want to handle "Other" or skip unexpected divisions:
+        // groupKey = 'Other'; 
+        // or skip them entirely:
+        return; 
+      }
+    }
+
+    if (!divisionGroups[groupKey]) {
+      divisionGroups[groupKey] = [];
+    }
+    divisionGroups[groupKey].push(team);
+  });
+
+  // Sort each group by rideTime
+  Object.keys(divisionGroups).forEach((key) => {
+    divisionGroups[key].sort((a, b) => {
+      const [hA, mA] = a.rideTime.split(':').map(Number);
+      const [hB, mB] = b.rideTime.split(':').map(Number);
+      return (hA * 60 + mA) - (hB * 60 + mB);
+    });
+  });
+
+  return divisionGroups;
+}
+
+// -----------------------------------------------------------
+// MAIN COMPONENT
+// -----------------------------------------------------------
 const ZRL = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [interestedRiders, setInterestedRiders] = useState<Rider[]>([]);
-  const [editMode, setEditMode] = useState(false);
-  const [currentTeam, setCurrentTeam] = useState<Team | null>(null); // For editing teams
-  const [currentRider, setCurrentRider] = useState<Rider | null>(null); // For editing riders
-  const [isRiderEditMode, setIsRiderEditMode] = useState(false); // New state for rider edit mode
 
-  // Real-time listener for teams collection
+  // For editing teams
+  const [editMode, setEditMode] = useState(false);
+  const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
+
+  // For editing riders
+  const [isRiderEditMode, setIsRiderEditMode] = useState(false);
+  const [currentRider, setCurrentRider] = useState<Rider | null>(null);
+
+  // -------------------------------------------------------
+  // LISTEN FOR TEAMS
+  // -------------------------------------------------------
   useEffect(() => {
     const teamsRef = collection(db, 'teams');
-    const unsubscribeTeams = onSnapshot(teamsRef, (snapshot) => {
-      const teamsList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Team[];
+    const unsubscribe = onSnapshot(teamsRef, (snapshot) => {
+      const teamsList = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      })) as Team[];
       setTeams(teamsList);
     });
-
-    return () => unsubscribeTeams();
+    return () => unsubscribe();
   }, []);
 
-  // Real-time listener for riders collection
+  // -------------------------------------------------------
+  // LISTEN FOR RIDERS
+  // -------------------------------------------------------
   useEffect(() => {
     const ridersRef = collection(db, 'riders');
-    const unsubscribeRiders = onSnapshot(ridersRef, (snapshot) => {
-      const ridersList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Rider[];
+    const unsubscribe = onSnapshot(ridersRef, (snapshot) => {
+      const ridersList = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      })) as Rider[];
       setInterestedRiders(ridersList);
     });
-
-    return () => unsubscribeRiders();
+    return () => unsubscribe();
   }, []);
+
+  // -------------------------------------------------------
+  // TEAM ACTIONS
+  // -------------------------------------------------------
+  const openEditModal = (team: Team) => {
+    setCurrentTeam(team);
+    setEditMode(true);
+  };
+
+  const closeEditModal = () => {
+    setEditMode(false);
+    setCurrentTeam(null);
+  };
 
   const handleDeleteTeam = async (teamId: string) => {
     try {
@@ -76,14 +184,17 @@ const ZRL = () => {
     }
   };
 
-  const openEditModal = (team: Team) => {
-    setCurrentTeam(team);
-    setEditMode(true);
+  // -------------------------------------------------------
+  // RIDER ACTIONS
+  // -------------------------------------------------------
+  const openRiderEditModal = (rider: Rider) => {
+    setCurrentRider(rider);
+    setIsRiderEditMode(true);
   };
 
-  const closeEditModal = () => {
-    setEditMode(false);
-    setCurrentTeam(null);
+  const closeRiderEditModal = () => {
+    setCurrentRider(null);
+    setIsRiderEditMode(false);
   };
 
   const handleDeleteRider = async (riderId: string) => {
@@ -95,150 +206,270 @@ const ZRL = () => {
     }
   };
 
-  const openRiderEditModal = (rider: Rider) => {
-    setCurrentRider(rider);
-    setIsRiderEditMode(true); // Set edit mode for riders
+  // -------------------------------------------------------
+  // FILTER TEAMS & RIDERS BY RACE SERIES
+  // -------------------------------------------------------
+  const filterTeamsBySeries = (series: string) =>
+    teams.filter((team) => team.raceSeries === series);
+
+  const filterRidersBySeries = (series: string) =>
+    interestedRiders.filter((rider) => rider.raceSeries === series);
+
+  // -------------------------------------------------------
+  // RENDER TEAMS
+  // -------------------------------------------------------
+  const renderTeams = (filteredTeams: Team[], raceSeries: string) => {
+    // 1) Group them
+    const divisionGroups = groupTeamsByDivision(filteredTeams, raceSeries);
+    // 2) We have a specific order for columns
+    const order = raceSeriesDivisionOrder[raceSeries] || [];
+
+    // We'll keep only the divisions in 'order' that actually exist in the grouping
+    const divisionsToShow = order.filter((div) => divisionGroups[div]);
+
+    // If no divisions to show, show "No teams found"
+    if (divisionsToShow.length === 0) {
+      return <Text textColor="white">No teams found in this series.</Text>;
+    }
+
+    // 3) Render columns in that order
+    return (
+      <SimpleGrid spacing={4} minChildWidth="250px" marginBlockEnd={4} textColor="white">
+        {divisionsToShow.map((divisionKey) => {
+          const teamsInGroup = divisionGroups[divisionKey];
+          return (
+            <Box key={divisionKey}>
+              {/* If it's WTRL ZRL, user sees "Division A", "Division B", etc. 
+                  Otherwise, the full string (like "Doppio"). */}
+              {raceSeries === 'WTRL ZRL' ? (
+                <Heading size="lg" mb={2}>
+                  Division {divisionKey}
+                </Heading>
+              ) : (
+                <Heading size="lg" mb={2}>
+                  {divisionKey}
+                </Heading>
+              )}
+
+              {teamsInGroup.map((team) => (
+                <Box
+                  key={team.id}
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  p={4}
+                  mb={2}
+                >
+                  <Heading size="md">
+                    {team.rideTime}: {team.name}
+                  </Heading>
+                  <Text>
+                    Captain: {team.captainName}
+                    <br />
+                    Division: {team.division}
+                  </Text>
+                  {team.lookingForRiders && (
+                    <Text color="yellow">Looking for riders</Text>
+                  )}
+                  {team.captainId === auth.currentUser?.uid && (
+                    <Stack direction="row" spacing={3} mt={2}>
+                      <Button
+                        colorScheme="yellow"
+                        onClick={() => openEditModal(team)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        colorScheme="red"
+                        onClick={() => handleDeleteTeam(team.id!)}
+                      >
+                        Delete
+                      </Button>
+                    </Stack>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          );
+        })}
+      </SimpleGrid>
+    );
   };
 
-  const closeRiderEditModal = () => {
-    setCurrentRider(null);
-    setIsRiderEditMode(false); // Reset edit mode for riders
+  // -------------------------------------------------------
+  // RENDER RIDERS
+  // -------------------------------------------------------
+  const renderRiders = (filteredRiders: Rider[]) => {
+    if (filteredRiders.length === 0) {
+      return <Text textColor="white">No interested riders yet.</Text>;
+    }
+
+    return (
+      <SimpleGrid
+        spacing={4}
+        templateColumns="repeat(auto-fit, minmax(200px, 300px))"
+        marginBlockEnd={4}
+        textColor="white"
+      >
+        {filteredRiders.map((rider) => (
+          <Box
+            key={rider.id}
+            borderWidth="1px"
+            borderRadius="lg"
+            p={4}
+            mb={2}
+          >
+            <Heading size="md">{rider.name}</Heading>
+            <Text>
+              Preferred Division: {rider.division}
+              <br />
+              Preferred Race Time: {rider.rideTime}
+            </Text>
+            {rider.userId === auth.currentUser?.uid && (
+              <Stack direction="row" spacing={3} mt={2}>
+                <Button colorScheme="yellow" onClick={() => openRiderEditModal(rider)}>
+                  Edit
+                </Button>
+                <Button
+                  colorScheme="red"
+                  onClick={() => handleDeleteRider(rider.id!)}
+                >
+                  Delete
+                </Button>
+              </Stack>
+            )}
+          </Box>
+        ))}
+      </SimpleGrid>
+    );
   };
 
-  // Group and sort teams by division and ride time
-  const divisionGroups = teams.reduce((acc: { [key: string]: Team[] }, team) => {
-    const divisionKey = team.division.charAt(0).toUpperCase();
-    if (!acc[divisionKey]) acc[divisionKey] = [];
-    acc[divisionKey].push(team);
-    return acc;
-  }, {});
-
-  // Sort the teams within each division by rideTime
-  Object.keys(divisionGroups).forEach((division) => {
-    divisionGroups[division].sort((a, b) => {
-      const timeA = a.rideTime.split(':').map(Number);
-      const timeB = b.rideTime.split(':').map(Number);
-      const totalMinutesA = timeA[0] * 60 + timeA[1];
-      const totalMinutesB = timeB[0] * 60 + timeB[1];
-      return totalMinutesA - totalMinutesB;
-    });
-  });
-
+  // -------------------------------------------------------
+  // MAIN RENDER
+  // -------------------------------------------------------
   return (
-    <Box p={4}>
+    <Box p={4} textColor="white">
       <Center>
-        <Heading as="h2" size="lg" mb={4} color="white">
+        <Heading as="h2" size="lg" mb={4}>
           DZR Zwift Racing Teams
         </Heading>
       </Center>
       <Divider mt={4} />
-      
-      <Text mr={4} mt={4} color={'white'}>
-          Dette er første udgave af en side, hvor man kan få overblik over hvilke hold vi har i ZRL. Derudover kan hold aktivt vise, at de leder efter
-          ryttere og ryttere kan vise at de leder efter et hold. Feedback og forslag er meget velkomne på <Link href='https://discord.gg/22t8MvWK' target='_Blank' isExternal color="blue.300">Discord <ExternalLinkIcon mx='2px' /></Link>
-        </Text>
-      
-        <Text mr={4} mt={4} color={'white'}>
-        <strong>• Holdkaptajner</strong> kan registere hold. Detaljer kan ændres af kaptajnen, når holdet er oprettet &#40;Edit&#41; og slettes &#40;Delete&#41;. Kryds af i &quot;Looking for riders&quot;
 
-          for at vise at I aktivt leder efter flere ryttere.
-        </Text>
-        <ZRLRegister />
-      
-        <Text mr={4} mt={4} color={'white'}>
-        <strong>• Ryttere</strong> kan flage interesse i at finde et team. Detaljer kan ændres af rytteren, når interessen er oprettet &#40;Edit&#41; og slettes &#40;Delete&#41;.
-        </Text>
-        <ZRLRider />
+      <Text mr={4} mt={4}>
+        Dette er første udgave af en side, hvor man kan få overblik over hvilke
+        hold vi har i de forskellige løbsserier. Derudover kan hold aktivt vise, at
+        de leder efter ryttere og ryttere kan vise at de leder efter et hold.
+        Feedback og forslag er meget velkomne på{' '}
+        <Link
+          href="https://discord.gg/22t8MvWK"
+          target="_blank"
+          isExternal
+          color="blue.300"
+        >
+          Discord <ExternalLinkIcon mx="2px" />
+        </Link>
+      </Text>
+
+      <Text mr={4} mt={4}>
+        <strong>• Holdkaptajner</strong> kan registere hold. Detaljer kan
+        ændres af kaptajnen, når holdet er oprettet (Edit) og slettes (Delete).
+        Kryds af i &quot;Looking for riders&quot; for at vise at I aktivt leder
+        efter flere ryttere.
+      </Text>
+      <ZRLRegister />
+
+      <Text mr={4} mt={4}>
+        <strong>• Ryttere</strong> kan flage interesse i at finde et team.
+        Detaljer kan ændres af rytteren, når interessen er oprettet (Edit) og
+        slettes (Delete).
+      </Text>
+      <ZRLRider />
 
       <Divider mb={4} />
-      <Heading size="xl" color="white" mb={4}>
-          Current Teams
-      </Heading>
-      <SimpleGrid spacing={4} minChildWidth={'250px'} marginBlockEnd={4}>
-        {['A', 'B', 'C', 'D'].map((division) => (
-          <Box key={division}>
-            <Heading size="lg" color="white" mb={2}>{`Division ${division}`}</Heading>
-            {divisionGroups[division]?.map((team) => (
-              <Box key={team.id} borderWidth="1px" borderRadius="lg" p={4} color="white" mb={2}>
-                <Heading size="md">
-                  {team.rideTime}: {team.name}
-                </Heading>
-                <Text>
-                  Captain: {team.captainName}<br />
-                  Division: {team.division}
-                </Text>
-                {team.lookingForRiders && (
-                  <Text color="yellow">Looking for riders</Text>
-                )}
-                {team.captainId === auth.currentUser?.uid && (
-                  <Stack direction="row" spacing={3} mt={2}>
-                    <Button colorScheme="yellow" onClick={() => openEditModal(team)}>
-                      Edit
-                    </Button>
-                    <Button colorScheme="red" onClick={() => handleDeleteTeam(team.id!)}>
-                      Delete
-                    </Button>
-                  </Stack>
-                )}
-              </Box>
-            ))} 
-          </Box>
-        ))}
-      </SimpleGrid>
-      <Divider mb={4} mt={4}/>
-      {/* Interested Riders Section */}
-      <Box mt={4}>
-        <Heading size="xl" color="white" mb={4}>
-          Riders Looking For Team
-        </Heading>
-        <SimpleGrid 
-  spacing={4} 
-  templateColumns="repeat(auto-fit, minmax(200px, 300px))" 
-  marginBlockEnd={4}
->
-        {interestedRiders.length > 0 ? (
-          interestedRiders.map((rider) => (
-           
-            <Box key={rider.userId} borderWidth="1px" borderRadius="lg" p={4} color="white" mb={2}>
-              <Heading size="md">
-                {rider.name}
-              </Heading>
-              <Text>
-                Preferred Division: {rider.division}<br />
-                Preferred Race Time: {rider.rideTime}
-              </Text>
-              {rider.userId === auth.currentUser?.uid && ( // Check if the current user is the rider
-                <Stack direction="row" spacing={3} mt={2}>
-                  <Button colorScheme="yellow" onClick={() => openRiderEditModal(rider)}>
-                    Edit
-                  </Button>
-                  <Button colorScheme="red" onClick={() => handleDeleteRider(rider.id!)}>
-                    Delete
-                  </Button>
-                </Stack>
-              )}
-            </Box>
-          
-          ))
-        ) : (
-          <Text color="white">No interested riders yet.</Text>
-        )}
-          </SimpleGrid>
-      </Box>
-      {/* Edit Team Component (conditionally rendered if a team is selected for editing) */}
+
+      {/* 
+        TABS for the 4 race series:
+        "WTRL ZRL", "WTRL TTT", "DRS", "Club Ladder"
+      */}
+      <Tabs variant="enclosed" mt={8}>
+        <TabList mb={4}>
+          <Tab>WTRL ZRL</Tab>
+          <Tab>WTRL TTT</Tab>
+          <Tab>DRS</Tab>
+          <Tab>Club Ladder</Tab>
+        </TabList>
+
+        <TabPanels>
+          {/* WTRL ZRL */}
+          <TabPanel>
+            <Heading size="xl" mb={4}>
+              Current Teams (WTRL ZRL)
+            </Heading>
+            {renderTeams(filterTeamsBySeries('WTRL ZRL'), 'WTRL ZRL')}
+
+            <Divider my={8} />
+
+            <Heading size="xl" mb={4}>
+              Riders Looking For Team (WTRL ZRL)
+            </Heading>
+            {renderRiders(filterRidersBySeries('WTRL ZRL'))}
+          </TabPanel>
+
+          {/* WTRL TTT */}
+          <TabPanel>
+            <Heading size="xl" mb={4}>
+              Current Teams (WTRL TTT)
+            </Heading>
+            {renderTeams(filterTeamsBySeries('WTRL TTT'), 'WTRL TTT')}
+
+            <Divider my={8} />
+
+            <Heading size="xl" mb={4}>
+              Riders Looking For Team (WTRL TTT)
+            </Heading>
+            {renderRiders(filterRidersBySeries('WTRL TTT'))}
+          </TabPanel>
+
+          {/* DRS */}
+          <TabPanel>
+            <Heading size="xl" mb={4}>
+              Current Teams (DRS)
+            </Heading>
+            {renderTeams(filterTeamsBySeries('DRS'), 'DRS')}
+
+            <Divider my={8} />
+
+            <Heading size="xl" mb={4}>
+              Riders Looking For Team (DRS)
+            </Heading>
+            {renderRiders(filterRidersBySeries('DRS'))}
+          </TabPanel>
+
+          {/* Club Ladder */}
+          <TabPanel>
+            <Heading size="xl" mb={4}>
+              Current Teams (Club Ladder)
+            </Heading>
+            {renderTeams(filterTeamsBySeries('Club Ladder'), 'Club Ladder')}
+
+            <Divider my={8} />
+
+            <Heading size="xl" mb={4}>
+              Riders Looking For Team (Club Ladder)
+            </Heading>
+            {renderRiders(filterRidersBySeries('Club Ladder'))}
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
+
+      {/* Conditionally render the Edit Team modal */}
       {editMode && currentTeam && (
-        <ZRLEditDelete
-          team={currentTeam}
-          onClose={closeEditModal} // Close modal function
-        />
+        <ZRLEditDelete team={currentTeam} onClose={closeEditModal} />
       )}
 
-      {/* Edit Rider Component (conditionally rendered if a rider is selected for editing) */}
+      {/* Conditionally render the Edit Rider modal */}
       {isRiderEditMode && currentRider && (
-        <ZRLRiderEditDelete
-          rider={currentRider} // Pass the current rider to edit
-          onClose={closeRiderEditModal} // Close modal function for riders
-        />
+        <ZRLRiderEditDelete rider={currentRider} onClose={closeRiderEditModal} />
       )}
     </Box>
   );

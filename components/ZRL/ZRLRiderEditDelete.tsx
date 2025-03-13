@@ -14,16 +14,18 @@ import {
   ModalBody,
   ModalCloseButton,
   ModalFooter,
+  Select,
 } from '@chakra-ui/react';
 import { db } from '@/app/utils/firebaseConfig';
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 
 interface Rider {
-  id?: string; // Optional ID for the rider
-  userId: string; // Field to store the user ID of the rider
-  name: string; // Rider's name
-  division: string; // Rider's division
-  rideTime: string; // Preferred race time
+  id?: string;       // Optional ID for the rider
+  userId: string;    // Field to store the user ID of the rider
+  name: string;      // Rider's name
+  division: string;  // Rider's division (free text)
+  rideTime: string;  // Preferred race time
+  raceSeries?: string; // Optional field for Race Series
 }
 
 interface ZRLRiderEditDeleteProps {
@@ -35,13 +37,16 @@ const ZRLRiderEditDelete: React.FC<ZRLRiderEditDeleteProps> = ({ rider, onClose 
   const [name, setName] = useState('');
   const [division, setDivision] = useState('');
   const [rideTime, setRideTime] = useState('');
+  const [raceSeries, setRaceSeries] = useState(''); // New state for race series
 
-  // Update local state when rider changes
+  // Populate local state when rider changes
   useEffect(() => {
     if (rider) {
       setName(rider.name);
       setDivision(rider.division);
       setRideTime(rider.rideTime);
+      // If raceSeries is missing, default to empty string
+      setRaceSeries(rider.raceSeries || '');
     }
   }, [rider]);
 
@@ -54,6 +59,7 @@ const ZRLRiderEditDelete: React.FC<ZRLRiderEditDeleteProps> = ({ rider, onClose 
         name,
         division,
         rideTime,
+        raceSeries, // Update the new raceSeries field
       });
       onClose(); // Close the modal after update
     } catch (error) {
@@ -61,17 +67,16 @@ const ZRLRiderEditDelete: React.FC<ZRLRiderEditDeleteProps> = ({ rider, onClose 
     }
   };
 
-
-
   return (
     <Modal isOpen={true} onClose={onClose}>
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader color="white">Edit Interested Rider</ModalHeader>
+        {/* Remove color="white" so it defaults to black text */}
+        <ModalHeader>Edit Interested Rider</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
           <FormControl id="riderName" mb={4}>
-            <FormLabel color="white">Rider Name</FormLabel>
+            <FormLabel>Rider Name</FormLabel>
             <Input
               type="text"
               value={name}
@@ -80,18 +85,36 @@ const ZRLRiderEditDelete: React.FC<ZRLRiderEditDeleteProps> = ({ rider, onClose 
               bg="white"
             />
           </FormControl>
+
+          {/* Race Series Dropdown */}
+          <FormControl id="raceSeries" mb={4}>
+            <FormLabel>Race Series</FormLabel>
+            <Select
+              placeholder="Select race series"
+              value={raceSeries}
+              onChange={(e) => setRaceSeries(e.target.value)}
+              bg="white"
+            >
+              <option value="WTRL ZRL">WTRL ZRL</option>
+              <option value="WTRL TTT">WTRL TTT</option>
+              <option value="DRS">DRS</option>
+              <option value="Club Ladder">Club Ladder</option>
+            </Select>
+          </FormControl>
+
           <FormControl id="division" mb={4}>
-            <FormLabel color="white">Division</FormLabel>
+            <FormLabel>Division</FormLabel>
             <Input
               type="text"
               value={division}
               onChange={(e) => setDivision(e.target.value)}
-              placeholder="Enter division (A, B, C, or D)"
+              placeholder="Enter division (e.g., A1, B2, etc.)"
               bg="white"
             />
           </FormControl>
+
           <FormControl id="rideTime" mb={4}>
-            <FormLabel color="white">Ride Time</FormLabel>
+            <FormLabel>Ride Time</FormLabel>
             <Input
               type="text"
               value={rideTime}
@@ -105,8 +128,10 @@ const ZRLRiderEditDelete: React.FC<ZRLRiderEditDeleteProps> = ({ rider, onClose 
           <Button colorScheme="blue" onClick={handleEditRider} isDisabled={!rider}>
             Update Interest
           </Button>
- 
-          <Button variant="ghost" onClick={onClose}>Close</Button>
+
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
         </ModalFooter>
       </ModalContent>
     </Modal>

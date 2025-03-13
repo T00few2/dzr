@@ -7,12 +7,14 @@ type Rider = {
   name: string;
   division: string;
   rideTime: string;
+  raceSeries: string;
 };
 
 type Team = {
   id: string;
   name: string;
   captainName: string;
+  raceSeries: string;
   rideTime: string;
   division: string;
   lookingForRiders: boolean;
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
       messageContent += `🚴 **Ryttere der leder efter hold** 🚴\n\n${riders
         .map(
           (rider: Rider) =>
-            `**${rider.name}**\n- Division: ${rider.division}\n- Preferred Time: ${rider.rideTime}`
+            `**${rider.name}**\n- Race Series: ${rider.raceSeries}\n- Division: ${rider.division}\n- Preferred Time: ${rider.rideTime}`
         )
         .join('\n\n')}`;
     }
@@ -90,7 +92,7 @@ export async function POST(request: Request) {
       messageContent += `📢 **Hold der leder efter ryttere** 📢\n\n${teams
         .map(
           (team: Team) =>
-            `**${team.name}**\n- Division: ${team.division}\n- Ride Time: ${team.rideTime}\n- Captain: ${team.captainName}`
+            `**${team.name}**\n- Race Series: ${team.raceSeries}\n-Division: ${team.division}\n- Ride Time: ${team.rideTime}\n- Captain: ${team.captainName}`
         )
         .join('\n\n')}`;
     }
