@@ -8,7 +8,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   setPersistence,
-  browserSessionPersistence,
+  browserLocalPersistence,
   updateProfile,
 } from 'firebase/auth';
 import { auth } from '@/app/utils/firebaseConfig'; // Adjust the path if needed
@@ -45,8 +45,8 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       // Set persistence to session for the login operation
-      await setPersistence(auth, browserSessionPersistence);
-      console.log('Persistence set to browserSessionPersistence for login');
+      await setPersistence(auth, browserLocalPersistence);
+      console.log('Persistence set to browserLocalPersistence for login');
 
       // Perform the sign-in operation
       await signInWithEmailAndPassword(auth, email, password);

@@ -19,12 +19,13 @@ import { collection, addDoc } from 'firebase/firestore';
 import SendMessage from '../discord-bot/SendMessage';
 
 interface Rider {
-  id?: string;     // Optional ID for the rider
-  userId: string;  // Field to store the user ID of the rider
-  name: string;    // Rider's name
-  division: string;// Rider's division (free text)
-  rideTime: string;// Preferred race time
-  raceSeries: string; // New field for Race Series
+  id?: string;
+  userId: string;
+  name: string;
+  division: string;
+  rideTime: string;
+  raceSeries: string; // new
+  expiresAt?: Date;   // new
 }
 
 const ZRLRider = () => {
@@ -53,6 +54,9 @@ const ZRLRider = () => {
       return;
     }
 
+    // Example: Let the registration expire in 21 days
+    const expiresAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
+
     try {
       const riderData: Rider = {
         userId: auth.currentUser.uid,
@@ -60,13 +64,14 @@ const ZRLRider = () => {
         division,
         rideTime,
         raceSeries,
+        expiresAt, // We'll use this in Firestore TTL
       };
 
       // Add the new rider doc to Firestore
       await addDoc(collection(db, 'riders'), riderData);
 
       // Post a message to Discord
-      const roleId = '1195878349617250405'; // The Discord role ID to mention
+      const roleId = '1195878349617250405';
       const messageContent = `🚴 Ny rytter i gården 🚴\n\n${name} er på fri transfer i ${raceSeries}.\nKører gerne ${division} klokken ${rideTime}.\nAttention <@&${roleId}>`;
 
       await SendMessage('1297934562558611526', messageContent);
