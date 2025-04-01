@@ -54,7 +54,7 @@ const ZRLRider = () => {
       return;
     }
 
-    // Example: Let the registration expire in 21 days
+    // Let the registration expire in 21 days
     const expiresAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
 
     try {

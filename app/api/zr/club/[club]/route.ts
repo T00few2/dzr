@@ -17,6 +17,15 @@ if (!admin.apps.length) {
 // Firestore database reference
 const db = admin.firestore();
 
+// Helper: Zwift Pacing Group ranking
+const zpCategoryRank = {
+  'D': 1,
+  'C': 2,
+  'B': 3,
+  'A': 4,
+  'A+': 5,
+};
+
 /**
  * GET /api/zr/[club]
  * Fetches the club data and stores it in Firestore under:
@@ -43,12 +52,16 @@ export async function GET(
   const dateId = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
   const docRef = db.collection('club_stats').doc(dateId);
 
+  // Let the data expire in 7 days
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
   try {
     // Store the entire clubData directly under "club_stats/{YYYY-MM-DD}"
     await docRef.set({
       timestamp: new Date().toISOString(),
       clubId: club,
-      data: clubData
+      data: clubData,
+      expiresAt: expiresAt, 
     });
 
     console.log(`Data stored in Firestore: club_stats/${dateId}`);
