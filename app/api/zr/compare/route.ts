@@ -106,12 +106,23 @@ export async function GET(request: NextRequest) {
         });
       }
     }
+
+    const timeStamp = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Paris', // CET/CEST depending on date
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(new Date());
     
 
     return NextResponse.json({
       message: 'Comparison complete.',
       upgradedZPCategory,
       upgradedZwiftRacingCategory,
+      timeStamp: timeStamp,
     });
   } catch (err: any) {
     console.error('Error during comparison:', err);

@@ -17,15 +17,6 @@ if (!admin.apps.length) {
 // Firestore database reference
 const db = admin.firestore();
 
-// Helper: Zwift Pacing Group ranking
-const zpCategoryRank = {
-  'D': 1,
-  'C': 2,
-  'B': 3,
-  'A': 4,
-  'A+': 5,
-};
-
 /**
  * GET /api/zr/[club]
  * Fetches the club data and stores it in Firestore under:
