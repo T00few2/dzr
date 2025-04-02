@@ -15,7 +15,6 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-// Category strength rankings for ZP
 const zpCategoryRank = {
   'D': 1,
   'C': 2,
@@ -28,21 +27,37 @@ function isZpCategory(cat: any): cat is keyof typeof zpCategoryRank {
   return typeof cat === 'string' && cat in zpCategoryRank;
 }
 
+// Helper to convert YYMMDD → YYYY-MM-DD
+function formatDate(input: string): string {
+  if (!/^\d{6}$/.test(input)) throw new Error(`Invalid date format: ${input}`);
+  const year = `20${input.slice(0, 2)}`;
+  const month = input.slice(2, 4);
+  const day = input.slice(4, 6);
+  return `${year}-${month}-${day}`;
+}
+
 export async function GET(request: NextRequest) {
-  const today = new Date();
-  const todayId = today.toISOString().split('T')[0];
-
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  const yesterdayId = yesterday.toISOString().split('T')[0];
-
   try {
+    const { searchParams } = new URL(request.url);
+    const todayRaw = searchParams.get('today');
+    const yesterdayRaw = searchParams.get('yesterday');
+
+    if (!todayRaw || !yesterdayRaw) {
+      return NextResponse.json(
+        { error: 'Missing required parameters: today and yesterday (YYMMDD)' },
+        { status: 400 }
+      );
+    }
+
+    const todayId = formatDate(todayRaw);
+    const yesterdayId = formatDate(yesterdayRaw);
+
     const todayDoc = await db.collection('club_stats').doc(todayId).get();
     const yesterdayDoc = await db.collection('club_stats').doc(yesterdayId).get();
 
     if (!todayDoc.exists || !yesterdayDoc.exists) {
       return NextResponse.json(
-        { message: 'One or both documents not found. Not enough data for comparison.' },
+        { error: 'One or both documents not found in Firestore' },
         { status: 404 }
       );
     }
@@ -61,22 +76,16 @@ export async function GET(request: NextRequest) {
       to: { category: string; number: number };
     }[] = [];
 
-    
-    
-
     for (const riderIdStr of Object.keys(todayMap)) {
       const riderId = Number(riderIdStr);
       const today = todayMap[riderId];
       const yesterday = yesterdayMap[riderId];
-
       if (!today || !yesterday) continue;
 
       const name = today.name ?? 'Unknown';
 
-      // ZP category upgrade
       const todayCat = today.zpCategory;
       const yesterdayCat = yesterday.zpCategory;
-      
 
       if (
         isZpCategory(todayCat) &&
@@ -87,7 +96,6 @@ export async function GET(request: NextRequest) {
         upgradedZPCategory.push({ riderId, name, from: yesterdayCat, to: todayCat });
       }
 
-      // ZwiftRacing category number upgrade (lower number is better)
       const todayMixed = today?.race?.current?.mixed;
       const yesterdayMixed = yesterday?.race?.current?.mixed;
 
@@ -116,18 +124,25 @@ export async function GET(request: NextRequest) {
       minute: '2-digit',
       second: '2-digit',
     }).format(new Date());
-    
 
-    return NextResponse.json({
-      message: 'Comparison complete.',
-      upgradedZPCategory,
-      upgradedZwiftRacingCategory,
-      timeStamp: timeStamp,
-    });
-  } catch (err: any) {
-    console.error('Error during comparison:', err);
     return NextResponse.json(
-      { error: 'Comparison failed', details: err.message },
+      {
+        message: 'Comparison complete.',
+        timeStamp: timeStamp,
+        upgradedZPCategory,
+        upgradedZwiftRacingCategory,
+      },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      }
+    );
+  } catch (err: any) {
+    console.error('Comparison error:', err);
+    return NextResponse.json(
+      { error: 'Internal server error', details: err.message },
       { status: 500 }
     );
   }
