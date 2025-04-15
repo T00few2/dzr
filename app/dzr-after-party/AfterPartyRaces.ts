@@ -281,4 +281,13 @@ export const AfterPartyRacesData = [
       finish: 'Banner third time on Yorkshire KOM Reverse',
       linkRoute: 'https://zwiftinsider.com/route/yorkshire-double-loops/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Ocean Lave Cliffside Loop',
+      world: 'Yorkshire',
+      laps: '1+',
+      distance: '31.935',
+      elevation: '301',
+      finish: 'Blue banner second time on top of Epic KOM Bypass',
+      linkRoute: 'https://zwiftinsider.com/route/ocean-lava-cliffside-loop/',
+    }),
 ];
