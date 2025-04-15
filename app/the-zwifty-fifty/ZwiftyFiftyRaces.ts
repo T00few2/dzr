@@ -326,4 +326,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1','1','1'],
     bonus: ['3','2','1'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Knights Of The Roundabout',
+    world: 'France',
+    linkRoute: 'https://zwiftinsider.com/route/knights-of-the-roundabout/',
+    laps: '1',
+    length: '54.4',
+    hm: '359',
+    climbs: ['Petit KOM'],
+    sprints: ['Aqueduc KOM','Sprint du Cratère','Sprinteur Sprint','Petit KOM'],
+    sprintLaps: ['1','1','1','1'],
+    bonus: ['3','2','1'],
+  }),
 ];
