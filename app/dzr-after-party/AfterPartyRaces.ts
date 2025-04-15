@@ -282,7 +282,7 @@ export const AfterPartyRacesData = [
       linkRoute: 'https://zwiftinsider.com/route/yorkshire-double-loops/',
     }),
     new AfterPartyRacesTemplate({
-      route: 'Ocean Lave Cliffside Loop',
+      route: 'Ocean Lava Cliffside Loop',
       world: 'Yorkshire',
       laps: '1+',
       distance: '31.935',
