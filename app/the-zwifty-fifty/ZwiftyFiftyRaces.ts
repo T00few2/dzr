@@ -250,9 +250,9 @@ export const ZwiftyFiftyRacesData = [
     length: '52.6',
     hm: '500',
     climbs: ['Jarvis KOM Reverse'],
-    sprints: [],
-    sprintLaps: [],
-    bonus: [],
+    sprints: ['Jarvis KOM Reverse'],
+    sprintLaps: ['1,2,3,4,5,6,7,8,9,10'],
+    bonus: ['1.5','1.0','0.5'],
   }),
   new ZwiftyFiftyRacesTemplate({
     route: 'Mighty Metropolitan',
