@@ -91,13 +91,34 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
       h="full"
       {...rest}>
       <Flex h="20" alignItems="center" mx="8" justifyContent="space-between">
-      <Link href= '/'><Image 
-          display={'flex'}
-          boxSize='50px' 
-          src='/general/DZR_logo.svg' 
-          alt='DZR logo' 
-          rounded={'md'}
+      <Link href= '/'>
+        <Box position="relative">
+          <Image 
+            display={'flex'}
+            boxSize='50px' 
+            src='/general/DZR_admin_logo.svg' 
+            alt='DZR Admin Dashboard' 
+            rounded={'md'}
+            transition="all 0.2s"
+            _hover={{ transform: 'scale(1.05)' }}
           />
+          {/* Optional admin badge overlay */}
+          <Box 
+            position="absolute" 
+            top="-2px" 
+            right="-2px" 
+            bg="green.400" 
+            color="white" 
+            fontSize="8px" 
+            fontWeight="bold" 
+            px="1" 
+            borderRadius="full"
+            border="1px solid"
+            borderColor="white"
+          >
+            ⚙️
+          </Box>
+        </Box>
         </Link>
         <CloseButton display={'flex'} onClick={onClose} color = 'white' size={'s'}/>
       </Flex>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg version="1.1" width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradient for modern look -->
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Glow effect -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="95" fill="url(#grad1)" stroke="#333" stroke-width="2"/>
+  
+  <!-- DZR Text with tech styling -->
+  <text x="100" y="80" text-anchor="middle" font-family="Consolas, monospace" font-size="36" font-weight="bold" fill="white" filter="url(#glow)">DZR</text>
+  
+  <!-- Admin badge -->
+  <rect x="65" y="90" width="70" height="20" rx="10" fill="#28a745" stroke="white" stroke-width="1"/>
+  <text x="100" y="103" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white">ADMIN</text>
+  
+  <!-- Coding/Backend elements -->
+  <!-- Terminal icon -->
+  <rect x="25" y="125" width="35" height="25" rx="3" fill="#1a1a1a" stroke="#666" stroke-width="1"/>
+  <text x="27" y="138" font-family="Consolas, monospace" font-size="8" fill="#00ff00">$_</text>
+  <rect x="35" y="140" width="8" height="1" fill="#00ff00"/>
+  
+  <!-- Gear icon -->
+  <circle cx="100" cy="140" r="12" fill="none" stroke="white" stroke-width="2"/>
+  <circle cx="100" cy="140" r="6" fill="white"/>
+  <!-- Gear teeth -->
+  <rect x="98" y="125" width="4" height="6" fill="white"/>
+  <rect x="98" y="149" width="4" height="6" fill="white"/>
+  <rect x="113" y="138" width="6" height="4" fill="white"/>
+  <rect x="81" y="138" width="6" height="4" fill="white"/>
+  
+  <!-- Database icon -->
+  <ellipse cx="155" cy="135" rx="15" ry="5" fill="#4a90e2"/>
+  <rect x="140" y="135" width="30" height="15" fill="#4a90e2"/>
+  <ellipse cx="155" cy="150" rx="15" ry="5" fill="#4a90e2"/>
+  <ellipse cx="155" cy="142" rx="15" ry="5" fill="none" stroke="#2c5aa0" stroke-width="1"/>
+  
+  <!-- Code brackets -->
+  <text x="35" y="175" font-family="Consolas, monospace" font-size="18" font-weight="bold" fill="white" opacity="0.7">{</text>
+  <text x="155" y="175" font-family="Consolas, monospace" font-size="18" font-weight="bold" fill="white" opacity="0.7">}</text>
+  
+  <!-- Bot/API indicator -->
+  <circle cx="100" cy="165" r="3" fill="#00ff88">
+    <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <text x="100" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="white" opacity="0.8">API</text>
+</svg> 
