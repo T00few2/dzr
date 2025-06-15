@@ -290,4 +290,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner second time on top of Epic KOM Bypass',
       linkRoute: 'https://zwiftinsider.com/route/ocean-lava-cliffside-loop/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Shisa Shakedown',
+      world: 'Makuri Islands',
+      laps: '<1',
+      distance: '37.778',
+      elevation: '457',
+      finish: 'Blue banner on top of Temple KOM',
+      linkRoute: 'https://zwiftinsider.com/route/shisa-shakedown/',
+    }),
 ];
