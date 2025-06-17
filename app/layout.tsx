@@ -23,26 +23,38 @@ export default function RootLayout({
   return (
     <html lang="en">
       <Head>
-        <title>⚙️ DZR Admin Dashboard</title>
-        <meta name="description" content="Danish Zwift Racers - Admin Dashboard and Management Interface" />
+        <title>DZR - Danish Zwift Racers | Online Cycling Community</title>
+        <meta name="description" content="Join Danish Zwift Racers - Denmark's premier online cycling community for Zwift racing events and competitions." />
         
-        {/* Admin-focused favicon */}
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%23667eea'/><stop offset='100%' style='stop-color:%23764ba2'/></linearGradient></defs><rect width='32' height='32' rx='6' fill='url(%23g)'/><text x='16' y='14' text-anchor='middle' font-family='Consolas' font-size='8' font-weight='bold' fill='white'>DZR</text><rect x='6' y='16' width='20' height='8' rx='4' fill='%2328a745'/><text x='16' y='21' text-anchor='middle' font-family='Arial' font-size='6' font-weight='bold' fill='white'>ADMIN</text><circle cx='8' cy='26' r='1.5' fill='%2300ff88'/><circle cx='16' cy='26' r='1.5' fill='%2300ff88'/><circle cx='24' cy='26' r='1.5' fill='%2300ff88'/></svg>" />
+        {/* Improved favicon setup */}
+        <link rel="icon" type="image/svg+xml" href="/general/DZR_logo.svg" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
         
         {/* Apple touch icon */}
-        <link rel="apple-touch-icon" href="/admin-favicon.svg" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         
-        {/* Theme color */}
-        <meta name="theme-color" content="#667eea" />
+        {/* Theme color matching your brand */}
+        <meta name="theme-color" content="#1a365d" />
+        <meta name="msapplication-TileColor" content="#1a365d" />
         
         {/* PWA meta tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="DZR Admin" />
+        <meta name="apple-mobile-web-app-title" content="DZR" />
         
-        {/* Admin-specific meta */}
-        <meta name="robots" content="noindex, nofollow" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        {/* Viewport and responsive design */}
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+        
+        {/* Language and locale */}
+        <meta httpEquiv="content-language" content="en,da" />
+        
+        {/* Additional meta for better SEO */}
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        
+        {/* Preload critical resources */}
+        <link rel="preload" href="/general/DZR_logo.svg" as="image" type="image/svg+xml" />
       </Head>
       <body>
         <AuthProvider>
