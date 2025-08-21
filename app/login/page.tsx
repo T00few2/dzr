@@ -2,7 +2,7 @@
 
 'use client'; // This line is essential for client components
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Container,
@@ -25,7 +25,7 @@ import { FaDiscord } from 'react-icons/fa';
 
 const REQUIRED_ROLE_ID = '1385216556166025347';
 
-export default function LoginPage() {
+function LoginContent() {
   const searchParams = useSearchParams();
   const urlError = searchParams?.get('error');
   const [isRoleModalOpen, setRoleModalOpen] = useState(false);
@@ -109,5 +109,13 @@ export default function LoginPage() {
         </ModalContent>
       </Modal>
     </Container>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }
