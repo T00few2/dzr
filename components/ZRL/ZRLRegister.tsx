@@ -16,6 +16,8 @@ import {
 } from '@chakra-ui/react';
 import { auth, db } from '@/app/utils/firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
+import { useSession } from 'next-auth/react';
+import SendMessage from '../discord-bot/SendMessage';
 
 interface Team {
   name: string;
@@ -28,6 +30,7 @@ interface Team {
 }
 
 const ZRLRegister = () => {
+  const { data: session } = useSession();
   const [newTeamName, setNewTeamName] = useState('');
   const [captainName, setCaptainName] = useState('');
   const [rideTime, setRideTime] = useState('');
@@ -65,7 +68,6 @@ const ZRLRegister = () => {
   };
 
   const openRegisterModal = () => {
-    // Prefill captain name using real name when available
     prefillCaptainName();
     setIsOpen(true);
   };
@@ -80,20 +82,20 @@ const ZRLRegister = () => {
   };
 
   const handleTeamRegister = async () => {
-    if (!newTeamName || !auth.currentUser || !rideTime || !raceSeries) {
+    const timeValue = (rideTime || '').trim();
+
+    if (!newTeamName || !auth.currentUser || !timeValue || !raceSeries) {
       alert('Please fill in all required fields.');
       return;
     }
 
-    // If a division is required (not "Club Ladder") but is still empty, warn the user
     if (raceSeries !== 'Club Ladder' && !division) {
       alert('Please select a division.');
       return;
     }
 
-    // Regular expression to match HH:MM format (24-hour clock)
     const timeFormat = /^([01]\d|2[0-3]):([0-5]\d)$/;
-    if (!timeFormat.test(rideTime)) {
+    if (!timeFormat.test(timeValue)) {
       alert('Please use the HH:MM format for Race Time');
       return;
     }
@@ -104,12 +106,21 @@ const ZRLRegister = () => {
         captainId: auth.currentUser.uid,
         captainName: captainName || auth.currentUser.displayName || 'Unknown',
         createdAt: new Date().toISOString(),
-        rideTime,
+        rideTime: timeValue,
         division: raceSeries === 'Club Ladder' ? '' : division,
-        raceSeries, // new field
+        raceSeries,
       };
 
       await addDoc(collection(db, 'teams'), teamData);
+
+      // Notify Discord channel, tagging the captain (the current session user)
+      const captainDiscordId = (session?.user as any)?.discordId as string | undefined;
+      const captainDisplay = captainDiscordId ? `<@${captainDiscordId}>` : (teamData.captainName || 'Captain');
+      const messageContent = `🆕 Nyt team registreret\n\n**${teamData.name}** er registreret i ${teamData.raceSeries}${teamData.division ? `, division ${teamData.division}` : ''}.\nRace time: ${teamData.rideTime}.\nHoldkaptajn: ${captainDisplay}`;
+      await SendMessage('1297934562558611526', messageContent, {
+        userIds: captainDiscordId ? [captainDiscordId] : [],
+      });
+
       resetForm();
     } catch (error) {
       console.error('Error registering team:', error);

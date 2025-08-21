@@ -16,8 +16,9 @@ import {
   Select,
 } from '@chakra-ui/react';
 import { db } from '@/app/utils/firebaseConfig'; 
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import SendMessage from '../discord-bot/SendMessage';
+import { useSession } from 'next-auth/react';
 
 interface Team {
   id?: string;
@@ -37,6 +38,7 @@ interface ZRLEditDeleteProps {
 }
 
 const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
+  const { data: session } = useSession();
   const [newTeamName, setNewTeamName] = useState('');
   const [rideTime, setRideTime] = useState('');
   const [division, setDivision] = useState('');
@@ -75,25 +77,13 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
     }
   }, [team]);
 
-  // Helper to load captain's discordId from user_profiles (by uid)
-  const fetchCaptainDiscordId = async (uid: string): Promise<string | null> => {
-    try {
-      const ref = doc(db, 'user_profiles', uid);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return null;
-      const data = snap.data() as any;
-      return data?.discordId || null;
-    } catch {
-      return null;
-    }
-  };
-
   const handleEditTeam = async () => {
     if (!team?.id) return;
 
-    // Validate Ride Time
-    const timeFormat = /^([01]\\d|2[0-3]):([0-5]\\d)$/;
-    if (!timeFormat.test(rideTime)) {
+    // Validate Ride Time (HH:MM 24h)
+    const value = (rideTime || '').trim();
+    const timeFormat = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    if (!timeFormat.test(value)) {
       alert('Please use the HH:MM format for Race Time');
       return;
     }
@@ -108,7 +98,7 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
       const teamRef = doc(db, 'teams', team.id);
       await updateDoc(teamRef, {
         name: newTeamName,
-        rideTime,
+        rideTime: value,
         division: raceSeries === 'Club Ladder' ? '' : division,
         raceSeries,           // <-- Update Firestore with Race Series
         captainName,
@@ -119,13 +109,13 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
 
       // If the team is looking for riders, send Discord message
       if (lookingForRiders) {
-        const captainDiscordId = await fetchCaptainDiscordId(team.captainId);
+        const captainDiscordId = (session?.user as any)?.discordId as string | undefined;
         const captainDisplay = captainDiscordId ? `<@${captainDiscordId}>` : captainName;
         const messageContent = 
-          '🚨BREAKING🚨\\n\\n' +
-          '@everyone\\n\\n' +
-          `${newTeamName} leder efter nye ryttere.\\n` +
-          `${newTeamName} kører ${raceSeries} i ${division} klokken ${rideTime}.\\n` +
+          '🚨BREAKING🚨\n\n' +
+          '@everyone\n\n' +
+          `${newTeamName} leder efter nye ryttere.\n` +
+          `${newTeamName} kører ${raceSeries} i ${division} klokken ${value}.\n` +
           `Kontakt holdkaptajn ${captainDisplay}.`;
         
         await SendMessage('1297934562558611526', messageContent, {
