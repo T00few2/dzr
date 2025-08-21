@@ -2,11 +2,18 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 
+type SendMessageBody = {
+  channelId: string;
+  messageContent: string;
+  userIds?: string[];
+  roleIds?: string[];
+  mentionEveryone?: boolean;
+};
+
 export async function POST(request: Request) {
   const botToken = process.env.DISCORD_BOT_TOKEN; // Ensure your bot token is stored in environment variables
 
-  // Parse the request body to get channelId and messageContent
-  const { channelId, messageContent } = await request.json();
+  const { channelId, messageContent, userIds, roleIds, mentionEveryone } = (await request.json()) as SendMessageBody;
 
   if (!channelId || !messageContent) {
     return NextResponse.json(
@@ -16,12 +23,27 @@ export async function POST(request: Request) {
   }
 
   try {
+    const payload: any = {
+      content: messageContent,
+      allowed_mentions: {
+        parse: [] as string[],
+        users: Array.isArray(userIds) ? userIds : [],
+        roles: Array.isArray(roleIds) ? roleIds : [],
+        replied_user: false,
+      },
+    };
+
+    if (mentionEveryone) {
+      payload.allowed_mentions.parse.push('everyone');
+    }
+
     const response = await axios.post(
       `https://discord.com/api/v10/channels/${channelId}/messages`,
-      { content: messageContent },
+      payload,
       {
         headers: {
           Authorization: `Bot ${botToken}`,
+          'Content-Type': 'application/json',
         },
       }
     );

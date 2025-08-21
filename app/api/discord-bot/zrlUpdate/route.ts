@@ -1,9 +1,11 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
 import { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 type Rider = {
   id: string;
+  userId?: string;
   name: string;
   division: string;
   rideTime: string;
@@ -13,6 +15,7 @@ type Rider = {
 type Team = {
   id: string;
   name: string;
+  captainId: string;
   captainName: string;
   raceSeries: string;
   rideTime: string;
@@ -75,26 +78,48 @@ export async function POST(request: Request) {
       ...(doc.data() as Omit<Team, 'id'>),
     }));
 
+    // Resolve discordIds for mentions
+    const mentionUserIds = new Set<string>();
+
+    async function getDiscordIdForUid(uid?: string): Promise<string | null> {
+      if (!uid) return null;
+      try {
+        const snap = await adminDb.collection('user_profiles').doc(uid).get();
+        if (!snap.exists) return null;
+        const data = snap.data() as any;
+        const discordId = typeof data?.discordId === 'string' ? data.discordId : null;
+        return discordId;
+      } catch {
+        return null;
+      }
+    }
+
     let messageContent = '';
     if (riders.length > 0 || teams.length > 0) {
       messageContent += '**🚨 Opsamling 🚨**\n\n';
     }
     if (riders.length > 0) {
-      messageContent += `🚴 **Ryttere der leder efter hold** 🚴\n\n${riders
-        .map(
-          (rider: Rider) =>
-            `**${rider.name}**\n- Race Series: ${rider.raceSeries}\n- Division: ${rider.division}\n- Preferred Time: ${rider.rideTime}`
-        )
-        .join('\n\n')}`;
+      const riderLines = await Promise.all(
+        riders.map(async (rider: Rider) => {
+          const discordId = await getDiscordIdForUid(rider.userId);
+          const riderDisplay = discordId ? `<@${discordId}>` : rider.name;
+          if (discordId) mentionUserIds.add(discordId);
+          return `**${riderDisplay}**\n- Race Series: ${rider.raceSeries}\n- Division: ${rider.division}\n- Preferred Time: ${rider.rideTime}`;
+        })
+      );
+      messageContent += `🚴 **Ryttere der leder efter hold** 🚴\n\n${riderLines.join('\n\n')}`;
     }
     if (teams.length > 0) {
       if (messageContent) messageContent += `\n\n`;
-      messageContent += `📢 **Hold der leder efter ryttere** 📢\n\n${teams
-        .map(
-          (team: Team) =>
-            `**${team.name}**\n- Race Series: ${team.raceSeries}\n-Division: ${team.division}\n- Ride Time: ${team.rideTime}\n- Captain: ${team.captainName}`
-        )
-        .join('\n\n')}`;
+      const teamLines = await Promise.all(
+        teams.map(async (team: Team) => {
+          const captainDiscordId = await getDiscordIdForUid(team.captainId);
+          const captainDisplay = captainDiscordId ? `<@${captainDiscordId}>` : team.captainName;
+          if (captainDiscordId) mentionUserIds.add(captainDiscordId);
+          return `**${team.name}**\n- Race Series: ${team.raceSeries}\n-Division: ${team.division}\n- Ride Time: ${team.rideTime}\n- Captain: ${captainDisplay}`;
+        })
+      );
+      messageContent += `📢 **Hold der leder efter ryttere** 📢\n\n${teamLines.join('\n\n')}`;
     }
     if (messageContent) {
       messageContent +=
@@ -112,7 +137,7 @@ export async function POST(request: Request) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ channelId, messageContent }),
+        body: JSON.stringify({ channelId, messageContent, userIds: Array.from(mentionUserIds) }),
       }
     );
 

@@ -2,49 +2,45 @@
 
 'use client'; // This line is essential for client components
 
-import React, { useState, useContext } from 'react';
-import { AuthContext } from '@/components/auth/AuthContext';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Container,
   Heading,
   Text,
   Grid,
-  InputGroup,
-  InputRightElement,
-  Input,
   Stack,
   Image,
   Flex,
   Button,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  ModalBody,
 } from '@chakra-ui/react';
-import ForgotPasswordModal from '@/components/auth/ForgotPasswordModel';
-import SignUpModal from '@/components/auth/SignUpModal'; // Adjust the path as necessary
+import { signIn } from 'next-auth/react';
+import { FaDiscord } from 'react-icons/fa';
+
+const REQUIRED_ROLE_ID = '1385216556166025347';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const { login } = useContext(AuthContext);
-  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlError = searchParams?.get('error');
+  const [isRoleModalOpen, setRoleModalOpen] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Login form submitted"); // Log form submission
-    try {
-      await login(email, password);
-      console.log("Redirecting to Members Zone...");
-      router.push('/members-zone'); // Redirect to members-zone
-    } catch (error) {
-      console.error("Login failed", error); // Log any errors during login
+  const handleSignInDiscord = async () => {
+    await signIn('discord', { callbackUrl: '/members-zone' });
+  };
+
+  const showMissingRole = urlError === 'AccessDenied';
+
+  useEffect(() => {
+    if (showMissingRole) {
+      setRoleModalOpen(true);
     }
-  };
-  
-  const [show, setShow] = useState(false);
-  const handleClick = () => setShow(!show);
-
-  const handleSignUpRedirect = () => {
-    router.push('/signup'); // Redirect to the signup page
-  };
+  }, [showMissingRole]);
 
   return (
     <Container maxW={'5xl'} centerContent  p={4} borderRadius="md" h="80vh" display="flex" flexDirection="column" justifyContent="center">
@@ -60,23 +56,58 @@ export default function LoginPage() {
           <Heading color="white">Members Login</Heading>
         </Flex>
 
-        <InputGroup size='md'>
-          <Input width='xs' variant='filled' placeholder='Email' bg={'white'} color={'grey'} value={email} onChange={(e) => setEmail(e.target.value)} />
-        </InputGroup>
-        <InputGroup size='md'>
-          <Input width='xs' variant='filled' type={show ? 'text' : 'password'} placeholder='Password' bg={'white'} color={'grey'} value={password} onChange={(e) => setPassword(e.target.value)} />
-          <InputRightElement width='5.5rem'>
-            <Button h='1.75rem' size='sm' onClick={handleClick}>
-              {show ? 'Hide' : 'Show'}
-            </Button>
-          </InputRightElement>
-        </InputGroup>
-        <Flex gap={4}>
-          <Button type='submit' width='20' onClick={handleSubmit} background="rgba(173, 26, 45, 0.95)" color={'white'}>Login</Button>
-          <SignUpModal />
-        </Flex>
-        <ForgotPasswordModal /> {/* Include the modal here */}
+        <Stack spacing={4}>
+          <Text color="white" width='xs' textAlign='left'>
+            Sign in with Discord. You must be a Verified Member on our Discord server to access the Members Zone.
+          </Text>
+          <Button onClick={handleSignInDiscord} leftIcon={<FaDiscord />} background="rgba(88, 101, 242, 0.95)" color={'white'} width='xs'>
+            Sign in with Discord
+          </Button>
+          <Text color="white" width='xs' textAlign='left'>Not a member yet? Click the button below to join the DZR Discord server.</Text>
+          <Button
+            as='a'
+            href={'https://discord.gg/FBtCsddbmU'}
+            target='_blank'
+            rel='noopener noreferrer'
+            leftIcon={<FaDiscord />}
+            variant='outline'
+            color='white'
+            borderColor='whiteAlpha.400'
+            _hover={{ bg: 'whiteAlpha.200' }}
+            width='xs'
+          >
+            Join the DZR Discord server
+          </Button>
+        </Stack>
       </Grid>
+
+      <Modal isOpen={isRoleModalOpen} onClose={() => setRoleModalOpen(false)} isCentered>
+        <ModalOverlay bg='blackAlpha.600' backdropFilter='blur(2px)' />
+        <ModalContent bg='black' color='white' border='1px solid' borderColor='whiteAlpha.300' rounded='md'>
+          <ModalHeader color='white'>Access denied</ModalHeader>
+          <ModalCloseButton color='white' _hover={{ bg: 'whiteAlpha.200' }} />
+          <ModalBody pb={6} color='white'>
+            <Stack spacing={4}>
+              <Text>
+                You need the Verified Member role on our Discord server to access the Members Zone. <br /> <br /> Not a member yet? Click the button below to join the DZR Discord server.
+              </Text>
+              <Button
+                as='a'
+                href={'https://discord.gg/FBtCsddbmU'}
+                target='_blank'
+                rel='noopener noreferrer'
+                leftIcon={<FaDiscord />}
+                background='rgba(88, 101, 242, 0.95)'
+                color='white'
+                _hover={{ background: 'rgba(88, 101, 242, 1)' }}
+                alignSelf='flex-start'
+              >
+                Join the DZR Discord server
+              </Button>
+            </Stack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </Container>
   );
 }

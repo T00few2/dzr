@@ -1,30 +1,21 @@
 // app/members-zone/ZRL/page.tsx
 'use client';
 
-import { useContext, useEffect } from 'react';
-import { AuthContext } from '@/components/auth/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
 import ZRL from "@/components/ZRL/ZRL";
 import {Text} from '@chakra-ui/react';
 
 const ZRLpage = () => {
-    const { currentUser, loading } = useContext(AuthContext);
-    const router = useRouter();
+    const { data: session, status } = useSession();
 
-    useEffect(() => {
-        if (!loading && !currentUser) {
-            router.push('/login'); // Redirect to login if not authenticated
-        }
-    }, [currentUser, loading, router]);
-
-    if (loading) {
+    if (status === 'loading') {
         return <LoadingSpinnerMemb/> // Show loading while checking auth
     }
 
     return (
         <div>
-            {currentUser ? (
+            {session?.user ? (
               <div>
                 <ZRL/>
               </div>

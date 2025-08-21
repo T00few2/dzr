@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchClubdata, ClubData } from '@/app/utils/fetchZPdata';
 import * as admin from 'firebase-admin';

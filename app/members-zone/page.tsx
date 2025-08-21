@@ -1,10 +1,7 @@
 'use client';
 
-import React, { useContext, useEffect, useState } from 'react';
-import { AuthContext } from '@/components/auth/AuthContext';
-import { useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth'; // Import signOut
-import { auth } from '@/app/utils/firebaseConfig'; // Adjust path if necessary
+import React, { useEffect, useState } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import FeaturesMembers from "@/components/FeaturesMembers";
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
 import EditProfileModal from '@/components/auth/EditProfileModal'; 
@@ -21,40 +18,39 @@ import {
 } from '@chakra-ui/react';
 
 const MembersZone = () => {
-    const { currentUser, loading } = useContext(AuthContext);
-    const router = useRouter();
+    const { data: session, status } = useSession();
     const [isEditProfileModalOpen, setEditProfileModalOpen] = useState(false);
+    const [realName, setRealName] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!loading && !currentUser) {
-            router.push('/login'); // Redirect to login if not authenticated
-        }
-    }, [currentUser, loading, router]);
-
-    const handleLogout = async () => {
-      try {
-          await signOut(auth); // Sign out the user
-          router.push('/login'); // Redirect to login after logout
-      } catch (error: any) { // Use 'any' for general error type
-          console.error("Logout failed:", error.message); // Safely access error.message
+      async function fetchRealName() {
+        try {
+          if (!session?.user) return;
+          const res = await fetch('/api/members/real-name');
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data?.displayName) setRealName(data.displayName);
+        } catch {}
       }
-  };
+      fetchRealName();
+    }, [session?.user]);
 
-    if (loading) {
+    if (status === 'loading') {
         return  <LoadingSpinnerMemb/>; // Show loading while checking auth
     }
+
+    const greetingName = realName || (session?.user as any)?.name;
 
     return (
     <div >
         <Container maxW={{base:'95vw', sm:'80vw', md:'70vw'}}  display="flex" flexDirection="column">
-        
-            {currentUser ? (
+        {session?.user ? (
             <>
                 <Stack spacing={4} as={Container} maxW={'3xl'} textAlign={'center'}>
                     <Heading color='white'>Members Zone</Heading>
-                    <Text color={'white'}>Welcome, {currentUser.displayName}</Text>
+                    <Text color={'white'}>Welcome, {greetingName}</Text>
                     <Center>
-                        <Button background="rgba(173, 26, 45, 0.95)" color={'white'} onClick={handleLogout}  >
+                        <Button background="rgba(173, 26, 45, 0.95)" color={'white'} onClick={() => signOut({ callbackUrl: '/login' })}  >
                             Log Out
                         </Button>
                         <Button background="rgba(0, 122, 255, 0.95)" color={'white'} onClick={() => setEditProfileModalOpen(true)} ml={4}>
@@ -70,13 +66,13 @@ const MembersZone = () => {
                 isOpen={isEditProfileModalOpen} 
                 onClose={() => setEditProfileModalOpen(false)} 
                 />
-                </>
-                ) : (
-                <Text align='center' color='white'>You need to login.</Text>
-                )}
-                </Container>
-                    </div>
-                    );
-                };
+            </>
+        ) : (
+            <Text align='center' color='white'>You need to login.</Text>
+        )}
+        </Container>
+    </div>
+    );
+};
 
 export default MembersZone;

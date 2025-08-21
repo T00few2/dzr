@@ -52,9 +52,21 @@ const ZRLRegister = () => {
   // Dynamically get the list of divisions based on the selected raceSeries
   const availableDivisions = divisionsMap[raceSeries] || [];
 
-  const openRegisterModal = () => {
-    // If user is logged in, prefill captain name
+  const prefillCaptainName = async () => {
+    try {
+      const res = await fetch('/api/members/real-name');
+      if (res.ok) {
+        const data = await res.json();
+        setCaptainName(data?.displayName || auth.currentUser?.displayName || '');
+        return;
+      }
+    } catch (_) {}
     setCaptainName(auth.currentUser?.displayName || '');
+  };
+
+  const openRegisterModal = () => {
+    // Prefill captain name using real name when available
+    prefillCaptainName();
     setIsOpen(true);
   };
 

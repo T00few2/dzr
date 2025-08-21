@@ -1,28 +1,17 @@
 // members-zone/shop/page.tsx
 'use client';
 
-import { useContext, useEffect, useState } from 'react';
-import { AuthContext } from '@/components/auth/AuthContext';
-import { useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/app/utils/firebaseConfig';
+import { useEffect, useState } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
 import ProductList from '@/components/shop/ProductList';
-import { Center, Heading, IconButton, Flex, Box, Grid, GridItem, Text, Badge } from '@chakra-ui/react';
+import { Center, Heading, IconButton, Flex, Box, Grid, GridItem, Text, Badge, Button } from '@chakra-ui/react';
 import { FiShoppingCart } from 'react-icons/fi'; // Add icon for basket
 import CartCheckoutModal from '@/components/shop/CartCheckoutModal';
 import ActiveOrders from '@/components/shop/ActiveOrders';
 
 const Shop = () => {
-  const { currentUser, loading } = useContext(AuthContext);
-  const router = useRouter();
-
-  // Effect to redirect if not authenticated
-  useEffect(() => {
-    if (!loading && !currentUser) {
-      router.push('/login');
-    }
-  }, [currentUser, loading, router]);
+  const { data: session, status } = useSession();
 
   interface Product {
     id: number;
@@ -66,15 +55,6 @@ const Shop = () => {
     setCartItems([]);
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.push('/login');
-    } catch (error: any) {
-      console.error('Logout failed:', error.message);
-    }
-  };
-
   const handleModalOpen = () => {
     setIsModalOpen(true);
   };
@@ -85,13 +65,13 @@ const Shop = () => {
 
   const cartItemCount = cartItems.reduce((total, item) => total + item.quantity, 0); // Calculate total items in cart
 
-  if (loading) {
+  if (status === 'loading') {
     return <LoadingSpinnerMemb />;
   }
 
   return (
     <>
-      {currentUser ? (
+      {session?.user ? (
         <Center>
           <Grid
             templateAreas={`"header"
@@ -146,6 +126,9 @@ const Shop = () => {
             removeFromCart={removeFromCart}
             clearCart={clearCart}
           />
+          <Button background="rgba(173, 26, 45, 0.95)" color={'white'} onClick={() => signOut({ callbackUrl: '/login' })} mt={4} mb={4}>
+            Log Out
+          </Button>
         </Center>
       ) : (
         <Text align='center' color='white'>You need to login.</Text>

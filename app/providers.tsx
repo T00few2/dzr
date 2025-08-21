@@ -2,6 +2,7 @@
 'use client'
 
 import { ChakraProvider, extendTheme } from '@chakra-ui/react';
+import { SessionProvider } from 'next-auth/react';
 
 // Define custom theme with desired font
 const theme = extendTheme({
@@ -20,5 +21,5 @@ const theme = extendTheme({
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  return <ChakraProvider theme={theme}>{children}</ChakraProvider>
+  return <SessionProvider><ChakraProvider theme={theme}>{children}</ChakraProvider></SessionProvider>
 }

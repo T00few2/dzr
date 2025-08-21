@@ -22,8 +22,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
-          <Providers>
+        <Providers>
+          <AuthProvider>
             {/* Background Effects 
             <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: -1 }}>
               <Snowfall />
@@ -38,8 +38,8 @@ export default function RootLayout({
             {/* Analytics and Performance */}
             <Analytics />
             <SpeedInsights />
-          </Providers>
-        </AuthProvider>
+          </AuthProvider>
+        </Providers>
       </body>
     </html>
   );

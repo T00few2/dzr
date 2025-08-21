@@ -16,7 +16,7 @@ import {
   Select,
 } from '@chakra-ui/react';
 import { db } from '@/app/utils/firebaseConfig'; 
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import SendMessage from '../discord-bot/SendMessage';
 
 interface Team {
@@ -75,11 +75,24 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
     }
   }, [team]);
 
+  // Helper to load captain's discordId from user_profiles (by uid)
+  const fetchCaptainDiscordId = async (uid: string): Promise<string | null> => {
+    try {
+      const ref = doc(db, 'user_profiles', uid);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return null;
+      const data = snap.data() as any;
+      return data?.discordId || null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleEditTeam = async () => {
     if (!team?.id) return;
 
     // Validate Ride Time
-    const timeFormat = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    const timeFormat = /^([01]\\d|2[0-3]):([0-5]\\d)$/;
     if (!timeFormat.test(rideTime)) {
       alert('Please use the HH:MM format for Race Time');
       return;
@@ -106,14 +119,19 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
 
       // If the team is looking for riders, send Discord message
       if (lookingForRiders) {
+        const captainDiscordId = await fetchCaptainDiscordId(team.captainId);
+        const captainDisplay = captainDiscordId ? `<@${captainDiscordId}>` : captainName;
         const messageContent = 
-          '🚨BREAKING🚨\n\n' +
-          '@everyone\n\n' +
-          `${newTeamName} leder efter nye ryttere.\n` +
-          `${newTeamName} kører ${raceSeries} i ${division} klokken ${rideTime}.\n` +
-          `Kontakt holdkaptajn ${captainName}.`;
+          '🚨BREAKING🚨\\n\\n' +
+          '@everyone\\n\\n' +
+          `${newTeamName} leder efter nye ryttere.\\n` +
+          `${newTeamName} kører ${raceSeries} i ${division} klokken ${rideTime}.\\n` +
+          `Kontakt holdkaptajn ${captainDisplay}.`;
         
-        await SendMessage('1297934562558611526', messageContent);
+        await SendMessage('1297934562558611526', messageContent, {
+          userIds: captainDiscordId ? [captainDiscordId] : [],
+          mentionEveryone: true,
+        });
       }
     } catch (error) {
       console.error('Error updating team:', error);

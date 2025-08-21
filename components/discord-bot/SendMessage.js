@@ -1,12 +1,13 @@
 // components/discord-bot/SendMessage.js
-const SendMessage = async (channelId, message) => {
+const SendMessage = async (channelId, message, options = {}) => {
+  const { userIds = [], roleIds = [], mentionEveryone = false } = options;
   try {
     const response = await fetch('/api/discord-bot/sendMessage', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ channelId, messageContent: message }),
+      body: JSON.stringify({ channelId, messageContent: message, userIds, roleIds, mentionEveryone }),
     });
 
     const data = await response.json();

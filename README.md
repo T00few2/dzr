@@ -34,3 +34,24 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+
+## Discord OAuth for Members Zone
+
+Configure environment variables (e.g. in `.env.local`):
+
+```
+DISCORD_CLIENT_ID=your_client_id
+DISCORD_CLIENT_SECRET=your_client_secret
+DISCORD_GUILD_ID=your_guild_id
+DISCORD_REQUIRED_ROLE_ID=1385216556166025347
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=generate_a_random_secret
+```
+
+Set the Discord OAuth redirect URL to:
+
+```
+http://localhost:3000/api/auth/callback/discord
+```
+
+The `members-zone` routes are protected by middleware that requires the Discord role ID `1385216556166025347`.

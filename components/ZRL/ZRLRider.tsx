@@ -17,6 +17,7 @@ import {
 import { auth, db } from '@/app/utils/firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
 import SendMessage from '../discord-bot/SendMessage';
+import { useSession } from 'next-auth/react';
 
 interface Rider {
   id?: string;
@@ -29,14 +30,28 @@ interface Rider {
 }
 
 const ZRLRider = () => {
-  const [name, setName] = useState(auth.currentUser?.displayName || '');
+  const { data: session } = useSession();
+  const [name, setName] = useState('');
   const [division, setDivision] = useState('');
   const [rideTime, setRideTime] = useState('');
   const [raceSeries, setRaceSeries] = useState('');
   const [isOpen, setIsOpen] = useState(false);
 
+  const prefillName = async () => {
+    try {
+      const res = await fetch('/api/members/real-name');
+      if (res.ok) {
+        const data = await res.json();
+        setName(data?.displayName || auth.currentUser?.displayName || '');
+        return;
+      }
+    } catch (_) {}
+    setName(auth.currentUser?.displayName || '');
+  };
+
   const openRegisterModal = () => {
     setIsOpen(true);
+    prefillName();
   };
 
   const resetForm = () => {
@@ -72,9 +87,13 @@ const ZRLRider = () => {
 
       // Post a message to Discord
       const roleId = '1195878349617250405';
-      const messageContent = `🚴 Ny rytter i gården 🚴\n\n${name} er på fri transfer i ${raceSeries}.\nKører gerne ${division} klokken ${rideTime}.\nAttention <@&${roleId}>`;
+      const discordId = (session?.user as any)?.discordId as string | undefined;
+      const riderDisplay = discordId ? `<@${discordId}>` : name;
+      const messageContent = `🚴 Ny rytter i gården 🚴\n\n${riderDisplay} er på fri transfer i ${raceSeries}.\nKører gerne ${division} klokken ${rideTime}.\nAttention <@&${roleId}>`;
 
-      await SendMessage('1297934562558611526', messageContent);
+      await SendMessage('1297934562558611526', messageContent, {
+        userIds: discordId ? [discordId] : [],
+      });
       resetForm();
 
     } catch (error) {
