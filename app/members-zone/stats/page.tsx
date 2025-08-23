@@ -202,20 +202,32 @@ export default function StatsPage() {
       await new Promise<void>((resolve, reject) => {
         canvas.toBlob(async (blob) => {
           if (!blob) return reject(new Error('Failed to create image'))
+          const type = 'image/png'
           try {
-            // @ts-ignore ClipboardItem may not be in TS lib
-            const item = new ClipboardItem({ 'image/png': blob })
-            await navigator.clipboard.write([item])
-            resolve()
-          } catch {
-            const a = document.createElement('a')
-            a.href = URL.createObjectURL(blob)
-            a.download = filename
-            document.body.appendChild(a)
-            a.click()
-            a.remove()
-            resolve()
-          }
+            const ClipboardItemCtor: any = (window as any).ClipboardItem || (globalThis as any).ClipboardItem
+            if (navigator.clipboard && 'write' in navigator.clipboard && ClipboardItemCtor) {
+              const item = new ClipboardItemCtor({ [type]: blob })
+              await navigator.clipboard.write([item])
+              resolve()
+              return
+            }
+          } catch {}
+          try {
+            const file = new File([blob], filename, { type })
+            const navAny: any = navigator as any
+            if (navAny.share && navAny.canShare && navAny.canShare({ files: [file] })) {
+              await navAny.share({ files: [file], title: 'Chart image' })
+              resolve()
+              return
+            }
+          } catch {}
+          const a = document.createElement('a')
+          a.href = URL.createObjectURL(blob)
+          a.download = filename
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+          resolve()
         }, 'image/png')
       })
     } catch {
