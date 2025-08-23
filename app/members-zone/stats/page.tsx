@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Container, Heading, Stack, Flex, Input, Button, Box, Text, Select, Table, Thead, Tr, Th, Tbody, Td, Checkbox } from '@chakra-ui/react'
+import { Container, Heading, Stack, Flex, Input, Button, Box, Text, Select, Table, Thead, Tr, Th, Tbody, Td, Checkbox, useToast } from '@chakra-ui/react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, Label } from 'recharts'
 
 type RiderRow = {
@@ -39,6 +39,7 @@ export default function StatsPage() {
   const timeSeriesChartRef = useRef<HTMLDivElement | null>(null)
   const [captainRoles, setCaptainRoles] = useState<{ roleId: string; roleName: string; zwiftIds: string[] }[]>([])
   const [selectedRole, setSelectedRole] = useState<string>('')
+  const toast = useToast()
 
   useEffect(() => {
     const load = async () => {
@@ -176,6 +177,16 @@ export default function StatsPage() {
       clone.setAttribute('width', String(width))
       clone.setAttribute('height', String(height))
       clone.setAttribute('viewBox', `0 0 ${width} ${height}`)
+      // Inject white background to avoid black exports on some browsers
+      const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+      bg.setAttribute('x', '0')
+      bg.setAttribute('y', '0')
+      bg.setAttribute('width', String(width))
+      bg.setAttribute('height', String(height))
+      bg.setAttribute('fill', '#ffffff')
+      clone.insertBefore(bg, clone.firstChild)
+      // Ensure fonts are loaded for consistent rendering
+      try { await (document as any).fonts?.ready } catch {}
       const xml = new XMLSerializer().serializeToString(clone)
       const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' })
       const url = URL.createObjectURL(svgBlob)
@@ -189,7 +200,7 @@ export default function StatsPage() {
       const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1))
       canvas.width = width * dpr
       canvas.height = height * dpr
-      const ctx = canvas.getContext('2d')
+      const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | null
       if (!ctx) return
       ctx.imageSmoothingEnabled = true
       ctx.imageSmoothingQuality = 'high'
@@ -207,6 +218,7 @@ export default function StatsPage() {
             if (navigator.clipboard && 'write' in navigator.clipboard && ClipboardItemCtor) {
               const item = new ClipboardItemCtor({ [type]: blob })
               await navigator.clipboard.write([item])
+              try { toast({ title: 'Image copied', status: 'success', duration: 2000 }) } catch {}
               resolve()
               return
             }
@@ -216,6 +228,7 @@ export default function StatsPage() {
             const navAny: any = navigator as any
             if (navAny.share && navAny.canShare && navAny.canShare({ files: [file] })) {
               await navAny.share({ files: [file], title: 'Chart image' })
+              try { toast({ title: 'Share dialog opened', description: 'Use Copy Photo to copy image', status: 'info', duration: 2500 }) } catch {}
               resolve()
               return
             }
@@ -226,6 +239,7 @@ export default function StatsPage() {
           document.body.appendChild(a)
           a.click()
           a.remove()
+          try { toast({ title: 'Image downloaded', status: 'info', duration: 2000 }) } catch {}
           resolve()
         }, 'image/png')
       })
