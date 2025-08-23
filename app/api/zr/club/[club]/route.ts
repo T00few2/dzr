@@ -1,4 +1,6 @@
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchClubdata, ClubData } from '@/app/utils/fetchZPdata';
 import * as admin from 'firebase-admin';
@@ -28,6 +30,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { club: string } }
 ) {
+  // Explicitly disable any caching at the edge or intermediate proxies
+  (request as any).headers?.set?.('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
   const { club } = params;
 
   if (!club) {
@@ -44,8 +48,8 @@ export async function GET(
   const dateId = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
   const docRef = db.collection('club_stats').doc(dateId);
 
-  // Let the data expire in 7 days
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  // Let the data expire in 31 days
+  const expiresAt = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000);
 
   try {
     // Store the entire clubData directly under "club_stats/{YYYY-MM-DD}"
@@ -62,5 +66,7 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to save data', details: String(err) }, { status: 500 });
   }
 
-  return NextResponse.json('Data saved', { status: 200 });
+  const res = NextResponse.json('Data saved', { status: 200 });
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  return res;
 }
