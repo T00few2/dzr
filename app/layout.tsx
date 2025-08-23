@@ -12,6 +12,7 @@ import Snowfall from "react-snowfall";
 require("dotenv").config();
 
 import { Providers } from "./providers";
+import DanishInviteBanner from "@/components/DanishInviteBanner";
 
 
 export default function RootLayout({
@@ -34,6 +35,7 @@ export default function RootLayout({
             {/* Sidebar and Content */}
             <SidebarWithHeader />
             <div style={{ position: "relative", minHeight: "100vh" }}>{children}</div>
+            <DanishInviteBanner />
 
             {/* Analytics and Performance */}
             <Analytics />
