@@ -235,6 +235,10 @@ export default function StatsPage() {
     }
   }
 
+  const powerColors = ['#ad1a2d','#007aff','#10b981','#f59e0b','#8b5cf6','#ef4444','#22c55e']
+  const zrsColors = ['#ad1a2d','#007aff','#10b981','#f59e0b']
+  const veloColors = ['#6b7280','#8b5cf6','#ef4444','#22c55e']
+
   
 
   return (
@@ -356,9 +360,14 @@ export default function StatsPage() {
                     <Label value={showWkg ? 'W/kg' : 'Watts'} angle={-90} position='insideLeft' />
                   </YAxis>
                   <Tooltip formatter={(val: any) => showWkg ? (typeof val === 'number' ? val.toFixed(2) : val) : val} labelFormatter={(l: any) => `${l}s`} />
-                  <Legend />
                   {selected.map(({ id, name }, idx) => (
-                    <Line key={`burst_${id}`} type='monotone' dataKey={`r_${id}`} name={name} stroke={['#ad1a2d','#007aff','#10b981','#f59e0b','#8b5cf6','#ef4444','#22c55e'][idx % 7]} dot={{ r: 2 }} />
+                    <Line key={`burst_${id}`} type='monotone' dataKey={`r_${id}`} name={name} stroke={powerColors[idx % powerColors.length]} dot={{ r: 2 }} />
+                  ))}
+                  {selected.map(({ name }, idx) => (
+                    <g key={`burst_legend_${idx}`}>
+                      <line x1={8} y1={26 + idx * 14} x2={22} y2={26 + idx * 14} stroke={powerColors[idx % powerColors.length]} strokeWidth={3} />
+                      <text x={28} y={26 + idx * 14 + 3} fontSize='12' fill='#374151'>{name}</text>
+                    </g>
                   ))}
                 </LineChart>
               </ResponsiveContainer>
@@ -416,12 +425,26 @@ export default function StatsPage() {
                   <Label value='vELO' angle={90} position='insideRight' />
                 </YAxis>
                 <Tooltip />
-                <Legend />
                 {showZrs && selected.map(({ id, name }, idx) => (
                   <Line key={`zrs_${id}`} yAxisId='left' type='monotone' dataKey={`zrs_${id}`} name={`ZRS ${name}`} stroke={['#ad1a2d','#007aff','#10b981','#f59e0b'][idx % 4]} dot={false} />
                 ))}
                 {showVelo && selected.map(({ id, name }, idx) => (
                   <Line key={`velo_${id}`} yAxisId='right' type='monotone' dataKey={`velo_${id}`} name={`vELO ${name}`} stroke={['#6b7280','#8b5cf6','#ef4444','#22c55e'][idx % 4]} dot={false} strokeDasharray='4 4' />
+                ))}
+                {selected.map(({ name }, idx) => (
+                  <g key={`ts_legend_${idx}`}>
+                    {showZrs && (
+                      <>
+                        <line x1={8} y1={26 + idx * 16} x2={22} y2={26 + idx * 16} stroke={zrsColors[idx % zrsColors.length]} strokeWidth={3} />
+                      </>
+                    )}
+                    {showVelo && (
+                      <>
+                        <line x1={24} y1={26 + idx * 16} x2={38} y2={26 + idx * 16} stroke={veloColors[idx % veloColors.length]} strokeWidth={3} strokeDasharray='4 4' />
+                      </>
+                    )}
+                    <text x={showVelo ? 44 : 28} y={26 + idx * 16 + 3} fontSize='12' fill='#374151'>{name}</text>
+                  </g>
                 ))}
               </LineChart>
             </ResponsiveContainer>
