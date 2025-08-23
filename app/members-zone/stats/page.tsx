@@ -32,8 +32,7 @@ export default function StatsPage() {
   const [selected, setSelected] = useState<{ id: string; name: string }[]>([])
   const [range, setRange] = useState('30')
   const [series, setSeries] = useState<Record<string, { date: string; racingScore: number | null; veloRating: number | null }[]>>({})
-  const [showVelo, setShowVelo] = useState(true)
-  const [showZrs, setShowZrs] = useState(true)
+  const [metric, setMetric] = useState<'velo' | 'zrs'>('velo')
   const [sort, setSort] = useState<{ key: keyof RiderRow; dir: 'asc' | 'desc' }>({ key: 'name', dir: 'asc' })
   const [showWkg, setShowWkg] = useState(false)
   const powerChartRef = useRef<HTMLDivElement | null>(null)
@@ -350,11 +349,11 @@ export default function StatsPage() {
             </Flex>
             <Box ref={powerChartRef} height='300px' bg='white' p={2} rounded='md'>
               <ResponsiveContainer width='100%' height='100%'>
-                <LineChart data={burstChartData} margin={{ top: 18, right: 20, left: 0, bottom: 0 }}>
+                <LineChart data={burstChartData} margin={{ top: 28, right: 20, left: 0, bottom: 28 }}>
                   <text x='50%' y={12} textAnchor='middle' dominantBaseline='middle' fontSize='12' fill='#374151'>Power Graph</text>
                   <CartesianGrid stroke='#eee' strokeDasharray='5 5' />
                   <XAxis dataKey='sec' tickFormatter={(v) => `${v}s`} tick={{ fontSize: 12 }}>
-                    <Label value='Seconds' position='insideBottom' offset={-5} />
+                    <Label value='Seconds' position='insideBottom' offset={-6} />
                   </XAxis>
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => showWkg ? v.toFixed(2) : `${v}`}>
                     <Label value={showWkg ? 'W/kg' : 'Watts'} angle={-90} position='insideLeft' />
@@ -365,8 +364,8 @@ export default function StatsPage() {
                   ))}
                   {selected.map(({ name }, idx) => (
                     <g key={`burst_legend_${idx}`}>
-                      <line x1={8} y1={26 + idx * 14} x2={22} y2={26 + idx * 14} stroke={powerColors[idx % powerColors.length]} strokeWidth={3} />
-                      <text x={28} y={26 + idx * 14 + 3} fontSize='12' fill='#374151'>{name}</text>
+                      <text x='92%' y={24 + idx * 14 + 3} fontSize='12' fill='#374151' textAnchor='end'>{name}</text>
+                      <line x1='94%' y1={24 + idx * 14} x2='99%' y2={24 + idx * 14} stroke={powerColors[idx % powerColors.length]} strokeWidth={3} />
                     </g>
                   ))}
                 </LineChart>
@@ -397,14 +396,14 @@ export default function StatsPage() {
               <option value='90'>Last 90 days</option>
             </Select>
             <Button onClick={loadCompare} isDisabled={selected.length === 0}>Load time series</Button>
-            <Flex gap={3} align='center'>
-              <Checkbox isChecked={showVelo} onChange={(e) => setShowVelo(e.target.checked)} color='white'>vELO</Checkbox>
-              <Checkbox isChecked={showZrs} onChange={(e) => setShowZrs(e.target.checked)} color='white'>ZRS</Checkbox>
-            </Flex>
+            <Select value={metric} onChange={(e) => setMetric(e.target.value as 'velo' | 'zrs')} width='xs' bg='white'>
+              <option value='velo'>vELO</option>
+              <option value='zrs'>ZRS</option>
+            </Select>
           </Flex>
           {selected.length === 0 && (
             <Box height='120px' border='1px dashed' borderColor='whiteAlpha.400' rounded='md' display='flex' alignItems='center' justifyContent='center'>
-              <Text color='whiteAlpha.800'>Select riders in the table and click Load time series to see ZRS and vELO over time.</Text>
+              <Text color='whiteAlpha.800'>Select riders in the table and click Load time series to see the selected metric over time.</Text>
             </Box>
           )}
         </Stack>
@@ -412,38 +411,26 @@ export default function StatsPage() {
         {Object.keys(series).length > 0 && (
           <Box ref={timeSeriesChartRef} height='360px' bg='white' p={2} rounded='md'>
             <ResponsiveContainer width='100%' height='100%'>
-              <LineChart data={chartData} margin={{ top: 18, right: 20, left: 0, bottom: 0 }}>
+              <LineChart data={chartData} margin={{ top: 28, right: 20, left: 0, bottom: 28 }}>
                 <text x='50%' y={12} textAnchor='middle' dominantBaseline='middle' fontSize='12' fill='#374151'>Time Series Graph</text>
                 <CartesianGrid stroke='#eee' strokeDasharray='5 5' />
                 <XAxis dataKey='date' tick={{ fontSize: 12 }}>
-                  <Label value='Date' position='insideBottom' offset={-5} />
+                  <Label value='Date' position='insideBottom' offset={-6} />
                 </XAxis>
-                <YAxis yAxisId='left' tick={{ fontSize: 12 }}>
-                  <Label value='ZRS' angle={-90} position='insideLeft' />
-                </YAxis>
-                <YAxis yAxisId='right' orientation='right' tick={{ fontSize: 12 }}>
-                  <Label value='vELO' angle={90} position='insideRight' />
+                <YAxis tick={{ fontSize: 12 }}>
+                  <Label value={metric === 'zrs' ? 'ZRS' : 'vELO'} angle={-90} position='insideLeft' />
                 </YAxis>
                 <Tooltip />
-                {showZrs && selected.map(({ id, name }, idx) => (
-                  <Line key={`zrs_${id}`} yAxisId='left' type='monotone' dataKey={`zrs_${id}`} name={`ZRS ${name}`} stroke={['#ad1a2d','#007aff','#10b981','#f59e0b'][idx % 4]} dot={false} />
+                {metric === 'zrs' && selected.map(({ id, name }, idx) => (
+                  <Line key={`zrs_${id}`} type='monotone' dataKey={`zrs_${id}`} name={`ZRS ${name}`} stroke={zrsColors[idx % zrsColors.length]} dot={false} />
                 ))}
-                {showVelo && selected.map(({ id, name }, idx) => (
-                  <Line key={`velo_${id}`} yAxisId='right' type='monotone' dataKey={`velo_${id}`} name={`vELO ${name}`} stroke={['#6b7280','#8b5cf6','#ef4444','#22c55e'][idx % 4]} dot={false} strokeDasharray='4 4' />
+                {metric === 'velo' && selected.map(({ id, name }, idx) => (
+                  <Line key={`velo_${id}`} type='monotone' dataKey={`velo_${id}`} name={`vELO ${name}`} stroke={veloColors[idx % veloColors.length]} dot={false} />
                 ))}
                 {selected.map(({ name }, idx) => (
                   <g key={`ts_legend_${idx}`}>
-                    {showZrs && (
-                      <>
-                        <line x1={8} y1={26 + idx * 16} x2={22} y2={26 + idx * 16} stroke={zrsColors[idx % zrsColors.length]} strokeWidth={3} />
-                      </>
-                    )}
-                    {showVelo && (
-                      <>
-                        <line x1={24} y1={26 + idx * 16} x2={38} y2={26 + idx * 16} stroke={veloColors[idx % veloColors.length]} strokeWidth={3} strokeDasharray='4 4' />
-                      </>
-                    )}
-                    <text x={showVelo ? 44 : 28} y={26 + idx * 16 + 3} fontSize='12' fill='#374151'>{name}</text>
+                    <text x='92%' y={24 + idx * 16 + 3} fontSize='12' fill='#374151' textAnchor='end'>{name}</text>
+                    <line x1='94%' y1={24 + idx * 16} x2='99%' y2={24 + idx * 16} stroke={(metric === 'zrs' ? zrsColors : veloColors)[idx % (metric === 'zrs' ? zrsColors.length : veloColors.length)]} strokeWidth={3} />
                   </g>
                 ))}
               </LineChart>
