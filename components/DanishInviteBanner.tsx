@@ -45,7 +45,7 @@ export default function DanishInviteBanner() {
         <AlertIcon color="white" />
         <Flex direction={{ base: "column", md: "row" }} align={{ base: "flex-start", md: "center" }} justify="space-between" w="100%" gap={3}>
           <Box>
-            <AlertTitle>Danske Zwift Racers - DZR</AlertTitle>
+            <AlertTitle>Danish Zwift Racers - DZR</AlertTitle>
             <AlertDescription>
               Bliv en del af DZR fællesskabet! Tilslut dig vores Discord server, mød andre danske Zwift race entusiaster og kør med på et af vores hold. Lige nu sætter vi hold til Zwift Racing League - holdbaseret Zwift racing når det er bedst og størst!
             </AlertDescription>
