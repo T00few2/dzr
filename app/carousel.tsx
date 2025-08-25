@@ -65,7 +65,7 @@ export default function Carousel({cards}: ImagesProps) {
         top={top}
         transform={'translate(0%, -50%)'}
         zIndex={2}
-        onClick={() => slider?.slickNext()}>
+        onClick={() => slider?.slickPrev()}>
         <MdOutlineKeyboardArrowLeft fontSize={'30px'} color='black'/>
       </IconButton>
       {/* Right Icon */}
