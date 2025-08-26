@@ -18,6 +18,8 @@ import {
 
 import { Metadata } from 'next'
 import Carousel from '../carousel'
+import fs from 'fs'
+import path from 'path'
 
 export const metadata: Metadata = {
   title: 'A Sunday in Hell with DZR',
@@ -39,6 +41,14 @@ export const metadata: Metadata = {
 }
 
 export default function ASundayInHellPage() {
+  const csvPath = path.join(process.cwd(), 'public', 'a-sunday-in-hell', 'sep25', 'data.csv')
+  let rows: string[][] = []
+  try {
+    const file = fs.readFileSync(csvPath, 'utf-8')
+    const lines = file.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim().length > 0)
+    // Skip header
+    rows = lines.slice(1).map(line => line.split(';'))
+  } catch {}
   return (
     <div style={{backgroundColor:'black'}}>
       <Container maxW={{base: '90%', md: '5xl'}} py={0} mb={20}>
@@ -77,8 +87,8 @@ Points are awarded for each stage, with the overall title going to the rider wit
               <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
                 <Thead>
                   <Tr>
+                    <Th textAlign="center" textColor={'white'}>Race</Th>
                     <Th textAlign="center" textColor={'white'}>Race Pass</Th>
-                    <Th textAlign="center" textColor={'white'}>Time (CET)</Th>
                     <Th textAlign="center" textColor={'white'}>World</Th>
                     <Th textAlign="center" textColor={'white'}>Route</Th>
                     <Th textAlign="center" textColor={'white'}>Laps</Th>
@@ -87,42 +97,38 @@ Points are awarded for each stage, with the overall title going to the rider wit
                   </Tr>
                 </Thead>
                 <Tbody>
-                  <Tr>
-                    <Td textAlign="center"><Link  color={'orange'} href='https://www.zwift.com/uk/events/view/0000001' target='_Blank' isExternal>Stage 1 - The iTT</Link></Td>
-                    <Td textAlign="center">09:45</Td>
-                    <Td textAlign="center">World TBD</Td>
-                    <Td textAlign="center"><Link  color={'orange'} href='https://zwiftinsider.com/' target='_Blank' isExternal>Route TBD</Link></Td>
-                    <Td textAlign="center">1</Td>
-                    <Td textAlign="center">15</Td>
-                    <Td textAlign="center">200</Td>
-                  </Tr>
-                  <Tr>
-                    <Td textAlign="center"><Link  color={'orange'} href='https://www.zwift.com/uk/events/view/0000002' target='_Blank' isExternal>Stage 2 - The Sprint</Link></Td>
-                    <Td textAlign="center">10:20</Td>
-                    <Td textAlign="center">World TBD</Td>
-                    <Td textAlign="center"><Link  color={'orange'} href='https://zwiftinsider.com/' target='_Blank' isExternal>Route TBD</Link></Td>
-                    <Td textAlign="center">1</Td>
-                    <Td textAlign="center">20</Td>
-                    <Td textAlign="center">150</Td>
-                  </Tr>
-                  <Tr>
-                    <Td textAlign="center"><Link  color={'orange'} href='https://www.zwift.com/uk/events/view/0000003' target='_Blank' isExternal>Stage 3 - The After Party</Link></Td>
-                    <Td textAlign="center">11:00</Td>
-                    <Td textAlign="center">World TBD</Td>
-                    <Td textAlign="center"><Link  color={'orange'} href='https://zwiftinsider.com/' target='_Blank' isExternal>Route TBD</Link></Td>
-                    <Td textAlign="center">1</Td>
-                    <Td textAlign="center">15</Td>
-                    <Td textAlign="center">300</Td>
-                  </Tr>
-                  <Tr>
-                    <Td textAlign="center"><Link  color={'orange'} href='https://www.zwift.com/uk/events/view/0000004' target='_Blank' isExternal>Stage 4 - The Climb</Link></Td>
-                    <Td textAlign="center">11:35</Td>
-                    <Td textAlign="center">World TBD</Td>
-                    <Td textAlign="center"><Link  color={'orange'} href='https://zwiftinsider.com/' target='_Blank' isExternal>Route TBD</Link></Td>
-                    <Td textAlign="center">1</Td>
-                    <Td textAlign="center">10</Td>
-                    <Td textAlign="center">350</Td>
-                  </Tr>
+                  {rows.map((cols, idx) => {
+                    const race = cols[0]
+                    const racePass = cols[1]
+                    const world = cols[2]
+                    const route = cols[3]
+                    const routeLink = cols[4]
+                    const laps = cols[5]
+                    const km = cols[6]
+                    const hm = cols[7]
+                    const isTotal = race?.toLowerCase() === 'total'
+                    return (
+                      <Tr key={idx}>
+                        <Td textAlign="center">{race}</Td>
+                        <Td textAlign="center">
+                          {!isTotal && racePass ? (
+                            <Link color={'orange'} href={`https://www.zwift.com/events/view/${racePass}`} target='_Blank' isExternal>
+                              Race Pass
+                            </Link>
+                          ) : ''}
+                        </Td>
+                        <Td textAlign="center">{world}</Td>
+                        <Td textAlign="center">
+                          {routeLink ? (
+                            <Link color={'orange'} href={routeLink} target='_Blank' isExternal>{route}</Link>
+                          ) : route}
+                        </Td>
+                        <Td textAlign="center">{isTotal ? '' : laps}</Td>
+                        <Td textAlign="center">{km}</Td>
+                        <Td textAlign="center">{hm}</Td>
+                      </Tr>
+                    )
+                  })}
                 </Tbody>
               </Table>
             </TableContainer>
@@ -137,27 +143,44 @@ Points are awarded for each stage, with the overall title going to the rider wit
               ]}
             />
 
-            <Heading color={'white'} fontSize={'2xl'}>Bonus Seconds</Heading>
-            <Heading color={'white'} fontSize={'xl'}>Stage 2 - The Sprint</Heading>
-            <Heading color={'white'} fontSize={'sm'}>First Across Line (FAL) bonus seconds are awarded on segments below</Heading>
+            <Heading color={'white'} fontSize={'2xl'}>Point Structure</Heading>
+            <Heading color={'white'} fontSize={'md'}>Most accumulated points in the four stages takes the overall win</Heading>
+            <Heading color={'white'} fontSize={'md'}>Points in the stages are divided according to</Heading>
+
+            <TableContainer  textAlign="center">
+              <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
+                <Tbody>
+                  <Tr>
+                    <Td textAlign="center">Points per race</Td>
+                    <Td textAlign="center">60, 57, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2 and 1 for everyone else</Td>
+                  </Tr>
+                </Tbody>
+              </Table>
+            </TableContainer>
+
+            <Heading color={'white'} fontSize={'xl'}>The Sprint</Heading>
+            <Text color={'white'} fontSize={'sm'}>The Sprint is a points race. The winner is the rider with the most points at the end of the race. Points are awarded on intermediate sprints (primes) and on the finish line. The points structure is as follows:</Text>
+            <Heading color={'white'} fontSize={'sm'}>First Across Line (FAL) points are awarded on segments below</Heading>
             <TableContainer  textAlign="center">
               <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
                 <Thead>
                   <Tr>
                     <Th textAlign="center" textColor={'white'}>Segment</Th>
-                    <Th textAlign="center" textColor={'white'}>Sprint Segment</Th>
+                    <Th textAlign="center" textColor={'white'}>Lap Banner</Th>
+                    <Th textAlign="center" textColor={'white'}>Prime Sprint</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
                   <Tr>
                     <Td textAlign="center">Laps</Td>
-                    <Td textAlign="center">2 , 4</Td>
+                    <Td textAlign="center">2 , 6</Td>
+                    <Td textAlign="center">4 , 8</Td>
                   </Tr>
                 </Tbody>
               </Table>
             </TableContainer>
 
-            <Heading color={'white'} fontSize={'sm'}>Bonus seconds on each sprint are awarded according to</Heading>
+            <Heading color={'white'} fontSize={'sm'}>Points on each prime are awarded according to</Heading>
             <TableContainer  textAlign="center">
               <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
                 <Thead>
@@ -168,43 +191,38 @@ Points are awarded for each stage, with the overall title going to the rider wit
                     <Th textAlign="center" textColor={'white'}>3</Th>
                     <Th textAlign="center" textColor={'white'}>4</Th>
                     <Th textAlign="center" textColor={'white'}>5</Th>
+                    <Th textAlign="center" textColor={'white'}>6</Th>
+                    <Th textAlign="center" textColor={'white'}>7</Th>
+                    <Th textAlign="center" textColor={'white'}>8</Th>
+                    <Th textAlign="center" textColor={'white'}>9</Th>
+                    <Th textAlign="center" textColor={'white'}>10</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
                   <Tr>
-                    <Td textAlign="center">Bonus Seconds</Td>
+                    <Td textAlign="center">Points</Td>
                     <Td textAlign="center">10</Td>
+                    <Td textAlign="center">9</Td>
                     <Td textAlign="center">8</Td>
+                    <Td textAlign="center">7</Td>
                     <Td textAlign="center">6</Td>
+                    <Td textAlign="center">5</Td>
                     <Td textAlign="center">4</Td>
+                    <Td textAlign="center">3</Td>
                     <Td textAlign="center">2</Td>
+                    <Td textAlign="center">1</Td>
                   </Tr>
                 </Tbody>
               </Table>
             </TableContainer>
 
-            <Heading color={'white'} fontSize={'xl'}>Stage 2, 3 & 4</Heading>
-            <Heading color={'white'} fontSize={'sm'}>Bonus seconds are awarded to top 5 on the finish line according to</Heading>
+            <Heading color={'white'} fontSize={'sm'}>First Across Line (FAL) points are awarded on the finish line according to</Heading>
             <TableContainer  textAlign="center">
               <Table size='sm' color={'white'} borderColor={'white'} border={'1px'}>
-                <Thead>
-                  <Tr>
-                    <Th textAlign="center" textColor={'white'}>Position</Th>
-                    <Th textAlign="center" textColor={'white'}>1</Th>
-                    <Th textAlign="center" textColor={'white'}>2</Th>
-                    <Th textAlign="center" textColor={'white'}>3</Th>
-                    <Th textAlign="center" textColor={'white'}>4</Th>
-                    <Th textAlign="center" textColor={'white'}>5</Th>
-                  </Tr>
-                </Thead>
                 <Tbody>
                   <Tr>
-                    <Td textAlign="center">Bonus Seconds</Td>
-                    <Td textAlign="center">10</Td>
-                    <Td textAlign="center">8</Td>
-                    <Td textAlign="center">6</Td>
-                    <Td textAlign="center">4</Td>
-                    <Td textAlign="center">2</Td>
+                    <Td textAlign="center">Points</Td>
+                    <Td textAlign="center">60, 57, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2 and 1</Td>
                   </Tr>
                 </Tbody>
               </Table>
