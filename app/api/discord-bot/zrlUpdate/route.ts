@@ -116,7 +116,7 @@ export async function POST(request: Request) {
           const captainDiscordId = await getDiscordIdForUid(team.captainId);
           const captainDisplay = captainDiscordId ? `<@${captainDiscordId}>` : team.captainName;
           if (captainDiscordId) mentionUserIds.add(captainDiscordId);
-          return `**${team.name}**\n- Race Series: ${team.raceSeries}\n-Division: ${team.division}\n- Ride Time: ${team.rideTime}\n- Captain: ${captainDisplay}`;
+          return `**${team.name}**\n- Race Series: ${team.raceSeries}\n- Division: ${team.division}\n- Ride Time: ${team.rideTime}\n- Captain: ${captainDisplay}`;
         })
       );
       messageContent += `📢 **Hold der leder efter ryttere** 📢\n\n${teamLines.join('\n\n')}`;
