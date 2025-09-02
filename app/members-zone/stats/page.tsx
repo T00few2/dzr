@@ -39,6 +39,7 @@ export default function StatsPage() {
   const timeSeriesChartRef = useRef<HTMLDivElement | null>(null)
   const [captainRoles, setCaptainRoles] = useState<{ roleId: string; roleName: string; zwiftIds: string[] }[]>([])
   const [selectedRole, setSelectedRole] = useState<string>('')
+  const [showZwiftId, setShowZwiftId] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
@@ -273,6 +274,10 @@ export default function StatsPage() {
           </Select>
         </Flex>
 
+        <Flex>
+          <Checkbox isChecked={showZwiftId} onChange={(e) => setShowZwiftId(e.target.checked)} color='white'>Show ZwiftId</Checkbox>
+        </Flex>
+
         <Flex justify='space-between' align='center'>
           <Text color='white'>Showing {rows.length} of {total}</Text>
           <Flex gap={2}>
@@ -287,6 +292,9 @@ export default function StatsPage() {
               <Tr>
                 <Th color='white'></Th>
                 <Th color='white' cursor='pointer' onClick={() => toggleSort('name')}>Name {sort.key==='name' ? (sort.dir==='asc'?'▲':'▼') : ''}</Th>
+                {showZwiftId && (
+                  <Th color='white' cursor='pointer' onClick={() => toggleSort('riderId')}>ZwiftID {sort.key==='riderId' ? (sort.dir==='asc'?'▲':'▼') : ''}</Th>
+                )}
                 <Th color='white' cursor='pointer' onClick={() => toggleSort('phenotype')}>Phenotype {sort.key==='phenotype' ? (sort.dir==='asc'?'▲':'▼') : ''}</Th>
                 <Th color='white' cursor='pointer' onClick={() => toggleSort('racingScore')}>ZRS {sort.key==='racingScore' ? (sort.dir==='asc'?'▲':'▼') : ''}</Th>
                 <Th color='white' cursor='pointer' onClick={() => toggleSort('zpCategory')}>ZPG {sort.key==='zpCategory' ? (sort.dir==='asc'?'▲':'▼') : ''}</Th>
@@ -320,6 +328,7 @@ export default function StatsPage() {
                     <Button size='xs' onClick={() => setSelected(prev => prev.some(s => s.id === String(r.riderId)) ? prev : [...prev, { id: String(r.riderId), name: r.name }])}>Add</Button>
                   </Td>
                   <Td color='white'>{r.name}</Td>
+                  {showZwiftId && (<Td color='white'>{r.riderId ?? '—'}</Td>)}
                   <Td color='white'>{r.phenotype ?? '—'}</Td>
                   <Td color='white'>{r.racingScore != null ? Math.round(r.racingScore) : '—'}</Td>
                   <Td color='white'>{r.zpCategory ?? '—'}</Td>
