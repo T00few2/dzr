@@ -72,7 +72,8 @@ export default function TeamManagementPage() {
     return () => unsubscribe();
   }, []);
 
-  const myTeams = teams.filter((t) => (t as any).captainDiscordId === (session?.user as any)?.discordId);
+  const isAdmin = Boolean((session?.user as any)?.isAdmin);
+  const myTeams = isAdmin ? teams : teams.filter((t) => (t as any).captainDiscordId === (session?.user as any)?.discordId);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   
   useEffect(() => {

@@ -3,6 +3,9 @@ import DiscordProvider from "next-auth/providers/discord";
 
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID as string;
 const REQUIRED_ROLE_ID = (process.env.DISCORD_REQUIRED_ROLE_ID || "1385216556166025347") as string;
+const ADMIN_ROLE_ID = '1195852714270277763';
+
+// Admin determination now uses a specific admin role id from the guild
 
 async function fetchMemberRoles(accessToken: string): Promise<string[]> {
 	const res = await fetch(`https://discord.com/api/v10/users/@me/guilds/${DISCORD_GUILD_ID}/member`, {
@@ -41,6 +44,8 @@ const handler = NextAuth({
 			if (account?.access_token) {
 				const roles = await fetchMemberRoles(account.access_token as string);
 				token.roles = roles;
+				// Compute isAdmin by presence of the Admin role id
+				token.isAdmin = Array.isArray(roles) && roles.includes(ADMIN_ROLE_ID);
 			}
 			if (profile && (profile as any).id) {
 				token.discordId = (profile as any).id;
@@ -53,6 +58,7 @@ const handler = NextAuth({
 		async session({ session, token }) {
 			(session as any).user.discordId = (token as any).discordId || null;
 			(session as any).user.roles = (token as any).roles || [];
+			(session as any).user.isAdmin = Boolean((token as any).isAdmin);
 			(session as any).user.email = (token as any).email || (session as any).user?.email || null;
 			return session;
 		},

@@ -27,9 +27,10 @@ export async function middleware(req: NextRequest) {
 		return NextResponse.redirect(url);
 	}
 
-	// Extra restriction: team management requires Holdkaptajn role
+	// Extra restriction: team management requires Holdkaptajn role OR admin
 	if (pathname.startsWith('/members-zone/team-management')) {
-		if (!roles.includes(teamCaptainRoleId)) {
+		const isAdmin = Boolean((token as any)?.isAdmin);
+		if (!isAdmin && !roles.includes(teamCaptainRoleId)) {
 			const url = req.nextUrl.clone();
 			url.pathname = '/members-zone';
 			url.searchParams.delete('error');
