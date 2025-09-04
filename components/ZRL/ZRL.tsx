@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Box,
+  Container,
   Heading,
   Text,
   Stack,
@@ -24,8 +25,7 @@ import {
   doc,
 } from 'firebase/firestore';
 
-import ZRLRegister from './ZRLRegister';
-import ZRLEditDelete from './ZRLEditDelete';
+import NextLink from 'next/link';
 import ZRLRider from './ZRLRider';
 import ZRLRiderEditDelete from './ZRLRiderEditDelete';
 
@@ -133,10 +133,6 @@ const ZRL = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [interestedRiders, setInterestedRiders] = useState<Rider[]>([]);
 
-  // For editing teams
-  const [editMode, setEditMode] = useState(false);
-  const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
-
   // For editing riders
   const [isRiderEditMode, setIsRiderEditMode] = useState(false);
   const [currentRider, setCurrentRider] = useState<Rider | null>(null);
@@ -174,16 +170,6 @@ const ZRL = () => {
   // -------------------------------------------------------
   // TEAM ACTIONS
   // -------------------------------------------------------
-  const openEditModal = (team: Team) => {
-    setCurrentTeam(team);
-    setEditMode(true);
-  };
-
-  const closeEditModal = () => {
-    setEditMode(false);
-    setCurrentTeam(null);
-  };
-
   const handleDeleteTeam = async (teamId: string) => {
     try {
       const teamRef = doc(db, 'teams', teamId);
@@ -285,17 +271,8 @@ const ZRL = () => {
                   )}
                   {team.captainId === auth.currentUser?.uid && (
                     <Stack direction="row" spacing={3} mt={2}>
-                      <Button
-                        colorScheme="yellow"
-                        onClick={() => openEditModal(team)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        colorScheme="red"
-                        onClick={() => handleDeleteTeam(team.id!)}
-                      >
-                        Delete
+                      <Button as={NextLink} href="/members-zone/team-management" colorScheme="yellow">
+                        Manage
                       </Button>
                     </Stack>
                   )}
@@ -360,7 +337,8 @@ const ZRL = () => {
   // MAIN RENDER
   // -------------------------------------------------------
   return (
-    <Box p={4} textColor="white">
+    <Container maxW={{base:'95vw', sm:'80vw', md:'70vw'}} py={6}>
+      <Box textColor="white">
       <Center>
         <Heading as="h2" size="lg" mb={4}>
           DZR Racing Teams
@@ -369,27 +347,17 @@ const ZRL = () => {
       <Divider mt={4} />
 
       <Text mr={4} mt={4}>
-        Dette er første udgave af en side, hvor man kan få overblik over hvilke
-        hold vi har i de forskellige løbsserier. Derudover kan hold aktivt vise, at
-        de leder efter ryttere og ryttere kan vise at de leder efter et hold.
-        Feedback og forslag er meget velkomne på{' '}
-        <Link
-          href="https://discord.gg/22t8MvWK"
-          target="_blank"
-          isExternal
-          color="blue.300"
-        >
-          Discord <ExternalLinkIcon mx="2px" />
-        </Link>
+        Få et overblik over DZR-hold på tværs af løbsserier, og se hvilke hold der søger ryttere.
+        Har du idéer til forbedringer? Del dem gerne på{' '}
+        <Link href="https://discord.gg/22t8MvWK" target="_blank" isExternal color="blue.300">Discord <ExternalLinkIcon mx="2px" /></Link>.
       </Text>
 
       <Text mr={4} mt={4}>
-        <strong>• Holdkaptajner</strong> kan registere hold. Detaljer kan
-        ændres af kaptajnen, når holdet er oprettet (Edit) og slettes (Delete).
-        Kryds af i &quot;Looking for riders&quot; for at vise at I aktivt leder
-        efter flere ryttere.
+        <strong>• For holdkaptajner:</strong> Opret og redigér jeres hold i Team Management. Her kan du også slå jeres hold op som “Looking for riders”.
       </Text>
-      <ZRLRegister />
+      <Button as={NextLink} href="/members-zone/team-management" colorScheme="blue" variant="outline" mt={4}>
+        Team Management
+      </Button>
 
       <Text mr={4} mt={4}>
         <strong>• Ryttere</strong> kan flage interesse i at finde et team.
@@ -475,16 +443,12 @@ const ZRL = () => {
         </TabPanels>
       </Tabs>
 
-      {/* Conditionally render the Edit Team modal */}
-      {editMode && currentTeam && (
-        <ZRLEditDelete team={currentTeam} onClose={closeEditModal} />
-      )}
-
       {/* Conditionally render the Edit Rider modal */}
       {isRiderEditMode && currentRider && (
         <ZRLRiderEditDelete rider={currentRider} onClose={closeRiderEditModal} />
       )}
-    </Box>
+      </Box>
+    </Container>
   );
 };
 

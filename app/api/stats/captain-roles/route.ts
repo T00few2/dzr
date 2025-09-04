@@ -93,7 +93,41 @@ export async function GET() {
       return { roleId: r.roleId, roleName: r.roleName ?? r.roleId, zwiftIds };
     });
 
-    return NextResponse.json({ roles: out });
+    // 5) Build profiles for all guild members that have a linked ZwiftID
+    const discordIdToProfile = new Map<string, { discordId: string; displayName: string; avatarUrl?: string }>();
+    for (const m of members) {
+      const user = m?.user || {};
+      const discordId = String(user?.id || '');
+      if (!discordId) continue;
+      const username = String(user?.username || '');
+      const globalName = String(user?.global_name || '');
+      const nick = String(m?.nick || '');
+      const displayName = nick || globalName || username || discordId;
+      let avatarUrl: string | undefined = undefined;
+      if (user?.id && user?.avatar) {
+        const ext = String(user.avatar).startsWith('a_') ? 'gif' : 'png';
+        avatarUrl = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${ext}`;
+      }
+      discordIdToProfile.set(discordId, { discordId, displayName, avatarUrl });
+    }
+
+    const profiles = Array.from(discordToZwift.entries()).map(([discordId, zwiftId]) => {
+      const p = discordIdToProfile.get(discordId);
+      return { zwiftId, discordId, displayName: p?.displayName || '', avatarUrl: p?.avatarUrl };
+    });
+
+    // 6) Build membersByRole for captainRoles: include all members with that role (including those without linked ZwiftID)
+    const membersByRole: Record<string, { discordId: string; displayName: string; avatarUrl?: string; zwiftId?: string }[]> = {};
+    for (const r of captainRoles) {
+      const dids = Array.from(roleIdToDiscordIds.get(r.roleId) || []);
+      membersByRole[r.roleId] = dids.map((discordId) => {
+        const profile = discordIdToProfile.get(discordId);
+        const zw = discordToZwift.get(discordId);
+        return { discordId, displayName: profile?.displayName || discordId, avatarUrl: profile?.avatarUrl, zwiftId: zw };
+      });
+    }
+
+    return NextResponse.json({ roles: out, profiles, membersByRole });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to load captain roles' }, { status: 500 });
   }

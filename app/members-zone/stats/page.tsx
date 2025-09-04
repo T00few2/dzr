@@ -38,6 +38,8 @@ export default function StatsPage() {
   const powerChartRef = useRef<HTMLDivElement | null>(null)
   const timeSeriesChartRef = useRef<HTMLDivElement | null>(null)
   const [captainRoles, setCaptainRoles] = useState<{ roleId: string; roleName: string; zwiftIds: string[] }[]>([])
+  const [discordProfiles, setDiscordProfiles] = useState<Record<string, { displayName: string; avatarUrl?: string }>>({})
+  const [membersByRole, setMembersByRole] = useState<Record<string, { discordId: string; displayName: string; avatarUrl?: string; zwiftId?: string }[]>>({})
   const [selectedRole, setSelectedRole] = useState<string>('')
   const [showZwiftId, setShowZwiftId] = useState(false)
   const toast = useToast()
@@ -65,6 +67,12 @@ export default function StatsPage() {
         setCaptainRoles(
           roles.map(r => ({ roleId: String(r.roleId), roleName: r.roleName || String(r.roleId), zwiftIds: Array.isArray(r.zwiftIds) ? r.zwiftIds.map(String) : [] }))
         )
+        const profilesArr: { zwiftId: string; displayName?: string; avatarUrl?: string }[] = data?.profiles || []
+        const map: Record<string, { displayName: string; avatarUrl?: string }> = {}
+        profilesArr.forEach((p) => { if (p.zwiftId) map[String(p.zwiftId)] = { displayName: p.displayName || '', avatarUrl: p.avatarUrl } })
+        setDiscordProfiles(map)
+        const mbr: Record<string, { discordId: string; displayName: string; avatarUrl?: string; zwiftId?: string }[]> = data?.membersByRole || {}
+        setMembersByRole(mbr)
       } catch {}
     }
     loadCaptainRoles()
@@ -76,8 +84,16 @@ export default function StatsPage() {
     const role = captainRoles.find(r => r.roleId === selectedRole)
     if (!role) return rows
     const idSet = new Set(role.zwiftIds.map(String))
-    return rows.filter(r => idSet.has(String(r.riderId)))
-  }, [rows, selectedRole, captainRoles])
+    const base = rows.filter(r => idSet.has(String(r.riderId)))
+    const baseIdSet = new Set(base.map(r => String(r.riderId)))
+    const extra = role.zwiftIds
+      .filter(zid => !baseIdSet.has(String(zid)))
+      .map(zid => ({
+        riderId: Number(zid),
+        name: discordProfiles[String(zid)]?.displayName || String(zid),
+      } as RiderRow))
+    return [...base, ...extra]
+  }, [rows, selectedRole, captainRoles, discordProfiles])
   const sortedRows = useMemo(() => {
     const stripTeamTag = (n: string) => n.replace(/\s*\[[^\]]+\]\s*$/, '')
     const normalizeName = (n?: string) =>
@@ -327,7 +343,12 @@ export default function StatsPage() {
                   <Td>
                     <Button size='xs' onClick={() => setSelected(prev => prev.some(s => s.id === String(r.riderId)) ? prev : [...prev, { id: String(r.riderId), name: r.name }])}>Add</Button>
                   </Td>
-                  <Td color='white'>{r.name}</Td>
+                  <Td color='white'>
+                    <Stack direction='row' align='center' spacing={2}>
+                      <Box as='img' src={discordProfiles[String(r.riderId)]?.avatarUrl} alt='' width='20px' height='20px' borderRadius='full' display={discordProfiles[String(r.riderId)]?.avatarUrl ? 'block' : 'none'} />
+                      <span>{discordProfiles[String(r.riderId)]?.displayName || r.name}</span>
+                    </Stack>
+                  </Td>
                   {showZwiftId && (<Td color='white'>{r.riderId ?? '—'}</Td>)}
                   <Td color='white'>{r.phenotype ?? '—'}</Td>
                   <Td color='white'>{r.racingScore != null ? Math.round(r.racingScore) : '—'}</Td>

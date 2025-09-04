@@ -5,6 +5,7 @@ import {
   FormControl,
   FormLabel,
   Input,
+  FormHelperText,
   Modal,
   ModalOverlay,
   ModalContent,
@@ -27,6 +28,7 @@ interface Team {
   rideTime: string;
   division: string;
   raceSeries: string;
+  teamRoleId: string;
 }
 
 const ZRLRegister = () => {
@@ -37,6 +39,7 @@ const ZRLRegister = () => {
   const [division, setDivision] = useState('');
   const [raceSeries, setRaceSeries] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [teamRoleId, setTeamRoleId] = useState('');
 
   // Map each race series to its possible divisions
   // (Empty array for "Club Ladder" means no division)
@@ -78,14 +81,22 @@ const ZRLRegister = () => {
     setRideTime('');
     setDivision('');
     setRaceSeries('');
+    setTeamRoleId('');
     setIsOpen(false);
   };
 
   const handleTeamRegister = async () => {
     const timeValue = (rideTime || '').trim();
 
-    if (!newTeamName || !auth.currentUser || !timeValue || !raceSeries) {
+    if (!newTeamName || !auth.currentUser || !timeValue || !raceSeries || !teamRoleId) {
       alert('Please fill in all required fields.');
+      return;
+    }
+
+    // Validate teamRoleId (Discord role id – numeric string)
+    const roleIdOk = /^[0-9]{15,21}$/.test(teamRoleId.trim());
+    if (!roleIdOk) {
+      alert('Please enter a valid Discord team role ID (numbers only).');
       return;
     }
 
@@ -109,6 +120,7 @@ const ZRLRegister = () => {
         rideTime: timeValue,
         division: raceSeries === 'Club Ladder' ? '' : division,
         raceSeries,
+        teamRoleId: teamRoleId.trim(),
       };
 
       await addDoc(collection(db, 'teams'), teamData);
@@ -143,7 +155,7 @@ const ZRLRegister = () => {
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Register a New Team</ModalHeader>
-          <ModalCloseButton />
+          <ModalCloseButton color="rgba(173, 26, 45, 0.95)" _hover={{ bg: 'rgba(173, 26, 45, 0.10)' }} />
           <ModalBody>
             <FormControl id="teamName" mb={4}>
               <FormLabel>Team Name</FormLabel>
@@ -165,6 +177,21 @@ const ZRLRegister = () => {
                 placeholder="Enter captain's name"
                 bg="white"
               />
+            </FormControl>
+
+            {/* Team Role ID (Discord) */}
+            <FormControl id="teamRoleId" mb={4} isRequired>
+              <FormLabel>Team Role ID (Discord)</FormLabel>
+              <Input
+                type="text"
+                value={teamRoleId}
+                onChange={(e) => setTeamRoleId(e.target.value)}
+                placeholder="Ask an admin for your team role ID (numbers only)"
+                bg="white"
+              />
+              <FormHelperText>
+                You need the Discord role ID for your team. Ask a Discord admin.
+              </FormHelperText>
             </FormControl>
 
             {/* New Race Series field */}
@@ -219,7 +246,12 @@ const ZRLRegister = () => {
             <Button colorScheme="blue" onClick={handleTeamRegister}>
               Register Team
             </Button>
-            <Button variant="ghost" onClick={resetForm}>
+            <Button
+              background="rgba(173, 26, 45, 0.95)"
+              color={'white'}
+              _hover={{ background: 'rgba(173, 26, 45, 1)' }}
+              onClick={resetForm}
+            >
               Close
             </Button>
           </ModalFooter>

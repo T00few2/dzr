@@ -30,6 +30,7 @@ interface Team {
   division: string;
   raceSeries?: string;              // <-- New field for the series
   lookingForRiders?: boolean;       // Existing field
+  teamRoleId?: string;
 }
 
 interface ZRLEditDeleteProps {
@@ -45,6 +46,7 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
   const [raceSeries, setRaceSeries] = useState('');  // <-- State for the Race Series
   const [captainName, setCaptainName] = useState('');
   const [lookingForRiders, setLookingForRiders] = useState(false);
+  const [teamRoleId, setTeamRoleId] = useState('');
 
   // Map each race series to its possible divisions
   const divisionsMap: { [key: string]: string[] } = {
@@ -74,6 +76,7 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
       setLookingForRiders(team.lookingForRiders || false);
       // If raceSeries is missing in the DB, default to empty string
       setRaceSeries(team.raceSeries || '');
+      setTeamRoleId(team.teamRoleId || '');
     }
   }, [team]);
 
@@ -103,6 +106,7 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
         raceSeries,           // <-- Update Firestore with Race Series
         captainName,
         lookingForRiders,
+        teamRoleId: teamRoleId?.trim?.() || '',
       });
 
       onClose();
@@ -131,54 +135,58 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
   return (
     <Modal isOpen={true} onClose={onClose}>
       <ModalOverlay />
-      <ModalContent>
+      <ModalContent bg='white' color='black'>
         <ModalHeader color="black">Edit Team</ModalHeader>
-        <ModalCloseButton />
+        <ModalCloseButton color="rgba(173, 26, 45, 0.95)" _hover={{ bg: 'rgba(173, 26, 45, 0.10)' }} />
         <ModalBody>
           {/* Team Name */}
           <FormControl id="teamName" mb={4}>
-            <FormLabel color="white">Team Name</FormLabel>
+            <FormLabel color="black">Team Name</FormLabel>
             <Input
               type="text"
               value={newTeamName}
               onChange={(e) => setNewTeamName(e.target.value)}
               placeholder="Enter team name"
               bg="white"
+              color="black"
             />
           </FormControl>
 
           {/* Captain Name */}
           <FormControl id="captainName" mb={4}>
-            <FormLabel color="white">Captain Name</FormLabel>
+            <FormLabel color="black">Captain Name</FormLabel>
             <Input
               type="text"
               value={captainName}
               onChange={(e) => setCaptainName(e.target.value)}
               placeholder="Enter captain's name"
               bg="white"
+              color="black"
             />
           </FormControl>
 
           {/* Ride Time */}
           <FormControl id="rideTime" mb={4}>
-            <FormLabel color="white">Ride Time</FormLabel>
+            <FormLabel color="black">Ride Time</FormLabel>
             <Input
               type="text"
               value={rideTime}
               onChange={(e) => setRideTime(e.target.value)}
               placeholder="HH:MM"
               bg="white"
+              color="black"
             />
           </FormControl>
 
           {/* Race Series */}
           <FormControl id="raceSeries" mb={4}>
-            <FormLabel color="white">Race Series</FormLabel>
+            <FormLabel color="black">Race Series</FormLabel>
             <Select
               placeholder="Select race series"
               value={raceSeries}
               onChange={(e) => setRaceSeries(e.target.value)}
               bg="white"
+              color="black"
             >
               <option value="WTRL ZRL">WTRL ZRL</option>
               <option value="WTRL TTT">WTRL TTT</option>
@@ -190,12 +198,13 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
           {/* Division - only if not Club Ladder */}
           {raceSeries !== 'Club Ladder' && (
             <FormControl id="division" mb={4}>
-              <FormLabel color="white">Division</FormLabel>
+              <FormLabel color="black">Division</FormLabel>
               <Select
                 placeholder="Select division"
                 value={division}
                 onChange={(e) => setDivision(e.target.value)}
                 bg="white"
+                color="black"
               >
                 {availableDivisions.map((div) => (
                   <option key={div} value={div}>
@@ -216,6 +225,19 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
               Looking for riders
             </Checkbox>
           </FormControl>
+
+          {/* Team Role ID (Discord) */}
+          <FormControl id="teamRoleId" mb={4}>
+            <FormLabel color="black">Team Role ID (Discord)</FormLabel>
+            <Input
+              type="text"
+              value={teamRoleId}
+              onChange={(e) => setTeamRoleId(e.target.value)}
+              placeholder="Discord team role ID (numbers only)"
+              bg="white"
+              color="black"
+            />
+          </FormControl>
         </ModalBody>
 
         <ModalFooter>
@@ -226,7 +248,12 @@ const ZRLEditDelete: React.FC<ZRLEditDeleteProps> = ({ team, onClose }) => {
           >
             Update Team
           </Button>
-          <Button variant="ghost" onClick={onClose}>
+          <Button
+            background="rgba(173, 26, 45, 0.95)"
+            color={'white'}
+            _hover={{ background: 'rgba(173, 26, 45, 1)' }}
+            onClick={onClose}
+          >
             Close
           </Button>
         </ModalFooter>
