@@ -33,11 +33,11 @@ import { LiaMountainSolid } from "react-icons/lia";
 import { Im500Px } from "react-icons/im";
 import { AiOutlineAim } from "react-icons/ai";
 import { RiBoxingFill } from "react-icons/ri";
-import { MdOutlineTimer } from "react-icons/md";
+import { MdOutlineTimer, MdManageAccounts } from "react-icons/md";
 import { FaTrophy } from "react-icons/fa6";
 import { MdCalendarMonth, MdInsights } from "react-icons/md";
 import { BsShopWindow } from "react-icons/bs";
-import { MdOutlineDirectionsBike } from "react-icons/md";
+// import { MdOutlineDirectionsBike } from "react-icons/md";
 import { countItems } from '@/components/shop/countItems';
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
@@ -103,7 +103,7 @@ export default function FeaturesMembers() {
         {/*<CustomCard href='members-zone/dzr-team-race' icon = {MdOutlineDirectionsBike} heading = 'DZR Team Race' text1 = 'Join a team race' text2= 'and let the fun begin' />*/}
         <CustomCard href='members-zone/zrl' icon = {FaTrophy} heading = 'DZR Racing Teams' text1 = 'Overview of DZR teams across race series' text2= 'Find a race series and team that suits' />
         {(isAdmin || isCaptain) && (
-          <CustomCard href='members-zone/team-management' icon = {MdOutlineDirectionsBike} heading = 'Team Management' text1 = 'Create and manage your teams' text2= 'Requires Holdkaptajn or Admin' />
+          <CustomCard href='members-zone/team-management' icon = {MdManageAccounts} heading = 'Team Management' text1 = 'Create and manage your teams' text2= 'Captains and admins only' />
         )}
         <CustomCard href='members-zone/stats' icon = {MdInsights} heading = 'Club Stats' text1 = 'Compare riders, ratings and power' text2= 'Time series and power graphs' />
         </SimpleGrid>
