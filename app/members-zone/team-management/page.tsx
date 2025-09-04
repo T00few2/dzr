@@ -24,12 +24,14 @@ import {
   FormControl,
   FormLabel,
   Select,
+  Switch,
 } from '@chakra-ui/react';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
 import ZRLRegister from '@/components/ZRL/ZRLRegister';
 import ZRLEditDelete from '@/components/ZRL/ZRLEditDelete';
 import { auth, db } from '@/app/utils/firebaseConfig';
-import { collection, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import SendMessage from '@/components/discord-bot/SendMessage';
 
 interface Team {
   id?: string;
@@ -220,9 +222,35 @@ export default function TeamManagementPage() {
                   <br />
                   Team role ID: {team.teamRoleId || '(missing)'}
                 </Text>
-                <Stack direction="row" spacing={3} mt={3}>
+                <Stack direction="row" spacing={3} mt={3} align="center">
                   <Button colorScheme="yellow" onClick={() => setEditTeam(team)}>Edit</Button>
                   <Button colorScheme="red" onClick={() => handleDeleteTeam(team.id)}>Delete</Button>
+                </Stack>
+                <Stack direction={{ base: 'column', sm: 'row' }} spacing={3} mt={3} align={{ base: 'flex-start', sm: 'center' }}>
+                  <Text>Looking for riders</Text>
+                  <Switch
+                    colorScheme='green'
+                    isChecked={!!team.lookingForRiders}
+                    onChange={async (e) => {
+                      try {
+                        const checked = e.target.checked;
+                        const teamRef = doc(db, 'teams', team.id!);
+                        await updateDoc(teamRef, { lookingForRiders: checked });
+                        // Optional: send discord message when turning on, mirroring edit modal behavior
+                        if (checked) {
+                          try {
+                            const messageContent =
+                              '🚨BREAKING🚨\n\n' +
+                              '@everyone\n\n' +
+                              `${team.name} leder efter nye ryttere.\n` +
+                              `${team.name} kører ${team.raceSeries || ''} i ${team.division || ''} klokken ${team.rideTime}.`;
+                            await SendMessage('1297934562558611526', messageContent, { mentionEveryone: true });
+                          } catch {}
+                        }
+                        await refreshMembersData();
+                      } catch {}
+                    }}
+                  />
                 </Stack>
                 {team.teamRoleId && (
                   <Box mt={3}>
