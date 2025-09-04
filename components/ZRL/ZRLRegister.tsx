@@ -22,7 +22,7 @@ import SendMessage from '../discord-bot/SendMessage';
 
 interface Team {
   name: string;
-  captainId: string;
+  captainDiscordId: string;
   captainName: string;
   createdAt: string;
   rideTime: string;
@@ -88,7 +88,8 @@ const ZRLRegister = () => {
   const handleTeamRegister = async () => {
     const timeValue = (rideTime || '').trim();
 
-    if (!newTeamName || !auth.currentUser || !timeValue || !raceSeries || !teamRoleId) {
+    const captainDiscordId = (session?.user as any)?.discordId as string | undefined;
+    if (!newTeamName || !captainDiscordId || !timeValue || !raceSeries || !teamRoleId) {
       alert('Please fill in all required fields.');
       return;
     }
@@ -114,8 +115,8 @@ const ZRLRegister = () => {
     try {
       const teamData: Team = {
         name: newTeamName,
-        captainId: auth.currentUser.uid,
-        captainName: captainName || auth.currentUser.displayName || 'Unknown',
+        captainDiscordId,
+        captainName: captainName || (auth.currentUser?.displayName || 'Unknown'),
         createdAt: new Date().toISOString(),
         rideTime: timeValue,
         division: raceSeries === 'Club Ladder' ? '' : division,
@@ -126,7 +127,6 @@ const ZRLRegister = () => {
       await addDoc(collection(db, 'teams'), teamData);
 
       // Notify Discord channel, tagging the captain (the current session user)
-      const captainDiscordId = (session?.user as any)?.discordId as string | undefined;
       const captainDisplay = captainDiscordId ? `<@${captainDiscordId}>` : (teamData.captainName || 'Captain');
       const messageContent = `🆕 Nyt team registreret\n\n**${teamData.name}** er registreret i ${teamData.raceSeries}${teamData.division ? `, division ${teamData.division}` : ''}.\nRace time: ${teamData.rideTime}.\nHoldkaptajn: ${captainDisplay}`;
       await SendMessage('1297934562558611526', messageContent, {

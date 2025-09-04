@@ -21,7 +21,7 @@ import { useSession } from 'next-auth/react';
 
 interface Rider {
   id?: string;
-  userId: string;
+  userDiscordId: string;
   name: string;
   division: string;
   rideTime: string;
@@ -64,7 +64,8 @@ const ZRLRider = () => {
 
   const handleRegisterInterest = async () => {
     // Basic validation
-    if (!rideTime || !auth.currentUser || !division || !raceSeries) {
+    const discordId = (session?.user as any)?.discordId as string | undefined;
+    if (!rideTime || !discordId || !division || !raceSeries) {
       alert('Please complete all fields before submitting.');
       return;
     }
@@ -74,7 +75,7 @@ const ZRLRider = () => {
 
     try {
       const riderData: Rider = {
-        userId: auth.currentUser.uid,
+        userDiscordId: discordId,
         name,
         division,
         rideTime,
@@ -87,7 +88,6 @@ const ZRLRider = () => {
 
       // Post a message to Discord
       const roleId = '1195878349617250405';
-      const discordId = (session?.user as any)?.discordId as string | undefined;
       const riderDisplay = discordId ? `<@${discordId}>` : name;
       const messageContent = `🚴 Ny rytter i gården 🚴\n\n${riderDisplay} er på fri transfer i ${raceSeries}.\nKører gerne ${division} klokken ${rideTime}.\nAttention <@&${roleId}>`;
 

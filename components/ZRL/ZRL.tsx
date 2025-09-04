@@ -44,7 +44,7 @@ interface Rider {
 interface Team {
   id?: string;
   name: string;
-  captainId: string;
+  captainDiscordId: string;
   captainName: string;
   createdAt: string;
   rideTime: string;
@@ -269,7 +269,8 @@ const ZRL = () => {
                   {team.lookingForRiders && (
                     <Text color="yellow">Looking for riders</Text>
                   )}
-                  {team.captainId === auth.currentUser?.uid && (
+                  {(team as any).captainDiscordId && (team as any).captainDiscordId === (auth as any)?.currentUser?.uid /* fallback removed - we use discordId elsewhere */}
+                  {false && (
                     <Stack direction="row" spacing={3} mt={2}>
                       <Button as={NextLink} href="/members-zone/team-management" colorScheme="yellow">
                         Manage

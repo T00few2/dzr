@@ -72,7 +72,7 @@ export default function TeamManagementPage() {
     return () => unsubscribe();
   }, []);
 
-  const myTeams = teams.filter((t) => t.captainId === auth.currentUser?.uid);
+  const myTeams = teams.filter((t) => (t as any).captainDiscordId === (session?.user as any)?.discordId);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   
   useEffect(() => {
