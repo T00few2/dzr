@@ -77,7 +77,7 @@ export default function TeamManagementPage() {
     if (!selectedTeamId && myTeams.length > 0) {
       setSelectedTeamId(myTeams[0].id || null);
     }
-  }, [selectedTeamId, myTeams.length]);
+  }, [selectedTeamId, myTeams]);
   const selectedTeam = myTeams.find(t => t.id === selectedTeamId) || null;
 
   const [riders, setRiders] = useState<RiderRow[]>([]);
@@ -392,7 +392,7 @@ export default function TeamManagementPage() {
                       return (
                         <Box mt={4}>
                           <Heading size='xs' mb={1}>Add rider with Zwift ID</Heading>
-                          <Text fontSize='sm' color='whiteAlpha.800' mb={2}>Paste the rider's Zwift ID and click Add.</Text>
+                          <Text fontSize='sm' color='whiteAlpha.800' mb={2}>Paste the rider&apos;s Zwift ID and click Add.</Text>
                           <Stack direction={{ base: 'column', sm: 'row' }} spacing={3} align={{ base: 'stretch', sm: 'flex-end' }}>
                             <FormControl maxW={{ sm: '280px' }}>
                               <FormLabel m={0} fontSize='sm' color='white'>Zwift ID</FormLabel>
