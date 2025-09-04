@@ -172,7 +172,7 @@ export default function TeamManagementPage() {
       <Box textColor="white">
       <Stack direction="row" justify="space-between" align="center">
         <Heading size="lg">Team Management</Heading>
-        <Button as={Link} href="/members-zone/zrl" variant="outline" colorScheme="gray">
+        <Button as={Link} href="/members-zone/zrl" background='white' color='black' _hover={{ background: 'whiteAlpha.900' }} variant='solid'>
           Back to Teams Overview
         </Button>
       </Stack>
