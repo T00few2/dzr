@@ -13,15 +13,7 @@ export async function GET(req: Request) {
       .filter(Boolean);
     if (riderIds.length === 0) return NextResponse.json({ series: [] });
 
-    // Restrict to riders that have linked zwiftIDs
-    const linkedSnap = await adminDb.collection('discord_users').get();
-    const linkedZwiftIds = new Set<string>();
-    linkedSnap.forEach((d) => {
-      const z = (d.data() as any)?.zwiftID;
-      if (z !== undefined && z !== null && String(z).trim() !== '') linkedZwiftIds.add(String(z));
-    });
-    riderIds = riderIds.filter((id) => linkedZwiftIds.has(String(id)));
-    if (riderIds.length === 0) return NextResponse.json({ series: {} });
+    // Previously restricted to linked ZwiftIDs; now allow any provided rider IDs
 
     // Load last N documents ordered by timestamp desc
     const snap = await adminDb

@@ -4,13 +4,7 @@ import { adminDb } from '@/app/utils/firebaseAdminConfig';
 
 export async function GET() {
   try {
-    // Build set of zwiftIDs that are linked from discord_users
-    const linkedSnap = await adminDb.collection('discord_users').get();
-    const linkedZwiftIds = new Set<string>();
-    linkedSnap.forEach((d) => {
-      const z = (d.data() as any)?.zwiftID;
-      if (z !== undefined && z !== null && String(z).trim() !== '') linkedZwiftIds.add(String(z));
-    });
+    // Previously restricted to linked ZwiftIDs; now include all riders
 
     const snap = await adminDb
       .collection('club_stats')
@@ -26,7 +20,6 @@ export async function GET() {
 
     // Trim rider fields for overview and normalize metrics
     const trimmed = riders
-      .filter((r: any) => linkedZwiftIds.has(String(r?.riderId)))
       .map((r: any) => ({
         riderId: r?.riderId ?? null,
         name: r?.name ?? null,

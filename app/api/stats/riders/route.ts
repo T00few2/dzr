@@ -10,13 +10,7 @@ export async function GET(req: Request) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10) || 50, 200);
     const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
 
-    // Build set of zwiftIDs that are linked from discord_users
-    const linkedSnap = await adminDb.collection('discord_users').get();
-    const linkedZwiftIds = new Set<string>();
-    linkedSnap.forEach((d) => {
-      const z = (d.data() as any)?.zwiftID;
-      if (z !== undefined && z !== null && String(z).trim() !== '') linkedZwiftIds.add(String(z));
-    });
+    // Previously restricted to linked ZwiftIDs; now include all riders
 
     const docId = date || (await getLatestId());
     if (!docId) return NextResponse.json({ total: 0, items: [] });
@@ -25,7 +19,7 @@ export async function GET(req: Request) {
     if (!doc.exists) return NextResponse.json({ total: 0, items: [] });
     const riders: any[] = (doc.data() as any)?.data?.riders || [];
 
-    const filteredBase = riders.filter((r) => linkedZwiftIds.has(String(r?.riderId)));
+    const filteredBase = riders;
     const filtered = q
       ? filteredBase.filter((r) => (r?.name || '').toLowerCase().includes(q))
       : filteredBase;
