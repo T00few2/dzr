@@ -44,6 +44,7 @@ DISCORD_CLIENT_ID=your_client_id
 DISCORD_CLIENT_SECRET=your_client_secret
 DISCORD_GUILD_ID=your_guild_id
 DISCORD_REQUIRED_ROLE_ID=1385216556166025347
+DISCORD_BOT_TOKEN=your_bot_token
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=generate_a_random_secret
 ```
@@ -55,3 +56,16 @@ http://localhost:3000/api/auth/callback/discord
 ```
 
 The `members-zone` routes are protected by middleware that requires the Discord role ID `1385216556166025347`.
+
+## Klubmesterskab (KMS) Signups
+
+KMS signups are role-based. When a user signs up on `members-zone/klubmesterskab`, the API assigns Discord role `1413793742808416377` to that user in the configured guild. Withdrawing removes the role. The signup list is derived from guild members who have that role and cross-referenced with Zwift IDs.
+
+Environment requirements:
+
+```
+DISCORD_GUILD_ID=...
+DISCORD_BOT_TOKEN=...
+```
+
+Ensure the bot has permissions to manage roles and is higher than the KMS role in the role hierarchy.

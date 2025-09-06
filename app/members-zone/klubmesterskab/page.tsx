@@ -128,7 +128,8 @@ export default function KMSpage() {
     <Container maxW={{ base: '95%', md: '6xl' }} py={4} color='white'>
       <Heading size='lg' mb={2}>Klubmesterskab</Heading>
       <Heading size='md' mb={2}>19:30 tirsdag den 28. oktober</Heading>
-      <Text mb={6}>Mere information kommer snart..</Text>
+      <Text mb={2}>Tilmelding/afmelding tildeler eller fjerner Discord-rollen for Klubmesterskab.</Text>
+      <Text mb={6}>Du skal være logget ind via Discord og være medlem af DZR Discord-serveren.</Text>
       {!session?.user ? (
         <Text align='center'>You need to login.</Text>
       ) : (

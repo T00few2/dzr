@@ -21,7 +21,7 @@ type RiderRow = {
   compoundScore?: number | null;
 };
 
-const SIGNUPS_COLLECTION = 'kms_signups';
+const KMS_ROLE_ID = '1413793742808416377';
 
 export async function GET(req: Request) {
   try {
@@ -39,16 +39,45 @@ export async function GET(req: Request) {
     const docData = doc.data() as any;
     const riders: any[] = Array.isArray(docData?.data?.riders) ? docData.data.riders : [];
 
-    // Load signups
-    const signupsSnap = await adminDb.collection(SIGNUPS_COLLECTION).get();
+    // Determine signups from Discord role membership
+    const guildId = process.env.DISCORD_GUILD_ID as string;
+    const botToken = process.env.DISCORD_BOT_TOKEN as string;
+    if (!guildId || !botToken) {
+      return NextResponse.json({ error: 'Missing Discord env (DISCORD_GUILD_ID or DISCORD_BOT_TOKEN)' }, { status: 500 });
+    }
+
+    // Fetch all guild members (paginated) to collect those with the role
+    const roleMemberDiscordIds = new Set<string>();
+    let after: string | undefined = undefined;
+    for (let i = 0; i < 50; i++) {
+      const url = new URL(`https://discord.com/api/v10/guilds/${guildId}/members`);
+      url.searchParams.set('limit', '1000');
+      if (after) url.searchParams.set('after', after);
+      const resp = await fetch(url.toString(), { headers: { Authorization: `Bot ${botToken}` }, cache: 'no-store' });
+      if (!resp.ok) break;
+      const page = (await resp.json()) as any[];
+      for (const m of page) {
+        const did = String(m?.user?.id || '');
+        const roles: string[] = Array.isArray(m?.roles) ? m.roles.map((x: any) => String(x)) : [];
+        if (did && roles.includes(KMS_ROLE_ID)) roleMemberDiscordIds.add(did);
+      }
+      if (page.length < 1000) break;
+      after = page[page.length - 1]?.user?.id;
+      if (!after) break;
+    }
+
+    // Map Discord IDs to ZwiftIDs via discord_users
+    const duSnap = await adminDb.collection('discord_users').get();
     const signedZwiftIds = new Set<string>();
     const signedDiscordIds = new Set<string>();
-    signupsSnap.forEach(d => {
+    duSnap.forEach((d) => {
       const data = d.data() as any;
+      const did = String(data?.discordID ?? d.id);
       const zw = data?.zwiftID != null ? String(data.zwiftID) : '';
-      const did = data?.discordId != null ? String(data.discordId) : d.id;
-      if (zw) signedZwiftIds.add(zw);
-      if (did) signedDiscordIds.add(did);
+      if (did && roleMemberDiscordIds.has(did)) {
+        signedDiscordIds.add(did);
+        if (zw) signedZwiftIds.add(zw);
+      }
     });
 
     // Filter riders to only those that are signed up
@@ -100,22 +129,19 @@ export async function POST(req: Request) {
     const discordId = (token as any)?.discordId as string | undefined;
     if (!discordId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Resolve ZwiftID from discord_users
-    const discordSnap = await adminDb
-      .collection('discord_users')
-      .where('discordID', '==', discordId)
-      .limit(1)
-      .get();
-    if (discordSnap.empty) return NextResponse.json({ error: 'No linked ZwiftID' }, { status: 400 });
-    const zwiftID = String(discordSnap.docs[0].get('zwiftID') || '');
-    if (!zwiftID) return NextResponse.json({ error: 'No linked ZwiftID' }, { status: 400 });
+    // Assign Discord role
+    const guildId = process.env.DISCORD_GUILD_ID as string;
+    const botToken = process.env.DISCORD_BOT_TOKEN as string;
+    if (!guildId || !botToken) {
+      return NextResponse.json({ error: 'Missing Discord env (DISCORD_GUILD_ID or DISCORD_BOT_TOKEN)' }, { status: 500 });
+    }
 
-    // Upsert signup document with discordId as id
-    await adminDb.collection(SIGNUPS_COLLECTION).doc(discordId).set({
-      discordId,
-      zwiftID,
-      createdAt: new Date().toISOString(),
-    }, { merge: true });
+    const addUrl = `https://discord.com/api/v10/guilds/${guildId}/members/${encodeURIComponent(discordId)}/roles/${encodeURIComponent(KMS_ROLE_ID)}`;
+    const resp = await fetch(addUrl, { method: 'PUT', headers: { Authorization: `Bot ${botToken}` } });
+    if (!resp.ok) {
+      const text = await resp.text();
+      return NextResponse.json({ error: `Discord API error (${resp.status}): ${text}` }, { status: 502 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
@@ -129,7 +155,20 @@ export async function DELETE(req: Request) {
     const discordId = (token as any)?.discordId as string | undefined;
     if (!discordId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    await adminDb.collection(SIGNUPS_COLLECTION).doc(discordId).delete();
+    // Remove Discord role
+    const guildId = process.env.DISCORD_GUILD_ID as string;
+    const botToken = process.env.DISCORD_BOT_TOKEN as string;
+    if (!guildId || !botToken) {
+      return NextResponse.json({ error: 'Missing Discord env (DISCORD_GUILD_ID or DISCORD_BOT_TOKEN)' }, { status: 500 });
+    }
+
+    const removeUrl = `https://discord.com/api/v10/guilds/${guildId}/members/${encodeURIComponent(discordId)}/roles/${encodeURIComponent(KMS_ROLE_ID)}`;
+    const resp = await fetch(removeUrl, { method: 'DELETE', headers: { Authorization: `Bot ${botToken}` } });
+    if (!resp.ok) {
+      const text = await resp.text();
+      return NextResponse.json({ error: `Discord API error (${resp.status}): ${text}` }, { status: 502 });
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to withdraw' }, { status: 500 });
