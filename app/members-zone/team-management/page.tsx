@@ -25,6 +25,7 @@ import {
   FormLabel,
   Select,
   Switch,
+  Badge,
 } from '@chakra-ui/react';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
 import ZRLRegister from '@/components/ZRL/ZRLRegister';
@@ -289,7 +290,14 @@ export default function TeamManagementPage() {
                                         <Avatar size='sm' name={profile?.displayName || r.name} src={profile?.avatarUrl} />
                                       </HStack>
                                     </Td>
-                                    <Td color='white'>{profile?.displayName || r.name}</Td>
+                                    <Td color='white'>
+                                      <HStack spacing={2}>
+                                        <Text color='white'>{profile?.displayName || r.name}</Text>
+                                        {profile && (
+                                          <Badge colorScheme='green' variant='subtle' fontSize='0.65rem' title='Zwift ID linked to Discord'>Verified</Badge>
+                                        )}
+                                      </HStack>
+                                    </Td>
                                     <Td color='white'>{r.riderId}</Td>
                                     <Td color='white'>{r.zpCategory ?? '—'}</Td>
                                     <Td color='white'>{r.racingScore != null ? Math.round(r.racingScore) : '—'}</Td>
@@ -348,7 +356,14 @@ export default function TeamManagementPage() {
                                         <Avatar size='sm' name={profile?.displayName || m.displayName} src={profile?.avatarUrl || m.avatarUrl} />
                                       </HStack>
                                     </Td>
-                                    <Td color='white'>{profile?.displayName || m.displayName}</Td>
+                                    <Td color='white'>
+                                      <HStack spacing={2}>
+                                        <Text color='white'>{profile?.displayName || m.displayName}</Text>
+                                        {profile && (
+                                          <Badge colorScheme='green' variant='subtle' fontSize='0.65rem' title='Zwift ID linked to Discord'>Verified</Badge>
+                                        )}
+                                      </HStack>
+                                    </Td>
                                     <Td color='white'>{zid}</Td>
                                     <Td color='white'>—</Td>
                                     <Td color='white'>—</Td>
@@ -542,7 +557,14 @@ export default function TeamManagementPage() {
                                             <Avatar size='sm' name={profile?.displayName || r.name} src={profile?.avatarUrl} />
                                           </HStack>
                                         </Td>
-                                        <Td color='white'>{profile?.displayName || r.name}</Td>
+                                        <Td color='white'>
+                                          <HStack spacing={2}>
+                                            <Text color='white'>{profile?.displayName || r.name}</Text>
+                                            {profile && (
+                                              <Badge colorScheme='green' variant='subtle' fontSize='0.65rem' title='Zwift ID linked to Discord'>Verified</Badge>
+                                            )}
+                                          </HStack>
+                                        </Td>
                                         <Td color='white'>{r.riderId}</Td>
                                         <Td>
                                           <Button

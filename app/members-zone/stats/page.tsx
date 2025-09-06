@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Container, Heading, Stack, Flex, Input, Button, Box, Text, Select, Table, Thead, Tr, Th, Tbody, Td, Checkbox, useToast } from '@chakra-ui/react'
+import { Container, Heading, Stack, Flex, Input, Button, Box, Text, Select, Table, Thead, Tr, Th, Tbody, Td, Checkbox, useToast, Badge } from '@chakra-ui/react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, Label } from 'recharts'
 
 type RiderRow = {
@@ -347,6 +347,9 @@ export default function StatsPage() {
                     <Stack direction='row' align='center' spacing={2}>
                       <Box as='img' src={discordProfiles[String(r.riderId)]?.avatarUrl} alt='' width='20px' height='20px' borderRadius='full' display={discordProfiles[String(r.riderId)]?.avatarUrl ? 'block' : 'none'} />
                       <span>{discordProfiles[String(r.riderId)]?.displayName || r.name}</span>
+                      {discordProfiles[String(r.riderId)] && (
+                        <Badge colorScheme='green' variant='subtle' fontSize='0.65rem' title='Zwift ID linked to Discord'>Verified</Badge>
+                      )}
                     </Stack>
                   </Td>
                   {showZwiftId && (<Td color='white'>{r.riderId ?? '—'}</Td>)}
