@@ -177,6 +177,57 @@ export default function StatsPage() {
     })
   }, [rows, selected, showWkg])
 
+  // Compute dynamic Y domains so axes fit the visible data instead of starting at 0
+  const timeSeriesYDomain = useMemo<[number | 'auto', number | 'auto']>(() => {
+    if (!chartData.length || selected.length === 0) return ['auto', 'auto']
+    const values: number[] = []
+    for (const row of chartData) {
+      for (const { id } of selected) {
+        const v = metric === 'zrs' ? (row as any)[`zrs_${id}`] : (row as any)[`velo_${id}`]
+        if (typeof v === 'number' && !Number.isNaN(v)) values.push(v)
+      }
+    }
+    if (values.length === 0) return ['auto', 'auto']
+    let min = Math.min(...values)
+    let max = Math.max(...values)
+    if (min === max) {
+      const pad = min === 0 ? 1 : Math.max(1, Math.abs(min) * 0.05)
+      min -= pad
+      max += pad
+    } else {
+      const span = max - min
+      const pad = Math.max(1, span * 0.05)
+      min = Math.floor(min - pad)
+      max = Math.ceil(max + pad)
+    }
+    return [min, max]
+  }, [chartData, selected, metric])
+
+  const powerYDomain = useMemo<[number | 'auto', number | 'auto']>(() => {
+    if (!burstChartData.length || selected.length === 0) return ['auto', 'auto']
+    const values: number[] = []
+    for (const row of burstChartData) {
+      for (const { id } of selected) {
+        const v = (row as any)[`r_${id}`]
+        if (typeof v === 'number' && !Number.isNaN(v)) values.push(v)
+      }
+    }
+    if (values.length === 0) return ['auto', 'auto']
+    let min = Math.min(...values)
+    let max = Math.max(...values)
+    if (min === max) {
+      const pad = min === 0 ? (showWkg ? 0.1 : 5) : Math.max(showWkg ? 0.1 : 5, Math.abs(min) * 0.05)
+      min -= pad
+      max += pad
+    } else {
+      const span = max - min
+      const pad = Math.max(showWkg ? 0.1 : 5, span * 0.08)
+      min = Math.floor(min - pad)
+      max = Math.ceil(max + pad)
+    }
+    return [min, max]
+  }, [burstChartData, selected, showWkg])
+
   const copyChartAsImage = async (container: HTMLDivElement | null, filename: string) => {
     try {
       // Wait a frame to ensure latest render
@@ -402,7 +453,7 @@ export default function StatsPage() {
                   <XAxis dataKey='sec' tickFormatter={(v) => `${v}s`} tick={{ fontSize: 12 }}>
                     <Label value='Seconds' position='insideBottom' offset={-6} />
                   </XAxis>
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => showWkg ? v.toFixed(2) : `${v}`}>
+                  <YAxis domain={powerYDomain} tick={{ fontSize: 12 }} tickFormatter={(v: number) => showWkg ? v.toFixed(2) : `${v}`}>
                     <Label value={showWkg ? 'W/kg' : 'Watts'} angle={-90} position='insideLeft' />
                   </YAxis>
                   <Tooltip formatter={(val: any) => showWkg ? (typeof val === 'number' ? val.toFixed(2) : val) : val} labelFormatter={(l: any) => `${l}s`} />
@@ -464,7 +515,7 @@ export default function StatsPage() {
                 <XAxis dataKey='date' tick={{ fontSize: 12 }}>
                   <Label value='Date' position='insideBottom' offset={-6} />
                 </XAxis>
-                <YAxis tick={{ fontSize: 12 }}>
+                <YAxis domain={timeSeriesYDomain} tick={{ fontSize: 12 }}>
                   <Label value={metric === 'zrs' ? 'ZRS' : 'vELO'} angle={-90} position='insideLeft' />
                 </YAxis>
                 <Tooltip />
