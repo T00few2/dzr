@@ -41,7 +41,7 @@ export const metadata: Metadata = {
 }
 
 export default function ASundayInHellPage() {
-  const csvPath = path.join(process.cwd(), 'public', 'a-sunday-in-hell', 'oct25', 'data.txt')
+  const csvPath = path.join(process.cwd(), 'public', 'a-sunday-in-hell', 'oct25', 'data.csv')
   let rows: string[][] = []
   try {
     const file = fs.readFileSync(csvPath, 'utf-8')
