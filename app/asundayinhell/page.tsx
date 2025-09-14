@@ -105,10 +105,15 @@ Points are awarded for each stage, with the overall title going to the rider wit
                 <Tbody>
                   {rows.map((cols, idx) => {
                     const race = cols[0]
-                    const racePass = cols[1]
+                    let racePass = cols[1]
                     const world = cols[2]
                     const route = cols[3]
                     let routeLink = cols[4]
+                    if (racePass) {
+                      racePass = racePass.replace(/^\uFEFF/, '').replace(/^@+/, '').trim()
+                      const m = racePass.match(/\d+/)
+                      racePass = m ? m[0] : ''
+                    }
                     if (routeLink) {
                       // Strip BOM and any accidental prefix chars (e.g., '@')
                       routeLink = routeLink.replace(/^\uFEFF/, '').replace(/^@+/, '').trim()
