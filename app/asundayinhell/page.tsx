@@ -33,6 +33,9 @@ export const metadata: Metadata = {
     images: [
       {
         url: '/a-sunday-in-hell/oct25/Promo.png',
+        width: 1200,
+        height: 630,
+        alt: 'A Sunday in Hell with DZR - Event Promo',
       },
     ],
     type: 'website',
