@@ -44,10 +44,16 @@ export default function ASundayInHellPage() {
   const csvPath = path.join(process.cwd(), 'public', 'a-sunday-in-hell', 'oct25', 'data.txt')
   let rows: string[][] = []
   try {
-    const file = fs.readFileSync(csvPath, 'utf-8')
+    const buf = fs.readFileSync(csvPath)
+    let file = buf.toString('utf8')
+    // If the file isn't UTF-8, fallback to UTF-16LE heuristically
+    const replacementCount = (file.match(/\uFFFD/g) || []).length
+    if (replacementCount > 5) {
+      try { file = buf.toString('utf16le') } catch {}
+    }
     const lines = file.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim().length > 0)
     // Skip header
-    rows = lines.slice(1).map(line => line.split('\t'))
+    rows = lines.slice(1).map(line => line.split('\t').map(c => c.replace(/^\uFEFF/, '').trim()))
   } catch {}
   return (
     <div style={{backgroundColor:'black'}}>
@@ -102,7 +108,11 @@ Points are awarded for each stage, with the overall title going to the rider wit
                     const racePass = cols[1]
                     const world = cols[2]
                     const route = cols[3]
-                    const routeLink = cols[4]
+                    let routeLink = cols[4]
+                    if (routeLink) {
+                      // Strip BOM and any accidental prefix chars (e.g., '@')
+                      routeLink = routeLink.replace(/^\uFEFF/, '').replace(/^@+/, '').trim()
+                    }
                     const laps = cols[5]
                     const km = cols[6]
                     const hm = cols[7]
