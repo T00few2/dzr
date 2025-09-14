@@ -44,16 +44,10 @@ export default function ASundayInHellPage() {
   const csvPath = path.join(process.cwd(), 'public', 'a-sunday-in-hell', 'oct25', 'data.txt')
   let rows: string[][] = []
   try {
-    const buf = fs.readFileSync(csvPath)
-    let file = buf.toString('utf8')
-    // If the file isn't UTF-8, fallback to UTF-16LE heuristically
-    const replacementCount = (file.match(/\uFFFD/g) || []).length
-    if (replacementCount > 5) {
-      try { file = buf.toString('utf16le') } catch {}
-    }
+    const file = fs.readFileSync(csvPath, 'utf-8')
     const lines = file.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim().length > 0)
-    // Skip header
-    rows = lines.slice(1).map(line => line.split('\t').map(c => c.replace(/^\uFEFF/, '').trim()))
+    // CSV with semicolon separator; skip header
+    rows = lines.slice(1).map(line => line.split(';').map(c => c.trim()))
   } catch {}
   return (
     <div style={{backgroundColor:'black'}}>
@@ -105,19 +99,10 @@ Points are awarded for each stage, with the overall title going to the rider wit
                 <Tbody>
                   {rows.map((cols, idx) => {
                     const race = cols[0]
-                    let racePass = cols[1]
+                    const racePass = cols[1]
                     const world = cols[2]
                     const route = cols[3]
-                    let routeLink = cols[4]
-                    if (racePass) {
-                      racePass = racePass.replace(/^\uFEFF/, '').replace(/^@+/, '').trim()
-                      const m = racePass.match(/\d+/)
-                      racePass = m ? m[0] : ''
-                    }
-                    if (routeLink) {
-                      // Strip BOM and any accidental prefix chars (e.g., '@')
-                      routeLink = routeLink.replace(/^\uFEFF/, '').replace(/^@+/, '').trim()
-                    }
+                    const routeLink = cols[4]
                     const laps = cols[5]
                     const km = cols[6]
                     const hm = cols[7]
