@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     siteName: 'DZR',
     images: [
       {
-        url: '/a-sunday-in-hell/sep25/Promo.png',
+        url: '/a-sunday-in-hell/oct25/Promo.png',
       },
     ],
     type: 'website',
@@ -41,13 +41,13 @@ export const metadata: Metadata = {
 }
 
 export default function ASundayInHellPage() {
-  const csvPath = path.join(process.cwd(), 'public', 'a-sunday-in-hell', 'sep25', 'data.csv')
+  const csvPath = path.join(process.cwd(), 'public', 'a-sunday-in-hell', 'oct25', 'data.txt')
   let rows: string[][] = []
   try {
     const file = fs.readFileSync(csvPath, 'utf-8')
     const lines = file.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim().length > 0)
     // Skip header
-    rows = lines.slice(1).map(line => line.split(';'))
+    rows = lines.slice(1).map(line => line.split('\t'))
   } catch {}
   return (
     <div style={{backgroundColor:'black'}}>
@@ -57,7 +57,7 @@ export default function ASundayInHellPage() {
             <Image
               rounded={'md'}
               alt={'A Sunday in Hell with DZR'}
-              src={'/a-sunday-in-hell/sep25/Promo.png'}
+              src={'/a-sunday-in-hell/oct25/Promo.png'}
               objectFit={'contain'}
               width="100%"
               height="auto"
@@ -136,10 +136,10 @@ Points are awarded for each stage, with the overall title going to the rider wit
             <Heading color={'white'} fontSize={'2xl'}>Route Profiles</Heading>
             <Carousel
               cards={[
-                '/a-sunday-in-hell/sep25/The%20iTT.png',
-                '/a-sunday-in-hell/sep25/The%20Sprint.png',
-                '/a-sunday-in-hell/sep25/The%20After%20Party.png',
-                '/a-sunday-in-hell/sep25/The%20Climb.png',
+                '/a-sunday-in-hell/oct25/The%20iTT.png',
+                '/a-sunday-in-hell/oct25/The%20Sprint.png',
+                '/a-sunday-in-hell/oct25/The%20After%20Party.png',
+                '/a-sunday-in-hell/oct25/The%20Climb.png',
               ]}
             />
 
