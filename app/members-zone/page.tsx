@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import FeaturesMembers from "@/components/FeaturesMembers";
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
+import { useRouter } from 'next/navigation';
 import EditProfileModal from '@/components/auth/EditProfileModal'; 
 
 import {
@@ -19,10 +20,16 @@ import {
 
 const MembersZone = () => {
     const { data: session, status } = useSession();
+    const router = useRouter();
     const [isEditProfileModalOpen, setEditProfileModalOpen] = useState(false);
     const [realName, setRealName] = useState<string | null>(null);
 
     useEffect(() => {
+      if (status === 'unauthenticated') {
+        const current = window.location.pathname + window.location.search;
+        router.replace(`/login?callbackUrl=${encodeURIComponent(current)}`);
+        return;
+      }
       async function fetchRealName() {
         try {
           if (!session?.user) return;
@@ -32,8 +39,8 @@ const MembersZone = () => {
           if (data?.displayName) setRealName(data.displayName);
         } catch {}
       }
-      fetchRealName();
-    }, [session?.user]);
+      if (status === 'authenticated') fetchRealName();
+    }, [session?.user, status, router]);
 
     if (status === 'loading') {
         return  <LoadingSpinnerMemb/>; // Show loading while checking auth

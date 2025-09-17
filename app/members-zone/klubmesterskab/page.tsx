@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { Container, Heading, Box, Text, Button, Table, Thead, Tr, Th, Tbody, Td, Spinner, useToast, Flex } from '@chakra-ui/react';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
 
@@ -26,6 +27,7 @@ type RiderRow = {
 export default function KMSpage() {
   const { data: session, status } = useSession();
   const toast = useToast();
+  const router = useRouter();
 
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<RiderRow[]>([]);
@@ -48,7 +50,18 @@ export default function KMSpage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (status === 'authenticated') {
+      load();
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      const current = window.location.pathname + window.location.search;
+      router.replace(`/login?callbackUrl=${encodeURIComponent(current)}`);
+    }
+  }, [status, router]);
 
   useEffect(() => {
     const loadProfiles = async () => {
