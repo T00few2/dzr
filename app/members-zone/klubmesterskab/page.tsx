@@ -34,6 +34,7 @@ export default function KMSpage() {
   const [currentUserSignedUp, setCurrentUserSignedUp] = useState(false);
   const [discordProfiles, setDiscordProfiles] = useState<Record<string, { displayName: string; avatarUrl?: string }>>({});
   const [sort, setSort] = useState<{ key: keyof RiderRow; dir: 'asc' | 'desc' }>({ key: 'name', dir: 'asc' });
+  const [signedZwiftIds, setSignedZwiftIds] = useState<string[]>([]);
 
   const load = async () => {
     try {
@@ -41,7 +42,42 @@ export default function KMSpage() {
       const res = await fetch('/api/kms/signups', { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Failed to load');
-      setRows(data?.items || []);
+      const items: RiderRow[] = Array.isArray(data?.items) ? data.items : [];
+      const signed: string[] = Array.isArray(data?.signedZwiftIds) ? data.signedZwiftIds.map(String) : [];
+      setSignedZwiftIds(signed);
+      const baseIdSet = new Set(items.map(r => String(r.riderId)));
+      const extras: RiderRow[] = signed
+        .filter(zid => !baseIdSet.has(String(zid)))
+        .map(zid => ({
+          riderId: Number(zid) || 0,
+          name: String(zid),
+          country: undefined,
+          zpCategory: undefined,
+          racingScore: null,
+          veloRating: null,
+          max30Rating: null,
+          max90Rating: null,
+          zpFTP: null,
+          phenotype: null,
+          weight: null,
+          w5: null,
+          w15: null,
+          w30: null,
+          w60: null,
+          w120: null,
+          w300: null,
+          w1200: null,
+          wkg5: null,
+          wkg15: null,
+          wkg30: null,
+          wkg60: null,
+          wkg120: null,
+          wkg300: null,
+          wkg1200: null,
+          cp: null,
+          compoundScore: null,
+        }));
+      setRows([...items, ...extras]);
       setCurrentUserSignedUp(Boolean(data?.currentUserSignedUp));
     } catch (err: any) {
       toast({ title: 'Failed to load signups', description: err?.message, status: 'error', position: 'top-right' });
@@ -197,7 +233,9 @@ export default function KMSpage() {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {sortedRows.map(r => (
+                  {sortedRows.map(r => {
+                    const hasStats = Boolean(r.veloRating != null || r.racingScore != null || r.zpFTP != null || r.cp != null || r.compoundScore != null);
+                    return (
                     <Tr key={r.riderId}>
                       <Td color='white'>
                         <Flex align='center' gap={2}>
@@ -205,32 +243,33 @@ export default function KMSpage() {
                           <span>{discordProfiles[String(r.riderId)]?.displayName || r.name}</span>
                         </Flex>
                       </Td>
-                      <Td color='white'>{r.phenotype ?? '—'}</Td>
-                      <Td color='white'>{r.zpCategory ?? '—'}</Td>
-                      <Td color='white'>{r.racingScore != null ? Math.round(r.racingScore) : '—'}</Td>
-                      <Td color='white'>{r.veloRating != null ? Math.round(r.veloRating) : '—'}</Td>
-                      <Td color='white'>{r.max30Rating != null ? Math.round(r.max30Rating) : '—'}</Td>
-                      <Td color='white'>{r.max90Rating != null ? Math.round(r.max90Rating) : '—'}</Td>
-                      <Td color='white'>{r.zpFTP != null ? Math.round(r.zpFTP) : '—'}</Td>
-                      <Td color='white'>{r.cp != null ? Math.round(r.cp) : '—'}</Td>
-                      <Td color='white'>{r.compoundScore != null ? Math.round(r.compoundScore) : '—'}</Td>
-                      <Td color='white'>{r.w5 ?? '—'}</Td>
-                      <Td color='white'>{r.w15 ?? '—'}</Td>
-                      <Td color='white'>{r.w30 ?? '—'}</Td>
-                      <Td color='white'>{r.w60 ?? '—'}</Td>
-                      <Td color='white'>{r.w120 ?? '—'}</Td>
-                      <Td color='white'>{r.w300 ?? '—'}</Td>
-                      <Td color='white'>{r.w1200 ?? '—'}</Td>
-                      <Td color='white'>{r.wkg5 != null ? r.wkg5.toFixed(2) : '—'}</Td>
-                      <Td color='white'>{r.wkg15 != null ? r.wkg15.toFixed(2) : '—'}</Td>
-                      <Td color='white'>{r.wkg30 != null ? r.wkg30.toFixed(2) : '—'}</Td>
-                      <Td color='white'>{r.wkg60 != null ? r.wkg60.toFixed(2) : '—'}</Td>
-                      <Td color='white'>{r.wkg120 != null ? r.wkg120.toFixed(2) : '—'}</Td>
-                      <Td color='white'>{r.wkg300 != null ? r.wkg300.toFixed(2) : '—'}</Td>
-                      <Td color='white'>{r.wkg1200 != null ? r.wkg1200.toFixed(2) : '—'}</Td>
-                      <Td color='white'>{r.weight ?? '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.phenotype ?? '—') : 'Husk at vælg DZR som klub på ZwiftPower'}</Td>
+                      <Td color='white'>{hasStats ? (r.zpCategory ?? '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.racingScore != null ? Math.round(r.racingScore) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.veloRating != null ? Math.round(r.veloRating) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.max30Rating != null ? Math.round(r.max30Rating) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.max90Rating != null ? Math.round(r.max90Rating) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.zpFTP != null ? Math.round(r.zpFTP) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.cp != null ? Math.round(r.cp) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.compoundScore != null ? Math.round(r.compoundScore) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.w5 ?? '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.w15 ?? '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.w30 ?? '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.w60 ?? '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.w120 ?? '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.w300 ?? '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.w1200 ?? '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.wkg5 != null ? r.wkg5.toFixed(2) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.wkg15 != null ? r.wkg15.toFixed(2) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.wkg30 != null ? r.wkg30.toFixed(2) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.wkg60 != null ? r.wkg60.toFixed(2) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.wkg120 != null ? r.wkg120.toFixed(2) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.wkg300 != null ? r.wkg300.toFixed(2) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.wkg1200 != null ? r.wkg1200.toFixed(2) : '—') : '—'}</Td>
+                      <Td color='white'>{hasStats ? (r.weight ?? '—') : '—'}</Td>
                     </Tr>
-                  ))}
+                    )
+                  })}
                 </Tbody>
               </Table>
             </Box>

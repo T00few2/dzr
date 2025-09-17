@@ -28,17 +28,6 @@ export async function GET(req: Request) {
     const token = await getToken({ req: req as any, secret: process.env.NEXTAUTH_SECRET });
     const discordId = (token as any)?.discordId as string | undefined;
 
-    // Load latest club stats
-    const snap = await adminDb
-      .collection('club_stats')
-      .orderBy('timestamp', 'desc')
-      .limit(1)
-      .get();
-    if (snap.empty) return NextResponse.json({ items: [], total: 0, date: null, currentUserSignedUp: false });
-    const doc = snap.docs[0];
-    const docData = doc.data() as any;
-    const riders: any[] = Array.isArray(docData?.data?.riders) ? docData.data.riders : [];
-
     // Determine signups from Discord role membership
     const guildId = process.env.DISCORD_GUILD_ID as string;
     const botToken = process.env.DISCORD_BOT_TOKEN as string;
@@ -80,6 +69,21 @@ export async function GET(req: Request) {
       }
     });
 
+    // Load latest club stats (after we know who signed up)
+    const snap = await adminDb
+      .collection('club_stats')
+      .orderBy('timestamp', 'desc')
+      .limit(1)
+      .get();
+    let riders: any[] = [];
+    let date: string | null = null;
+    if (!snap.empty) {
+      const doc = snap.docs[0];
+      const docData = doc.data() as any;
+      riders = Array.isArray(docData?.data?.riders) ? docData.data.riders : [];
+      date = doc.id;
+    }
+
     // Filter riders to only those that are signed up
     const items: RiderRow[] = riders
       .filter((r: any) => signedZwiftIds.has(String(r?.riderId)))
@@ -117,7 +121,8 @@ export async function GET(req: Request) {
       }));
 
     const currentUserSignedUp = discordId ? signedDiscordIds.has(discordId) : false;
-    return NextResponse.json({ items, total: items.length, date: doc.id, currentUserSignedUp });
+    const signedZwiftIdsArr = Array.from(signedZwiftIds);
+    return NextResponse.json({ items, total: items.length, date, currentUserSignedUp, signedZwiftIds: signedZwiftIdsArr });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to load signups' }, { status: 500 });
   }
