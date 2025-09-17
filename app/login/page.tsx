@@ -28,10 +28,11 @@ const REQUIRED_ROLE_ID = '1385216556166025347';
 function LoginContent() {
   const searchParams = useSearchParams();
   const urlError = searchParams?.get('error');
+  const callbackUrl = searchParams?.get('callbackUrl') || '/members-zone';
   const [isRoleModalOpen, setRoleModalOpen] = useState(false);
 
   const handleSignInDiscord = async () => {
-    await signIn('discord', { callbackUrl: '/members-zone' });
+    await signIn('discord', { callbackUrl });
   };
 
   const showMissingRole = urlError === 'AccessDenied';

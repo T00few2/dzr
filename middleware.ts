@@ -15,6 +15,9 @@ export async function middleware(req: NextRequest) {
 		const url = req.nextUrl.clone();
 		url.pathname = '/login';
 		url.searchParams.delete('error');
+		// Preserve intended destination so we can return after login
+		const callback = req.nextUrl.pathname + req.nextUrl.search;
+		url.searchParams.set('callbackUrl', callback);
 		return NextResponse.redirect(url);
 	}
 
@@ -24,6 +27,8 @@ export async function middleware(req: NextRequest) {
 		const url = req.nextUrl.clone();
 		url.pathname = '/login';
 		url.searchParams.set('error', 'AccessDenied');
+		const callback = req.nextUrl.pathname + req.nextUrl.search;
+		url.searchParams.set('callbackUrl', callback);
 		return NextResponse.redirect(url);
 	}
 
@@ -43,6 +48,8 @@ export async function middleware(req: NextRequest) {
 		const url = req.nextUrl.clone();
 		url.pathname = '/login';
 		url.searchParams.set('error', 'AccessDenied');
+		const callback = req.nextUrl.pathname + req.nextUrl.search;
+		url.searchParams.set('callbackUrl', callback);
 		return NextResponse.redirect(url);
 	}
 
