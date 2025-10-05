@@ -171,14 +171,12 @@ Points are awarded for each stage, with the overall title going to the rider wit
                   <Tr>
                     <Th textAlign="center" textColor={'white'}>Segment</Th>
                     <Th textAlign="center" textColor={'white'}>Lap Banner</Th>
-                    <Th textAlign="center" textColor={'white'}>Prime Sprint</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
                   <Tr>
                     <Td textAlign="center">Laps</Td>
-                    <Td textAlign="center">2 , 6</Td>
-                    <Td textAlign="center">4 , 8</Td>
+                    <Td textAlign="center">1, 3, 5</Td>
                   </Tr>
                 </Tbody>
               </Table>
