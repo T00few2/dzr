@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     siteName: 'DZR',
     images: [
       {
-        url: 'https://www.dzrracingseries.com/a-sunday-in-hell/oct25/Promo.png',
+        url: 'https://www.dzrracingseries.com/a-sunday-in-hell/nov25/Promo.png',
         width: 1200,
         height: 630,
         alt: 'A Sunday in Hell with DZR - Event Promo',
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
 }
 
 export default function ASundayInHellPage() {
-  const csvPath = path.join(process.cwd(), 'public', 'a-sunday-in-hell', 'oct25', 'data.csv')
+  const csvPath = path.join(process.cwd(), 'public', 'a-sunday-in-hell', 'nov25', 'data.csv')
   let rows: string[][] = []
   try {
     const file = fs.readFileSync(csvPath, 'utf-8')
@@ -61,7 +61,7 @@ export default function ASundayInHellPage() {
             <Image
               rounded={'md'}
               alt={'A Sunday in Hell with DZR'}
-              src={'/a-sunday-in-hell/oct25/Promo.png'}
+              src={'/a-sunday-in-hell/nov25/Promo.png'}
               objectFit={'contain'}
               width="100%"
               height="auto"
@@ -140,10 +140,10 @@ Points are awarded for each stage, with the overall title going to the rider wit
             <Heading color={'white'} fontSize={'2xl'}>Route Profiles</Heading>
             <Carousel
               cards={[
-                '/a-sunday-in-hell/oct25/The%20iTT.png',
-                '/a-sunday-in-hell/oct25/The%20Sprint.png',
-                '/a-sunday-in-hell/oct25/The%20After%20Party.png',
-                '/a-sunday-in-hell/oct25/The%20Climb.png',
+                '/a-sunday-in-hell/nov25/The%20iTT.png',
+                '/a-sunday-in-hell/nov25/The%20Sprint.png',
+                '/a-sunday-in-hell/nov25/The%20After%20Party.png',
+                '/a-sunday-in-hell/nov25/The%20Climb.png',
               ]}
             />
 
