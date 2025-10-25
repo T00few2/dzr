@@ -334,8 +334,8 @@ export const ZwiftyFiftyRacesData = [
     length: '54.4',
     hm: '359',
     climbs: ['Petit KOM'],
-    sprints: ['Aqueduc KOM','Sprint du Cratère','Sprinteur Sprint','Petit KOM'],
-    sprintLaps: ['1','1','2','1'],
-    bonus: ['3','2','1'],
+    sprints: ['Petit KOM'],
+    sprintLaps: ['1'],
+    bonus: ['6','4','2'],
   }),
 ];
