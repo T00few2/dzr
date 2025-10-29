@@ -299,4 +299,13 @@ export const AfterPartyRacesData = [
       finish: 'Blue banner on top of Temple KOM',
       linkRoute: 'https://zwiftinsider.com/route/shisa-shakedown/',
     }),
+    new AfterPartyRacesTemplate({
+      route: 'Green To Screen',
+      world: 'New York',
+      laps: '1+',
+      distance: '38.581',
+      elevation: '290',
+      finish: 'Banner second time on Manhattan Sprint',
+      linkRoute: 'https://zwiftinsider.com/route/green-to-screen/',
+    }),
 ];
