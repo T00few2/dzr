@@ -345,9 +345,9 @@ export const ZwiftyFiftyRacesData = [
     laps: '1',
     length: '79',
     hm: '838',
-    climbs: ['NY KOM Reverse'],
-    sprints: ['NY KOM Reverse','Brooklyn Bridge KOM'],
+    climbs: ['New York KOM Reverse'],
+    sprints: ['New York KOM Reverse','Brooklyn Bridge KOM'],
     sprintLaps: ['1','1'],
-    bonus: ['4','2','1'],
+    bonus: ['3','2','1'],
   }),
 ];
