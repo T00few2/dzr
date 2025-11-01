@@ -338,4 +338,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1'],
     bonus: ['6','4','2'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Fuhgeddaboudit',
+    world: 'New York',
+    linkRoute: 'https://zwiftinsider.com/route/fuhgeddaboudit/',
+    laps: '1',
+    length: '79',
+    hm: '838',
+    climbs: ['NY KOM Reverse'],
+    sprints: ['NY KOM Reverse','Brooklyn Bridge KOM'],
+    sprintLaps: ['1','1'],
+    bonus: ['4','2','1'],
+  }),
 ];
