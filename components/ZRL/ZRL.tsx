@@ -138,18 +138,35 @@ const ZRL = () => {
   const [currentRider, setCurrentRider] = useState<Rider | null>(null);
 
   // -------------------------------------------------------
-  // LISTEN FOR TEAMS
+  // LOAD TEAMS FROM BACKEND-MANAGED ROLES
   // -------------------------------------------------------
   useEffect(() => {
-    const teamsRef = collection(db, 'teams');
-    const unsubscribe = onSnapshot(teamsRef, (snapshot) => {
-      const teamsList = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      })) as Team[];
-      setTeams(teamsList);
-    });
-    return () => unsubscribe();
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/stats/captain-roles', { cache: 'no-store' });
+        const data = await res.json();
+        const roles: any[] = Array.isArray(data?.roles) ? data.roles : [];
+        // Derive Team[] from roles marked as team roles
+        const teamRows: Team[] = roles
+          .filter((r: any) => !!r?.isTeamRole)
+          .map((r: any) => ({
+            id: String(r.roleId),
+            name: String(r.teamName || r.roleName || r.roleId),
+            captainDiscordId: r.teamCaptainId ? String(r.teamCaptainId) : '',
+            captainName: r.captainDisplayName ? String(r.captainDisplayName) : '',
+            createdAt: '',
+            rideTime: r.rideTime ? String(r.rideTime) : '',
+            division: r.division ? String(r.division) : '',
+            raceSeries: r.raceSeries ? String(r.raceSeries) : undefined,
+            lookingForRiders: !!r.lookingForRiders,
+            teamRoleId: String(r.roleId),
+          }));
+        if (!cancelled) setTeams(teamRows);
+      } catch {}
+    };
+    load();
+    return () => { cancelled = true; };
   }, []);
 
   // -------------------------------------------------------

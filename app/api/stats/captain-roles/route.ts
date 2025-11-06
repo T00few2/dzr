@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
 
-type RoleDef = { roleId: string; roleName?: string; teamCaptainId?: string | boolean | null };
+type RoleDef = { roleId: string; roleName?: string; teamCaptainId?: string | boolean | null; raw?: any };
 
 async function fetchAllGuildMembers(guildId: string, botToken: string) {
   const members: any[] = [];
@@ -51,12 +51,12 @@ export async function GET() {
     let roleDefs: RoleDef[] = [];
     if (Array.isArray(rolesNode)) {
       roleDefs = rolesNode
-        .map((r: any) => ({ roleId: String(r?.roleId ?? r?.id ?? ''), roleName: r?.roleName ?? r?.name, teamCaptainId: r?.teamCaptainId }))
+        .map((r: any) => ({ roleId: String(r?.roleId ?? r?.id ?? ''), roleName: r?.roleName ?? r?.name, teamCaptainId: r?.teamCaptainId, raw: r }))
         .filter((r: RoleDef) => r.roleId);
     } else if (rolesNode && typeof rolesNode === 'object') {
       roleDefs = Object.values(rolesNode)
         .filter((r: any) => r && (r.roleId || r.id))
-        .map((r: any) => ({ roleId: String(r.roleId ?? r.id), roleName: r.roleName ?? r.name, teamCaptainId: r.teamCaptainId }));
+        .map((r: any) => ({ roleId: String(r.roleId ?? r.id), roleName: r.roleName ?? r.name, teamCaptainId: r.teamCaptainId, raw: r }));
     }
 
     const captainRoles = roleDefs.filter((r) => r.teamCaptainId);
@@ -90,7 +90,23 @@ export async function GET() {
     const out = captainRoles.map((r) => {
       const dids = Array.from(roleIdToDiscordIds.get(r.roleId) || []);
       const zwiftIds = dids.map((id) => discordToZwift.get(id)).filter((x): x is string => Boolean(x));
-      return { roleId: r.roleId, roleName: r.roleName ?? r.roleId, zwiftIds };
+      const raw = (r as any).raw || {};
+      return {
+        roleId: r.roleId,
+        roleName: r.roleName ?? r.roleId,
+        zwiftIds,
+        // expose team metadata from backend-managed roles
+        isTeamRole: !!raw.isTeamRole,
+        teamName: raw.teamName ?? r.roleName ?? r.roleId,
+        raceSeries: raw.raceSeries ?? null,
+        division: raw.division ?? null,
+        rideTime: raw.rideTime ?? null,
+        lookingForRiders: !!raw.lookingForRiders,
+        sortIndex: typeof raw.sortIndex === 'number' ? raw.sortIndex : 0,
+        visibility: raw.visibility ?? 'public',
+        teamCaptainId: r.teamCaptainId ?? null,
+        captainDisplayName: raw.captainDisplayName ?? null,
+      };
     });
 
     // 5) Build profiles for all guild members that have a linked ZwiftID

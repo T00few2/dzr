@@ -28,11 +28,8 @@ import {
   Badge,
 } from '@chakra-ui/react';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
-import ZRLRegister from '@/components/ZRL/ZRLRegister';
-import ZRLEditDelete from '@/components/ZRL/ZRLEditDelete';
-import { auth, db } from '@/app/utils/firebaseConfig';
-import { collection, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import SendMessage from '@/components/discord-bot/SendMessage';
+// Teams are derived from backend-managed roles; Firestore 'teams' is no longer used
 
 interface Team {
   id?: string;
@@ -61,17 +58,7 @@ export default function TeamManagementPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [editTeam, setEditTeam] = useState<Team | null>(null);
 
-  useEffect(() => {
-    const teamsRef = collection(db, 'teams');
-    const unsubscribe = onSnapshot(teamsRef, (snapshot) => {
-      const teamsList = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      })) as Team[];
-      setTeams(teamsList);
-    });
-    return () => unsubscribe();
-  }, []);
+  // Teams are loaded from backend-managed roles in the loader below
 
   const isAdmin = Boolean((session?.user as any)?.isAdmin);
   const myTeams = isAdmin ? teams : teams.filter((t) => (t as any).captainDiscordId === (session?.user as any)?.discordId);
@@ -117,6 +104,24 @@ export default function TeamManagementPage() {
           setCaptainRoles(
             roles.map(r => ({ roleId: String(r.roleId), roleName: r.roleName || String(r.roleId), zwiftIds: Array.isArray(r.zwiftIds) ? r.zwiftIds.map(String) : [] }))
           );
+          // Build teams from roles metadata
+          const teamRows: Team[] = (roles as any[])
+            .filter((r) => !!r?.isTeamRole)
+            .map((r: any) => ({
+              id: String(r.roleId),
+              name: String(r.teamName || r.roleName || r.roleId),
+              captainId: '',
+              captainName: r.captainDisplayName ? String(r.captainDisplayName) : '',
+              createdAt: '',
+              rideTime: r.rideTime ? String(r.rideTime) : '',
+              division: r.division ? String(r.division) : '',
+              raceSeries: r.raceSeries ? String(r.raceSeries) : undefined,
+              lookingForRiders: !!r.lookingForRiders,
+              teamRoleId: String(r.roleId),
+              // used for myTeams filtering
+              ...(r.teamCaptainId ? { captainDiscordId: String(r.teamCaptainId) } : {}),
+            }));
+          setTeams(teamRows);
           const profilesArr: { zwiftId: string; displayName?: string; avatarUrl?: string; discordId?: string }[] = rolesJson?.profiles || [];
           const map: Record<string, { displayName: string; avatarUrl?: string; discordId?: string }> = {};
           profilesArr.forEach((p) => { if (p.zwiftId) map[String(p.zwiftId)] = { displayName: p.displayName || '', avatarUrl: p.avatarUrl, discordId: p.discordId }; });
@@ -151,15 +156,7 @@ export default function TeamManagementPage() {
     finally { setDataLoading(false); }
   };
 
-  const handleDeleteTeam = async (teamId?: string) => {
-    if (!teamId) return;
-    try {
-      const teamRef = doc(db, 'teams', teamId);
-      await deleteDoc(teamRef);
-    } catch (e) {
-      console.error('Failed to delete team', e);
-    }
-  };
+  // Deletion and metadata edits are handled in backend admin UI
 
   if (status === 'loading') {
     return <LoadingSpinnerMemb/>;
@@ -185,13 +182,11 @@ export default function TeamManagementPage() {
 
       <Divider my={6} />
 
-      <Heading size="md" mb={2}>Create a new team</Heading>
+      <Heading size="md" mb={2}>Team setup</Heading>
       {dataLoading && (<Text color='whiteAlpha.700' mb={2}>Loading…</Text>)}
       <Text color='whiteAlpha.900' mb={3}>
-        To create a team, you need the Team Role ID from a Discord admin. Ask an admin for the
-        Discord role ID that represents your team.
+        Team creation and metadata edits are now managed in the Admin Role Management UI.
       </Text>
-      <ZRLRegister />
 
       <Divider my={6} />
 
@@ -224,36 +219,7 @@ export default function TeamManagementPage() {
                   <br />
                   Team role ID: {team.teamRoleId || '(missing)'}
                 </Text>
-                <Stack direction="row" spacing={3} mt={3} align="center">
-                  <Button colorScheme="yellow" onClick={() => setEditTeam(team)}>Edit</Button>
-                  <Button colorScheme="red" onClick={() => handleDeleteTeam(team.id)}>Delete</Button>
-                </Stack>
-                <Stack direction={{ base: 'column', sm: 'row' }} spacing={3} mt={3} align={{ base: 'flex-start', sm: 'center' }}>
-                  <Text>Looking for riders</Text>
-                  <Switch
-                    colorScheme='green'
-                    isChecked={!!team.lookingForRiders}
-                    onChange={async (e) => {
-                      try {
-                        const checked = e.target.checked;
-                        const teamRef = doc(db, 'teams', team.id!);
-                        await updateDoc(teamRef, { lookingForRiders: checked });
-                        // Optional: send discord message when turning on, mirroring edit modal behavior
-                        if (checked) {
-                          try {
-                            const messageContent =
-                              '🚨BREAKING🚨\n\n' +
-                              '@everyone\n\n' +
-                              `${team.name} leder efter nye ryttere.\n` +
-                              `${team.name} kører ${team.raceSeries || ''} i ${team.division || ''} klokken ${team.rideTime}.`;
-                            await SendMessage('1297934562558611526', messageContent, { mentionEveryone: true });
-                          } catch {}
-                        }
-                        await refreshMembersData();
-                      } catch {}
-                    }}
-                  />
-                </Stack>
+                {/* Metadata edits moved to backend UI; no edit/delete/toggle here */}
                 {team.teamRoleId && (
                   <Box mt={3}>
                     <Divider my={2} borderColor='whiteAlpha.300' />
@@ -615,12 +581,7 @@ export default function TeamManagementPage() {
         </>
       )}
 
-      {editTeam && (
-        <ZRLEditDelete
-          team={editTeam}
-          onClose={() => setEditTeam(null)}
-        />
-      )}
+      {/* Team metadata is edited in backend admin UI */}
       </Box>
     </Container>
   );
