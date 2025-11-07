@@ -40,7 +40,7 @@ export default function HeroSection() {
 
         <Heading
           lineHeight={'150%'}
-          py={5}
+          py={50}
           display={{ base: 'block', sm: 'block', md: 'block' }}><DZR_logo/></Heading>
         <DZR_slogan />
         <Stack direction={'row'} spacing={6}>

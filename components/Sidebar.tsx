@@ -2,7 +2,6 @@
 
 import {
   IconButton,
-  Avatar,
   Box,
   CloseButton,
   Flex,
@@ -36,6 +35,8 @@ import {
   FiMenu,
   FiBell,
   FiChevronDown,
+  FiLogOut,
+  FiLogIn,
 } from 'react-icons/fi'
 import { HamburgerIcon } from '@chakra-ui/icons'
 import { LiaMountainSolid } from "react-icons/lia";
@@ -48,6 +49,8 @@ import { RiBoxingFill } from "react-icons/ri";
 import { MdOutlineTimer } from "react-icons/md";
 import { GiDevilMask } from "react-icons/gi";
 import Sparkles from 'react-sparkle'
+import { useSession, signIn, signOut } from 'next-auth/react'
+import { FaUserCircle, FaUser } from 'react-icons/fa'
 
 interface LinkItemProps {
   name: string
@@ -149,16 +152,85 @@ const NavItem = ({ icon, children, href, ...rest }: NavItemProps) => {
   )
 }
 
+// Match left sidebar item styling for the profile drawer
+const ProfileNavItem = ({ children, href, onClick, icon }: { children: React.ReactNode; href?: string; onClick?: () => void; icon?: IconType }) => {
+  const commonProps = {
+    style: { textDecoration: 'none' as const },
+  }
+  if (href) {
+    return (
+      <Box as="a" href={href} display={'block'} w={'100%'} {...commonProps}>
+        <Flex
+          align="center"
+          p="4"
+          mx="4"
+          borderRadius="lg"
+          role="group"
+          cursor="pointer"
+          color={'white'}
+          fontWeight="900"
+          w={'calc(100% - 2rem)'}
+          _hover={{ bg: 'white', color: 'black' }}
+        >
+          {icon && (
+            <Icon
+              mr="4"
+              fontSize="16"
+              _groupHover={{ color: 'black' }}
+              as={icon}
+            />
+          )}
+          {children}
+        </Flex>
+      </Box>
+    )
+  }
+  return (
+    <Box as="button" onClick={onClick} display={'block'} w={'100%'} {...commonProps}>
+      <Flex
+        align="center"
+        p="4"
+        mx="4"
+        borderRadius="lg"
+        role="group"
+        cursor="pointer"
+        color={'white'}
+        fontWeight="900"
+        w={'calc(100% - 2rem)'}
+        _hover={{ bg: 'white', color: 'black' }}
+      >
+        {icon && (
+          <Icon
+            mr="4"
+            fontSize="16"
+            _groupHover={{ color: 'black' }}
+            as={icon}
+          />
+        )}
+        {children}
+      </Flex>
+    </Box>
+  )
+}
+
 const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
+  const { data: session } = useSession()
+  const { isOpen: isProfileOpen, onOpen: openProfile, onClose: closeProfile } = useDisclosure()
   return (
     <Flex
       ml={0}
       px={4}
       height="20"
       alignItems="center"
+      position={'fixed'}
+      top={0}
+      left={0}
+      right={0}
+      bg={'transparent'}
+      zIndex={10}
       
-      borderBottomWidth="1px"
-      borderBottomColor={('black')}
+      borderBottomWidth="0px"
+      borderBottomColor={('transparent')}
       
       justifyContent={'space-between'}
       
@@ -173,8 +245,7 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
         borderColor={'black'}
         color={'white'}
         icon={<HamburgerIcon />}
-        zIndex={20}
-        position={'fixed'}
+        zIndex={10}
         _hover={{ bg: 'gray.700', borderColor: 'gray.700' }}
         fontSize={{base:"34px", md:"44px"}}
         fontWeight = '900'
@@ -188,6 +259,56 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
           />
   */}
       
+      <HStack spacing={{ base: '2', md: '6' }}>
+        <IconButton
+          display={'flex'}
+          aria-label="open profile menu"
+          onClick={openProfile}
+          variant="outline"
+          bg={('black')}
+          borderColor={'black'}
+          color={'white'}
+          icon={<Icon as={FaUserCircle} />}
+          zIndex={10}
+          _hover={{ bg: 'gray.700', borderColor: 'gray.700' }}
+          fontSize={{base:"34px", md:"44px"}}
+          fontWeight = '900'
+        />
+      </HStack>
+      <Drawer
+        isOpen={isProfileOpen}
+        placement="right"
+        onClose={closeProfile}
+        returnFocusOnClose={true}
+        onOverlayClick={closeProfile}
+        closeOnOverlayClick={true}
+        size={'xs'}
+      >
+        <DrawerOverlay bg="rgba(173, 26, 45, 0.95)" />
+        <DrawerContent bg={'black'}>
+          <Box h="full" color={'white'}>
+            <Flex h="20" alignItems="center" mx="8" justifyContent="space-between">
+              <Link href='/'><Image 
+                  display={'flex'}
+                  boxSize='50px' 
+                  src='/general/DZR_logo.svg' 
+                  alt='DZR logo' 
+                  rounded={'md'}
+                  />
+              </Link>
+              <CloseButton display={'flex'} onClick={closeProfile} color = 'white' size={'s'}/>
+            </Flex>
+            {session ? (
+              <>
+                <ProfileNavItem href="/members-zone/profile" icon={FaUser}>Profile</ProfileNavItem>
+                <ProfileNavItem onClick={() => signOut({ callbackUrl: '/' })} icon={FiLogOut}>Logout</ProfileNavItem>
+              </>
+            ) : (
+              <ProfileNavItem onClick={() => signIn()} icon={FiLogIn}>Log in</ProfileNavItem>
+            )}
+          </Box>
+        </DrawerContent>
+      </Drawer>
       
     </Flex>
   )
