@@ -34,7 +34,7 @@ export default function RootLayout({
 
             {/* Sidebar and Content */}
             <SidebarWithHeader />
-            <div style={{ position: "relative", minHeight: "100vh" }}>{children}</div>
+            <div style={{ position: "relative", minHeight: "100vh", paddingTop: '80px' }}>{children}</div>
             <DanishInviteBanner />
 
             {/* Analytics and Performance */}
