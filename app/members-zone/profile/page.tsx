@@ -10,6 +10,7 @@ export default function ProfilePage() {
   const { data: session, status } = useSession()
   const { currentUser } = useContext(AuthContext)
   const [zwiftId, setZwiftId] = useState<string | null>(null)
+  const [roleNames, setRoleNames] = useState<string[] | null>(null)
 
   useEffect(() => {
     let ignore = false
@@ -22,6 +23,24 @@ export default function ProfilePage() {
       } catch (_) {}
     }
     if (session) fetchZwiftId()
+    return () => { ignore = true }
+  }, [session])
+
+  useEffect(() => {
+    let ignore = false
+    async function fetchRoleNames() {
+      try {
+        const res = await fetch('/api/discord/roles', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        const roles: Array<{ id: string; name: string }> = Array.isArray(data?.roles) ? data.roles : []
+        const idToName = new Map(roles.map(r => [String(r.id), String(r.name)]))
+        const ids: string[] = Array.isArray((session as any)?.user?.roles) ? ((session as any).user.roles as string[]) : []
+        const names = ids.map(id => idToName.get(String(id)) || String(id))
+        if (!ignore) setRoleNames(names)
+      } catch {}
+    }
+    if (session) fetchRoleNames()
     return () => { ignore = true }
   }, [session])
 
@@ -66,7 +85,7 @@ export default function ProfilePage() {
 
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
         <Box>
-          <Text fontWeight="bold" mb={1}>Name</Text>
+          <Text fontWeight="bold" mb={1}>Discord Display Name</Text>
           <Text>{profile.name}</Text>
         </Box>
         <Box>
@@ -83,7 +102,7 @@ export default function ProfilePage() {
         </Box>
         <Box>
           <Text fontWeight="bold" mb={1}>Roles</Text>
-          <Text>{profile.roles.length ? profile.roles.join(', ') : '—'}</Text>
+          <Text>{(roleNames && roleNames.length) ? roleNames.join(', ') : (profile.roles.length ? profile.roles.join(', ') : '—')}</Text>
         </Box>
         <Box>
           <Text fontWeight="bold" mb={1}>Created</Text>
