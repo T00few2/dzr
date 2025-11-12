@@ -41,9 +41,9 @@ import {
 import { HamburgerIcon } from '@chakra-ui/icons'
 import { LiaMountainSolid } from "react-icons/lia";
 import { Im500Px } from "react-icons/im";
-import { MdDirectionsBike } from "react-icons/md";
+import { MdDirectionsBike, MdCalendarMonth, MdManageAccounts, MdInsights } from "react-icons/md";
 import { IconType } from 'react-icons'
-import { FaPeopleGroup } from "react-icons/fa6";
+import { FaPeopleGroup, FaTrophy } from "react-icons/fa6";
 import { AiOutlineAim } from "react-icons/ai";
 import { RiBoxingFill } from "react-icons/ri";
 import { MdOutlineTimer } from "react-icons/md";
@@ -81,7 +81,6 @@ const LinkItems: Array<LinkItemProps> = [
   { name: 'A Sunday in Hell', href: '/asundayinhell', icon: GiDevilMask },
   { name: 'In The Zone 2', href: '/in-the-zone-2', icon: AiOutlineAim },
   { name: 'The Zwifty Fifty', href: '/the-zwifty-fifty', icon: Im500Px },
-  { name: 'Members Zone', href: '/members-zone', icon: FaPeopleGroup },
 ]
 
 const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
@@ -216,6 +215,9 @@ const ProfileNavItem = ({ children, href, onClick, icon }: { children: React.Rea
 const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
   const { data: session } = useSession()
   const { isOpen: isProfileOpen, onOpen: openProfile, onClose: closeProfile } = useDisclosure()
+  const roles: string[] = Array.isArray((session?.user as any)?.roles) ? (session?.user as any).roles : []
+  const isAdmin: boolean = Boolean((session?.user as any)?.isAdmin)
+  const isCaptain: boolean = roles.includes('1195878349617250405')
   return (
     <Flex
       ml={0}
@@ -300,6 +302,13 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
             </Flex>
             {session ? (
               <>
+                <ProfileNavItem href="/members-zone" icon={FaPeopleGroup}>Members Zone</ProfileNavItem>
+                <ProfileNavItem href="/members-zone/race-calendar" icon={MdCalendarMonth}>Race Calendar</ProfileNavItem>
+                <ProfileNavItem href="/members-zone/zrl" icon={FaTrophy}>DZR Racing Teams</ProfileNavItem>
+                {(isAdmin || isCaptain) && (
+                  <ProfileNavItem href="/members-zone/team-management" icon={MdManageAccounts}>Team Management</ProfileNavItem>
+                )}
+                <ProfileNavItem href="/members-zone/stats" icon={MdInsights}>Club Stats</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/profile" icon={FaUser}>Profile</ProfileNavItem>
                 <ProfileNavItem onClick={() => signOut({ callbackUrl: '/' })} icon={FiLogOut}>Logout</ProfileNavItem>
               </>
