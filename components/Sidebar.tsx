@@ -303,6 +303,9 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
             {session ? (
               <>
                 <ProfileNavItem href="/members-zone" icon={FaPeopleGroup}>Members Zone</ProfileNavItem>
+                {isAdmin && (
+                  <ProfileNavItem href="/members-zone/membership" icon={MdManageAccounts}>Membership</ProfileNavItem>
+                )}
                 <ProfileNavItem href="/members-zone/race-calendar" icon={MdCalendarMonth}>Race Calendar</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/zrl" icon={FaTrophy}>DZR Racing Teams</ProfileNavItem>
                 {(isAdmin || isCaptain) && (
