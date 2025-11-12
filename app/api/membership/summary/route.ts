@@ -11,23 +11,54 @@ export async function GET(req: Request) {
     const userId = (token as any)?.discordId || (token as any)?.sub || null
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const doc = await adminDb.collection('memberships').doc(String(userId)).get()
-    if (!doc.exists) {
-      return NextResponse.json({
-        userId,
-        currentStatus: 'community',
-        coveredThroughYear: null,
-        lastPaymentId: null,
-        fullName: null
-      }, { status: 200 })
-    }
-    const data = doc.data() || {}
+    // Load cached membership doc (for name fallback)
+    const membershipSnap = await adminDb.collection('memberships').doc(String(userId)).get()
+    const cached = membershipSnap.exists ? (membershipSnap.data() || {}) : {}
+
+    // Compute current coverage based on successful payments
+    const paymentsSnap = await adminDb
+      .collection('payments')
+      .where('userId', '==', String(userId))
+      .where('status', '==', 'succeeded')
+      .get()
+
+    let maxCoveredThrough: number | null = null
+    let lastPaymentId: string | null = null
+    let latestPaidAt: string | null = null
+    paymentsSnap.forEach((p) => {
+      const d = p.data() || {}
+      const covered = typeof d.coveredThroughYear === 'number' ? d.coveredThroughYear : null
+      const paidAt = typeof d.paidAt === 'string' ? d.paidAt : null
+      if (covered != null && (maxCoveredThrough == null || covered > maxCoveredThrough)) {
+        maxCoveredThrough = covered
+      }
+      if (paidAt && (!latestPaidAt || paidAt > latestPaidAt)) {
+        latestPaidAt = paidAt
+        lastPaymentId = d?.stripe?.paymentIntentId || p.id
+      }
+    })
+
+    const currentYear = new Date().getUTCFullYear()
+    const computedStatus = maxCoveredThrough != null && maxCoveredThrough >= currentYear ? 'club' : 'community'
+
+    // Optionally persist the computed values back to the membership doc to keep it in sync
+    try {
+      await adminDb.collection('memberships').doc(String(userId)).set({
+        userId: String(userId),
+        currentStatus: computedStatus,
+        coveredThroughYear: maxCoveredThrough ?? null,
+        lastPaymentId: lastPaymentId ?? null,
+        fullName: cached?.fullName ?? null,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true })
+    } catch {}
+
     return NextResponse.json({
       userId,
-      currentStatus: data.currentStatus || 'community',
-      coveredThroughYear: data.coveredThroughYear ?? null,
-      lastPaymentId: data.lastPaymentId ?? null,
-      fullName: data.fullName ?? null
+      currentStatus: computedStatus,
+      coveredThroughYear: maxCoveredThrough ?? null,
+      lastPaymentId: lastPaymentId ?? null,
+      fullName: cached?.fullName ?? null,
     }, { status: 200 })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to load summary' }, { status: 500 })
