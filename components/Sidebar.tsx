@@ -303,9 +303,6 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
             {session ? (
               <>
                 <ProfileNavItem href="/members-zone" icon={FaPeopleGroup}>Members Zone</ProfileNavItem>
-                {isAdmin && (
-                  <ProfileNavItem href="/members-zone/membership" icon={MdManageAccounts}>Membership</ProfileNavItem>
-                )}
                 <ProfileNavItem href="/members-zone/race-calendar" icon={MdCalendarMonth}>Race Calendar</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/zrl" icon={FaTrophy}>DZR Racing Teams</ProfileNavItem>
                 {(isAdmin || isCaptain) && (
@@ -313,6 +310,9 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
                 )}
                 <ProfileNavItem href="/members-zone/stats" icon={MdInsights}>Club Stats</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/profile" icon={FaUser}>Profile</ProfileNavItem>
+                {isAdmin && (
+                  <ProfileNavItem href="/members-zone/membership" icon={MdManageAccounts}>Membership</ProfileNavItem>
+                )}
                 <ProfileNavItem onClick={() => signOut({ callbackUrl: '/' })} icon={FiLogOut}>Logout</ProfileNavItem>
               </>
             ) : (

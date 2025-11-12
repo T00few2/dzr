@@ -11,6 +11,7 @@ export default function ProfilePage() {
   const { currentUser } = useContext(AuthContext)
   const [zwiftId, setZwiftId] = useState<string | null>(null)
   const [roleNames, setRoleNames] = useState<string[] | null>(null)
+  const [memberSummary, setMemberSummary] = useState<{ currentStatus?: string; coveredThroughYear?: number | null } | null>(null)
 
   useEffect(() => {
     let ignore = false
@@ -41,6 +42,20 @@ export default function ProfilePage() {
       } catch {}
     }
     if (session) fetchRoleNames()
+    return () => { ignore = true }
+  }, [session])
+
+  useEffect(() => {
+    let ignore = false
+    async function fetchMembership() {
+      try {
+        const res = await fetch('/api/membership/summary', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        if (!ignore) setMemberSummary({ currentStatus: data?.currentStatus, coveredThroughYear: data?.coveredThroughYear ?? null })
+      } catch {}
+    }
+    if (session) fetchMembership()
     return () => { ignore = true }
   }, [session])
 
@@ -89,12 +104,20 @@ export default function ProfilePage() {
           <Text>{profile.name}</Text>
         </Box>
         <Box>
+          <Text fontWeight="bold" mb={1}>Membership Status</Text>
+          <Text>{memberSummary?.currentStatus === 'club' ? 'Club Member' : 'Community Member'}</Text>
+        </Box>
+        <Box>
           <Text fontWeight="bold" mb={1}>Email</Text>
           <Text>{profile.email}</Text>
         </Box>
         <Box>
           <Text fontWeight="bold" mb={1}>Zwift ID</Text>
           <Text>{zwiftId || '—'}</Text>
+        </Box>
+        <Box>
+          <Text fontWeight="bold" mb={1}>Covered Through</Text>
+          <Text>{memberSummary?.coveredThroughYear ?? '—'}</Text>
         </Box>
         <Box>
           <Text fontWeight="bold" mb={1}>Discord ID</Text>
