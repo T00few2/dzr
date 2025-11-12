@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -25,7 +25,7 @@ import {
 } from '@chakra-ui/react'
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb'
 
-export default function MembershipPage() {
+function MembershipContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const toast = useToast()
@@ -162,6 +162,14 @@ export default function MembershipPage() {
         </Box>
       </Stack>
     </Container>
+  )
+}
+
+export default function MembershipPage() {
+  return (
+    <Suspense fallback={<LoadingSpinnerMemb/>}>
+      <MembershipContent />
+    </Suspense>
   )
 }
 
