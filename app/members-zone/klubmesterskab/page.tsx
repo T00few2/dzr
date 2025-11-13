@@ -90,7 +90,7 @@ export default function KMSpage() {
     if (status === 'authenticated') {
       load();
     }
-  }, [status]);
+  }, [status, load]);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
