@@ -217,7 +217,7 @@ function MembershipContent() {
               Du har betalt kontingent. Kontingentet udløber {expiryDateText}
             </Text>
           )}
-          <Stack spacing={4}>
+          <Stack spacing={4} maxW={{ base: '100%', md: '720px' }}>
             <FormControl>
               <FormLabel color={'white'}>Vælg år</FormLabel>
               <HStack wrap="wrap" spacing={3}>
@@ -255,9 +255,9 @@ function MembershipContent() {
             </SimpleGrid>
 
             <FormControl>
-              <Box display="flex" alignItems="center" gap={3}>
+              <Box display="flex" alignItems="center" gap={3} flexWrap={{ base: 'wrap', md: 'nowrap' }}>
                 <Text color={'white'} fontWeight="bold" whiteSpace="nowrap">Vælg beløb (DKK)</Text>
-                <Box flex="1">
+                <Box flex="1" maxW={{ base: '100%', md: '420px' }}>
                   <Slider
                     min={settings?.minAmountDkk ?? 10}
                     max={settings?.maxAmountDkk ?? 100}
