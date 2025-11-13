@@ -11,7 +11,7 @@ export default function ProfilePage() {
   const { currentUser } = useContext(AuthContext)
   const [zwiftId, setZwiftId] = useState<string | null>(null)
   const [roleNames, setRoleNames] = useState<string[] | null>(null)
-  const [memberSummary, setMemberSummary] = useState<{ currentStatus?: string; coveredThroughYear?: number | null } | null>(null)
+  const [memberSummary, setMemberSummary] = useState<{ currentStatus?: string; coveredThroughYear?: number | null; fullName?: string | null } | null>(null)
 
   useEffect(() => {
     let ignore = false
@@ -52,7 +52,7 @@ export default function ProfilePage() {
         const res = await fetch('/api/membership/summary', { cache: 'no-store' })
         if (!res.ok) return
         const data = await res.json()
-        if (!ignore) setMemberSummary({ currentStatus: data?.currentStatus, coveredThroughYear: data?.coveredThroughYear ?? null })
+        if (!ignore) setMemberSummary({ currentStatus: data?.currentStatus, coveredThroughYear: data?.coveredThroughYear ?? null, fullName: data?.fullName ?? null })
       } catch {}
     }
     if (session) fetchMembership()
@@ -90,57 +90,112 @@ export default function ProfilePage() {
     )
   }
 
+  const isClub = memberSummary?.currentStatus === 'club'
+  const displayName = memberSummary?.fullName || profile.name
+  const expiryDateText = (() => {
+    const y = memberSummary?.coveredThroughYear
+    if (!y || typeof y !== 'number') return '—'
+    const d = new Date(Date.UTC(y, 11, 31)) // 31 Dec <year> UTC
+    const day = String(d.getUTCDate()).padStart(2, '0')
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const month = monthNames[d.getUTCMonth()]
+    return `${day} ${month} ${y}`
+  })()
+
   return (
     <Box px={{ base: 4, md: 8 }} py={{ base: 100, md: 100 }} color={'white'}>
       <Flex align={{ base: 'flex-start', md: 'center' }} justify="space-between" mb={4} gap={4} direction={{ base: 'column', md: 'row' }}>
         <Heading size={{ base: 'md', md: 'lg' }}>Profile</Heading>
         <Badge colorScheme={profile.email !== '—' ? 'green' : 'gray'}>{profile.email !== '—' ? 'Logged in' : 'Guest'}</Badge>
       </Flex>
-      <Divider borderColor={'gray.700'} mb={6} />
 
-      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-        <Box>
-          <Text fontWeight="bold" mb={1}>Discord Display Name</Text>
-          <Text>{profile.name}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold" mb={1}>Membership Status</Text>
-          <Text>{memberSummary?.currentStatus === 'club' ? 'Club Member' : 'Community Member'}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold" mb={1}>Email</Text>
-          <Text>{profile.email}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold" mb={1}>Zwift ID</Text>
-          <Text>{zwiftId || '—'}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold" mb={1}>Covered Through</Text>
-          <Text>{memberSummary?.coveredThroughYear ?? '—'}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold" mb={1}>Discord ID</Text>
-          <Text>{profile.discordId}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold" mb={1}>Roles</Text>
-          <Text>{(roleNames && roleNames.length) ? roleNames.join(', ') : (profile.roles.length ? profile.roles.join(', ') : '—')}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold" mb={1}>Created</Text>
-          <Text>{profile.createdAt}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold" mb={1}>Last sign-in</Text>
-          <Text>{profile.lastSignInAt}</Text>
-        </Box>
-      </SimpleGrid>
+      <Text mb={4} color={'white'}>
+        Her kan du se dine kontooplysninger, medlemskabsstatus og Discord-roller.
+      </Text>
 
-      <Divider borderColor={'gray.700'} my={6} />
-      <Stack spacing={2}>
-        <Text fontSize="sm" color="gray.300">Work in progress... more features will be added later.</Text>
-      </Stack>
+      {/* Primary Info */}
+      <Box borderWidth={'1px'} borderColor={'gray.700'} borderRadius={'md'} p={4} mb={6}>
+        <Heading size="sm" mb={4}>Account</Heading>
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+          {isClub && displayName !== '—' ? (
+            <>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Name</Text>
+                <Text>{displayName}</Text>
+              </Box>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Email</Text>
+                <Text>{profile.email}</Text>
+              </Box>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Zwift ID</Text>
+                <Text>{zwiftId || '—'}</Text>
+              </Box>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Last sign-in</Text>
+                <Text>{profile.lastSignInAt}</Text>
+              </Box>
+            </>
+          ) : (
+            <>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Email</Text>
+                <Text>{profile.email}</Text>
+              </Box>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Zwift ID</Text>
+                <Text>{zwiftId || '—'}</Text>
+              </Box>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Name</Text>
+                <Text>{displayName}</Text>
+              </Box>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Last sign-in</Text>
+                <Text>{profile.lastSignInAt}</Text>
+              </Box>
+            </>
+          )}
+        </SimpleGrid>
+      </Box>
+
+      {/* Membership Info */}
+      <Box borderWidth={'1px'} borderColor={'gray.700'} borderRadius={'md'} p={4} mb={6}>
+        <Heading size="sm" mb={4}>Membership</Heading>
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+          <Box>
+            <Text fontWeight="bold" mb={1}>Status</Text>
+            <Text>{isClub ? 'Club Member' : 'Community Member'}</Text>
+          </Box>
+          <Box>
+            <Text fontWeight="bold" mb={1}>Expiry date</Text>
+            <Text>{expiryDateText}</Text>
+          </Box>
+        </SimpleGrid>
+      </Box>
+
+      {/* Discord Info */}
+      <Box borderWidth={'1px'} borderColor={'gray.700'} borderRadius={'md'} p={4}>
+        <Heading size="sm" mb={4}>Discord</Heading>
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+          <Box>
+            <Text fontWeight="bold" mb={1}>Display Name</Text>
+            <Text>{profile.name}</Text>
+          </Box>
+          <Box>
+            <Text fontWeight="bold" mb={1}>Discord ID</Text>
+            <Text>{profile.discordId}</Text>
+          </Box>
+          <Box>
+            <Text fontWeight="bold" mb={1}>Roles</Text>
+            <Text>{(roleNames && roleNames.length) ? roleNames.join(', ') : (profile.roles.length ? profile.roles.join(', ') : '—')}</Text>
+          </Box>
+          <Box>
+            <Text fontWeight="bold" mb={1}>Created</Text>
+            <Text>{profile.createdAt}</Text>
+          </Box>
+        </SimpleGrid>
+      </Box>
     </Box>
   )
 }

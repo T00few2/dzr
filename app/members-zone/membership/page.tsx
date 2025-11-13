@@ -20,6 +20,7 @@ import {
   SliderTrack,
   SliderFilledTrack,
   SliderThumb,
+  SimpleGrid,
 } from '@chakra-ui/react'
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb'
 
@@ -87,6 +88,25 @@ function MembershipContent() {
     return `Covered through ${summary.coveredThroughYear}`
   }, [summary])
 
+  const expiryDateText = useMemo(() => {
+    const y = summary?.coveredThroughYear
+    if (!y || typeof y !== 'number') return '—'
+    const d = new Date(Date.UTC(y, 11, 31))
+    const day = String(d.getUTCDate()).padStart(2, '0')
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const month = monthNames[d.getUTCMonth()]
+    return `${day} ${month} ${y}`
+  }, [summary])
+
+  const rangeText = useMemo(() => {
+    const min = settings?.minAmountDkk
+    const max = settings?.maxAmountDkk
+    if (typeof min === 'number' && typeof max === 'number') {
+      return ` Kontingentet er valgfrit mellem ${min} og ${max} DKK.`
+    }
+    return ''
+  }, [settings])
+
   if (status === 'loading') return <LoadingSpinnerMemb />
   if (!session) {
     return (
@@ -133,44 +153,70 @@ function MembershipContent() {
       <Stack spacing={4} textAlign={'left'}>
         <Heading color={'white'}>Membership</Heading>
         <Text color={'white'}>
-          Status: {summary?.currentStatus === 'club' ? 'Club Member' : 'Community Member'} • {coveredText}
+          Her kan du se din medlemsstatus og betale kontingent.{rangeText} Udfyld fornavn og efternavn,
+          vælg et beløb med skyderen og tryk “Betal” for at gennemføre betaling.
         </Text>
-        <Divider />
 
+        {/* Status card matching Profile page styling */}
         <Box borderWidth={'1px'} borderColor={'white'} borderRadius={'md'} p={4}>
-          <Heading size="sm" color={'white'} mb={2}>Settings</Heading>
-          <Text color={'white'}>Allowed amount: {settings ? `${settings.minAmountDkk}–${settings.maxAmountDkk} DKK` : '—'}</Text>
-          <Text color={'white'}>Dual year mode: {settings?.dualYearMode ? 'On' : 'Off'}</Text>
+          <Heading size="sm" color={'white'} mb={4}>Nuværende medlemskab</Heading>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+            <Box>
+              <Text fontWeight="bold" mb={1} color={'white'}>Status</Text>
+              <Text color={'white'}>{summary?.currentStatus === 'club' ? 'Club member' : 'Community Member'}</Text>
+            </Box>
+            <Box>
+              <Text fontWeight="bold" mb={1} color={'white'}>Udløbsdato</Text>
+              <Text color={'white'}>{expiryDateText}</Text>
+            </Box>
+          </SimpleGrid>
         </Box>
 
         <Box borderWidth={'1px'} borderColor={'white'} borderRadius={'md'} p={4}>
-          <Heading size="sm" color={'white'} mb={4}>Pay membership</Heading>
+          <Heading size="sm" color={'white'} mb={4}>Betal kontingent</Heading>
+          <Text color={'white'} mb={4}>
+            {(() => {
+              const y = new Date().getUTCFullYear()
+              if (settings?.dualYearMode) {
+                return `Medlemskab gælder for resten af ${y} og hele ${y + 1}`
+              }
+              return `Medlemskab gælder for hele ${y}`
+            })()}
+          </Text>
           <Stack spacing={4}>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+              <FormControl>
+                <FormLabel color={'white'}>Fornavn</FormLabel>
+                <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} bg="white" color="black" />
+              </FormControl>
+              <FormControl>
+                <FormLabel color={'white'}>Efternavn</FormLabel>
+                <Input value={lastName} onChange={(e) => setLastName(e.target.value)} bg="white" color="black" />
+              </FormControl>
+            </SimpleGrid>
+
             <FormControl>
-              <FormLabel color={'white'}>First name</FormLabel>
-              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} bg="white" color="black" />
+              <Box display="flex" alignItems="center" gap={3}>
+                <Text color={'white'} fontWeight="bold" whiteSpace="nowrap">Vælg beløb (DKK)</Text>
+                <Box flex="1">
+                  <Slider
+                    min={settings?.minAmountDkk ?? 10}
+                    max={settings?.maxAmountDkk ?? 100}
+                    value={amount}
+                    onChange={(v) => setAmount(v)}
+                  >
+                    <SliderTrack>
+                      <SliderFilledTrack />
+                    </SliderTrack>
+                    <SliderThumb />
+                  </Slider>
+                </Box>
+                <Text color={'white'} whiteSpace="nowrap">{amount} DKK</Text>
+              </Box>
             </FormControl>
-            <FormControl>
-              <FormLabel color={'white'}>Last name</FormLabel>
-              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} bg="white" color="black" />
-            </FormControl>
-            <FormControl>
-              <FormLabel color={'white'}>Amount (DKK)</FormLabel>
-              <Text color={'white'} mb={2}>{amount} DKK</Text>
-              <Slider
-                min={settings?.minAmountDkk ?? 10}
-                max={settings?.maxAmountDkk ?? 100}
-                value={amount}
-                onChange={(v) => setAmount(v)}
-              >
-                <SliderTrack>
-                  <SliderFilledTrack />
-                </SliderTrack>
-                <SliderThumb />
-              </Slider>
-            </FormControl>
+
             <HStack>
-              <Button onClick={startCheckout} isLoading={loading} colorScheme="red">Pay with MobilePay / Card</Button>
+              <Button onClick={startCheckout} isLoading={loading} colorScheme="red">Betal</Button>
             </HStack>
           </Stack>
         </Box>
