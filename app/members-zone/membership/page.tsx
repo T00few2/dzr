@@ -234,7 +234,10 @@ function MembershipContent() {
                       color={isSelected ? 'white' : 'white'}
                       borderColor={isSelected ? undefined : 'white'}
                       _hover={overlaps ? {} : (isSelected ? { opacity: 0.9 } : { bg: 'whiteAlpha.200' })}
-                      onClick={() => !overlaps && setSelectedOptionId(opt.id)}
+                      onClick={() => {
+                        if (overlaps) return
+                        setSelectedOptionId((prev) => (prev === opt.id ? '' : opt.id))
+                      }}
                       isDisabled={overlaps}
                     >
                       {(opt.label || opt.id) + (overlaps ? ' (allerede betalt)' : '')}
