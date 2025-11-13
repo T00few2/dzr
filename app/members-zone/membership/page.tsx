@@ -153,11 +153,6 @@ function MembershipContent() {
   async function startCheckout() {
     try {
       setLoading(true)
-      if (isActiveClub) {
-        toast({ title: 'Allerede betalt', description: `Du har betalt kontingent. Kontingentet udløber ${expiryDateText}`, status: 'info' })
-        setLoading(false)
-        return
-      }
       const fullName = `${firstName || ''} ${lastName || ''}`.trim()
       if (!firstName || !lastName) {
         throw new Error('Please enter first and last name')
@@ -236,6 +231,9 @@ function MembershipContent() {
                       size="sm"
                       colorScheme={isSelected ? 'red' : 'gray'}
                       variant={isSelected ? 'solid' : 'outline'}
+                      color={isSelected ? 'white' : 'white'}
+                      borderColor={isSelected ? undefined : 'white'}
+                      _hover={overlaps ? {} : (isSelected ? { opacity: 0.9 } : { bg: 'whiteAlpha.200' })}
                       onClick={() => !overlaps && setSelectedOptionId(opt.id)}
                       isDisabled={overlaps}
                     >
