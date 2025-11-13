@@ -107,6 +107,11 @@ function MembershipContent() {
     return ''
   }, [settings])
 
+  const isActiveClub = (() => {
+    const y = new Date().getUTCFullYear()
+    return summary?.currentStatus === 'club' && typeof summary?.coveredThroughYear === 'number' && summary.coveredThroughYear >= y
+  })()
+
   if (status === 'loading') return <LoadingSpinnerMemb />
   if (!session) {
     return (
@@ -128,6 +133,11 @@ function MembershipContent() {
   async function startCheckout() {
     try {
       setLoading(true)
+      if (isActiveClub) {
+        toast({ title: 'Allerede betalt', description: `Du har betalt kontingent. Kontingentet udløber ${expiryDateText}`, status: 'info' })
+        setLoading(false)
+        return
+      }
       const fullName = `${firstName || ''} ${lastName || ''}`.trim()
       if (!firstName || !lastName) {
         throw new Error('Please enter first and last name')
@@ -174,15 +184,22 @@ function MembershipContent() {
 
         <Box borderWidth={'1px'} borderColor={'white'} borderRadius={'md'} p={4}>
           <Heading size="sm" color={'white'} mb={4}>Betal kontingent</Heading>
-          <Text color={'white'} mb={4}>
-            {(() => {
-              const y = new Date().getUTCFullYear()
-              if (settings?.dualYearMode) {
-                return `Medlemskab gælder for resten af ${y} og hele ${y + 1}`
-              }
-              return `Medlemskab gælder for hele ${y}`
-            })()}
-          </Text>
+          {!isActiveClub && (
+            <Text color={'white'} mb={4}>
+              {(() => {
+                const y = new Date().getUTCFullYear()
+                if (settings?.dualYearMode) {
+                  return `Medlemskab gælder for resten af ${y} og hele ${y + 1}`
+                }
+                return `Medlemskab gælder for hele ${y}`
+              })()}
+            </Text>
+          )}
+          {isActiveClub && (
+            <Text color={'white'} mb={4}>
+              Du har betalt kontingent. Kontingentet udløber {expiryDateText}
+            </Text>
+          )}
           <Stack spacing={4}>
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
               <FormControl>
