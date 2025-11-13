@@ -21,7 +21,6 @@ import {
   SliderFilledTrack,
   SliderThumb,
   SimpleGrid,
-  Select,
 } from '@chakra-ui/react'
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb'
 
@@ -114,6 +113,25 @@ function MembershipContent() {
     return summary?.currentStatus === 'club' && typeof summary?.coveredThroughYear === 'number' && summary.coveredThroughYear >= y
   })()
 
+  const coverageTextFromSelection = useMemo(() => {
+    if (!selectedOptionId) return 'Vælg år for at se dækning.'
+    const opt = (settings?.paymentOptions || []).find(o => String(o?.id || '') === selectedOptionId)
+    const years = (opt?.coversYears || []).map((n) => Number(n)).filter((n) => Number.isFinite(n)).sort()
+    if (!years.length) return ''
+    const nowY = new Date().getUTCFullYear()
+    if (years.length === 1) {
+      const y = years[0]
+      if (y === nowY) return `Medlemskab gælder for resten af ${y}`
+      return `Medlemskab gælder for hele ${y}`
+    }
+    if (years.length === 2) {
+      const [a, b] = years
+      if (a === nowY && b === nowY + 1) return `Medlemskab gælder for resten af ${a} og hele ${b}`
+      return `Medlemskab gælder for ${a} og ${b}`
+    }
+    return `Medlemskab gælder for ${years.join(' og ')}`
+  }, [selectedOptionId, settings])
+
   if (status === 'loading') return <LoadingSpinnerMemb />
   if (!session) {
     return (
@@ -197,15 +215,7 @@ function MembershipContent() {
         <Box borderWidth={'1px'} borderColor={'white'} borderRadius={'md'} p={4}>
           <Heading size="sm" color={'white'} mb={4}>Betal kontingent</Heading>
           {!isActiveClub && (
-            <Text color={'white'} mb={4}>
-              {(() => {
-                const y = new Date().getUTCFullYear()
-                if (settings?.dualYearMode) {
-                  return `Medlemskab gælder for resten af ${y} og hele ${y + 1}`
-                }
-                return `Medlemskab gælder for hele ${y}`
-              })()}
-            </Text>
+            <Text color={'white'} mb={4}>{coverageTextFromSelection}</Text>
           )}
           {isActiveClub && (
             <Text color={'white'} mb={4}>
@@ -215,23 +225,25 @@ function MembershipContent() {
           <Stack spacing={4}>
             <FormControl>
               <FormLabel color={'white'}>Vælg år</FormLabel>
-              <Select
-                bg="white"
-                color="black"
-                placeholder="Vælg år"
-                value={selectedOptionId}
-                onChange={(e) => setSelectedOptionId(e.target.value)}
-              >
+              <HStack wrap="wrap" spacing={3}>
                 {(settings?.paymentOptions || []).map((opt) => {
                   const coveredYears = new Set<number>((summary?.coveredYears || []) as number[])
                   const overlaps = (opt.coversYears || []).some((y) => coveredYears.has(Number(y)))
+                  const isSelected = selectedOptionId === opt.id
                   return (
-                    <option key={opt.id} value={opt.id} disabled={overlaps}>
-                      {opt.label || opt.id}{overlaps ? ' (allerede betalt)' : ''}
-                    </option>
+                    <Button
+                      key={opt.id}
+                      size="sm"
+                      colorScheme={isSelected ? 'red' : 'gray'}
+                      variant={isSelected ? 'solid' : 'outline'}
+                      onClick={() => !overlaps && setSelectedOptionId(opt.id)}
+                      isDisabled={overlaps}
+                    >
+                      {(opt.label || opt.id) + (overlaps ? ' (allerede betalt)' : '')}
+                    </Button>
                   )
                 })}
-              </Select>
+              </HStack>
             </FormControl>
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
               <FormControl>
