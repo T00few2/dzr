@@ -56,15 +56,22 @@ async function handleSuccessfulPayment(stripe: Stripe, pi: Stripe.PaymentIntent,
     receiptUrl = charges.data[0]?.receipt_url || ''
   } catch {}
 
-  // Load settings
+  // Load settings (for role id)
   const settingsDoc = await adminDb.collection('system_settings').doc('global').get()
   const membership = (settingsDoc.exists ? (settingsDoc.data() as any)?.membership : null) || {}
-  const dualYearMode = Boolean(membership?.dualYearMode ?? true)
   const clubMemberRoleId = typeof membership?.clubMemberRoleId === 'string' ? membership.clubMemberRoleId : ''
 
+  // Determine coverage years from metadata; fallback to current year(s) if missing
   const now = new Date()
   const currentYear = now.getUTCFullYear()
-  const coversYears = dualYearMode ? [currentYear, currentYear + 1] : [currentYear]
+  let coversYears: number[] | null = null
+  const metaYears = (metadata.coversYears || '').trim()
+  if (metaYears) {
+    coversYears = metaYears.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n))
+  }
+  if (!coversYears || coversYears.length === 0) {
+    coversYears = [currentYear]
+  }
   const coveredThroughYear = Math.max(...coversYears)
 
   // Store payment record
@@ -86,6 +93,7 @@ async function handleSuccessfulPayment(stripe: Stripe, pi: Stripe.PaymentIntent,
     paidAt,
     coversYears,
     coveredThroughYear,
+    coversYears,
     createdAt: new Date().toISOString(),
   }, { merge: true })
 

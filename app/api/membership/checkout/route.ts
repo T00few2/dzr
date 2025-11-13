@@ -13,8 +13,10 @@ export async function POST(req: Request) {
     const body = await req.json()
     const amountDkk = Number(body?.amountDkk)
     const fullName = String(body?.fullName || '').trim()
+    const selectedOptionId = String(body?.selectedOptionId || '').trim()
     if (!amountDkk || amountDkk <= 0) return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
     if (!fullName) return NextResponse.json({ error: 'Full name required' }, { status: 400 })
+    if (!selectedOptionId) return NextResponse.json({ error: 'Payment year selection required' }, { status: 400 })
 
     const settingsDoc = await adminDb.collection('system_settings').doc('global').get()
     const membership = (settingsDoc.exists ? (settingsDoc.data() as any)?.membership : null) || {}
@@ -23,6 +25,12 @@ export async function POST(req: Request) {
     if (amountDkk < minAmount || amountDkk > maxAmount) {
       return NextResponse.json({ error: `Amount must be between ${minAmount} and ${maxAmount} DKK` }, { status: 400 })
     }
+    const paymentOptions: Array<{ id: string; label?: string; coversYears?: number[] }> =
+      Array.isArray(membership?.paymentOptions) ? membership.paymentOptions : []
+    const selected = paymentOptions.find(o => String(o?.id || '') === selectedOptionId)
+    if (!selected || !Array.isArray(selected.coversYears) || selected.coversYears.length === 0) {
+      return NextResponse.json({ error: 'Invalid payment option' }, { status: 400 })
+    }
 
     const stripeSecret = process.env.STRIPE_SECRET_KEY as string
     if (!stripeSecret) return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
@@ -30,6 +38,10 @@ export async function POST(req: Request) {
 
     const userId = (token as any)?.discordId || (token as any)?.sub || 'unknown'
     const userEmail = (token as any)?.email || undefined
+
+    // Store selected coverage in metadata
+    const coversYearsCsv = selected.coversYears.join(',')
+    const optionLabel = selected.label || selected.id
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -47,12 +59,16 @@ export async function POST(req: Request) {
         userId: String(userId),
         fullName: String(fullName),
         userEmail: String(userEmail || ''),
+        coversYears: coversYearsCsv,
+        optionLabel: String(optionLabel),
       },
       payment_intent_data: {
         metadata: {
           userId: String(userId),
           fullName: String(fullName),
           userEmail: String(userEmail || ''),
+          coversYears: coversYearsCsv,
+          optionLabel: String(optionLabel),
         },
       },
       success_url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/members-zone/membership?status=success`,

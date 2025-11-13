@@ -12,7 +12,8 @@ export async function GET() {
       minAmountDkk: Number(membership?.minAmountDkk ?? 10),
       maxAmountDkk: Number(membership?.maxAmountDkk ?? 100),
       dualYearMode: Boolean(membership?.dualYearMode ?? true),
-      clubMemberRoleId: typeof membership?.clubMemberRoleId === 'string' ? membership.clubMemberRoleId : ''
+      clubMemberRoleId: typeof membership?.clubMemberRoleId === 'string' ? membership.clubMemberRoleId : '',
+      paymentOptions: Array.isArray(membership?.paymentOptions) ? membership.paymentOptions : []
     }
     return NextResponse.json(out, { status: 200 })
   } catch (err: any) {

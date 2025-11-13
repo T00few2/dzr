@@ -21,6 +21,7 @@ import {
   SliderFilledTrack,
   SliderThumb,
   SimpleGrid,
+  Select,
 } from '@chakra-ui/react'
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb'
 
@@ -31,8 +32,9 @@ function MembershipContent() {
   const qp = useSearchParams()
 
   const isAdmin = Boolean((session as any)?.user?.isAdmin)
-  const [settings, setSettings] = useState<{ minAmountDkk: number; maxAmountDkk: number; dualYearMode: boolean } | null>(null)
-  const [summary, setSummary] = useState<{ currentStatus: string; coveredThroughYear: number | null; fullName: string | null } | null>(null)
+  const [settings, setSettings] = useState<{ minAmountDkk: number; maxAmountDkk: number; dualYearMode: boolean; paymentOptions?: Array<{ id: string; label?: string; coversYears?: number[] }> } | null>(null)
+  const [summary, setSummary] = useState<{ currentStatus: string; coveredThroughYear: number | null; fullName: string | null; coveredYears?: number[] } | null>(null)
+  const [selectedOptionId, setSelectedOptionId] = useState<string>('')
 
   const [amount, setAmount] = useState<number>(50)
   const [firstName, setFirstName] = useState<string>('')
@@ -142,10 +144,20 @@ function MembershipContent() {
       if (!firstName || !lastName) {
         throw new Error('Please enter first and last name')
       }
+      if (!selectedOptionId) {
+        throw new Error('Vælg venligst år for betaling')
+      }
+      // Prevent selecting options that include already covered years
+      const option = (settings?.paymentOptions || []).find(o => String(o?.id || '') === selectedOptionId)
+      const coveredYears = new Set<number>((summary?.coveredYears || []) as number[])
+      const overlaps = option?.coversYears?.some((y) => coveredYears.has(Number(y))) || false
+      if (overlaps) {
+        throw new Error('Du har allerede betalt for det valgte år')
+      }
       const res = await fetch('/api/membership/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amountDkk: amount, fullName }),
+        body: JSON.stringify({ amountDkk: amount, fullName, selectedOptionId }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -201,6 +213,26 @@ function MembershipContent() {
             </Text>
           )}
           <Stack spacing={4}>
+            <FormControl>
+              <FormLabel color={'white'}>Vælg år</FormLabel>
+              <Select
+                bg="white"
+                color="black"
+                placeholder="Vælg år"
+                value={selectedOptionId}
+                onChange={(e) => setSelectedOptionId(e.target.value)}
+              >
+                {(settings?.paymentOptions || []).map((opt) => {
+                  const coveredYears = new Set<number>((summary?.coveredYears || []) as number[])
+                  const overlaps = (opt.coversYears || []).some((y) => coveredYears.has(Number(y)))
+                  return (
+                    <option key={opt.id} value={opt.id} disabled={overlaps}>
+                      {opt.label || opt.id}{overlaps ? ' (allerede betalt)' : ''}
+                    </option>
+                  )
+                })}
+              </Select>
+            </FormControl>
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
               <FormControl>
                 <FormLabel color={'white'}>Fornavn</FormLabel>

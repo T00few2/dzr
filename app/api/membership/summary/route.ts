@@ -25,10 +25,15 @@ export async function GET(req: Request) {
     let maxCoveredThrough: number | null = null
     let lastPaymentId: string | null = null
     let latestPaidAt: string | null = null
+    const coveredYearsSet = new Set<number>()
     paymentsSnap.forEach((p) => {
       const d = p.data() || {}
       const covered = typeof d.coveredThroughYear === 'number' ? d.coveredThroughYear : null
       const paidAt = typeof d.paidAt === 'string' ? d.paidAt : null
+      const coversYears: number[] = Array.isArray(d.coversYears) ? d.coversYears : []
+      for (const y of coversYears) {
+        if (typeof y === 'number') coveredYearsSet.add(y)
+      }
       if (covered != null && (maxCoveredThrough == null || covered > maxCoveredThrough)) {
         maxCoveredThrough = covered
       }
@@ -59,6 +64,7 @@ export async function GET(req: Request) {
       coveredThroughYear: maxCoveredThrough ?? null,
       lastPaymentId: lastPaymentId ?? null,
       fullName: cached?.fullName ?? null,
+      coveredYears: Array.from(coveredYearsSet).sort()
     }, { status: 200 })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to load summary' }, { status: 500 })
