@@ -15,12 +15,12 @@ type Rider = {
 type Team = {
   id: string;
   name: string;
-  captainId: string;
-  captainName: string;
   raceSeries: string;
   rideTime: string;
   division: string;
   lookingForRiders: boolean;
+  captainDiscordId?: string;
+  captainName?: string;
 };
 
 function isAuthenticated(request: Request): boolean {
@@ -68,15 +68,36 @@ export async function POST(request: Request) {
       ...(doc.data() as Omit<Rider, 'id'>),
     }));
 
-    // Fetch teams looking for riders
-    const teamsSnapshot = await adminDb
-      .collection('teams')
-      .where('lookingForRiders', '==', true)
-      .get();
-    const teams: Team[] = teamsSnapshot.docs.map((doc: QueryDocumentSnapshot): Team => ({
-      id: doc.id,
-      ...(doc.data() as Omit<Team, 'id'>),
-    }));
+    // Fetch teams looking for riders from backend-managed roles (selfRoles)
+    const selfRolesSnap = await adminDb.collection('selfRoles').limit(1).get();
+    let teams: Team[] = [];
+    if (!selfRolesSnap.empty) {
+      const selfRolesDoc = selfRolesSnap.docs[0].data() as any;
+      const panels = selfRolesDoc?.panels || {};
+      const teamRoles: any[] = [];
+      Object.values(panels).forEach((panel: any) => {
+        const roles = Array.isArray(panel?.roles) ? panel.roles : [];
+        roles.forEach((role: any) => {
+          if (role && role.isTeamRole && role.lookingForRiders) {
+            teamRoles.push(role);
+          }
+        });
+      });
+      teams = teamRoles
+        .map(
+          (r: any): Team => ({
+            id: String(r.roleId ?? r.id ?? ''),
+            name: String(r.teamName ?? r.roleName ?? r.roleId ?? 'Unknown team'),
+            raceSeries: String(r.raceSeries ?? ''),
+            rideTime: String(r.rideTime ?? ''),
+            division: String(r.division ?? ''),
+            lookingForRiders: !!r.lookingForRiders,
+            captainDiscordId: typeof r.teamCaptainId === 'string' ? r.teamCaptainId : undefined,
+            captainName: r.captainDisplayName ? String(r.captainDisplayName) : undefined,
+          })
+        )
+        .filter((t) => t.id);
+    }
 
     // Resolve discordIds for mentions
     const mentionUserIds = new Set<string>();
@@ -113,8 +134,8 @@ export async function POST(request: Request) {
       if (messageContent) messageContent += `\n\n`;
       const teamLines = await Promise.all(
         teams.map(async (team: Team) => {
-          const captainDiscordId = await getDiscordIdForUid(team.captainId);
-          const captainDisplay = captainDiscordId ? `<@${captainDiscordId}>` : team.captainName;
+          const captainDiscordId = team.captainDiscordId;
+          const captainDisplay = captainDiscordId ? `<@${captainDiscordId}>` : (team.captainName || 'Captain');
           if (captainDiscordId) mentionUserIds.add(captainDiscordId);
           return `**${team.name}**\n- Race Series: ${team.raceSeries}\n- Division: ${team.division}\n- Ride Time: ${team.rideTime}\n- Captain: ${captainDisplay}`;
         })
