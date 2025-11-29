@@ -105,7 +105,7 @@ export async function fetchRiderdata(id: string): Promise<RiderData | null> {
     }
   
     try {
-      const response = await fetch(`https://zwift-ranking.herokuapp.com/public/riders/${id}`, {
+      const response = await fetch(`https://api.zwiftracing.app/api/public/riders/${id}`, {
         headers: {
           Authorization: authKey,
         },
@@ -152,7 +152,7 @@ export async function fetchRiderdata(id: string): Promise<RiderData | null> {
     }
   
     try {
-      const response = await fetch(`https://zwift-ranking.herokuapp.com/public/clubs/${club}`, {
+      const response = await fetch(`https://api.zwiftracing.app/api/public/clubs/${club}`, {
         headers: {
           Authorization: authKey,
         },
