@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Container, Heading, Box, Text, Button, Table, Thead, Tr, Th, Tbody, Td, Spinner, useToast, Flex } from '@chakra-ui/react';
@@ -36,7 +36,7 @@ export default function KMSpage() {
   const [sort, setSort] = useState<{ key: keyof RiderRow; dir: 'asc' | 'desc' }>({ key: 'name', dir: 'asc' });
   const [signedZwiftIds, setSignedZwiftIds] = useState<string[]>([]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch('/api/kms/signups', { cache: 'no-store' });
@@ -84,7 +84,7 @@ export default function KMSpage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     if (status === 'authenticated') {
