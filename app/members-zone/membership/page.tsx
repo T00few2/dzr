@@ -21,6 +21,13 @@ import {
   SliderFilledTrack,
   SliderThumb,
   SimpleGrid,
+  Accordion,
+  AccordionItem,
+  AccordionButton,
+  AccordionPanel,
+  AccordionIcon,
+  List,
+  ListItem,
 } from '@chakra-ui/react'
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb'
 
@@ -205,6 +212,44 @@ function MembershipContent() {
               <Text color={'white'}>{expiryDateText}</Text>
             </Box>
           </SimpleGrid>
+        </Box>
+
+        {/* Terms and Conditions */}
+        <Box borderWidth="1px" borderColor="gray.600" borderRadius="md" bg="gray.800">
+          <Accordion allowToggle>
+            <AccordionItem border="none">
+              <h2>
+                <AccordionButton _hover={{ bg: 'gray.700' }} py={4}>
+                  <HStack flex="1" textAlign="left" spacing={3}>
+                    <Box color="gray.400" fontSize="xl">ℹ️</Box>
+                    <Text color="white" fontWeight="bold" fontSize="md">
+                      Vilkår for medlemskab
+                    </Text>
+                  </HStack>
+                  <AccordionIcon color="white" />
+                </AccordionButton>
+              </h2>
+              <AccordionPanel pb={4} color="gray.300" fontSize="sm" lineHeight="tall">
+                <Text mb={2}>
+                  Ved betaling af kontingent accepterer du følgende vilkår:
+                </Text>
+                <List spacing={2} ml={4}>
+                  <ListItem>
+                    • Medlemskabet gælder for den valgte periode og kan ikke opsiges i denne periode
+                  </ListItem>
+                  <ListItem>
+                    • Medlemskabet udløber automatisk ved periodens afslutning uden yderligere forpligtelser
+                  </ListItem>
+                  <ListItem>
+                    • Betalt kontingent refunderes ikke, jf. foreningens vedtægter §5
+                  </ListItem>
+                  <ListItem>
+                    • Som klubmedlem har du stemmeret på generalforsamlinger
+                  </ListItem>
+                </List>
+              </AccordionPanel>
+            </AccordionItem>
+          </Accordion>
         </Box>
 
         <Box borderWidth={'1px'} borderColor={'white'} borderRadius={'md'} p={4}>

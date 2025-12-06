@@ -35,7 +35,7 @@ import { AiOutlineAim } from "react-icons/ai";
 import { RiBoxingFill } from "react-icons/ri";
 import { MdOutlineTimer, MdManageAccounts } from "react-icons/md";
 import { FaTrophy } from "react-icons/fa6";
-import { MdCalendarMonth, MdInsights } from "react-icons/md";
+import { MdCalendarMonth, MdInsights, MdInfo } from "react-icons/md";
 import { BsShopWindow } from "react-icons/bs";
 // import { MdOutlineDirectionsBike } from "react-icons/md";
 import { countItems } from '@/components/shop/countItems';
@@ -98,6 +98,9 @@ export default function FeaturesMembers() {
 <>
       <Box >
         <SimpleGrid spacing={4} minChildWidth={'300px'} marginBlockEnd={4}>
+        {(isAdmin) && (
+        <CustomCard href='members-zone/about' icon = {MdInfo} heading = 'About DZR' text1 = 'Club information' text2 = '' />
+        )}
         <CustomCard href='members-zone/race-calendar' icon = {MdCalendarMonth} heading = 'Race Calendar' text1 = 'When we race' text2 = 'Join us'/>
         {/*<CustomCard href='members-zone/shop' icon = {BsShopWindow} heading = 'Shop' text1 = 'Get the DZR kit IRL' text2={`Suits & bibs orders: ${totalQuantity}/20`} />*/}
         {/*<CustomCard href='members-zone/dzr-team-race' icon = {MdOutlineDirectionsBike} heading = 'DZR Team Race' text1 = 'Join a team race' text2= 'and let the fun begin' />*/}

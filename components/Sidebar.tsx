@@ -41,9 +41,9 @@ import {
 import { HamburgerIcon } from '@chakra-ui/icons'
 import { LiaMountainSolid } from "react-icons/lia";
 import { Im500Px } from "react-icons/im";
-import { MdDirectionsBike, MdCalendarMonth, MdManageAccounts, MdInsights } from "react-icons/md";
+import { MdDirectionsBike, MdCalendarMonth, MdManageAccounts, MdInsights, MdInfo } from "react-icons/md";
 import { IconType } from 'react-icons'
-import { FaPeopleGroup, FaTrophy } from "react-icons/fa6";
+import { FaTrophy } from "react-icons/fa6";
 import { AiOutlineAim } from "react-icons/ai";
 import { RiBoxingFill } from "react-icons/ri";
 import { MdOutlineTimer } from "react-icons/md";
@@ -290,7 +290,7 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
         <DrawerContent bg={'black'}>
           <Box h="full" color={'white'}>
             <Flex h="20" alignItems="center" mx="8" justifyContent="space-between">
-              <Link href='/'><Image 
+              <Link href='/members-zone'><Image 
                   display={'flex'}
                   boxSize='50px' 
                   src='/general/DZR_logo.svg' 
@@ -302,7 +302,9 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
             </Flex>
             {session ? (
               <>
-                <ProfileNavItem href="/members-zone" icon={FaPeopleGroup}>Members Zone</ProfileNavItem>
+               {isAdmin && (
+                <ProfileNavItem href="/members-zone/about" icon={MdInfo}>About DZR</ProfileNavItem>
+              )}
                 <ProfileNavItem href="/members-zone/race-calendar" icon={MdCalendarMonth}>Race Calendar</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/zrl" icon={FaTrophy}>DZR Racing Teams</ProfileNavItem>
                 {(isAdmin || isCaptain) && (
