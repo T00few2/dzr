@@ -5,6 +5,9 @@ import { getToken } from 'next-auth/jwt';
 export async function middleware(req: NextRequest) {
 	const { pathname } = req.nextUrl;
 	if (!pathname.startsWith('/members-zone')) return NextResponse.next();
+	
+	// Allow public access to About page
+	if (pathname === '/members-zone/about') return NextResponse.next();
 
 	const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 	const requiredRoleId = process.env.DISCORD_REQUIRED_ROLE_ID || '1385216556166025347';
