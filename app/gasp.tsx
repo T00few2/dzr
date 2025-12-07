@@ -46,13 +46,19 @@ export const DZR_logo = () => {
   
     // Animation function
     const animateText = () => {
-        gsap.to(textRef.current, {
-          duration: 5,
-          delay: 0,
-          
-          textShadow: '0 0 10px  rgba(173, 26, 45, 1),0 0 20px  rgba(173, 26, 45, 1),0 0 30px  rgba(173, 26, 45, 1),0 0 40px  rgba(173, 26, 45, 1),0 0 60px  rgba(173, 26, 45, 1),0 0 80px  rgba(173, 26, 45, 1)',
-          zIndex : -1,
-          });    
+        gsap.fromTo(textRef.current, 
+          {
+            opacity: 0,
+            y: 30
+          },
+          {
+            duration: 1.2,
+            opacity: 1,
+            y: 0,
+            ease: 'power3.out',
+            color: '#fffaf0' // floralwhite in hex
+          }
+        );    
     };
 
     useEffect(() => {
@@ -60,7 +66,14 @@ export const DZR_logo = () => {
       }, []); 
   
     return (
-        <Text ref={textRef} color='floralwhite' maxW={'5xl'} fontSize={{ base: '5xl', sm: '5xl', md: '7xl' }} fontWeight={900} >
+        <Text 
+          ref={textRef} 
+          style={{ color: '#fffaf0' }}
+          maxW={'5xl'} 
+          fontSize={{ base: '5xl', sm: '5xl', md: '7xl' }} 
+          fontWeight={900}
+          textShadow='0 4px 20px rgba(173, 26, 45, 0.5)'
+        >
             DANISH ZWIFT RACERS
         </Text>
     );
