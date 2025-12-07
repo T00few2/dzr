@@ -80,7 +80,7 @@ export default function AboutPage() {
             About DZR
           </Heading>
           <Text color="gray.300" fontSize="lg">
-            Learn more about Danish Zwift Riders
+            Learn more about Danish Zwift Racers
           </Text>
         </Box>
 
