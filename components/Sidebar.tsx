@@ -302,9 +302,7 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
             </Flex>
             {session ? (
               <>
-               {isAdmin && (
                 <ProfileNavItem href="/members-zone/about" icon={MdInfo}>About DZR</ProfileNavItem>
-              )}
                 <ProfileNavItem href="/members-zone/race-calendar" icon={MdCalendarMonth}>Race Calendar</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/zrl" icon={FaTrophy}>DZR Racing Teams</ProfileNavItem>
                 {(isAdmin || isCaptain) && (
@@ -318,7 +316,10 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
                 <ProfileNavItem onClick={() => signOut({ callbackUrl: '/' })} icon={FiLogOut}>Logout</ProfileNavItem>
               </>
             ) : (
-              <ProfileNavItem onClick={() => signIn()} icon={FiLogIn}>Log in</ProfileNavItem>
+              <>
+                <ProfileNavItem href="/members-zone/about" icon={MdInfo}>About</ProfileNavItem>
+                <ProfileNavItem onClick={() => signIn()} icon={FiLogIn}>Log in</ProfileNavItem>
+              </>
             )}
           </Box>
         </DrawerContent>

@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import {
   Box,
   Container,
@@ -37,25 +36,9 @@ interface BoardMember {
 
 export default function AboutPage() {
   const { data: session, status } = useSession();
-  const router = useRouter();
-
-  React.useEffect(() => {
-    if (status === 'unauthenticated') {
-      const current = window.location.pathname + window.location.search;
-      router.replace(`/login?callbackUrl=${encodeURIComponent(current)}`);
-    }
-  }, [status, router]);
 
   if (status === 'loading') {
     return <LoadingSpinnerMemb />;
-  }
-
-  if (!session) {
-    return (
-      <Container maxW="7xl" py={8}>
-        <Text color="white">You need to be logged in to view this page.</Text>
-      </Container>
-    );
   }
 
   // Board members data
