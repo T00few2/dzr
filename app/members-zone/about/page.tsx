@@ -36,6 +36,25 @@ interface BoardMember {
 
 export default function AboutPage() {
   const { data: session, status } = useSession();
+  const [membershipSettings, setMembershipSettings] = React.useState<{ minAmountDkk: number; maxAmountDkk: number } | null>(null);
+
+  React.useEffect(() => {
+    async function fetchSettings() {
+      try {
+        const res = await fetch('/api/membership/settings', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          setMembershipSettings({
+            minAmountDkk: data?.minAmountDkk ?? 10,
+            maxAmountDkk: data?.maxAmountDkk ?? 100
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch membership settings:', error);
+      }
+    }
+    fetchSettings();
+  }, []);
 
   if (status === 'loading') {
     return <LoadingSpinnerMemb />;
@@ -47,6 +66,10 @@ export default function AboutPage() {
     { name: 'Nick Niebling', role: 'Kasserer (Treasurer)' },
     { name: 'Mik Endersen', role: 'Bestyrelsesmedlem (Board Member)' },
   ];
+
+  const membershipAmount = membershipSettings 
+    ? `${membershipSettings.minAmountDkk}-${membershipSettings.maxAmountDkk} kr. årligt`
+    : '...';
 
   return (
     <Container maxW="7xl" py={8}>
@@ -97,7 +120,7 @@ export default function AboutPage() {
                         Klub Medlem
                       </Heading>
                       <Badge bg="#ad1a2d" color="white" mt={2}>
-                        10-100 kr. årligt
+                        {membershipAmount}
                       </Badge>
                     </CardHeader>
                     <CardBody>
