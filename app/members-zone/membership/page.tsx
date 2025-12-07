@@ -235,7 +235,7 @@ function MembershipContent() {
                 </Text>
                 <List spacing={2} ml={4}>
                   <ListItem>
-                    • Medlemskabet gælder for den valgte periode og kan ikke opsiges i denne periode
+                    • Medlemskabet gælder for den valgte periode og refunderes ikke ved opsigelse i denne periode
                   </ListItem>
                   <ListItem>
                     • Medlemskabet udløber automatisk ved periodens afslutning uden yderligere forpligtelser

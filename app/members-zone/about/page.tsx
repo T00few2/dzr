@@ -89,9 +89,8 @@ export default function AboutPage() {
             <CardBody>
               <VStack align="start" spacing={4}>
                 <Text color="white" fontSize="md" lineHeight="tall">
-                  Danish Zwift Racers (DZR) er en almennyttig og non-profit sportsforening med 
-                  hjemsted på Frederiksberg. Foreningen blev stiftet den 17. november 2025 med 
-                  det formål at fremme e-cykling som sportsgren og socialt fællesskab i Danmark.
+                  Danish Zwift Racers (DZR) er en almennyttig og non-profit online sportsforening med medlemmer fra hele Danmark. 
+                  Foreningen blev stiftet den 17. november 2025 med det formål at fremme e-cykling som sportsgren og socialt fællesskab i Danmark.
                 </Text>
                 <Text color="white" fontSize="md" lineHeight="tall">
                   DZR skaber rammer for træning, løb og fællesskab på virtuelle cykelplatforme. 
@@ -171,6 +170,44 @@ export default function AboutPage() {
                   </Card>
                 </SimpleGrid>
                 
+                {/* Terms and Conditions - Compact */}
+                <Box borderWidth="1px" borderColor="gray.600" borderRadius="md" bg="gray.800" mt={4}>
+                  <Accordion allowToggle>
+                    <AccordionItem border="none">
+                      <h2>
+                        <AccordionButton _hover={{ bg: 'gray.700' }} py={2}>
+                          <Text flex="1" textAlign="left" color="gray.300" fontSize="sm">
+                            Vilkår for medlemskab
+                          </Text>
+                          <AccordionIcon color="gray.400" />
+                        </AccordionButton>
+                      </h2>
+                      <AccordionPanel pb={3} pt={1} color="gray.300" fontSize="xs" lineHeight="tall">
+                        <Text mb={2}>
+                          Ved betaling af kontingent accepterer du følgende vilkår:
+                        </Text>
+                        <List spacing={1} ml={4}>
+                          <ListItem>
+                            • Medlemskabet gælder for den valgte periode og refunderes ikke ved opsigelse i denne periode
+                          </ListItem>
+                          <ListItem>
+                            • Medlemskabet udløber automatisk ved periodens afslutning uden yderligere forpligtelser
+                          </ListItem>
+                          <ListItem>
+                            • Betalt kontingent refunderes ikke, jf. foreningens vedtægter §5
+                          </ListItem>
+                          <ListItem>
+                            • Medlemskabet fornyes ikke automatisk - du skal selv forny dit medlemskab ved periodens udløb
+                          </ListItem>
+                          <ListItem>
+                            • Som klubmedlem har du stemmeret på generalforsamlinger
+                          </ListItem>
+                        </List>
+                      </AccordionPanel>
+                    </AccordionItem>
+                  </Accordion>
+                </Box>
+                
                 <Divider borderColor="gray.600" my={2} />
                 
               </VStack>
@@ -232,8 +269,8 @@ export default function AboutPage() {
                   <AccordionPanel pb={4} color="gray.300">
                     <Text>
                       Foreningens navn er Danish Zwift Racers (DZR). Foreningen er en almennyttig 
-                      og non-profit sportsforening med hjemsted på Frederiksberg. Foreningen 
-                      registreres med CVR-nummer.
+                      og non-profit online sportsforening med hjemsted på Frederiksberg og med medlemmer fra hele Danmark. Foreningen 
+                      har CVR-nummer 46035771.
                     </Text>
                   </AccordionPanel>
                 </AccordionItem>
@@ -304,7 +341,7 @@ export default function AboutPage() {
                     <List spacing={2} ml={4}>
                       <ListItem>
                         <strong>1. Klub medlemmer:</strong> har betalt kontingent, har stemmeret 
-                        og kan deltage i DCU-events via DZR.
+                        og mulighed for DCU e-licens via DZR.
                       </ListItem>
                       <ListItem>
                         <strong>2. Community medlemmer:</strong> deltager i foreningens 
@@ -411,7 +448,7 @@ export default function AboutPage() {
                   <AccordionPanel pb={4} color="gray.300">
                     <Text>
                       Afholdes når bestyrelsen beslutter det, eller når mindst 1/5 af de aktive 
-                      medlemmer skriftligt kræver det. Indkaldes med samme varsel som ordinær 
+                      medlemmer (Klub medlemmer) skriftligt kræver det. Indkaldes med samme varsel som ordinær 
                       generalforsamling.
                     </Text>
                   </AccordionPanel>
