@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -18,7 +18,7 @@ import dynamic from 'next/dynamic';
 
 const ClubStats = dynamic(() => import('./club-stats/page'), { ssr: false });
 
-export default function StatsHubPage() {
+function StatsHubPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,6 +69,14 @@ export default function StatsHubPage() {
         </TabPanels>
       </Tabs>
     </Container>
+  );
+}
+
+export default function StatsHubPage() {
+  return (
+    <Suspense fallback={<LoadingSpinnerMemb />}>
+      <StatsHubPageContent />
+    </Suspense>
   );
 }
 

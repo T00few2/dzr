@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -22,7 +22,7 @@ const RaceCalendar = dynamic(() => import('./race-calendar/page'), { ssr: false 
 const ZRL = dynamic(() => import('./zrl/page'), { ssr: false });
 const TeamManagement = dynamic(() => import('./team-management/page'), { ssr: false });
 
-export default function RacingPage() {
+function RacingPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -95,6 +95,14 @@ export default function RacingPage() {
         </TabPanels>
       </Tabs>
     </Container>
+  );
+}
+
+export default function RacingPage() {
+  return (
+    <Suspense fallback={<LoadingSpinnerMemb />}>
+      <RacingPageContent />
+    </Suspense>
   );
 }
 

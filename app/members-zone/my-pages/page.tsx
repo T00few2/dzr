@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -19,7 +19,7 @@ import dynamic from 'next/dynamic';
 const Profile = dynamic(() => import('./profile/page'), { ssr: false });
 const Membership = dynamic(() => import('./membership/page'), { ssr: false });
 
-export default function MyPagesPage() {
+function MyPagesPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -82,6 +82,14 @@ export default function MyPagesPage() {
         </TabPanels>
       </Tabs>
     </Container>
+  );
+}
+
+export default function MyPagesPage() {
+  return (
+    <Suspense fallback={<LoadingSpinnerMemb />}>
+      <MyPagesPageContent />
+    </Suspense>
   );
 }
 
