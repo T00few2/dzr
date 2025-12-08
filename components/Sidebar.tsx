@@ -41,7 +41,7 @@ import {
 import { HamburgerIcon } from '@chakra-ui/icons'
 import { LiaMountainSolid } from "react-icons/lia";
 import { Im500Px } from "react-icons/im";
-import { MdDirectionsBike, MdCalendarMonth, MdManageAccounts, MdInsights, MdInfo } from "react-icons/md";
+import { MdDirectionsBike, MdInsights, MdInfo } from "react-icons/md";
 import { IconType } from 'react-icons'
 import { FaTrophy } from "react-icons/fa6";
 import { AiOutlineAim } from "react-icons/ai";
@@ -50,7 +50,7 @@ import { MdOutlineTimer } from "react-icons/md";
 import { GiDevilMask } from "react-icons/gi";
 import Sparkles from 'react-sparkle'
 import { useSession, signIn, signOut } from 'next-auth/react'
-import { FaUserCircle, FaUser } from 'react-icons/fa'
+import { FaUser, FaUserCircle } from 'react-icons/fa'
 
 interface LinkItemProps {
   name: string
@@ -302,17 +302,10 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
             </Flex>
             {session ? (
               <>
-                <ProfileNavItem href="/members-zone/about" icon={MdInfo}>About DZR</ProfileNavItem>
-                <ProfileNavItem href="/members-zone/race-calendar" icon={MdCalendarMonth}>Race Calendar</ProfileNavItem>
-                <ProfileNavItem href="/members-zone/zrl" icon={FaTrophy}>DZR Racing Teams</ProfileNavItem>
-                {(isAdmin || isCaptain) && (
-                  <ProfileNavItem href="/members-zone/team-management" icon={MdManageAccounts}>Team Management</ProfileNavItem>
-                )}
-                <ProfileNavItem href="/members-zone/stats" icon={MdInsights}>Club Stats</ProfileNavItem>
-                <ProfileNavItem href="/members-zone/profile" icon={FaUser}>Profile</ProfileNavItem>
-                {isAdmin && (
-                  <ProfileNavItem href="/members-zone/membership" icon={MdManageAccounts}>Membership</ProfileNavItem>
-                )}
+                <ProfileNavItem href="/members-zone/about" icon={MdInfo}>About</ProfileNavItem>
+                <ProfileNavItem href="/members-zone/racing" icon={FaTrophy}>Racing</ProfileNavItem>
+                <ProfileNavItem href="/members-zone/stats-hub" icon={MdInsights}>Stats</ProfileNavItem>
+                <ProfileNavItem href="/members-zone/my-pages" icon={FaUserCircle}>My Pages</ProfileNavItem>
                 <ProfileNavItem onClick={() => signOut({ callbackUrl: '/' })} icon={FiLogOut}>Logout</ProfileNavItem>
               </>
             ) : (

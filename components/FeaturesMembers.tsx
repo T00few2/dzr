@@ -29,18 +29,9 @@ import { IconType } from 'react-icons';
 
 import { motion } from 'framer-motion';
 
-import { LiaMountainSolid } from "react-icons/lia";
-import { Im500Px } from "react-icons/im";
-import { AiOutlineAim } from "react-icons/ai";
-import { RiBoxingFill } from "react-icons/ri";
-import { MdOutlineTimer, MdManageAccounts } from "react-icons/md";
 import { FaTrophy } from "react-icons/fa6";
-import { MdCalendarMonth, MdInsights, MdInfo } from "react-icons/md";
-import { BsShopWindow } from "react-icons/bs";
-// import { MdOutlineDirectionsBike } from "react-icons/md";
-import { countItems } from '@/components/shop/countItems';
-import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { MdInsights } from "react-icons/md";
+import { FaUserCircle } from "react-icons/fa";
 
 interface Props {
   href: string;
@@ -75,42 +66,33 @@ const CustomCard: React.FC<Props> = ({ href, icon, heading, text1, text2 }) => {
 };
 
 export default function FeaturesMembers() {
-  const [totalQuantity, setTotalQuantity] = useState(0);
-  const { data: session } = useSession();
-  const roles: string[] = Array.isArray((session?.user as any)?.roles) ? (session?.user as any).roles : [];
-  const isAdmin: boolean = Boolean((session?.user as any)?.isAdmin);
-  const isCaptain: boolean = roles.includes('1195878349617250405');
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Fetch total item counts from all users
-        const total = await countItems();
-        setTotalQuantity(total);
-      } catch (error) {
-        console.error('Error loading item counts:', error);
-      } 
-    };
-
-    loadData();
-  }, []);
   return (
-<>
-      <Box >
+    <>
+      <Box>
         <SimpleGrid spacing={4} minChildWidth={'300px'} marginBlockEnd={4}>
-        {(isAdmin) && (
-        <CustomCard href='members-zone/about' icon = {MdInfo} heading = 'About DZR' text1 = 'Club information' text2 = '' />
-        )}
-        <CustomCard href='members-zone/race-calendar' icon = {MdCalendarMonth} heading = 'Race Calendar' text1 = 'When we race' text2 = 'Join us'/>
-        {/*<CustomCard href='members-zone/shop' icon = {BsShopWindow} heading = 'Shop' text1 = 'Get the DZR kit IRL' text2={`Suits & bibs orders: ${totalQuantity}/20`} />*/}
-        {/*<CustomCard href='members-zone/dzr-team-race' icon = {MdOutlineDirectionsBike} heading = 'DZR Team Race' text1 = 'Join a team race' text2= 'and let the fun begin' />*/}
-        <CustomCard href='members-zone/zrl' icon = {FaTrophy} heading = 'DZR Racing Teams' text1 = 'Overview of DZR teams across race series' text2= 'Find a race series and team that suits' />
-        {(isAdmin || isCaptain) && (
-          <CustomCard href='members-zone/team-management' icon = {MdManageAccounts} heading = 'Team Management' text1 = 'Create and manage your teams' text2= 'Captains and admins only' />
-        )}
-        <CustomCard href='members-zone/stats' icon = {MdInsights} heading = 'Club Stats' text1 = 'Compare riders, ratings and power' text2= 'Time series and power graphs' />
+          <CustomCard 
+            href='members-zone/racing' 
+            icon={FaTrophy} 
+            heading='Racing' 
+            text1='Race Calendar, DZR Racing Teams' 
+            text2='and Team Management' 
+          />
+          <CustomCard 
+            href='members-zone/stats-hub' 
+            icon={MdInsights} 
+            heading='Stats' 
+            text1='Club Stats, rider comparisons' 
+            text2='and performance tracking' 
+          />
+          <CustomCard 
+            href='members-zone/my-pages' 
+            icon={FaUserCircle} 
+            heading='My Pages' 
+            text1='Your profile and' 
+            text2='membership settings' 
+          />
         </SimpleGrid>
       </Box>
-   </>
+    </>
   )
 }
