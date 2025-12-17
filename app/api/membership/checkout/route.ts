@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import Stripe from 'stripe'
+import { vippsCreatePayment } from '@/app/api/membership/vippsClient'
 
 export async function POST(req: Request) {
   try {
@@ -32,29 +32,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid payment option' }, { status: 400 })
     }
 
-    const stripeSecret = process.env.STRIPE_SECRET_KEY as string
-    if (!stripeSecret) return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
-    const stripe = new Stripe(stripeSecret, { apiVersion: '2023-10-16' })
-
     const userId = (token as any)?.discordId || (token as any)?.sub || 'unknown'
     const userEmail = (token as any)?.email || undefined
 
-    // Store selected coverage in metadata
     const coversYearsCsv = selected.coversYears.join(',')
     const optionLabel = selected.label || selected.id
+    // Vipps/MobilePay reference must match ^[a-zA-Z0-9-]{8,64}$ and be unique per MSN.
+    const referenceBase = `dzr-${String(userId).replace(/[^a-zA-Z0-9]/g, '') || 'user'}`
+    const reference = `${referenceBase}-${Date.now()}`
+      .replace(/[^a-zA-Z0-9-]/g, '-')
+      .slice(0, 64)
+      .padEnd(8, '0')
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: [
-        {
-          price_data: {
-            currency: 'dkk',
-            product_data: { name: 'DZR Club Membership Fee' },
-            unit_amount: Math.round(amountDkk * 100),
-          },
-          quantity: 1,
-        },
-      ],
+    const siteUrl = (process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/+$/, '')
+    const returnUrl = `${siteUrl}/members-zone/my-pages/membership?vippsReference=${encodeURIComponent(reference)}`
+
+    // Store a "created" payment record immediately (so we can reconcile even if the user never returns)
+    await adminDb.collection('payments').doc(`vipps_${reference}`).set({
+      userId: String(userId),
+      userEmail: String(userEmail || ''),
+      fullName: String(fullName),
+      amountDkk: Number(amountDkk),
+      currency: 'DKK',
+      paymentProvider: 'vipps',
+      vipps: {
+        reference,
+        state: 'CREATED',
+      },
+      status: 'created',
+      coversYears: selected.coversYears,
+      coveredThroughYear: Math.max(...selected.coversYears),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }, { merge: true })
+
+    const created = await vippsCreatePayment({
+      amount: { currency: 'DKK', value: Math.round(amountDkk * 100) },
+      reference,
+      paymentMethod: { type: 'WALLET' },
+      returnUrl,
+      userFlow: 'WEB_REDIRECT',
+      paymentDescription: 'DZR Club Membership Fee',
       metadata: {
         userId: String(userId),
         fullName: String(fullName),
@@ -62,21 +80,27 @@ export async function POST(req: Request) {
         coversYears: coversYearsCsv,
         optionLabel: String(optionLabel),
       },
-      payment_intent_data: {
-        metadata: {
-          userId: String(userId),
-          fullName: String(fullName),
-          userEmail: String(userEmail || ''),
-          coversYears: coversYearsCsv,
-          optionLabel: String(optionLabel),
-        },
-      },
-      success_url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/members-zone/membership?status=success`,
-      cancel_url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/members-zone/membership?status=cancelled`,
-      customer_email: userEmail,
     })
 
-    return NextResponse.json({ url: session.url }, { status: 200 })
+    const redirectUrl =
+      (typeof (created as any)?.redirectUrl === 'string' && (created as any).redirectUrl) ||
+      (typeof (created as any)?.url === 'string' && (created as any).url) ||
+      ''
+    if (!redirectUrl) {
+      return NextResponse.json({ error: 'Vipps/MobilePay did not return a redirectUrl' }, { status: 502 })
+    }
+
+    await adminDb.collection('payments').doc(`vipps_${reference}`).set({
+      vipps: {
+        reference,
+        pspReference: String((created as any)?.pspReference || ''),
+        state: 'INITIATED',
+      },
+      status: 'initiated',
+      updatedAt: new Date().toISOString(),
+    }, { merge: true })
+
+    return NextResponse.json({ url: redirectUrl }, { status: 200 })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Checkout failed' }, { status: 500 })
   }

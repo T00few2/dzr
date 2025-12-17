@@ -47,15 +47,69 @@ function MembershipContent() {
   const [lastName, setLastName] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
 
+  async function refreshSummary() {
+    try {
+      const res = await fetch('/api/membership/summary', { cache: 'no-store' })
+      if (!res.ok) return
+      const b = await res.json()
+      setSummary(b)
+      if (b?.fullName) {
+        const parts = String(b.fullName).trim().split(/\s+/)
+        setFirstName(parts[0] || '')
+        setLastName(parts.slice(1).join(' ') || '')
+      }
+    } catch {}
+  }
+
   useEffect(() => {
     const statusParam = qp?.get('status')
     if (statusParam === 'success') {
       toast({ title: 'Payment successful', status: 'success' })
-      router.replace('/members-zone/membership')
+      refreshSummary()
+      router.replace('/members-zone/my-pages/membership')
     } else if (statusParam === 'cancelled') {
       toast({ title: 'Payment cancelled', status: 'info' })
-      router.replace('/members-zone/membership')
+      router.replace('/members-zone/my-pages/membership')
     }
+  }, [qp, toast, router])
+
+  useEffect(() => {
+    const ref = qp?.get('vippsReference')
+    if (!ref) return
+    let ignore = false
+    async function confirm() {
+      try {
+        const res = await fetch(`/api/membership/vipps/confirm?reference=${encodeURIComponent(ref)}`, { cache: 'no-store' })
+        const data = await res.json().catch(() => ({} as any))
+        if (!res.ok) throw new Error(data?.error || 'Failed to confirm payment')
+        if (ignore) return
+        if (data?.status === 'succeeded') {
+          toast({ title: 'Payment successful', status: 'success' })
+          // Refresh membership status immediately so the UI updates without a manual reload.
+          await refreshSummary()
+          router.replace('/members-zone/my-pages/membership')
+        } else if (data?.status === 'authorized') {
+          toast({
+            title: 'Payment pending',
+            description: 'Your payment has been authorized and is being processed. If your membership does not update shortly, please contact an admin.',
+            status: 'info',
+          })
+          router.replace('/members-zone/my-pages/membership')
+        } else if (data?.status === 'failed') {
+          toast({ title: 'Payment failed', status: 'error' })
+          router.replace('/members-zone/my-pages/membership')
+        } else {
+          toast({ title: 'Payment pending', description: 'If you just paid, it can take a moment. Refresh in a bit.', status: 'info' })
+          router.replace('/members-zone/my-pages/membership')
+        }
+      } catch (err: any) {
+        if (ignore) return
+        toast({ title: 'Error', description: err?.message || 'Confirm failed', status: 'error' })
+        router.replace('/members-zone/my-pages/membership')
+      }
+    }
+    confirm()
+    return () => { ignore = true }
   }, [qp, toast, router])
 
   useEffect(() => {

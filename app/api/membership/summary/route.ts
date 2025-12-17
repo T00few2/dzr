@@ -39,7 +39,7 @@ export async function GET(req: Request) {
       }
       if (paidAt && (!latestPaidAt || paidAt > latestPaidAt)) {
         latestPaidAt = paidAt
-        lastPaymentId = d?.stripe?.paymentIntentId || p.id
+        lastPaymentId = d?.vipps?.reference || p.id
       }
     })
 
