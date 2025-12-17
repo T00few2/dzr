@@ -14,6 +14,8 @@ export async function POST(req: Request) {
     const amountDkk = Number(body?.amountDkk)
     const fullName = String(body?.fullName || '').trim()
     const selectedOptionId = String(body?.selectedOptionId || '').trim()
+    const paymentMethodRaw = String(body?.paymentMethod || 'WALLET').trim().toUpperCase()
+    const paymentMethod = paymentMethodRaw === 'CARD' ? 'CARD' : 'WALLET'
     if (!amountDkk || amountDkk <= 0) return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
     if (!fullName) return NextResponse.json({ error: 'Full name required' }, { status: 400 })
     if (!selectedOptionId) return NextResponse.json({ error: 'Payment year selection required' }, { status: 400 })
@@ -58,6 +60,7 @@ export async function POST(req: Request) {
       vipps: {
         reference,
         state: 'CREATED',
+        paymentMethod,
       },
       status: 'created',
       coversYears: selected.coversYears,
@@ -69,7 +72,7 @@ export async function POST(req: Request) {
     const created = await vippsCreatePayment({
       amount: { currency: 'DKK', value: Math.round(amountDkk * 100) },
       reference,
-      paymentMethod: { type: 'WALLET' },
+      paymentMethod: { type: paymentMethod },
       returnUrl,
       userFlow: 'WEB_REDIRECT',
       paymentDescription: 'DZR Club Membership Fee',
@@ -95,6 +98,7 @@ export async function POST(req: Request) {
         reference,
         pspReference: String((created as any)?.pspReference || ''),
         state: 'INITIATED',
+        paymentMethod,
       },
       status: 'initiated',
       updatedAt: new Date().toISOString(),

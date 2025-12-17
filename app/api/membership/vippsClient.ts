@@ -136,7 +136,7 @@ async function vippsRequestWithFallback<T>(
 export type VippsCreatePaymentRequest = {
   amount: { currency: string; value: number }
   reference: string
-  paymentMethod: { type: string; blockedSources?: string[] }
+  paymentMethod: { type: 'WALLET' | 'CARD'; blockedSources?: string[] }
   returnUrl: string
   userFlow: string
   paymentDescription?: string

@@ -13,6 +13,8 @@ import {
   Heading,
   HStack,
   Input,
+  Radio,
+  RadioGroup,
   Stack,
   Text,
   useToast,
@@ -46,6 +48,7 @@ function MembershipContent() {
   const [firstName, setFirstName] = useState<string>('')
   const [lastName, setLastName] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
+  const [paymentMethod, setPaymentMethod] = useState<'WALLET' | 'CARD'>('WALLET')
 
   async function refreshSummary() {
     try {
@@ -231,7 +234,7 @@ function MembershipContent() {
       const res = await fetch('/api/membership/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amountDkk: amount, fullName, selectedOptionId }),
+        body: JSON.stringify({ amountDkk: amount, fullName, selectedOptionId, paymentMethod }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -317,6 +320,19 @@ function MembershipContent() {
             </Text>
           )}
           <Stack spacing={4} maxW={{ base: '100%', md: '720px' }}>
+            <FormControl>
+              <FormLabel color={'white'}>Betalingsmetode</FormLabel>
+              <RadioGroup value={paymentMethod} onChange={(v) => setPaymentMethod((v as any) === 'CARD' ? 'CARD' : 'WALLET')}>
+                <HStack spacing={6} wrap="wrap">
+                  <Radio value="WALLET" colorScheme="red">
+                    <Text color="white">MobilePay / Vipps</Text>
+                  </Radio>
+                  <Radio value="CARD" colorScheme="red">
+                    <Text color="white">Kort (Visa/Mastercard)</Text>
+                  </Radio>
+                </HStack>
+              </RadioGroup>
+            </FormControl>
             <FormControl>
               <FormLabel color={'white'}>Vælg år</FormLabel>
               <HStack wrap="wrap" spacing={3}>
