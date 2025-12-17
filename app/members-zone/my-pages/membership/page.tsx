@@ -79,10 +79,11 @@ function MembershipContent() {
   useEffect(() => {
     const ref = qp?.get('vippsReference')
     if (!ref) return
+    const refStr = String(ref)
     let ignore = false
     async function confirm() {
       try {
-        const res = await fetch(`/api/membership/vipps/confirm?reference=${encodeURIComponent(ref)}`, { cache: 'no-store' })
+        const res = await fetch(`/api/membership/vipps/confirm?reference=${encodeURIComponent(refStr)}`, { cache: 'no-store' })
         const data = await res.json().catch(() => ({} as any))
         if (!res.ok) throw new Error(data?.error || 'Failed to confirm payment')
         if (ignore) return
