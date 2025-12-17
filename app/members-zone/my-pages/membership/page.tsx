@@ -7,14 +7,11 @@ import {
   Box,
   Button,
   Container,
-  Divider,
   FormControl,
   FormLabel,
   Heading,
   HStack,
   Input,
-  Radio,
-  RadioGroup,
   Stack,
   Text,
   useToast,
@@ -48,7 +45,6 @@ function MembershipContent() {
   const [firstName, setFirstName] = useState<string>('')
   const [lastName, setLastName] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
-  const [paymentMethod, setPaymentMethod] = useState<'WALLET' | 'CARD'>('WALLET')
 
   async function refreshSummary() {
     try {
@@ -76,43 +72,36 @@ function MembershipContent() {
     }
   }, [qp, toast, router])
 
+  // Handle return from Vipps Checkout API
   useEffect(() => {
-    const ref = qp?.get('vippsReference')
+    const ref = qp?.get('checkoutReference')
     if (!ref) return
     const refStr = String(ref)
     let ignore = false
-    async function confirm() {
+    async function confirmCheckout() {
       try {
-        const res = await fetch(`/api/membership/vipps/confirm?reference=${encodeURIComponent(refStr)}`, { cache: 'no-store' })
+        const res = await fetch(`/api/membership/vipps-checkout/confirm?reference=${encodeURIComponent(refStr)}`, { cache: 'no-store' })
         const data = await res.json().catch(() => ({} as any))
         if (!res.ok) throw new Error(data?.error || 'Failed to confirm payment')
         if (ignore) return
         if (data?.status === 'succeeded') {
-          toast({ title: 'Payment successful', status: 'success' })
-          // Refresh membership status immediately so the UI updates without a manual reload.
+          toast({ title: 'Betaling gennemført', status: 'success' })
           await refreshSummary()
           router.replace('/members-zone/my-pages/membership')
-        } else if (data?.status === 'authorized') {
-          toast({
-            title: 'Payment pending',
-            description: 'Your payment has been authorized and is being processed. If your membership does not update shortly, please contact an admin.',
-            status: 'info',
-          })
-          router.replace('/members-zone/my-pages/membership')
         } else if (data?.status === 'failed') {
-          toast({ title: 'Payment failed', status: 'error' })
+          toast({ title: 'Betaling mislykkedes', status: 'error' })
           router.replace('/members-zone/my-pages/membership')
         } else {
-          toast({ title: 'Payment pending', description: 'If you just paid, it can take a moment. Refresh in a bit.', status: 'info' })
+          toast({ title: 'Betaling afventer', description: 'Hvis du lige har betalt, kan det tage et øjeblik. Prøv at genindlæse siden.', status: 'info' })
           router.replace('/members-zone/my-pages/membership')
         }
       } catch (err: any) {
         if (ignore) return
-        toast({ title: 'Error', description: err?.message || 'Confirm failed', status: 'error' })
+        toast({ title: 'Fejl', description: err?.message || 'Bekræftelse mislykkedes', status: 'error' })
         router.replace('/members-zone/my-pages/membership')
       }
     }
-    confirm()
+    confirmCheckout()
     return () => { ignore = true }
   }, [qp, toast, router])
 
@@ -232,10 +221,11 @@ function MembershipContent() {
       if (overlaps) {
         throw new Error('Du har allerede betalt for det valgte år')
       }
-      const res = await fetch('/api/membership/checkout', {
+      
+      const res = await fetch('/api/membership/vipps-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amountDkk: amount, fullName, selectedOptionId, paymentMethod }),
+        body: JSON.stringify({ amountDkk: amount, fullName, selectedOptionId }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -321,19 +311,6 @@ function MembershipContent() {
             </Text>
           )}
           <Stack spacing={4} maxW={{ base: '100%', md: '720px' }}>
-            <FormControl>
-              <FormLabel color={'white'}>Betalingsmetode</FormLabel>
-              <RadioGroup value={paymentMethod} onChange={(v) => setPaymentMethod((v as any) === 'CARD' ? 'CARD' : 'WALLET')}>
-                <HStack spacing={6} wrap="wrap">
-                  <Radio value="WALLET" colorScheme="red">
-                    <Text color="white">MobilePay / Vipps</Text>
-                  </Radio>
-                  <Radio value="CARD" colorScheme="red">
-                    <Text color="white">Kort (Visa/Mastercard)</Text>
-                  </Radio>
-                </HStack>
-              </RadioGroup>
-            </FormControl>
             <FormControl>
               <FormLabel color={'white'}>Vælg år</FormLabel>
               <HStack wrap="wrap" spacing={3}>

@@ -1,3 +1,10 @@
+/**
+ * Vipps MobilePay Checkout API Client
+ * 
+ * Uses the Checkout API which automatically handles capture.
+ * See: https://developer.vippsmobilepay.com/docs/APIs/checkout-api/
+ */
+
 type VippsEnv = {
   baseUrl: string
   clientId: string
@@ -15,7 +22,6 @@ let cachedToken: { token: string; expiresAtMs: number } | null = null
 function makeIdempotencyKey(): string {
   const k =
     (globalThis as any)?.crypto?.randomUUID?.() ||
-    // Node.js runtime provides crypto.randomUUID(); fall back safely if unavailable.
     `${Date.now()}-${Math.random().toString(16).slice(2)}`
   return String(k).slice(0, 50)
 }
@@ -113,144 +119,96 @@ async function vippsRequest<T>(path: string, init: RequestInit & { headers?: Rec
   return (data || {}) as T
 }
 
-async function vippsRequestWithFallback<T>(
-  paths: string[],
-  init: RequestInit & { headers?: Record<string, string> } = {},
-): Promise<T> {
-  let lastErr: any = null
-  for (const p of paths) {
-    try {
-      return await vippsRequest<T>(p, init)
-    } catch (err: any) {
-      lastErr = err
-      const msg = String(err?.message || '')
-      // Vipps API gateway sometimes returns: "no Route matched with those values" when the path is slightly wrong.
-      if (!msg.toLowerCase().includes('no route matched')) {
-        throw err
-      }
-    }
-  }
-  throw lastErr || new Error('Vipps API failed')
-}
+// ============================================================================
+// VIPPS CHECKOUT API
+// ============================================================================
 
-export type VippsCreatePaymentRequest = {
-  amount: { currency: string; value: number }
+export type VippsCheckoutSessionRequest = {
+  type: 'PAYMENT'
   reference: string
-  paymentMethod: { type: 'WALLET' | 'CARD'; blockedSources?: string[] }
-  returnUrl: string
-  userFlow: string
-  paymentDescription?: string
-  metadata?: Record<string, string>
+  transaction: {
+    amount: { value: number; currency: string }
+    paymentDescription?: string
+  }
+  merchantInfo: {
+    callbackUrl: string
+    returnUrl: string
+    callbackAuthorizationToken?: string
+    termsAndConditionsUrl?: string
+  }
+  prefillCustomer?: {
+    firstName?: string
+    lastName?: string
+    email?: string
+    phoneNumber?: string
+  }
+  configuration?: {
+    customerInteraction?: 'CUSTOMER_PRESENT' | 'CUSTOMER_NOT_PRESENT'
+    elements?: 'PaymentOnly' | 'Full'
+    countries?: { supported?: string[] }
+  }
 }
 
-export type VippsCreatePaymentResponse = {
-  redirectUrl?: string
-  reference?: string
-  pspReference?: string
+export type VippsCheckoutSessionResponse = {
+  token?: string
+  checkoutFrontendUrl?: string
+  pollingUrl?: string
   [k: string]: any
 }
 
-export async function vippsCreatePayment(body: VippsCreatePaymentRequest): Promise<VippsCreatePaymentResponse> {
-  // Different environments/tenants may expose the resource as /payment or /payments.
-  // Idempotency-Key is required by the ePayment API for create-payment operations.
-  return await vippsRequestWithFallback<VippsCreatePaymentResponse>(['/epayment/v1/payment', '/epayment/v1/payments'], {
+/**
+ * Create a Vipps Checkout session.
+ * The user will be redirected to checkoutFrontendUrl to complete payment.
+ * Capture is handled automatically by Checkout API - no manual capture needed!
+ */
+export async function vippsCreateCheckoutSession(body: VippsCheckoutSessionRequest): Promise<VippsCheckoutSessionResponse> {
+  const env = getVippsEnv()
+  return await vippsRequest<VippsCheckoutSessionResponse>('/checkout/v3/session', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Idempotency-Key': makeIdempotencyKey(),
+      'client_id': env.clientId,
+      'client_secret': env.clientSecret,
     },
     body: JSON.stringify(body),
   })
 }
 
-export type VippsGetPaymentResponse = {
+export type VippsCheckoutSessionInfo = {
   reference?: string
-  pspReference?: string
-  state?: string
-  amount?: { currency?: string; value?: number }
-  metadata?: Record<string, string>
-  [k: string]: any
-}
-
-export async function vippsGetPayment(reference: string): Promise<VippsGetPaymentResponse> {
-  const safe = encodeURIComponent(reference)
-  return await vippsRequestWithFallback<VippsGetPaymentResponse>(
-    [`/epayment/v1/payment/${safe}`, `/epayment/v1/payments/${safe}`],
-    { method: 'GET' },
-  )
-}
-
-export type VippsCapturePaymentRequest = {
-  modificationAmount: { currency: string; value: number }
-}
-
-export type VippsCapturePaymentResponse = {
-  reference?: string
-  pspReference?: string
-  state?: string | string[]
-  amount?: { currency?: string; value?: number }
-  [k: string]: any
-}
-
-export async function vippsCapturePayment(reference: string, body: VippsCapturePaymentRequest): Promise<VippsCapturePaymentResponse> {
-  const safe = encodeURIComponent(reference)
-  return await vippsRequestWithFallback<VippsCapturePaymentResponse>(
-    [`/epayment/v1/payment/${safe}/capture`, `/epayment/v1/payments/${safe}/capture`],
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Idempotency-Key': makeIdempotencyKey(),
-      },
-      body: JSON.stringify(body),
-    },
-  )
-}
-
-export type VippsPaymentEvent = {
-  reference?: string
-  pspReference?: string
-  name?: string
-  amount?: { currency?: string; value?: number }
-  timestamp?: string
-  [k: string]: any
-}
-
-export async function vippsGetPaymentEvents(reference: string): Promise<VippsPaymentEvent[]> {
-  const safe = encodeURIComponent(reference)
-  return await vippsRequestWithFallback<VippsPaymentEvent[]>(
-    [
-      `/epayment/v1/payment/${safe}/event`,
-      `/epayment/v1/payment/${safe}/events`,
-      `/epayment/v1/payments/${safe}/event`,
-      `/epayment/v1/payments/${safe}/events`,
-    ],
-    { method: 'GET' },
-  )
-}
-
-export type VippsCancelPaymentResponse = {
-  aggregate?: {
-    authorizedAmount?: { currency?: string; value?: number }
-    cancelledAmount?: { currency?: string; value?: number }
-    capturedAmount?: { currency?: string; value?: number }
-    refundedAmount?: { currency?: string; value?: number }
+  sessionState?: 'SessionCreated' | 'PaymentInitiated' | 'SessionExpired' | 'PaymentSuccessful' | 'PaymentTerminated'
+  paymentDetails?: {
+    amount?: { value?: number; currency?: string }
+    state?: 'CREATED' | 'AUTHORIZED' | 'CAPTURED' | 'TERMINATED'
+    aggregate?: {
+      cancelledAmount?: { value?: number; currency?: string }
+      capturedAmount?: { value?: number; currency?: string }
+      refundedAmount?: { value?: number; currency?: string }
+      authorizedAmount?: { value?: number; currency?: string }
+    }
+  }
+  billingDetails?: {
+    firstName?: string
+    lastName?: string
+    email?: string
+    phoneNumber?: string
   }
   [k: string]: any
 }
 
-export async function vippsCancelPayment(reference: string): Promise<VippsCancelPaymentResponse> {
+/**
+ * Get information about a Checkout session.
+ * Use this to check if payment was successful and captured.
+ */
+export async function vippsGetCheckoutSession(reference: string): Promise<VippsCheckoutSessionInfo> {
+  const env = getVippsEnv()
   const safe = encodeURIComponent(reference)
-  return await vippsRequestWithFallback<VippsCancelPaymentResponse>(
-    [`/epayment/v1/payment/${safe}/cancel`, `/epayment/v1/payments/${safe}/cancel`],
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Idempotency-Key': makeIdempotencyKey(),
-      },
+  return await vippsRequest<VippsCheckoutSessionInfo>(`/checkout/v3/session/${safe}`, {
+    method: 'GET',
+    headers: {
+      'client_id': env.clientId,
+      'client_secret': env.clientSecret,
     },
-  )
+  })
 }
-
-
