@@ -212,3 +212,29 @@ export async function vippsGetCheckoutSession(reference: string): Promise<VippsC
     },
   })
 }
+
+// ============================================================================
+// EPAYMENT API - Capture (for Reserve Capture merchant accounts)
+// ============================================================================
+
+/**
+ * Capture an authorized payment.
+ * Only needed if merchant account is in "Reserve Capture" mode.
+ * In "Direct Capture" mode, payments are captured automatically.
+ */
+export async function vippsCapturePayment(reference: string, amountValue: number, currency: string = 'DKK'): Promise<any> {
+  const safe = encodeURIComponent(reference)
+  return await vippsRequest<any>(`/epayment/v1/payments/${safe}/capture`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': makeIdempotencyKey(),
+    },
+    body: JSON.stringify({
+      modificationAmount: {
+        value: amountValue,
+        currency,
+      },
+    }),
+  })
+}

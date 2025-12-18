@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import { vippsGetCheckoutSession } from '@/app/api/membership/vippsClient'
+import { vippsGetCheckoutSession, vippsCapturePayment } from '@/app/api/membership/vippsClient'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -37,8 +37,27 @@ export async function GET(req: Request) {
     }
 
     const sessionState = String(session?.sessionState || '').trim()
-    const paymentState = String(session?.paymentDetails?.state || '').toUpperCase()
-    const capturedAmount = Number(session?.paymentDetails?.aggregate?.capturedAmount?.value ?? 0)
+    let paymentState = String(session?.paymentDetails?.state || '').toUpperCase()
+    let capturedAmount = Number(session?.paymentDetails?.aggregate?.capturedAmount?.value ?? 0)
+    const authorizedAmount = Number(session?.paymentDetails?.aggregate?.authorizedAmount?.value ?? 0)
+    const amountValue = Number(session?.paymentDetails?.amount?.value ?? 0)
+    const currency = String(session?.paymentDetails?.amount?.currency || 'DKK').toUpperCase()
+
+    // Auto-capture if payment is AUTHORIZED but not CAPTURED (Reserve Capture mode)
+    if (paymentState === 'AUTHORIZED' && capturedAmount === 0 && (authorizedAmount > 0 || amountValue > 0)) {
+      const captureAmount = authorizedAmount || amountValue
+      console.log(`Auto-capturing payment ${reference} for amount ${captureAmount} ${currency}`)
+      try {
+        await vippsCapturePayment(reference, captureAmount, currency)
+        paymentState = 'CAPTURED'
+        capturedAmount = captureAmount
+        console.log(`Auto-capture successful for ${reference}`)
+      } catch (err: any) {
+        console.error(`Auto-capture failed for ${reference}:`, err?.message || err)
+        // Continue - user can retry or capture manually
+      }
+    }
+
     const isCaptured = paymentState === 'CAPTURED' || capturedAmount > 0
     const isSuccessful = sessionState === 'PaymentSuccessful' || isCaptured
     const isTerminalFail = sessionState === 'SessionExpired' || sessionState === 'PaymentTerminated' || paymentState === 'TERMINATED'
