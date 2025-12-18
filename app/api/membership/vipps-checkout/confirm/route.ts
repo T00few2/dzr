@@ -101,8 +101,6 @@ export async function GET(req: Request) {
     ).trim()
     const userEmail = String(local?.userEmail || billingDetails.email || '').trim()
 
-    const amountValue = Number(session?.paymentDetails?.amount?.value ?? 0)
-    const currency = String(session?.paymentDetails?.amount?.currency || local?.currency || 'DKK').toUpperCase()
     const amount = amountValue ? amountValue / 100 : Number(local?.amountDkk || 0)
 
     const coversYears: number[] = Array.isArray(local?.coversYears) ? local.coversYears : [new Date().getUTCFullYear()]
