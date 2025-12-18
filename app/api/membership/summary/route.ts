@@ -46,17 +46,20 @@ export async function GET(req: Request) {
     const currentYear = new Date().getUTCFullYear()
     const computedStatus = maxCoveredThrough != null && maxCoveredThrough >= currentYear ? 'club' : 'community'
 
-    // Optionally persist the computed values back to the membership doc to keep it in sync
-    try {
-      await adminDb.collection('memberships').doc(String(userId)).set({
-        userId: String(userId),
-        currentStatus: computedStatus,
-        coveredThroughYear: maxCoveredThrough ?? null,
-        lastPaymentId: lastPaymentId ?? null,
-        fullName: cached?.fullName ?? null,
-        updatedAt: new Date().toISOString(),
-      }, { merge: true })
-    } catch {}
+    // Only persist membership doc if user has made at least one successful payment
+    // Users without payments are implicitly "community" members - no need to store that
+    if (maxCoveredThrough != null) {
+      try {
+        await adminDb.collection('memberships').doc(String(userId)).set({
+          userId: String(userId),
+          currentStatus: computedStatus,
+          coveredThroughYear: maxCoveredThrough,
+          lastPaymentId: lastPaymentId ?? null,
+          fullName: cached?.fullName ?? null,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true })
+      } catch {}
+    }
 
     return NextResponse.json({
       userId,
