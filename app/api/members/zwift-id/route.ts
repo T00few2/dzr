@@ -10,17 +10,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ zwiftId: null }, { status: 200 });
     }
 
-    const snap = await adminDb
-      .collection('discord_users')
-      .where('discordID', '==', discordId)
-      .limit(1)
-      .get();
+    const doc = await adminDb.collection('users').doc(discordId).get();
 
-    if (snap.empty) {
+    if (!doc.exists) {
       return NextResponse.json({ zwiftId: null }, { status: 200 });
     }
 
-    const zwiftId = snap.docs[0].get('zwiftID') ?? null;
+    const zwiftId = doc.get('zwiftId') ?? null;
     return NextResponse.json({ zwiftId: zwiftId ? String(zwiftId) : null }, { status: 200 });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Lookup failed' }, { status: 500 });

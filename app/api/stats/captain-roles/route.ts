@@ -76,13 +76,13 @@ export async function GET() {
       });
     }
 
-    // 3) Build discordId -> zwiftID map from discord_users
-    const duSnap = await adminDb.collection('discord_users').get();
+    // 3) Build discordId -> zwiftId map from users collection
+    const usersSnap = await adminDb.collection('users').get();
     const discordToZwift = new Map<string, string>();
-    duSnap.forEach((d) => {
+    usersSnap.forEach((d) => {
       const data = d.data() as any;
-      const did = String(data?.discordID ?? d.id);
-      const zw = data?.zwiftID != null ? String(data.zwiftID) : '';
+      const did = String(data?.discordId ?? d.id);
+      const zw = data?.zwiftId != null ? String(data.zwiftId) : '';
       if (did && zw) discordToZwift.set(did, zw);
     });
 

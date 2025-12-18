@@ -105,11 +105,19 @@ export async function POST(request: Request) {
     async function getDiscordIdForUid(uid?: string): Promise<string | null> {
       if (!uid) return null;
       try {
-        const snap = await adminDb.collection('user_profiles').doc(uid).get();
-        if (!snap.exists) return null;
-        const data = snap.data() as any;
-        const discordId = typeof data?.discordId === 'string' ? data.discordId : null;
-        return discordId;
+        // uid here is actually a discordId stored as the rider's userId
+        // First check if it's directly a discordId (new structure)
+        const userDoc = await adminDb.collection('users').doc(uid).get();
+        if (userDoc.exists) {
+          return uid; // uid is the discordId
+        }
+        // Fallback: search by firebaseUid (for legacy compatibility)
+        const snap = await adminDb.collection('users').where('firebaseUid', '==', uid).limit(1).get();
+        if (!snap.empty) {
+          const data = snap.docs[0].data() as any;
+          return typeof data?.discordId === 'string' ? data.discordId : null;
+        }
+        return null;
       } catch {
         return null;
       }

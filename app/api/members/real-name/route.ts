@@ -14,18 +14,14 @@ export async function GET(req: Request) {
 			return NextResponse.json({ displayName: null }, { status: 200 });
 		}
 
-		// 1) Resolve ZwiftID from discord_users
-		const discordUsersSnap = await adminDb
-			.collection('discord_users')
-			.where('discordID', '==', discordId)
-			.limit(1)
-			.get();
+		// 1) Resolve ZwiftID from users collection
+		const userDoc = await adminDb.collection('users').doc(discordId).get();
 
-		if (discordUsersSnap.empty) {
+		if (!userDoc.exists) {
 			return NextResponse.json({ displayName: null }, { status: 200 });
 		}
 
-		const zwiftID = discordUsersSnap.docs[0].get('zwiftID');
+		const zwiftID = userDoc.get('zwiftId');
 		if (!zwiftID) {
 			return NextResponse.json({ displayName: null }, { status: 200 });
 		}

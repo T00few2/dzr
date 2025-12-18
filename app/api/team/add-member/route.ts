@@ -47,8 +47,8 @@ export async function POST(request: Request) {
     }
 
     // Lookup Discord ID from zwiftId
-    const duSnap = await adminDb.collection('discord_users').where('zwiftID', '==', String(zwiftId)).limit(1).get();
-    const discordId = duSnap.empty ? null : String((duSnap.docs[0].data() as any)?.discordID || duSnap.docs[0].id);
+    const usersSnap = await adminDb.collection('users').where('zwiftId', '==', String(zwiftId)).limit(1).get();
+    const discordId = usersSnap.empty ? null : String((usersSnap.docs[0].data() as any)?.discordId || usersSnap.docs[0].id);
     if (!discordId) {
       return NextResponse.json({ error: 'No Discord user linked to this ZwiftID' }, { status: 404 });
     }

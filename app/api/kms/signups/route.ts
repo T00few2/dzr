@@ -55,14 +55,14 @@ export async function GET(req: Request) {
       if (!after) break;
     }
 
-    // Map Discord IDs to ZwiftIDs via discord_users
-    const duSnap = await adminDb.collection('discord_users').get();
+    // Map Discord IDs to ZwiftIDs via users collection
+    const usersSnap = await adminDb.collection('users').get();
     const signedZwiftIds = new Set<string>();
     const signedDiscordIds = new Set<string>();
-    duSnap.forEach((d) => {
+    usersSnap.forEach((d) => {
       const data = d.data() as any;
-      const did = String(data?.discordID ?? d.id);
-      const zw = data?.zwiftID != null ? String(data.zwiftID) : '';
+      const did = String(data?.discordId ?? d.id);
+      const zw = data?.zwiftId != null ? String(data.zwiftId) : '';
       if (did && roleMemberDiscordIds.has(did)) {
         signedDiscordIds.add(did);
         if (zw) signedZwiftIds.add(zw);

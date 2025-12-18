@@ -39,15 +39,14 @@ export async function GET(req: Request) {
 			}
 		}
 
-		// 2) Else map via user_profiles by discordId
+		// 2) Else check users collection for existing firebaseUid
 		if (!targetUid) {
-			const snap = await db
-				.collection('user_profiles')
-				.where('discordId', '==', discordId)
-				.limit(1)
-				.get();
-			if (!snap.empty) {
-				targetUid = snap.docs[0].id;
+			const userDoc = await db.collection('users').doc(discordId).get();
+			if (userDoc.exists) {
+				const userData = userDoc.data() as any;
+				if (userData?.firebaseUid) {
+					targetUid = userData.firebaseUid;
+				}
 			}
 		}
 
@@ -57,7 +56,7 @@ export async function GET(req: Request) {
 			targetUid = created.uid;
 		}
 
-		// Persist Discord linkage and profile
+		// Persist Discord linkage and profile in users collection
 		try {
 			const userRecord = await authAdmin.getUser(targetUid);
 			const existingClaims = (userRecord.customClaims as Record<string, unknown>) || {};
@@ -65,12 +64,13 @@ export async function GET(req: Request) {
 				await authAdmin.setCustomUserClaims(targetUid, { ...existingClaims, discordId });
 			}
 			await db
-				.collection('user_profiles')
-				.doc(targetUid)
+				.collection('users')
+				.doc(discordId)
 				.set(
 					{
 						discordId,
 						email: email ?? userRecord.email ?? null,
+						firebaseUid: targetUid,
 						updatedAt: admin.firestore.FieldValue.serverTimestamp(),
 					},
 					{ merge: true }
