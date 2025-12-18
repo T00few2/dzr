@@ -37,7 +37,7 @@ function MembershipContent() {
   const qp = useSearchParams()
 
   const isAdmin = Boolean((session as any)?.user?.isAdmin)
-  const [settings, setSettings] = useState<{ minAmountDkk: number; maxAmountDkk: number; dualYearMode: boolean; paymentOptions?: Array<{ id: string; label?: string; coversYears?: number[] }> } | null>(null)
+  const [settings, setSettings] = useState<{ minAmountDkk: number; maxAmountDkk: number; paymentOptions?: Array<{ id: string; label?: string; coversYears?: number[] }> } | null>(null)
   const [summary, setSummary] = useState<{ currentStatus: string; coveredThroughYear: number | null; fullName: string | null; coveredYears?: number[] } | null>(null)
   const [selectedOptionId, setSelectedOptionId] = useState<string>('')
 
