@@ -24,8 +24,6 @@ function MyPagesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const isAdmin: boolean = Boolean((session?.user as any)?.isAdmin);
-  
   const tabFromUrl = searchParams?.get('tab');
   const initialTab = tabFromUrl ? parseInt(tabFromUrl) : 0;
   const [tabIndex, setTabIndex] = useState(initialTab);
@@ -63,22 +61,18 @@ function MyPagesPageContent() {
           <Tab color="gray.300" _selected={{ color: 'white', bg: 'gray.800', borderColor: 'gray.600', borderBottomColor: 'gray.800' }}>
             Profile
           </Tab>
-          {isAdmin && (
-            <Tab color="gray.300" _selected={{ color: 'white', bg: 'gray.800', borderColor: 'gray.600', borderBottomColor: 'gray.800' }}>
-              Membership
-            </Tab>
-          )}
+          <Tab color="gray.300" _selected={{ color: 'white', bg: 'gray.800', borderColor: 'gray.600', borderBottomColor: 'gray.800' }}>
+            Membership
+          </Tab>
         </TabList>
 
         <TabPanels>
           <TabPanel px={0}>
             <Profile />
           </TabPanel>
-          {isAdmin && (
-            <TabPanel px={0}>
-              <Membership />
-            </TabPanel>
-          )}
+          <TabPanel px={0}>
+            <Membership />
+          </TabPanel>
         </TabPanels>
       </Tabs>
     </Container>

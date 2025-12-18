@@ -19,8 +19,6 @@ export async function POST(req: Request) {
   try {
     const token = await getToken({ req: req as any, secret: process.env.NEXTAUTH_SECRET })
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const isAdmin = Boolean((token as any)?.isAdmin)
-    if (!isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const body = await req.json()
     const amountDkk = Number(body?.amountDkk)
