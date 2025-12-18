@@ -56,7 +56,7 @@ export async function POST(req: Request) {
       .padEnd(8, '0')
 
     const siteUrl = (process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/+$/, '')
-    const returnUrl = `${siteUrl}/members-zone/my-pages/membership?checkoutReference=${encodeURIComponent(reference)}`
+    const returnUrl = `${siteUrl}/members-zone/my-pages?tab=1&checkoutReference=${encodeURIComponent(reference)}`
     
     // Vipps requires HTTPS for callback URLs. In development (localhost), we need a real HTTPS URL.
     // Option 1: Set VIPPS_CALLBACK_URL env var to your ngrok/deployed URL

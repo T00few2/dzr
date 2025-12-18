@@ -64,10 +64,10 @@ function MembershipContent() {
     if (statusParam === 'success') {
       toast({ title: 'Payment successful', status: 'success' })
       refreshSummary()
-      router.replace('/members-zone/my-pages/membership')
+      router.replace('/members-zone/my-pages?tab=1')
     } else if (statusParam === 'cancelled') {
       toast({ title: 'Payment cancelled', status: 'info' })
-      router.replace('/members-zone/my-pages/membership')
+      router.replace('/members-zone/my-pages?tab=1')
     }
   }, [qp, toast, router])
 
@@ -86,18 +86,18 @@ function MembershipContent() {
         if (data?.status === 'succeeded') {
           toast({ title: 'Betaling gennemført', status: 'success' })
           await refreshSummary()
-          router.replace('/members-zone/my-pages/membership')
+          router.replace('/members-zone/my-pages?tab=1')
         } else if (data?.status === 'failed') {
           toast({ title: 'Betaling mislykkedes', status: 'error' })
-          router.replace('/members-zone/my-pages/membership')
+          router.replace('/members-zone/my-pages?tab=1')
         } else {
           toast({ title: 'Betaling afventer', description: 'Hvis du lige har betalt, kan det tage et øjeblik. Prøv at genindlæse siden.', status: 'info' })
-          router.replace('/members-zone/my-pages/membership')
+          router.replace('/members-zone/my-pages?tab=1')
         }
       } catch (err: any) {
         if (ignore) return
         toast({ title: 'Fejl', description: err?.message || 'Bekræftelse mislykkedes', status: 'error' })
-        router.replace('/members-zone/my-pages/membership')
+        router.replace('/members-zone/my-pages?tab=1')
       }
     }
     confirmCheckout()
