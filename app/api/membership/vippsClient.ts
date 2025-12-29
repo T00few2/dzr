@@ -81,7 +81,7 @@ async function getAccessToken(): Promise<string> {
   return token
 }
 
-async function vippsRequest<T>(path: string, init: RequestInit & { headers?: Record<string, string> } = {}): Promise<T> {
+async function vippsRequest<T>(path: string, init: RequestInit & { headers?: Record<string, string> } = {}, retried = false): Promise<T> {
   const env = getVippsEnv()
   const token = await getAccessToken()
 
@@ -106,6 +106,13 @@ async function vippsRequest<T>(path: string, init: RequestInit & { headers?: Rec
     data = raw ? JSON.parse(raw) : {}
   } catch {
     data = {}
+  }
+
+  // If 401 and we haven't retried yet, clear token cache and retry once
+  if (resp.status === 401 && !retried) {
+    console.log('Vipps token expired, clearing cache and retrying...')
+    cachedToken = null
+    return vippsRequest<T>(path, init, true)
   }
 
   if (!resp.ok) {
