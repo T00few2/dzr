@@ -53,9 +53,11 @@ function getVippsEnv(): VippsEnv {
 async function getAccessToken(): Promise<string> {
   const now = Date.now()
   if (cachedToken && cachedToken.expiresAtMs - now > 30_000) {
+    console.log(`Using cached Vipps token (expires in ${Math.round((cachedToken.expiresAtMs - now) / 1000)}s)`)
     return cachedToken.token
   }
 
+  console.log('Fetching new Vipps access token...')
   const env = getVippsEnv()
   const resp = await fetch(`${env.baseUrl}/accessToken/get`, {
     method: 'POST',
@@ -68,6 +70,7 @@ async function getAccessToken(): Promise<string> {
 
   const data = await resp.json().catch(() => ({} as any))
   if (!resp.ok) {
+    console.error('Vipps access token request failed:', resp.status, data)
     throw new Error(data?.error_description || data?.error || `Vipps access token failed (${resp.status})`)
   }
 
@@ -77,6 +80,7 @@ async function getAccessToken(): Promise<string> {
     throw new Error('Vipps access token response missing access_token/expires_in')
   }
 
+  console.log(`Got new Vipps access token (expires in ${expiresIn}s)`)
   cachedToken = { token, expiresAtMs: now + expiresIn * 1000 }
   return token
 }
@@ -86,7 +90,10 @@ async function vippsRequest<T>(path: string, init: RequestInit & { headers?: Rec
   const token = await getAccessToken()
 
   const urlPath = path.startsWith('/') ? path : `/${path}`
-  const resp = await fetch(`${env.baseUrl}${urlPath}`, {
+  const fullUrl = `${env.baseUrl}${urlPath}`
+  console.log(`Vipps API ${init.method || 'GET'} ${urlPath} (retried: ${retried})`)
+  
+  const resp = await fetch(fullUrl, {
     ...init,
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -108,9 +115,11 @@ async function vippsRequest<T>(path: string, init: RequestInit & { headers?: Rec
     data = {}
   }
 
+  console.log(`Vipps API response: ${resp.status} ${resp.statusText}`)
+
   // If 401 and we haven't retried yet, clear token cache and retry once
   if (resp.status === 401 && !retried) {
-    console.log('Vipps token expired, clearing cache and retrying...')
+    console.log('Vipps token rejected (401), clearing cache and retrying with fresh token...')
     cachedToken = null
     return vippsRequest<T>(path, init, true)
   }
@@ -121,6 +130,7 @@ async function vippsRequest<T>(path: string, init: RequestInit & { headers?: Rec
       data?.error ||
       data?.error_description ||
       (raw ? raw.slice(0, 2000) : '')
+    console.error(`Vipps API error: ${resp.status}`, details || raw)
     throw new Error(`Vipps API failed (${resp.status})${details ? `: ${details}` : ''}`)
   }
   return (data || {}) as T
@@ -230,12 +240,16 @@ export async function vippsGetCheckoutSession(reference: string): Promise<VippsC
  * In "Direct Capture" mode, payments are captured automatically.
  */
 export async function vippsCapturePayment(reference: string, amountValue: number, currency: string = 'DKK'): Promise<any> {
+  const env = getVippsEnv()
   const safe = encodeURIComponent(reference)
+  console.log(`Capturing payment ${reference} for ${amountValue} ${currency}...`)
   return await vippsRequest<any>(`/epayment/v1/payments/${safe}/capture`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Idempotency-Key': makeIdempotencyKey(),
+      'client_id': env.clientId,
+      'client_secret': env.clientSecret,
     },
     body: JSON.stringify({
       modificationAmount: {
