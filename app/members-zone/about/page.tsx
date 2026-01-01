@@ -101,7 +101,7 @@ export default function AboutPage() {
                 <Text color="white" fontSize="md" lineHeight="tall">
                   DZR skaber rammer for træning, løb og fællesskab på virtuelle cykelplatforme. 
                   Aktiviteter foregår primært online, men fysiske møder kan afholdes efter behov. 
-                  Foreningen tilstræber medlemskab af Danmarks Cykle Union (DCU).
+                  Foreningen er medlem af Danmarks Cykle Union (DCU).
                 </Text>
 
                 <Text color="gray.400" fontSize="sm">
@@ -313,12 +313,8 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text mb={2}>
-                      Foreningen tilstræber medlemskab af Danmarks Cykle Union (DCU) og vil 
-                      følge DCU&apos;s love og bestemmelser, når optagelsen er godkendt.
-                    </Text>
-                    <Text mb={2}>
-                      Indtil medlemskabet er formelt godkendt af DCU, fungerer foreningen som 
-                      en selvstændig e-cykelklub.
+                      Foreningen er medlem af Danmarks Cykle Union (DCU) og 
+                      følger DCU&apos;s love og bestemmelser.
                     </Text>
                     <Text>
                       Foreningen har ingen øvrige organisatoriske tilknytninger.
