@@ -76,7 +76,7 @@ const LinkItems: Array<LinkItemProps> = [
   { name: 'Home', href: '/', icon: MdDirectionsBike },
   // { name: 'Puncheurs Summer Cup', href: 'puncheurs-summer-cup', icon: RiBoxingFill },
   //{ name: 'STAGES by DZR', href: '/stages', icon: MdOutlineTimer },
-  { name: 'The SANTA league', href: '/santa', icon: LiaMountainSolid },
+  // { name: 'The SANTA league', href: '/santa', icon: LiaMountainSolid },
   { name: 'DZR After Party Series', href: '/dzr-after-party', icon: LiaMountainSolid },
   // { name: 'A Sunday in Hell', href: '/asundayinhell', icon: GiDevilMask },
   { name: 'In The Zone 2', href: '/in-the-zone-2', icon: AiOutlineAim },
@@ -95,15 +95,15 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
       h="full"
       {...rest}>
       <Flex h="20" alignItems="center" mx="8" justifyContent="space-between">
-      <Link href= '/'><Image 
+        <Link href='/'><Image
           display={'flex'}
-          boxSize='50px' 
-          src='/general/DZR_logo.svg' 
-          alt='DZR logo' 
+          boxSize='50px'
+          src='/general/DZR_logo.svg'
+          alt='DZR logo'
           rounded={'md'}
-          />
+        />
         </Link>
-        <CloseButton display={'flex'} onClick={onClose} color = 'white' size={'s'}/>
+        <CloseButton display={'flex'} onClick={onClose} color='white' size={'s'} />
       </Flex>
       {LinkItems.map((link) => (
         <NavItem key={link.name} icon={link.icon} href={link.href}>
@@ -119,7 +119,7 @@ const NavItem = ({ icon, children, href, ...rest }: NavItemProps) => {
     <Box
       as="a"
       href={href}
-      style={{ textDecoration: 'none'}}
+      style={{ textDecoration: 'none' }}
       _focus={{ boxShadow: 'none' }}>
       <Flex
         align="center"
@@ -128,7 +128,7 @@ const NavItem = ({ icon, children, href, ...rest }: NavItemProps) => {
         borderRadius="lg"
         role="group"
         cursor="pointer"
-        color = 'white'
+        color='white'
         fontWeight="900"
         _hover={{
           bg: 'white',
@@ -230,14 +230,14 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
       right={0}
       bg={'transparent'}
       zIndex={10}
-      
+
       borderBottomWidth="0px"
       borderBottomColor={('transparent')}
-      
+
       justifyContent={'space-between'}
-      
-      >
-        
+
+    >
+
       <IconButton
         display={'flex'}
         onClick={onOpen}
@@ -249,10 +249,10 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
         icon={<HamburgerIcon />}
         zIndex={10}
         _hover={{ bg: 'gray.700', borderColor: 'gray.700' }}
-        fontSize={{base:"34px", md:"44px"}}
-        fontWeight = '900'
+        fontSize={{ base: "34px", md: "44px" }}
+        fontWeight='900'
       />
-      
+
       {/* <Image 
           display={'flex'}
           boxSize='50px' 
@@ -260,7 +260,7 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
           alt='DZR logo' 
           />
   */}
-      
+
       <HStack spacing={{ base: '2', md: '6' }}>
         <IconButton
           display={'flex'}
@@ -273,8 +273,8 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
           icon={<Icon as={FaUserCircle} />}
           zIndex={10}
           _hover={{ bg: 'gray.700', borderColor: 'gray.700' }}
-          fontSize={{base:"34px", md:"44px"}}
-          fontWeight = '900'
+          fontSize={{ base: "34px", md: "44px" }}
+          fontWeight='900'
         />
       </HStack>
       <Drawer
@@ -290,15 +290,15 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
         <DrawerContent bg={'black'}>
           <Box h="full" color={'white'}>
             <Flex h="20" alignItems="center" mx="8" justifyContent="space-between">
-              <Link href='/members-zone'><Image 
-                  display={'flex'}
-                  boxSize='50px' 
-                  src='/general/DZR_logo.svg' 
-                  alt='DZR logo' 
-                  rounded={'md'}
-                  />
+              <Link href='/members-zone'><Image
+                display={'flex'}
+                boxSize='50px'
+                src='/general/DZR_logo.svg'
+                alt='DZR logo'
+                rounded={'md'}
+              />
               </Link>
-              <CloseButton display={'flex'} onClick={closeProfile} color = 'white' size={'s'}/>
+              <CloseButton display={'flex'} onClick={closeProfile} color='white' size={'s'} />
             </Flex>
             {session ? (
               <>
@@ -317,14 +317,14 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
           </Box>
         </DrawerContent>
       </Drawer>
-      
+
     </Flex>
   )
 }
 
 const SidebarWithHeader = () => {
   const { isOpen, onOpen, onClose } = useDisclosure()
-  
+
   return (
     <Box>
       <SidebarContent onClose={() => onClose} display={'none'} />
@@ -334,12 +334,12 @@ const SidebarWithHeader = () => {
         onClose={onClose}
         returnFocusOnClose={true}
         onOverlayClick={onClose}
-        closeOnOverlayClick= {true}
+        closeOnOverlayClick={true}
         size={'xs'}
-        >
-        <DrawerOverlay  bg="rgba(173, 26, 45, 0.95)" />
+      >
+        <DrawerOverlay bg="rgba(173, 26, 45, 0.95)" />
         <DrawerContent>
-          <DrawerCloseButton color={'red'}/>
+          <DrawerCloseButton color={'red'} />
           <SidebarContent onClose={onClose} />
         </DrawerContent>
       </Drawer>

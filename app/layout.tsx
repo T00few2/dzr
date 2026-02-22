@@ -7,7 +7,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { AuthProvider } from "@/components/auth/AuthContext";
 
 import Sparkles from 'react-sparkle'
-import Snowfall from "react-snowfall";
+// import Snowfall from "react-snowfall";
 
 require("dotenv").config();
 
@@ -26,9 +26,9 @@ export default function RootLayout({
         <Providers>
           <AuthProvider>
             {/* Background Effects */}
-            <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: -1 }}>
+            {/* <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: -1 }}>
               <Snowfall />
-            </div>
+            </div> */}
 
             {/* Sidebar and Content */}
             <SidebarWithHeader />
