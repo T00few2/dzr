@@ -57,4 +57,28 @@
     z-index: 1;
   }
   
+  .hover-discord:hover {
+    animation: pulse ease-in-out 0.2s forwards, changeBgDiscord ease-in-out 0.2s forwards;
+  }
   
+  @keyframes changeBgDiscord {
+    0% {
+      background-color: rgba(0, 0, 0, 1);
+    }
+    100% {
+      background-color: rgba(88, 101, 242, 0.95);
+    }
+  }
+  
+  .hover-red:hover {
+    animation: pulse ease-in-out 0.2s forwards, changeBgRed ease-in-out 0.2s forwards;
+  }
+  
+  @keyframes changeBgRed {
+    0% {
+      background-color: rgba(0, 0, 0, 1);
+    }
+    100% {
+      background-color: #ad1a2d;
+    }
+  }

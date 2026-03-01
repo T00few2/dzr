@@ -28,12 +28,12 @@ export default function DanishInviteBanner() {
         setVisible(false);
         return;
       }
-    } catch {}
+    } catch { }
     setVisible(shouldShowForDanish());
   }, []);
 
   const handleDismiss = () => {
-    try { window.localStorage.setItem(DISMISS_KEY, "1"); } catch {}
+    try { window.localStorage.setItem(DISMISS_KEY, "1"); } catch { }
     setVisible(false);
   };
 
@@ -82,7 +82,7 @@ export default function DanishInviteBanner() {
           <Box>
             <AlertTitle fontSize={{ base: 'md', md: 'lg' }}>Danish Zwift Racers - DZR</AlertTitle>
             <AlertDescription fontSize={{ base: 'sm', md: 'md' }}>
-              Bliv en del af DZR fællesskabet! Tilslut dig vores Discord server, mød andre danske Zwift race entusiaster og kør med på et af vores hold. Lige nu sætter vi hold til Zwift Racing League - holdbaseret Zwift racing når det er bedst og størst!
+              Bliv en del af DZR fællesskabet! Tilslut dig vores Discord server, mød andre danske Zwift race entusiaster og kør med på et af vores hold.
             </AlertDescription>
           </Box>
           <Flex gap={3} align="center" w={{ base: '100%', md: 'auto' }}>

@@ -33,7 +33,7 @@ import { LiaMountainSolid } from "react-icons/lia";
 import { Im500Px } from "react-icons/im";
 import { AiOutlineAim } from "react-icons/ai";
 import { RiBoxingFill } from "react-icons/ri";
-import { MdOutlineTimer } from "react-icons/md";
+import { MdOutlineTimer, MdInfo } from "react-icons/md";
 import { GiDevilMask } from "react-icons/gi";
 
 
@@ -87,6 +87,7 @@ export default function Features() {
           {/* <CustomCard href='puncheurs-summer-cup' icon = {RiBoxingFill} heading = 'Puncheurs Summer Cup' text1 = 'Puncheurs Summer Battle' text2= 'Tuesdays in June 19:20 CEST | 1:20 PM EDT' /> */}
           {/* <CustomCard href='santa' icon = {LiaMountainSolid} heading = 'The SANTA league' text1 = "Head start your New Year&#39;s resolution" text2= '9:20 AM UTC | 3:20 PM UTC | 9:20 PM UTC' /> */}
           {/* <CustomCard href='asundayinhell' icon = {GiDevilMask} heading = 'A Sunday in Hell' text1 = 'Four back-to-back races' text2= 'First Sunday monthly' /> */}
+          <CustomCard href='/members-zone/about' icon={MdInfo} heading='About DZR' text1='Learn about our community' text2='& memberships.' />
           <CustomCard href='dzr-after-party' icon={LiaMountainSolid} heading='DZR After Party Series' text1='Uphill finishes' text2='Thursdays 17:15 CET | 11:15 AM EST' />
           {/*<CustomCard href='stages' icon = {MdOutlineTimer} heading = 'STAGES by DZR' text1 = 'Stage racing done right' text2= 'Tuesdays in ZRL break 19:20 CET | 1:20 PM EST' /> */}
           <CustomCard href='in-the-zone-2' icon={AiOutlineAim} heading='In The Zone 2' text1='Structured zone 2 group workouts' text2='Saturdays 9:30 CET & 14:30 CET' />
