@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
 import {
   Box,
   Container,
@@ -24,8 +24,11 @@ import {
   List,
   ListItem,
   ListIcon,
+  Button,
 } from '@chakra-ui/react';
 import { MdCheckCircle, MdPerson } from 'react-icons/md';
+import { FaDiscord } from 'react-icons/fa';
+import { FiArrowRight } from 'react-icons/fi';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
 
 interface BoardMember {
@@ -67,7 +70,7 @@ export default function AboutPage() {
     { name: 'Mik Endersen', role: 'Bestyrelsesmedlem (Board Member)' },
   ];
 
-  const membershipAmount = membershipSettings 
+  const membershipAmount = membershipSettings
     ? `${membershipSettings.minAmountDkk}-${membershipSettings.maxAmountDkk} kr. årligt`
     : '...';
 
@@ -95,26 +98,26 @@ export default function AboutPage() {
             <CardBody>
               <VStack align="start" spacing={4}>
                 <Text color="white" fontSize="md" lineHeight="tall">
-                  Danish Zwift Racers (DZR) er en almennyttig og non-profit online sportsforening med medlemmer fra hele Danmark. 
+                  Danish Zwift Racers (DZR) er en almennyttig og non-profit online sportsforening med medlemmer fra hele Danmark.
                   Foreningen blev stiftet den 17. november 2025 med det formål at fremme e-cykling som sportsgren og socialt fællesskab i Danmark.
                 </Text>
                 <Text color="white" fontSize="md" lineHeight="tall">
-                  DZR skaber rammer for træning, løb og fællesskab på virtuelle cykelplatforme. 
-                  Aktiviteter foregår primært online, men fysiske møder kan afholdes efter behov. 
+                  DZR skaber rammer for træning, løb og fællesskab på virtuelle cykelplatforme.
+                  Aktiviteter foregår primært online, men fysiske møder kan afholdes efter behov.
                   Foreningen er medlem af Danmarks Cykle Union (DCU).
                 </Text>
 
                 <Text color="gray.400" fontSize="sm">
                   CVR: 46035771
                 </Text>
-              
+
                 <Divider borderColor="gray.600" my={2} />
-                
+
                 <Heading color="white" size="md" mt={4}>
                   Medlemskategorier
                 </Heading>
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mt={4}>
-                  <Card bg="gray.800" borderColor="#ad1a2d" borderWidth="2px">
+                  <Card bg="gray.800" borderColor="#ad1a2d" borderWidth="2px" h="full" overflow="hidden">
                     <CardHeader>
                       <Heading size="md" color="white">
                         Klub Medlem
@@ -123,9 +126,9 @@ export default function AboutPage() {
                         {membershipAmount}
                       </Badge>
                     </CardHeader>
-                    <CardBody>
+                    <CardBody display="flex" flexDirection="column" justifyContent="space-between">
                       <List spacing={2} color="white">
-                      <ListItem fontSize="sm">
+                        <ListItem fontSize="sm">
                           • Deltager i Discord-server
                         </ListItem>
                         <ListItem fontSize="sm">
@@ -143,12 +146,30 @@ export default function AboutPage() {
                         <ListItem fontSize="sm">
                           • Støt DZR 🫶
                         </ListItem>
-   
                       </List>
+
+                      {status === 'unauthenticated' ? (
+                        <Text mt={6} fontSize="xs" color="gray.400" textAlign="center" pb={2}>
+                          For at blive Klub Medlem skal du først være Community Medlem på Discord.
+                        </Text>
+                      ) : (
+                        <Text mt={6} fontSize="xs" color="gray.400" textAlign="center" pb={2}>
+                          Gå til Min Side for at betale kontingent og blive Klub Medlem.
+                        </Text>
+                      )}
                     </CardBody>
+                    {status === 'unauthenticated' ? (
+                      <Button onClick={() => signIn('discord')} bg="#ad1a2d" color="white" _hover={{ bg: '#8a1524' }} w="full" size="lg" py={7} borderRadius="0" textTransform="uppercase" letterSpacing="wide" fontSize="md" leftIcon={<FaDiscord size="1.2em" />}>
+                        Log ind med Discord
+                      </Button>
+                    ) : (
+                      <Button as="a" href="/members-zone/my-pages" bg="#ad1a2d" color="white" _hover={{ bg: '#8a1524' }} w="full" size="lg" py={7} borderRadius="0" textTransform="uppercase" letterSpacing="wide" fontSize="md" rightIcon={<FiArrowRight size="1.2em" />}>
+                        Gå til Min Side
+                      </Button>
+                    )}
                   </Card>
-                  
-                  <Card bg="gray.800" borderColor="#5865F2" borderWidth="2px">
+
+                  <Card bg="gray.800" borderColor="#5865F2" borderWidth="2px" h="full" overflow="hidden">
                     <CardHeader>
                       <Heading size="md" color="white">
                         Community Medlem
@@ -157,7 +178,7 @@ export default function AboutPage() {
                         Gratis
                       </Badge>
                     </CardHeader>
-                    <CardBody>
+                    <CardBody display="flex" flexDirection="column" justifyContent="space-between">
                       <List spacing={2} color="white">
                         <ListItem fontSize="sm">
                           • Deltager i Discord-server
@@ -170,12 +191,15 @@ export default function AboutPage() {
                         </ListItem>
                         <ListItem fontSize="sm">
                           • Ingen stemmeret
-                        </ListItem>  
+                        </ListItem>
                       </List>
                     </CardBody>
+                    <Button as="a" href="https://discord.gg/FBtCsddbmU" target="_blank" bg="#5865F2" color="white" _hover={{ bg: '#4752C4' }} w="full" size="lg" py={7} borderRadius="0" textTransform="uppercase" letterSpacing="wide" fontSize="md" leftIcon={<FaDiscord size="1.2em" />}>
+                      Join Discord Server
+                    </Button>
                   </Card>
                 </SimpleGrid>
-                
+
                 {/* Terms and Conditions - Compact */}
                 <Box borderWidth="1px" borderColor="gray.600" borderRadius="md" bg="gray.800" mt={4}>
                   <Accordion allowToggle>
@@ -213,9 +237,9 @@ export default function AboutPage() {
                     </AccordionItem>
                   </Accordion>
                 </Box>
-                
+
                 <Divider borderColor="gray.600" my={2} />
-                
+
               </VStack>
             </CardBody>
           </Card>
@@ -274,8 +298,8 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text>
-                      Foreningens navn er Danish Zwift Racers (DZR). Foreningen er en almennyttig 
-                      og non-profit online sportsforening med hjemsted på Frederiksberg og med medlemmer fra hele Danmark. Foreningen 
+                      Foreningens navn er Danish Zwift Racers (DZR). Foreningen er en almennyttig
+                      og non-profit online sportsforening med hjemsted på Frederiksberg og med medlemmer fra hele Danmark. Foreningen
                       har CVR-nummer 46035771.
                     </Text>
                   </AccordionPanel>
@@ -292,8 +316,8 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text mb={2}>
-                      Foreningens formål er at fremme e-cykling som sportsgren og socialt 
-                      fællesskab i Danmark. DZR skaber rammer for træning, løb og fællesskab 
+                      Foreningens formål er at fremme e-cykling som sportsgren og socialt
+                      fællesskab i Danmark. DZR skaber rammer for træning, løb og fællesskab
                       på virtuelle cykelplatforme.
                     </Text>
                     <Text>
@@ -313,7 +337,7 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text mb={2}>
-                      Foreningen er medlem af Danmarks Cykle Union (DCU) og 
+                      Foreningen er medlem af Danmarks Cykle Union (DCU) og
                       følger DCU&apos;s love og bestemmelser.
                     </Text>
                     <Text>
@@ -333,8 +357,8 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text mb={2}>
-                      Som medlem kan optages enhver person, der støtter foreningens formål. 
-                      Indmeldelse sker digitalt via foreningens officielle hjemmeside 
+                      Som medlem kan optages enhver person, der støtter foreningens formål.
+                      Indmeldelse sker digitalt via foreningens officielle hjemmeside
                       www.dzrracingseries.com.
                     </Text>
                     <Text mb={2}>
@@ -342,12 +366,12 @@ export default function AboutPage() {
                     </Text>
                     <List spacing={2} ml={4}>
                       <ListItem>
-                        <strong>1. Klub medlemmer:</strong> har betalt kontingent, har stemmeret 
+                        <strong>1. Klub medlemmer:</strong> har betalt kontingent, har stemmeret
                         og mulighed for DCU e-licens via DZR.
                       </ListItem>
                       <ListItem>
-                        <strong>2. Community medlemmer:</strong> deltager i foreningens 
-                        Discord-server og online fællesskab, men uden stemmeret eller adgang til 
+                        <strong>2. Community medlemmer:</strong> deltager i foreningens
+                        Discord-server og online fællesskab, men uden stemmeret eller adgang til
                         DCU-aktiviteter.
                       </ListItem>
                     </List>
@@ -368,12 +392,12 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text mb={2}>
-                      Udmeldelse sker digitalt via foreningens hjemmeside www.dzrracingseries.com. 
+                      Udmeldelse sker digitalt via foreningens hjemmeside www.dzrracingseries.com.
                       Betalt kontingent refunderes ikke.
                     </Text>
                     <Text>
-                      Et medlem kan ekskluderes, hvis det handler til skade for foreningen. 
-                      Eksklusion kan indbringes for den førstkommende generalforsamling til 
+                      Et medlem kan ekskluderes, hvis det handler til skade for foreningen.
+                      Eksklusion kan indbringes for den førstkommende generalforsamling til
                       endelig afgørelse.
                     </Text>
                   </AccordionPanel>
@@ -390,11 +414,11 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text mb={2}>
-                      Kontingentets størrelse fastsættes én gang årligt på generalforsamlingen. 
+                      Kontingentets størrelse fastsættes én gang årligt på generalforsamlingen.
                       Kontingent opkræves digitalt for et år ad gangen.
                     </Text>
                     <Text>
-                      Kontingentet dækker perioden 1. januar til 31. december og følger 
+                      Kontingentet dækker perioden 1. januar til 31. december og følger
                       DCU&apos;s licensår.
                     </Text>
                   </AccordionPanel>
@@ -411,8 +435,8 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text mb={2}>
-                      Generalforsamlingen er foreningens højeste myndighed. Ordinær 
-                      generalforsamling afholdes én gang årligt - digitalt eller fysisk - 
+                      Generalforsamlingen er foreningens højeste myndighed. Ordinær
+                      generalforsamling afholdes én gang årligt - digitalt eller fysisk -
                       inden udgangen af marts.
                     </Text>
                     <Text mb={2}>
@@ -432,7 +456,7 @@ export default function AboutPage() {
                       <ListItem>8. Eventuelt</ListItem>
                     </List>
                     <Text mt={2}>
-                      Forslag skal være bestyrelsen i hænde senest 7 dage før. Hvert aktivt 
+                      Forslag skal være bestyrelsen i hænde senest 7 dage før. Hvert aktivt
                       medlem har én stemme. Beslutninger træffes ved simpelt flertal.
                     </Text>
                   </AccordionPanel>
@@ -449,8 +473,8 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text>
-                      Afholdes når bestyrelsen beslutter det, eller når mindst 1/5 af de aktive 
-                      medlemmer (Klub medlemmer) skriftligt kræver det. Indkaldes med samme varsel som ordinær 
+                      Afholdes når bestyrelsen beslutter det, eller når mindst 1/5 af de aktive
+                      medlemmer (Klub medlemmer) skriftligt kræver det. Indkaldes med samme varsel som ordinær
                       generalforsamling.
                     </Text>
                   </AccordionPanel>
@@ -467,11 +491,11 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text mb={2}>
-                      Bestyrelsen består af mindst 3 medlemmer valgt for ét år ad gangen. 
+                      Bestyrelsen består af mindst 3 medlemmer valgt for ét år ad gangen.
                       Bestyrelsen konstituerer sig selv med formand, kasserer og menigt medlem.
                     </Text>
                     <Text mb={2}>
-                      Møder kan afholdes digitalt. Bestyrelsen er beslutningsdygtig, når mindst 
+                      Møder kan afholdes digitalt. Bestyrelsen er beslutningsdygtig, når mindst
                       halvdelen af medlemmerne deltager.
                     </Text>
                     <Text>
@@ -491,11 +515,11 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text mb={2}>
-                      Foreningens regnskabsår følger kalenderåret. Foreningen tegnes af formanden 
+                      Foreningens regnskabsår følger kalenderåret. Foreningen tegnes af formanden
                       og kassereren i forening.
                     </Text>
                     <Text mb={2}>
-                      Medlemmer hæfter ikke personligt for foreningens forpligtelser - foreningen 
+                      Medlemmer hæfter ikke personligt for foreningens forpligtelser - foreningen
                       hæfter alene med sin egen formue.
                     </Text>
                     <Text>
@@ -515,7 +539,7 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text>
-                      Ændringer af vedtægterne kræver, at 2/3 af de afgivne stemmer på en 
+                      Ændringer af vedtægterne kræver, at 2/3 af de afgivne stemmer på en
                       generalforsamling stemmer for.
                     </Text>
                   </AccordionPanel>
@@ -532,8 +556,8 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text>
-                      Beslutning om opløsning kræver 3/4 flertal på en ekstraordinær 
-                      generalforsamling. Eventuel formue skal tilfalde cykelsportslige eller 
+                      Beslutning om opløsning kræver 3/4 flertal på en ekstraordinær
+                      generalforsamling. Eventuel formue skal tilfalde cykelsportslige eller
                       almennyttige formål og må ikke udbetales til medlemmerne.
                     </Text>
                   </AccordionPanel>
@@ -550,7 +574,7 @@ export default function AboutPage() {
                   </h2>
                   <AccordionPanel pb={4} color="gray.300">
                     <Text>
-                      Disse vedtægter er vedtaget på foreningens stiftende generalforsamling 
+                      Disse vedtægter er vedtaget på foreningens stiftende generalforsamling
                       den 17. november 2025.
                     </Text>
                   </AccordionPanel>
