@@ -40,3 +40,5 @@ next-env.d.ts
 
 .vercel
 .env*.local
+active_members_2026_emails.csv
+scripts/export-active-member-emails-2026.js
