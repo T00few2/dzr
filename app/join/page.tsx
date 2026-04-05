@@ -4,7 +4,37 @@ import React from 'react'
 import { Badge, Box, Button, Container, Heading, List, ListItem, Stack, Text } from '@chakra-ui/react'
 import { FaDiscord } from 'react-icons/fa'
 
+type SettingsResponse = { minAmountDkk?: number; maxAmountDkk?: number }
+
 export default function JoinIndexPage() {
+  const [kontingentText, setKontingentText] = React.useState<string>('Kontingentet fastsættes i indmeldelsesflowet.')
+
+  React.useEffect(() => {
+    let ignore = false
+
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/membership/settings', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = (await res.json()) as SettingsResponse
+        if (ignore) return
+
+        const min = Number(data?.minAmountDkk)
+        const max = Number(data?.maxAmountDkk)
+        if (Number.isFinite(min) && Number.isFinite(max)) {
+          setKontingentText(`Kontingentet er valgfrit mellem ${min} og ${max} DKK.`)
+        }
+      } catch {
+        // Keep fallback text when settings cannot be loaded.
+      }
+    }
+
+    loadSettings()
+    return () => {
+      ignore = true
+    }
+  }, [])
+
   return (
     <Container maxW="5xl" py={{ base: 8, md: 14 }}>
       <Stack spacing={8}>
@@ -35,6 +65,7 @@ export default function JoinIndexPage() {
             <Text color="gray.300">
               Indmeldelsen foregår i 3 enkle trin: log ind med Discord, betal kontingent, og indtast dit Zwift ID.
             </Text>
+            <Text color="gray.300">{kontingentText}</Text>
             <Text color="gray.300">
               Discord er en central del af DZR-fællesskabet, hvor vi koordinerer hold, events og kommunikation.
               Derfor bruger vi Discord-login i indmeldelsesflowet.

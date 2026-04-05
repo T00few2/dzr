@@ -64,6 +64,14 @@ export default function JoinPaymentPage() {
   }, [settings])
 
   React.useEffect(() => {
+    if (selectedOptionId) return
+    const firstOptionId = String(settings?.paymentOptions?.[0]?.id || '').trim()
+    if (firstOptionId) {
+      setSelectedOptionId(firstOptionId)
+    }
+  }, [settings, selectedOptionId])
+
+  React.useEffect(() => {
     let ignore = false
     async function load() {
       const [sRes, sessionRes, statusRes] = await Promise.all([
