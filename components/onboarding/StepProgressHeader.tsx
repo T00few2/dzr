@@ -7,7 +7,7 @@ type StepProgressHeaderProps = {
   currentStep: 1 | 2 | 3 | 4
 }
 
-const STEP_LABELS = ['Link Discord', 'Pay Membership', 'Add Zwift ID'] as const
+const STEP_LABELS = ['Log in with Discord', 'Pay Membership', 'Add Zwift ID'] as const
 const STEP_HREFS = ['/join/discord', '/join/payment', '/join/zwift-id'] as const
 
 export default function StepProgressHeader({ currentStep }: StepProgressHeaderProps) {

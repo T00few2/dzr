@@ -75,6 +75,7 @@ export async function GET(req: Request) {
       discordId,
       discordUsername: username || null,
       discordEmail: email || null,
+      autoLinkDisabled: false,
       steps: {
         ...(ensured.session.steps || {}),
         discordLinked: true,

@@ -129,7 +129,7 @@ export default function JoinPaymentPage() {
         <Stack spacing={4}>
           <StepProgressHeader currentStep={2} />
           <Heading color="white">Join DZR - Step 2 of 3</Heading>
-          <Text color="gray.300">Please complete Step 1 first by linking your Discord profile.</Text>
+          <Text color="gray.300">Please complete Step 1 first by logging in with Discord.</Text>
           <Button as="a" href="/join/discord" colorScheme="red">
             Go to Step 1
           </Button>
