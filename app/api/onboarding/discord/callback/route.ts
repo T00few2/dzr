@@ -11,6 +11,12 @@ function getBaseUrl(req: Request): string {
   return `${url.protocol}//${url.host}`
 }
 
+function getDiscordOnboardingRedirectUri(req: Request): string {
+  const explicit = String(process.env.DISCORD_ONBOARDING_REDIRECT_URI || '').trim()
+  if (explicit) return explicit
+  return `${getBaseUrl(req)}/api/onboarding/discord/callback`
+}
+
 function redirectWithError(req: Request, errorCode: string) {
   const url = new URL('/join/discord', getBaseUrl(req))
   url.searchParams.set('error', errorCode)
@@ -34,7 +40,7 @@ export async function GET(req: Request) {
     const clientSecret = String(process.env.DISCORD_CLIENT_SECRET || '').trim()
     if (!clientId || !clientSecret) return redirectWithError(req, 'missing_discord_oauth_env')
 
-    const redirectUri = `${getBaseUrl(req)}/api/onboarding/discord/callback`
+    const redirectUri = getDiscordOnboardingRedirectUri(req)
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

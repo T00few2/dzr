@@ -12,6 +12,12 @@ function getBaseUrl(req: Request): string {
   return `${url.protocol}//${url.host}`
 }
 
+function getDiscordOnboardingRedirectUri(req: Request): string {
+  const explicit = String(process.env.DISCORD_ONBOARDING_REDIRECT_URI || '').trim()
+  if (explicit) return explicit
+  return `${getBaseUrl(req)}/api/onboarding/discord/callback`
+}
+
 export async function GET(req: Request) {
   try {
     const clientId = String(process.env.DISCORD_CLIENT_ID || '').trim()
@@ -30,7 +36,7 @@ export async function GET(req: Request) {
       },
     })
 
-    const redirectUri = `${getBaseUrl(req)}/api/onboarding/discord/callback`
+    const redirectUri = getDiscordOnboardingRedirectUri(req)
     const authorizeUrl = new URL('https://discord.com/oauth2/authorize')
     authorizeUrl.searchParams.set('client_id', clientId)
     authorizeUrl.searchParams.set('response_type', 'code')
