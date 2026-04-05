@@ -59,7 +59,7 @@ export default function JoinDiscordPage() {
       <Stack spacing={6}>
         <StepProgressHeader currentStep={1} />
         <Heading color="white">Join DZR - Step 1 of 3</Heading>
-        <Text color="gray.300">Link your Discord profile to start your member onboarding.</Text>
+        <Text color="gray.300">Log in with Discord to start your member onboarding.</Text>
         {linkedFromLogin ? (
           <Text color="green.300">Discord profile already linked from your current login.</Text>
         ) : null}
@@ -78,7 +78,7 @@ export default function JoinDiscordPage() {
             isLoading={loading}
             onClick={() => track('onboarding_discord_link_start')}
           >
-            Link Discord profile
+            Login / Link Discord
           </Button>
         )}
       </Stack>

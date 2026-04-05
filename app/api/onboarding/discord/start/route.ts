@@ -43,7 +43,6 @@ export async function GET(req: Request) {
     authorizeUrl.searchParams.set('redirect_uri', redirectUri)
     authorizeUrl.searchParams.set('scope', 'identify email')
     authorizeUrl.searchParams.set('state', oauthState)
-    authorizeUrl.searchParams.set('prompt', 'consent')
 
     const res = NextResponse.redirect(authorizeUrl.toString())
     applyOnboardingCookie(res, ensured.cookieValue, ensured.session.expiresAt)
