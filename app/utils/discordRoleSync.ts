@@ -61,3 +61,37 @@ export async function syncClubMemberRole(input: {
     return { status: 'queued', roleId: clubMemberRoleId, roleUpdateId: queued.id }
   }
 }
+
+export async function syncMemberRoleOnLogin(input: {
+  userId: string
+  source: string
+}): Promise<RoleSyncResult> {
+  const userId = String(input.userId || '').trim()
+  if (!userId) return { status: 'skipped', reason: 'missing_user' }
+
+  const settingsDoc = await adminDb.collection('system_settings').doc('global').get()
+  const membership = (settingsDoc.exists ? (settingsDoc.data() as any)?.membership : null) || {}
+  const memberRoleIdFromSettings = typeof membership?.memberRoleId === 'string' ? membership.memberRoleId : ''
+  const memberRoleId = String(memberRoleIdFromSettings || process.env.DISCORD_REQUIRED_ROLE_ID || '').trim()
+  if (!memberRoleId) return { status: 'skipped', reason: 'missing_member_role_id' }
+
+  const guildId = String(process.env.DISCORD_GUILD_ID || '').trim()
+  const botToken = String(process.env.DISCORD_BOT_TOKEN || '').trim()
+  if (!guildId || !botToken) return { status: 'skipped', reason: 'missing_discord_env' }
+
+  try {
+    await discordAddRole(guildId, userId, memberRoleId, botToken)
+    return { status: 'succeeded', roleId: memberRoleId }
+  } catch {
+    const queued = await adminDb.collection('role_updates').add({
+      userId,
+      guildId,
+      addRoleIds: [memberRoleId],
+      removeRoleIds: [],
+      createdAt: new Date().toISOString(),
+      attempt: 0,
+      source: input.source,
+    })
+    return { status: 'queued', roleId: memberRoleId, roleUpdateId: queued.id }
+  }
+}

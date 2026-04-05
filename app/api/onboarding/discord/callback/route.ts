@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { applyOnboardingCookie, getOnboardingSessionFromRequest, updateOnboardingSession } from '@/app/api/onboarding/_lib/session'
+import { syncMemberRoleOnLogin } from '@/app/utils/discordRoleSync'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -83,6 +84,12 @@ export async function GET(req: Request) {
       discordLinkedAt: new Date().toISOString(),
       oauth: null,
     })
+
+    const memberRoleSync = await syncMemberRoleOnLogin({
+      userId: discordId,
+      source: 'onboarding-discord-login',
+    })
+    await updateOnboardingSession(ensured.sessionId, { memberRoleSync })
 
     const nextUrl = new URL('/join/payment', getBaseUrl(req))
     const res = NextResponse.redirect(nextUrl.toString())
