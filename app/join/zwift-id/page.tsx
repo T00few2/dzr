@@ -139,7 +139,7 @@ export default function JoinZwiftIdPage() {
 
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" bg="gray.900" p={4}>
           <Stack spacing={2}>
-            <Text color="white" fontWeight="bold">Saadan finder du dit Zwift ID</Text>
+            <Text color="white" fontWeight="bold">Sådan finder du dit Zwift ID</Text>
             <Text color="gray.300">
               Se vejledning fra Zwift her: {' '}
               <Text

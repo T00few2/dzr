@@ -43,6 +43,17 @@ export default function JoinPaymentPage() {
   const [message, setMessage] = React.useState<string>('')
   const [alreadyPaid, setAlreadyPaid] = React.useState(false)
   const [coveredThroughYear, setCoveredThroughYear] = React.useState<number | null>(null)
+  async function refreshOnboardingStatus() {
+    const statusRes = await fetch('/api/onboarding/status', { cache: 'no-store' })
+    if (!statusRes.ok) return
+    const statusData = (await statusRes.json()) as OnboardingStatusResponse
+    const paid = Boolean(statusData?.membershipAlreadyPaid)
+    setAlreadyPaid(paid)
+    setCoveredThroughYear(typeof statusData?.coveredThroughYear === 'number' ? statusData.coveredThroughYear : null)
+    if (paid) {
+      setPaymentDone(true)
+    }
+  }
   const rangeText = React.useMemo(() => {
     const min = settings?.minAmountDkk
     const max = settings?.maxAmountDkk
@@ -95,6 +106,7 @@ export default function JoinPaymentPage() {
         if (confirmRes.ok && confirmData?.status === 'succeeded') {
           setPaymentDone(true)
           setMessage('Betaling bekræftet. Fortsæt til trin 3.')
+          await refreshOnboardingStatus()
           track('onboarding_step2_payment_succeeded')
         } else if (confirmData?.status === 'pending') {
           setMessage('Betalingen afventer stadig. Opdater siden om et øjeblik.')
