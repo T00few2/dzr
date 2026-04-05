@@ -29,13 +29,17 @@ export default function JoinZwiftIdPage() {
       ])
       const data = (await res.json()) as SessionState
       if (ignore) return
-      const paid = Boolean(data?.session?.steps?.paymentSucceeded)
-      setCanEdit(paid)
+      const paidInSession = Boolean(data?.session?.steps?.paymentSucceeded)
+      setCanEdit(paidInSession)
       if (data?.session?.zwiftId) {
         setZwiftId(String(data.session.zwiftId))
       }
       if (statusRes.ok) {
         const statusData = (await statusRes.json()) as OnboardingStatusResponse
+        const paidByMembership = Boolean(statusData?.membershipAlreadyPaid)
+        if (paidByMembership) {
+          setCanEdit(true)
+        }
         if (statusData?.zwiftId) {
           setZwiftId(String(statusData.zwiftId))
           setMessage(`Zwift ID already set: ${String(statusData.zwiftId)}`)
