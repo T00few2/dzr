@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { getOnboardingSessionFromRequest, updateOnboardingSession } from '@/app/api/onboarding/_lib/session'
+import { syncMemberRoleOnLogin } from '@/app/utils/discordRoleSync'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -38,9 +39,15 @@ export async function POST(req: Request) {
       updatedAt: now,
     }, { merge: true })
 
+    const verifiedRoleSync = await syncMemberRoleOnLogin({
+      userId: discordId,
+      source: 'onboarding-complete',
+    })
+
     await updateOnboardingSession(onboarding.sessionId, {
       zwiftId,
       zwiftLinkedAt: now,
+      verifiedRoleSync,
       status: 'completed',
       steps: {
         discordLinked: Boolean(onboarding.session.steps?.discordLinked),
