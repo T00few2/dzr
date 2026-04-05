@@ -14,10 +14,10 @@ export default function JoinCompletePage() {
     <Container maxW="4xl" py={10}>
       <Stack spacing={6}>
         <StepProgressHeader currentStep={4} />
-        <Heading color="white">Welcome to DZR</Heading>
-        <Text color="gray.300">Your onboarding is complete. You can now continue in the community and members area when eligible.</Text>
+        <Heading color="white">Velkommen til DZR</Heading>
+        <Text color="gray.300">Din indmeldelse er gennemfoert. Du kan nu fortsætte i fællesskabet og medlemsomraaderne, når du er berettiget.</Text>
         <Button as="a" href="/members-zone/about" colorScheme="red">
-          Learn more about DZR
+          Læs mere om DZR
         </Button>
       </Stack>
     </Container>

@@ -56,7 +56,7 @@ export default function JoinDiscordPage() {
       setCanUnlink(!paymentDone)
       const username = String(data?.session?.discordUsername || '').trim()
       const discordId = String(data?.session?.discordId || '').trim()
-      setLinkedIdentity(username || (discordId ? `Discord user ${discordId}` : 'Discord account'))
+      setLinkedIdentity(username || (discordId ? `Discord bruger ${discordId}` : 'Discord-konto'))
       setLoading(false)
       track('onboarding_step_view', { step: 'discord_link' })
     }
@@ -72,14 +72,14 @@ export default function JoinDiscordPage() {
       setInfoMessage('')
       const res = await fetch('/api/onboarding/discord/unlink', { method: 'POST' })
       const data = await res.json().catch(() => ({} as any))
-      if (!res.ok) throw new Error(data?.error || 'Could not remove linked profile')
+      if (!res.ok) throw new Error(data?.error || 'Kunne ikke logge ud af den linkede profil')
       setDiscordLinked(false)
       setLinkedFromLogin(false)
       setLinkedIdentity('')
       track('onboarding_discord_unlinked')
       await signOut({ callbackUrl: '/join/discord' })
     } catch (err: any) {
-      setInfoMessage(err?.message || 'Could not remove linked profile')
+      setInfoMessage(err?.message || 'Kunne ikke logge ud af den linkede profil')
     } finally {
       setIsRemoving(false)
     }
@@ -89,12 +89,14 @@ export default function JoinDiscordPage() {
     <Container maxW="4xl" py={10}>
       <Stack spacing={6}>
         <StepProgressHeader currentStep={1} />
-        <Heading color="white">Join DZR - Step 1 of 3</Heading>
+        <Heading color="white">Bliv medlem af DZR - Trin 1 af 3</Heading>
         {!discordLinked ? (
-          <Text color="gray.300">Log in with Discord to start your member onboarding.</Text>
+          <Text color="gray.300">
+            Log ind med Discord for at starte din indmeldelse. Discord er en central del af vores fællesskab, hvor vi koordinerer hold, events og kommunikation.
+          </Text>
         ) : (
           <Text color="green.300">
-            You are logged in as {linkedIdentity}{' '}
+            Du er logget ind som {linkedIdentity}{' '}
             {canUnlink ? (
               <Text
                 as="button"
@@ -106,19 +108,24 @@ export default function JoinDiscordPage() {
                 isTruncated={false}
                 disabled={isRemoving}
               >
-                (log out)
+                (log ud)
               </Text>
             ) : (
-              <Text as="span">(log out unavailable)</Text>
+              <Text as="span">(log ud er ikke tilgængelig)</Text>
             )}
-            . Continue to payment.
+            . Fortsæt til betaling.
           </Text>
         )}
+        {!discordLinked ? (
+          <Text color="gray.300">
+            Har du ikke en Discord-konto endnu, kan du oprette en gratis konto i login-flowet.
+          </Text>
+        ) : null}
         {infoMessage ? <Text color="orange.300">{infoMessage}</Text> : null}
         {discordLinked ? (
           <Stack spacing={3}>
             <Button as="a" href="/join/payment" colorScheme="red" onClick={() => track('onboarding_continue_after_discord')}>
-              Continue to payment
+              Fortsæt til betaling
             </Button>
           </Stack>
         ) : (
@@ -132,7 +139,7 @@ export default function JoinDiscordPage() {
             isLoading={loading}
             onClick={() => track('onboarding_discord_link_start')}
           >
-            Log in with Discord
+            Log ind med Discord
           </Button>
         )}
       </Stack>

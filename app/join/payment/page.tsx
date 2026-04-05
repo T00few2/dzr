@@ -5,6 +5,11 @@ import {
   Box,
   Button,
   Container,
+  Accordion,
+  AccordionButton,
+  AccordionIcon,
+  AccordionItem,
+  AccordionPanel,
   FormControl,
   FormLabel,
   Heading,
@@ -38,6 +43,14 @@ export default function JoinPaymentPage() {
   const [message, setMessage] = React.useState<string>('')
   const [alreadyPaid, setAlreadyPaid] = React.useState(false)
   const [coveredThroughYear, setCoveredThroughYear] = React.useState<number | null>(null)
+  const rangeText = React.useMemo(() => {
+    const min = settings?.minAmountDkk
+    const max = settings?.maxAmountDkk
+    if (typeof min === 'number' && typeof max === 'number') {
+      return `Kontingentet er valgfrit mellem ${min} og ${max} DKK.`
+    }
+    return ''
+  }, [settings])
 
   React.useEffect(() => {
     let ignore = false
@@ -60,8 +73,8 @@ export default function JoinPaymentPage() {
           setPaymentDone(true)
           setMessage(
             typeof statusData?.coveredThroughYear === 'number'
-              ? `Membership already paid (covered through ${statusData.coveredThroughYear}).`
-              : 'Membership already paid.'
+              ? `Kontingent er allerede betalt (daekket til og med ${statusData.coveredThroughYear}).`
+              : 'Kontingent er allerede betalt.'
           )
         }
       }
@@ -81,12 +94,12 @@ export default function JoinPaymentPage() {
         if (ignore) return
         if (confirmRes.ok && confirmData?.status === 'succeeded') {
           setPaymentDone(true)
-          setMessage('Payment confirmed. Continue to step 3.')
+          setMessage('Betaling bekræftet. Fortsæt til trin 3.')
           track('onboarding_step2_payment_succeeded')
         } else if (confirmData?.status === 'pending') {
-          setMessage('Payment is still pending. Please refresh in a moment.')
+          setMessage('Betalingen afventer stadig. Opdater siden om et øjeblik.')
         } else if (confirmData?.status === 'failed') {
-          setMessage('Payment failed. Please try again.')
+          setMessage('Betalingen mislykkedes. Prøv igen.')
         }
       }
 
@@ -104,8 +117,8 @@ export default function JoinPaymentPage() {
       setSaving(true)
       setMessage('')
       const fullName = `${firstName} ${lastName}`.trim()
-      if (!fullName) throw new Error('Please enter first and last name')
-      if (!selectedOptionId) throw new Error('Please select payment period')
+      if (!fullName) throw new Error('Indtast fornavn og efternavn')
+      if (!selectedOptionId) throw new Error('Vælg betalingsperiode')
 
       track('onboarding_step2_payment_started')
       const res = await fetch('/api/onboarding/payment/create', {
@@ -114,10 +127,10 @@ export default function JoinPaymentPage() {
         body: JSON.stringify({ amountDkk: amount, fullName, selectedOptionId }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Could not start payment')
+      if (!res.ok) throw new Error(data?.error || 'Kunne ikke starte betaling')
       window.location.href = String(data?.url || '')
     } catch (err: any) {
-      setMessage(err?.message || 'Could not start payment')
+      setMessage(err?.message || 'Kunne ikke starte betaling')
       setSaving(false)
       track('onboarding_step2_payment_failed')
     }
@@ -128,10 +141,10 @@ export default function JoinPaymentPage() {
       <Container maxW="4xl" py={10}>
         <Stack spacing={4}>
           <StepProgressHeader currentStep={2} />
-          <Heading color="white">Join DZR - Step 2 of 3</Heading>
-          <Text color="gray.300">Please complete Step 1 first by logging in with Discord.</Text>
+          <Heading color="white">Bliv medlem af DZR - Trin 2 af 3</Heading>
+          <Text color="gray.300">Gennemfoer trin 1 ved at logge ind med Discord først.</Text>
           <Button as="a" href="/join/discord" colorScheme="red">
-            Go to Step 1
+            Gå til trin 1
           </Button>
         </Stack>
       </Container>
@@ -142,13 +155,30 @@ export default function JoinPaymentPage() {
     <Container maxW="4xl" py={10}>
       <Stack spacing={6}>
         <StepProgressHeader currentStep={2} />
-        <Heading color="white">Join DZR - Step 2 of 3</Heading>
-        <Text color="gray.300">Pay your membership fee to continue onboarding.</Text>
+        <Heading color="white">Bliv medlem af DZR - Trin 2 af 3</Heading>
+        <Text color="gray.300">
+          Her kan du se din medlemsstatus og betale kontingent for at fortsætte indmeldelsen.
+          {rangeText ? ` ${rangeText}` : ''}
+        </Text>
         {message ? <Text color="orange.300">{message}</Text> : null}
+
+        <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" bg="gray.900" p={4}>
+          <Stack spacing={1}>
+            <Text color="white" fontWeight="bold">Nuværende status</Text>
+            {alreadyPaid ? (
+              <Text color="green.300">
+                Klubmedlem - kontingent betalt
+                {typeof coveredThroughYear === 'number' ? ` (daekket til og med ${coveredThroughYear})` : ''}
+              </Text>
+            ) : (
+              <Text color="gray.300">Ikke registreret som betalt klubmedlem endnu</Text>
+            )}
+          </Stack>
+        </Box>
 
         {paymentDone ? (
           <Button as="a" href="/join/zwift-id" colorScheme="red" onClick={() => track('onboarding_step2_continue_to_step3')}>
-            Continue to Step 3
+            Fortsæt til trin 3
           </Button>
         ) : (
           <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" bg="gray.900" p={5}>
@@ -161,15 +191,15 @@ export default function JoinPaymentPage() {
                 ))}
               </HStack>
               <FormControl>
-                <FormLabel color="white">First name</FormLabel>
+                <FormLabel color="white">Fornavn</FormLabel>
                 <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} bg="white" color="black" />
               </FormControl>
               <FormControl>
-                <FormLabel color="white">Last name</FormLabel>
+                <FormLabel color="white">Efternavn</FormLabel>
                 <Input value={lastName} onChange={(e) => setLastName(e.target.value)} bg="white" color="black" />
               </FormControl>
               <FormControl>
-                <FormLabel color="white">Amount ({amount} DKK)</FormLabel>
+                <FormLabel color="white">Beløb ({amount} DKK)</FormLabel>
                 <Slider min={settings?.minAmountDkk ?? 10} max={settings?.maxAmountDkk ?? 100} value={amount} onChange={setAmount}>
                   <SliderTrack>
                     <SliderFilledTrack />
@@ -178,11 +208,33 @@ export default function JoinPaymentPage() {
                 </Slider>
               </FormControl>
               <Button onClick={startPayment} isLoading={saving} colorScheme="red" isDisabled={loading}>
-                Proceed to Vipps
+                Fortsæt til Vipps
               </Button>
             </Stack>
           </Box>
         )}
+
+        <Box borderWidth="1px" borderColor="gray.600" borderRadius="md" bg="gray.800">
+          <Accordion allowToggle>
+            <AccordionItem border="none">
+              <h2>
+                <AccordionButton _hover={{ bg: 'gray.700' }} py={3}>
+                  <Text flex="1" textAlign="left" color="white" fontWeight="bold" fontSize="sm">
+                    Vilkår for medlemskab
+                  </Text>
+                  <AccordionIcon color="white" />
+                </AccordionButton>
+              </h2>
+              <AccordionPanel pb={4} color="gray.300" fontSize="sm" lineHeight="tall">
+                <Text mb={2}>Ved betaling af kontingent accepterer du følgende vilkår:</Text>
+                <Text mb={1}>• Medlemskabet gælder for den valgte periode og refunderes ikke ved opsigelse i perioden.</Text>
+                <Text mb={1}>• Medlemskabet udløber automatisk ved periodens afslutning uden yderligere forpligtelser.</Text>
+                <Text mb={1}>• Betalt kontingent refunderes ikke, jf. foreningens vedtægter §5.</Text>
+                <Text>• Som klubmedlem har du stemmeret på generalforsamlinger.</Text>
+              </AccordionPanel>
+            </AccordionItem>
+          </Accordion>
+        </Box>
       </Stack>
     </Container>
   )

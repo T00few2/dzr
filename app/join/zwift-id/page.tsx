@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Button, Container, FormControl, FormLabel, Heading, Input, Stack, Text } from '@chakra-ui/react'
+import { Box, Button, Container, FormControl, FormLabel, Heading, Input, Stack, Text } from '@chakra-ui/react'
 import { track } from '@vercel/analytics'
 import StepProgressHeader from '@/components/onboarding/StepProgressHeader'
 
@@ -55,9 +55,9 @@ export default function JoinZwiftIdPage() {
       if (paid && hasZwiftId) {
         setIsComplete(true)
         if (statusZwiftId || sessionZwiftId) {
-          setMessage(`Everything is OK. Membership is paid and Zwift ID is already set (${statusZwiftId || sessionZwiftId}).`)
+          setMessage(`Alt er i orden. Kontingent er betalt, og Zwift ID er allerede sat (${statusZwiftId || sessionZwiftId}).`)
         } else {
-          setMessage('Everything is OK. Membership is paid and Zwift ID is already set.')
+          setMessage('Alt er i orden. Kontingent er betalt, og Zwift ID er allerede sat.')
         }
       }
 
@@ -80,11 +80,11 @@ export default function JoinZwiftIdPage() {
         body: JSON.stringify({ zwiftId }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Could not save Zwift ID')
+      if (!res.ok) throw new Error(data?.error || 'Kunne ikke gemme Zwift ID')
       track('onboarding_step3_zwift_saved')
       window.location.href = '/join/complete'
     } catch (err: any) {
-      setMessage(err?.message || 'Could not save Zwift ID')
+      setMessage(err?.message || 'Kunne ikke gemme Zwift ID')
       setSaving(false)
     }
   }
@@ -94,10 +94,10 @@ export default function JoinZwiftIdPage() {
       <Container maxW="4xl" py={10}>
         <Stack spacing={4}>
           <StepProgressHeader currentStep={3} />
-          <Heading color="white">Join DZR - Step 3 of 3</Heading>
-          <Text color="gray.300">Please complete payment before entering your Zwift ID.</Text>
+          <Heading color="white">Bliv medlem af DZR - Trin 3 af 3</Heading>
+          <Text color="gray.300">Gennemfoer betaling før du indtaster dit Zwift ID.</Text>
           <Button as="a" href="/join/payment" colorScheme="red">
-            Go to Step 2
+            Gå til trin 2
           </Button>
         </Stack>
       </Container>
@@ -109,13 +109,13 @@ export default function JoinZwiftIdPage() {
       <Container maxW="4xl" py={10}>
         <Stack spacing={6}>
           <StepProgressHeader currentStep={4} />
-          <Heading color="white">Join DZR - Onboarding complete</Heading>
+          <Heading color="white">Bliv medlem af DZR - indmeldelse gennemfoert</Heading>
           <Text color="gray.300">
-            Everything is OK. Your membership is already paid and your Zwift ID is already set.
+            Alt er i orden. Dit kontingent er allerede betalt, og dit Zwift ID er allerede sat.
           </Text>
           {message ? <Text color="green.300">{message}</Text> : null}
           <Button as="a" href="/join/complete" colorScheme="red">
-            Continue
+            Fortsæt
           </Button>
         </Stack>
       </Container>
@@ -126,16 +126,35 @@ export default function JoinZwiftIdPage() {
     <Container maxW="4xl" py={10}>
       <Stack spacing={6}>
         <StepProgressHeader currentStep={3} />
-        <Heading color="white">Join DZR - Step 3 of 3</Heading>
-        <Text color="gray.300">Enter your Zwift ID to complete onboarding.</Text>
+        <Heading color="white">Bliv medlem af DZR - Trin 3 af 3</Heading>
+        <Text color="gray.300">Indtast dit Zwift ID for at færdiggøre indmeldelsen.</Text>
         {message ? <Text color="orange.300">{message}</Text> : null}
         <FormControl>
           <FormLabel color="white">Zwift ID</FormLabel>
-          <Input value={zwiftId} onChange={(e) => setZwiftId(e.target.value)} bg="white" color="black" placeholder="e.g. 1234567" />
+          <Input value={zwiftId} onChange={(e) => setZwiftId(e.target.value)} bg="white" color="black" placeholder="fx 1234567" />
         </FormControl>
         <Button onClick={saveZwiftId} isLoading={saving || loading} colorScheme="red">
-          Complete onboarding
+          Faerdiggoer indmeldelse
         </Button>
+
+        <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" bg="gray.900" p={4}>
+          <Stack spacing={2}>
+            <Text color="white" fontWeight="bold">Saadan finder du dit Zwift ID</Text>
+            <Text color="gray.300">
+              Se vejledning fra Zwift her: {' '}
+              <Text
+                as="a"
+                href="https://support.zwift.com/locating-your-zwift-id-H1WiyxS_I"
+                target="_blank"
+                rel="noopener noreferrer"
+                color="blue.300"
+                textDecoration="underline"
+              >
+                Find dit Zwift ID hos Zwift
+              </Text>
+            </Text>
+          </Stack>
+        </Box>
       </Stack>
     </Container>
   )
