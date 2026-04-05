@@ -15,6 +15,7 @@ type OnboardingSessionResponse = {
 export default function JoinDiscordPage() {
   const [loading, setLoading] = React.useState(true)
   const [discordLinked, setDiscordLinked] = React.useState(false)
+  const [linkedFromLogin, setLinkedFromLogin] = React.useState(false)
 
   React.useEffect(() => {
     let ignore = false
@@ -30,6 +31,16 @@ export default function JoinDiscordPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ utm }),
       })
+      const autoLinkRes = await fetch('/api/onboarding/discord/link-from-session', {
+        method: 'POST',
+        cache: 'no-store',
+      })
+      if (autoLinkRes.ok) {
+        const auto = await autoLinkRes.json().catch(() => ({} as any))
+        if (auto?.linked) {
+          setLinkedFromLogin(true)
+        }
+      }
       const sessionRes = await fetch('/api/onboarding/session', { cache: 'no-store' })
       const data = (await sessionRes.json()) as OnboardingSessionResponse
       if (ignore) return
@@ -49,6 +60,9 @@ export default function JoinDiscordPage() {
         <StepProgressHeader currentStep={1} />
         <Heading color="white">Join DZR - Step 1 of 3</Heading>
         <Text color="gray.300">Link your Discord profile to start your member onboarding.</Text>
+        {linkedFromLogin ? (
+          <Text color="green.300">Discord profile already linked from your current login.</Text>
+        ) : null}
         {discordLinked ? (
           <Button as="a" href="/join/payment" colorScheme="red" onClick={() => track('onboarding_continue_after_discord')}>
             Continue to payment

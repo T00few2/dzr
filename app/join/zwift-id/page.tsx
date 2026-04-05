@@ -17,6 +17,7 @@ export default function JoinZwiftIdPage() {
   const [loading, setLoading] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
   const [canEdit, setCanEdit] = React.useState(false)
+  const [isComplete, setIsComplete] = React.useState(false)
   const [zwiftId, setZwiftId] = React.useState('')
   const [message, setMessage] = React.useState('')
 
@@ -30,21 +31,36 @@ export default function JoinZwiftIdPage() {
       const data = (await res.json()) as SessionState
       if (ignore) return
       const paidInSession = Boolean(data?.session?.steps?.paymentSucceeded)
+      const sessionZwiftId = data?.session?.zwiftId ? String(data.session.zwiftId) : ''
+      const sessionZwiftLinked = Boolean(data?.session?.steps?.zwiftLinked)
       setCanEdit(paidInSession)
-      if (data?.session?.zwiftId) {
-        setZwiftId(String(data.session.zwiftId))
-      }
+      if (sessionZwiftId) setZwiftId(sessionZwiftId)
+
+      let paidByMembership = false
+      let statusZwiftId = ''
       if (statusRes.ok) {
         const statusData = (await statusRes.json()) as OnboardingStatusResponse
-        const paidByMembership = Boolean(statusData?.membershipAlreadyPaid)
+        paidByMembership = Boolean(statusData?.membershipAlreadyPaid)
         if (paidByMembership) {
           setCanEdit(true)
         }
         if (statusData?.zwiftId) {
-          setZwiftId(String(statusData.zwiftId))
-          setMessage(`Zwift ID already set: ${String(statusData.zwiftId)}`)
+          statusZwiftId = String(statusData.zwiftId)
+          setZwiftId(statusZwiftId)
         }
       }
+
+      const paid = paidInSession || paidByMembership
+      const hasZwiftId = Boolean(statusZwiftId || sessionZwiftId || sessionZwiftLinked)
+      if (paid && hasZwiftId) {
+        setIsComplete(true)
+        if (statusZwiftId || sessionZwiftId) {
+          setMessage(`Everything is OK. Membership is paid and Zwift ID is already set (${statusZwiftId || sessionZwiftId}).`)
+        } else {
+          setMessage('Everything is OK. Membership is paid and Zwift ID is already set.')
+        }
+      }
+
       setLoading(false)
       track('onboarding_step_view', { step: 'zwift_id' })
     }
@@ -82,6 +98,24 @@ export default function JoinZwiftIdPage() {
           <Text color="gray.300">Please complete payment before entering your Zwift ID.</Text>
           <Button as="a" href="/join/payment" colorScheme="red">
             Go to Step 2
+          </Button>
+        </Stack>
+      </Container>
+    )
+  }
+
+  if (isComplete && !loading) {
+    return (
+      <Container maxW="4xl" py={10}>
+        <Stack spacing={6}>
+          <StepProgressHeader currentStep={4} />
+          <Heading color="white">Join DZR - Onboarding complete</Heading>
+          <Text color="gray.300">
+            Everything is OK. Your membership is already paid and your Zwift ID is already set.
+          </Text>
+          {message ? <Text color="green.300">{message}</Text> : null}
+          <Button as="a" href="/join/complete" colorScheme="red">
+            Continue
           </Button>
         </Stack>
       </Container>
