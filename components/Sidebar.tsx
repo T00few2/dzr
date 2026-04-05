@@ -74,6 +74,7 @@ interface SidebarProps extends BoxProps {
 
 const LinkItems: Array<LinkItemProps> = [
   { name: 'Home', href: '/', icon: MdDirectionsBike },
+  { name: 'About', href: '/members-zone/about', icon: MdInfo },
   // { name: 'Puncheurs Summer Cup', href: 'puncheurs-summer-cup', icon: RiBoxingFill },
   //{ name: 'STAGES by DZR', href: '/stages', icon: MdOutlineTimer },
   // { name: 'The SANTA league', href: '/santa', icon: LiaMountainSolid },

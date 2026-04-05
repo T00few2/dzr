@@ -134,7 +134,7 @@ export default function JoinZwiftIdPage() {
           <Input value={zwiftId} onChange={(e) => setZwiftId(e.target.value)} bg="white" color="black" placeholder="fx 1234567" />
         </FormControl>
         <Button onClick={saveZwiftId} isLoading={saving || loading} colorScheme="red">
-          Faerdiggoer indmeldelse
+          Færdiggør indmelselse
         </Button>
 
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" bg="gray.900" p={4}>
