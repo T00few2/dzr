@@ -23,11 +23,33 @@ export default function StepProgressHeader({ currentStep }: StepProgressHeaderPr
           const isDone = currentStep > stepNumber || currentStep === 4
           const href = isDone ? STEP_HREFS[idx] : undefined
 
+          if (href) {
+            return (
+              <Box
+                key={label}
+                as="a"
+                href={href}
+                flex="1"
+                borderWidth="1px"
+                borderRadius="md"
+                px={3}
+                py={2}
+                borderColor={isActive || isDone ? 'red.400' : 'gray.700'}
+                bg={isActive ? 'red.900' : isDone ? 'green.900' : 'gray.900'}
+                cursor="pointer"
+                _hover={{ bg: 'green.800' }}
+                transition="background-color 0.2s ease"
+              >
+                <Text fontSize="xs" color={isActive || isDone ? 'white' : 'gray.400'}>
+                  {stepNumber}. {label}
+                </Text>
+              </Box>
+            )
+          }
+
           return (
             <Box
               key={label}
-              as={href ? 'a' : 'div'}
-              href={href}
               flex="1"
               borderWidth="1px"
               borderRadius="md"
@@ -35,8 +57,7 @@ export default function StepProgressHeader({ currentStep }: StepProgressHeaderPr
               py={2}
               borderColor={isActive || isDone ? 'red.400' : 'gray.700'}
               bg={isActive ? 'red.900' : isDone ? 'green.900' : 'gray.900'}
-              cursor={href ? 'pointer' : 'default'}
-              _hover={href ? { bg: 'green.800' } : undefined}
+              cursor="default"
               transition="background-color 0.2s ease"
             >
               <Text fontSize="xs" color={isActive || isDone ? 'white' : 'gray.400'}>
