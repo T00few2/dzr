@@ -18,7 +18,26 @@ export async function POST(req: Request) {
     const onboarding = await getOnboardingSessionFromRequest(req)
     if (!onboarding) return NextResponse.json({ error: 'Missing onboarding session' }, { status: 401 })
     if (!onboarding.session.discordId) return NextResponse.json({ error: 'Discord profile is not linked' }, { status: 400 })
-    if (!onboarding.session.steps?.paymentSucceeded) {
+
+    const discordId = String(onboarding.session.discordId)
+
+    let paymentSucceeded = Boolean(onboarding.session.steps?.paymentSucceeded)
+    if (!paymentSucceeded) {
+      const membershipSnap = await adminDb.collection('memberships').doc(discordId).get()
+      const membership = membershipSnap.exists ? (membershipSnap.data() as any) : {}
+      const coveredThroughYear = typeof membership?.coveredThroughYear === 'number' ? membership.coveredThroughYear : null
+      paymentSucceeded =
+        String(membership?.currentStatus || '') === 'club' &&
+        coveredThroughYear !== null &&
+        coveredThroughYear >= new Date().getUTCFullYear()
+      if (paymentSucceeded) {
+        await updateOnboardingSession(onboarding.sessionId, {
+          steps: { ...onboarding.session.steps, paymentSucceeded: true },
+        })
+      }
+    }
+
+    if (!paymentSucceeded) {
       return NextResponse.json({ error: 'Payment must be completed before adding Zwift ID' }, { status: 400 })
     }
 
@@ -28,7 +47,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid Zwift ID format' }, { status: 400 })
     }
 
-    const discordId = String(onboarding.session.discordId)
     const now = new Date().toISOString()
     await adminDb.collection('users').doc(discordId).set({
       discordId,
@@ -51,7 +69,7 @@ export async function POST(req: Request) {
       status: 'completed',
       steps: {
         discordLinked: Boolean(onboarding.session.steps?.discordLinked),
-        paymentSucceeded: Boolean(onboarding.session.steps?.paymentSucceeded),
+        paymentSucceeded: true,
         zwiftLinked: true,
       },
     })
