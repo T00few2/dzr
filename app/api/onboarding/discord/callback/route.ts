@@ -72,6 +72,19 @@ export async function GET(req: Request) {
     const email = String(me?.email || '').trim()
     if (!discordId) return redirectWithError(req, 'missing_discord_id')
 
+    const guildId = String(process.env.DISCORD_GUILD_ID || '').trim()
+    const botToken = String(process.env.DISCORD_BOT_TOKEN || '').trim()
+    if (guildId && botToken) {
+      await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bot ${botToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ access_token: accessToken }),
+      })
+    }
+
     await updateOnboardingSession(ensured.sessionId, {
       discordId,
       discordUsername: username || null,
