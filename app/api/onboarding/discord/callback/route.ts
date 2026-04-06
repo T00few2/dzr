@@ -75,6 +75,11 @@ export async function GET(req: Request) {
     const guildId = String(process.env.DISCORD_GUILD_ID || '').trim()
     const botToken = String(process.env.DISCORD_BOT_TOKEN || '').trim()
     if (guildId && botToken) {
+      // Bot token first segment is base64(applicationId) — must match DISCORD_CLIENT_ID
+      const botAppId = Buffer.from(botToken.split('.')[0], 'base64').toString('utf8').trim()
+      if (botAppId !== clientId) {
+        console.error(`[onboarding] bot/oauth mismatch: bot app=${botAppId} oauth client=${clientId}`)
+      }
       const joinRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`, {
         method: 'PUT',
         headers: {
