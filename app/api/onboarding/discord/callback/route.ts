@@ -73,12 +73,12 @@ export async function GET(req: Request) {
     if (!discordId) return redirectWithError(req, 'missing_discord_id')
 
     const guildId = String(process.env.DISCORD_GUILD_ID || '').trim()
-    const botToken = String(process.env.DISCORD_BOT_TOKEN || '').trim()
-    if (guildId && botToken) {
+    const onboardingBotToken = String(process.env.DISCORD_ONBOARDING_BOT_TOKEN || '').trim()
+    if (guildId && onboardingBotToken) {
       const joinRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`, {
         method: 'PUT',
         headers: {
-          Authorization: `Bot ${botToken}`,
+          Authorization: `Bot ${onboardingBotToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ access_token: accessToken }),
@@ -88,7 +88,7 @@ export async function GET(req: Request) {
         console.error(`[onboarding] guild join failed: status=${joinRes.status} body=${joinErr}`)
       }
     } else {
-      console.warn('[onboarding] guild join skipped: missing DISCORD_GUILD_ID or DISCORD_BOT_TOKEN')
+      console.warn('[onboarding] guild join skipped: missing DISCORD_GUILD_ID or DISCORD_ONBOARDING_BOT_TOKEN')
     }
 
     await updateOnboardingSession(ensured.sessionId, {
