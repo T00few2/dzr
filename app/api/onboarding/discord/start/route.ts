@@ -41,7 +41,7 @@ export async function GET(req: Request) {
     authorizeUrl.searchParams.set('client_id', clientId)
     authorizeUrl.searchParams.set('response_type', 'code')
     authorizeUrl.searchParams.set('redirect_uri', redirectUri)
-    authorizeUrl.searchParams.set('scope', 'identify email')
+    authorizeUrl.searchParams.set('scope', 'identify email guilds.join')
     authorizeUrl.searchParams.set('state', oauthState)
 
     const res = NextResponse.redirect(authorizeUrl.toString())
