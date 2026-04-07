@@ -18,6 +18,7 @@ import {
   Slider,
   SliderFilledTrack,
   SliderThumb,
+  Spinner,
   SliderTrack,
   Stack,
   Text,
@@ -42,6 +43,7 @@ export default function JoinPaymentPage() {
   const [selectedOptionId, setSelectedOptionId] = React.useState('')
   const [message, setMessage] = React.useState<string>('')
   const [messageColor, setMessageColor] = React.useState<string>('orange.300')
+  const [isPolling, setIsPolling] = React.useState(false)
   const [alreadyPaid, setAlreadyPaid] = React.useState(false)
   const [coveredThroughYear, setCoveredThroughYear] = React.useState<number | null>(null)
   async function refreshOnboardingStatus() {
@@ -80,6 +82,7 @@ export default function JoinPaymentPage() {
     async function pollConfirmation(ref: string, attemptsLeft: number) {
       if (ignore) return
       if (attemptsLeft <= 0) {
+        setIsPolling(false)
         setMessage('Betalingen er endnu ikke bekræftet. Prøv at genindlæse siden eller kontakt support.')
         setMessageColor('orange.300')
         return
@@ -91,13 +94,14 @@ export default function JoinPaymentPage() {
           const data = await res.json().catch(() => ({}))
           if (ignore) return
           if (res.ok && data?.status === 'succeeded') {
+            setIsPolling(false)
             track('onboarding_step2_payment_succeeded')
             await refreshOnboardingStatus()
             window.location.href = '/join/zwift-id'
           } else if (data?.status === 'pending') {
-            setMessage(`Bekræfter betaling… (forsøg ${11 - attemptsLeft + 1} af 10)`)
             pollConfirmation(ref, attemptsLeft - 1)
           } else if (data?.status === 'failed') {
+            setIsPolling(false)
             setMessage('Betalingen mislykkedes. Prøv igen.')
             setMessageColor('red.300')
           }
@@ -152,8 +156,9 @@ export default function JoinPaymentPage() {
           window.location.href = '/join/zwift-id'
           return
         } else if (confirmData?.status === 'pending') {
-          setMessage('Bekræfter betaling… (forsøg 1 af 10)')
+          setMessage('Bekræfter betaling…')
           setMessageColor('orange.300')
+          setIsPolling(true)
           setLoading(false)
           track('onboarding_step_view', { step: 'payment' })
           pollConfirmation(ref, 10)
@@ -233,7 +238,12 @@ export default function JoinPaymentPage() {
           Her kan du se din medlemsstatus og betale kontingent for at fortsætte indmeldelsen.
           {rangeText ? ` ${rangeText}` : ''}
         </Text>
-        {message ? <Text color={messageColor}>{message}</Text> : null}
+        {message ? (
+          <HStack spacing={2}>
+            {isPolling && <Spinner size="sm" color={messageColor} />}
+            <Text color={messageColor}>{message}</Text>
+          </HStack>
+        ) : null}
 
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" bg="gray.900" p={4}>
           <Stack spacing={1}>
