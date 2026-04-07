@@ -23,12 +23,8 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react'
-import Script from 'next/script'
 import { track } from '@vercel/analytics'
 import StepProgressHeader from '@/components/onboarding/StepProgressHeader'
-
-const VIPPS_CHECKOUT_BUTTON_SCRIPT =
-  'https://checkout.vipps.no/checkout-button/v1/vipps-checkout-button.js'
 
 type PaymentOption = { id: string; label?: string; coversYears?: number[] }
 type SettingsResponse = { minAmountDkk: number; maxAmountDkk: number; paymentOptions: PaymentOption[] }
@@ -50,7 +46,6 @@ export default function JoinPaymentPage() {
   const [isPolling, setIsPolling] = React.useState(false)
   const [alreadyPaid, setAlreadyPaid] = React.useState(false)
   const [coveredThroughYear, setCoveredThroughYear] = React.useState<number | null>(null)
-  const [mobilePayButtonReady, setMobilePayButtonReady] = React.useState(false)
   async function refreshOnboardingStatus() {
     const statusRes = await fetch('/api/onboarding/status', { cache: 'no-store' })
     if (!statusRes.ok) return
@@ -236,11 +231,6 @@ export default function JoinPaymentPage() {
 
   return (
     <Container maxW="4xl" py={10}>
-      <Script
-        src={VIPPS_CHECKOUT_BUTTON_SCRIPT}
-        strategy="afterInteractive"
-        onLoad={() => setMobilePayButtonReady(true)}
-      />
       <Stack spacing={6}>
         <StepProgressHeader currentStep={2} />
         <Heading color="white">Bliv medlem af DZR - Trin 2 af 3</Heading>
@@ -300,51 +290,9 @@ export default function JoinPaymentPage() {
                   <SliderThumb />
                 </Slider>
               </FormControl>
-              {!mobilePayButtonReady ? (
-                <HStack spacing={3}>
-                  <Spinner size="sm" color="gray.400" />
-                  <Text color="gray.400" fontSize="sm">
-                    Henter betalingsknap…
-                  </Text>
-                </HStack>
-              ) : (
-                <Box position="relative" w="100%">
-                  {saving ? (
-                    <Box
-                      position="absolute"
-                      inset={0}
-                      zIndex={1}
-                      display="flex"
-                      alignItems="center"
-                      justifyContent="center"
-                      bg="blackAlpha.600"
-                      borderRadius="md"
-                    >
-                      <Spinner color="white" />
-                    </Box>
-                  ) : null}
-                  <Box
-                    w="100%"
-                    cursor={loading || saving ? 'not-allowed' : 'pointer'}
-                    opacity={loading ? 0.5 : 1}
-                    pointerEvents={loading || saving ? 'none' : 'auto'}
-                    onClick={() => {
-                      if (loading || saving) return
-                      void startPayment()
-                    }}
-                  >
-                    <vipps-mobilepay-button
-                      brand="mobilepay"
-                      language="dk"
-                      verb="pay"
-                      variant="primary"
-                      rounded="true"
-                      branded="true"
-                      stretched="true"
-                    />
-                  </Box>
-                </Box>
-              )}
+              <Button onClick={startPayment} isLoading={saving} colorScheme="red" isDisabled={loading}>
+                Fortsæt til Vipps
+              </Button>
             </Stack>
           </Box>
         )}
