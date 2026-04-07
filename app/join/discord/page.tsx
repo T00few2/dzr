@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Button, Container, Heading, Stack, Text } from '@chakra-ui/react'
+import { Button, Container, Heading, Stack, Text, HStack } from '@chakra-ui/react'
 import { track } from '@vercel/analytics'
 import { FaDiscord } from 'react-icons/fa'
 import StepProgressHeader from '@/components/onboarding/StepProgressHeader'
@@ -95,26 +95,24 @@ export default function JoinDiscordPage() {
             Log ind med Discord for at starte din indmeldelse. Discord er en central del af vores fællesskab, hvor vi koordinerer hold, events og kommunikation.
           </Text>
         ) : (
-          <Text color="green.300">
-            Du er logget ind som {linkedIdentity}{' '}
+          <Stack spacing={1}>
+            <Text color="green.300">Du er logget ind som {linkedIdentity}. Fortsæt til betaling.</Text>
             {canUnlink ? (
-              <Text
-                as="button"
-                type="button"
+              <Button
+                variant="link"
+                size="sm"
                 color="red.200"
-                textDecoration="underline"
                 _hover={{ color: 'red.100' }}
                 onClick={unlinkDiscordProfile}
-                isTruncated={false}
-                disabled={isRemoving}
+                isLoading={isRemoving}
+                alignSelf="flex-start"
               >
-                (log ud)
-              </Text>
+                Log ud
+              </Button>
             ) : (
-              <Text as="span">(log ud er ikke tilgængelig)</Text>
+              <Text color="gray.500" fontSize="sm">(log ud er ikke tilgængelig)</Text>
             )}
-            . Fortsæt til betaling.
-          </Text>
+          </Stack>
         )}
         {!discordLinked ? (
           <Text color="gray.300">
@@ -136,7 +134,6 @@ export default function JoinDiscordPage() {
             bg="rgba(88, 101, 242, 0.95)"
             color="white"
             _hover={{ bg: 'rgba(88, 101, 242, 1)' }}
-            isLoading={loading}
             onClick={() => track('onboarding_discord_link_start')}
           >
             Log ind med Discord

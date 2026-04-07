@@ -18,6 +18,7 @@ import {
   Slider,
   SliderFilledTrack,
   SliderThumb,
+  Spinner,
   SliderTrack,
   Stack,
   Text,
@@ -41,6 +42,8 @@ export default function JoinPaymentPage() {
   const [lastName, setLastName] = React.useState('')
   const [selectedOptionId, setSelectedOptionId] = React.useState('')
   const [message, setMessage] = React.useState<string>('')
+  const [messageColor, setMessageColor] = React.useState<string>('orange.300')
+  const [isPolling, setIsPolling] = React.useState(false)
   const [alreadyPaid, setAlreadyPaid] = React.useState(false)
   const [coveredThroughYear, setCoveredThroughYear] = React.useState<number | null>(null)
   async function refreshOnboardingStatus() {
@@ -71,8 +74,43 @@ export default function JoinPaymentPage() {
     }
   }, [settings, selectedOptionId])
 
+  const pollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
   React.useEffect(() => {
     let ignore = false
+
+    async function pollConfirmation(ref: string, attemptsLeft: number) {
+      if (ignore) return
+      if (attemptsLeft <= 0) {
+        setIsPolling(false)
+        setMessage('Betalingen er endnu ikke bekræftet. Prøv at genindlæse siden eller kontakt support.')
+        setMessageColor('orange.300')
+        return
+      }
+      pollTimerRef.current = setTimeout(async () => {
+        if (ignore) return
+        try {
+          const res = await fetch(`/api/onboarding/payment/confirm?reference=${encodeURIComponent(ref)}`, { cache: 'no-store' })
+          const data = await res.json().catch(() => ({}))
+          if (ignore) return
+          if (res.ok && data?.status === 'succeeded') {
+            setIsPolling(false)
+            track('onboarding_step2_payment_succeeded')
+            await refreshOnboardingStatus()
+            window.location.href = '/join/zwift-id'
+          } else if (data?.status === 'pending') {
+            pollConfirmation(ref, attemptsLeft - 1)
+          } else if (data?.status === 'failed') {
+            setIsPolling(false)
+            setMessage('Betalingen mislykkedes. Prøv igen.')
+            setMessageColor('red.300')
+          }
+        } catch {
+          if (!ignore) pollConfirmation(ref, attemptsLeft - 1)
+        }
+      }, 3000)
+    }
+
     async function load() {
       const [sRes, sessionRes, statusRes] = await Promise.all([
         fetch('/api/membership/settings', { cache: 'no-store' }),
@@ -92,9 +130,10 @@ export default function JoinPaymentPage() {
           setPaymentDone(true)
           setMessage(
             typeof statusData?.coveredThroughYear === 'number'
-              ? `Kontingent er allerede betalt (daekket til og med ${statusData.coveredThroughYear}).`
+              ? `Kontingent er allerede betalt (dækket til og med ${statusData.coveredThroughYear}).`
               : 'Kontingent er allerede betalt.'
           )
+          setMessageColor('green.300')
         }
       }
 
@@ -112,14 +151,21 @@ export default function JoinPaymentPage() {
         const confirmData = await confirmRes.json().catch(() => ({}))
         if (ignore) return
         if (confirmRes.ok && confirmData?.status === 'succeeded') {
-          setPaymentDone(true)
-          setMessage('Betaling bekræftet. Fortsæt til trin 3.')
-          await refreshOnboardingStatus()
           track('onboarding_step2_payment_succeeded')
+          await refreshOnboardingStatus()
+          window.location.href = '/join/zwift-id'
+          return
         } else if (confirmData?.status === 'pending') {
-          setMessage('Betalingen afventer stadig. Opdater siden om et øjeblik.')
+          setMessage('Bekræfter betaling…')
+          setMessageColor('orange.300')
+          setIsPolling(true)
+          setLoading(false)
+          track('onboarding_step_view', { step: 'payment' })
+          pollConfirmation(ref, 10)
+          return
         } else if (confirmData?.status === 'failed') {
           setMessage('Betalingen mislykkedes. Prøv igen.')
+          setMessageColor('red.300')
         }
       }
 
@@ -129,6 +175,7 @@ export default function JoinPaymentPage() {
     load().catch(() => setLoading(false))
     return () => {
       ignore = true
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
     }
   }, [])
 
@@ -137,8 +184,18 @@ export default function JoinPaymentPage() {
       setSaving(true)
       setMessage('')
       const fullName = `${firstName} ${lastName}`.trim()
-      if (!fullName) throw new Error('Indtast fornavn og efternavn')
-      if (!selectedOptionId) throw new Error('Vælg betalingsperiode')
+      if (!fullName) {
+        setMessage('Indtast fornavn og efternavn')
+        setMessageColor('orange.300')
+        setSaving(false)
+        return
+      }
+      if (!selectedOptionId) {
+        setMessage('Vælg betalingsperiode')
+        setMessageColor('orange.300')
+        setSaving(false)
+        return
+      }
 
       track('onboarding_step2_payment_started')
       const res = await fetch('/api/onboarding/payment/create', {
@@ -151,6 +208,7 @@ export default function JoinPaymentPage() {
       window.location.href = String(data?.url || '')
     } catch (err: any) {
       setMessage(err?.message || 'Kunne ikke starte betaling')
+      setMessageColor('red.300')
       setSaving(false)
       track('onboarding_step2_payment_failed')
     }
@@ -162,7 +220,7 @@ export default function JoinPaymentPage() {
         <Stack spacing={4}>
           <StepProgressHeader currentStep={2} />
           <Heading color="white">Bliv medlem af DZR - Trin 2 af 3</Heading>
-          <Text color="gray.300">Gennemfoer trin 1 ved at logge ind med Discord først.</Text>
+          <Text color="gray.300">Gennemfør trin 1 ved at logge ind med Discord først.</Text>
           <Button as="a" href="/join/discord" colorScheme="red">
             Gå til trin 1
           </Button>
@@ -180,7 +238,12 @@ export default function JoinPaymentPage() {
           Her kan du se din medlemsstatus og betale kontingent for at fortsætte indmeldelsen.
           {rangeText ? ` ${rangeText}` : ''}
         </Text>
-        {message ? <Text color="orange.300">{message}</Text> : null}
+        {message ? (
+          <HStack spacing={2}>
+            {isPolling && <Spinner size="sm" color={messageColor} />}
+            <Text color={messageColor}>{message}</Text>
+          </HStack>
+        ) : null}
 
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" bg="gray.900" p={4}>
           <Stack spacing={1}>
@@ -188,7 +251,7 @@ export default function JoinPaymentPage() {
             {alreadyPaid ? (
               <Text color="green.300">
                 Klubmedlem - kontingent betalt
-                {typeof coveredThroughYear === 'number' ? ` (daekket til og med ${coveredThroughYear})` : ''}
+                {typeof coveredThroughYear === 'number' ? ` (dækket til og med ${coveredThroughYear})` : ''}
               </Text>
             ) : (
               <Text color="gray.300">Ikke registreret som betalt klubmedlem endnu</Text>

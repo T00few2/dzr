@@ -8,7 +8,10 @@ import StepProgressHeader from '@/components/onboarding/StepProgressHeader'
 
 export default function JoinCompletePage() {
   React.useEffect(() => {
-    track('onboarding_funnel_completed')
+    if (!sessionStorage.getItem('onboarding_completed_tracked')) {
+      track('onboarding_funnel_completed')
+      sessionStorage.setItem('onboarding_completed_tracked', '1')
+    }
   }, [])
 
   return (
@@ -16,7 +19,7 @@ export default function JoinCompletePage() {
       <Stack spacing={6}>
         <StepProgressHeader currentStep={4} />
         <Heading color="white">Velkommen til DZR</Heading>
-        <Text color="gray.300">Din indmeldelse er gennemfoert. Du kan nu fortsætte i fællesskabet og medlemsomraaderne.</Text>
+        <Text color="gray.300">Din indmeldelse er gennemført. Du kan nu fortsætte i fællesskabet og medlemsområderne.</Text>
         <Button as="a" href="/members-zone/about" colorScheme="red">
           Læs mere om DZR
         </Button>
