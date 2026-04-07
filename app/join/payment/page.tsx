@@ -290,8 +290,24 @@ export default function JoinPaymentPage() {
                   <SliderThumb />
                 </Slider>
               </FormControl>
-              <Button onClick={startPayment} isLoading={saving} colorScheme="red" isDisabled={loading}>
-                Fortsæt til Vipps
+              <Button
+                onClick={startPayment}
+                isLoading={saving}
+                isDisabled={loading}
+                variant="unstyled"
+                h="auto"
+                p={0}
+                _hover={{ opacity: 0.95 }}
+                _active={{ transform: 'translateY(1px)' }}
+                aria-label="Betal med MobilePay"
+              >
+                <Box
+                  as="img"
+                  src="/general/mobilepay-pay-primary-dk.svg"
+                  alt="Betal med MobilePay"
+                  w="100%"
+                  maxW="340px"
+                />
               </Button>
             </Stack>
           </Box>
