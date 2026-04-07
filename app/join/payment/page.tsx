@@ -72,8 +72,41 @@ export default function JoinPaymentPage() {
     }
   }, [settings, selectedOptionId])
 
+  const pollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
   React.useEffect(() => {
     let ignore = false
+
+    async function pollConfirmation(ref: string, attemptsLeft: number) {
+      if (ignore) return
+      if (attemptsLeft <= 0) {
+        setMessage('Betalingen er endnu ikke bekræftet. Prøv at genindlæse siden eller kontakt support.')
+        setMessageColor('orange.300')
+        return
+      }
+      pollTimerRef.current = setTimeout(async () => {
+        if (ignore) return
+        try {
+          const res = await fetch(`/api/onboarding/payment/confirm?reference=${encodeURIComponent(ref)}`, { cache: 'no-store' })
+          const data = await res.json().catch(() => ({}))
+          if (ignore) return
+          if (res.ok && data?.status === 'succeeded') {
+            track('onboarding_step2_payment_succeeded')
+            await refreshOnboardingStatus()
+            window.location.href = '/join/zwift-id'
+          } else if (data?.status === 'pending') {
+            setMessage(`Bekræfter betaling… (forsøg ${11 - attemptsLeft + 1} af 10)`)
+            pollConfirmation(ref, attemptsLeft - 1)
+          } else if (data?.status === 'failed') {
+            setMessage('Betalingen mislykkedes. Prøv igen.')
+            setMessageColor('red.300')
+          }
+        } catch {
+          if (!ignore) pollConfirmation(ref, attemptsLeft - 1)
+        }
+      }, 3000)
+    }
+
     async function load() {
       const [sRes, sessionRes, statusRes] = await Promise.all([
         fetch('/api/membership/settings', { cache: 'no-store' }),
@@ -119,8 +152,12 @@ export default function JoinPaymentPage() {
           window.location.href = '/join/zwift-id'
           return
         } else if (confirmData?.status === 'pending') {
-          setMessage('Betalingen afventer stadig. Opdater siden om et øjeblik.')
+          setMessage('Bekræfter betaling… (forsøg 1 af 10)')
           setMessageColor('orange.300')
+          setLoading(false)
+          track('onboarding_step_view', { step: 'payment' })
+          pollConfirmation(ref, 10)
+          return
         } else if (confirmData?.status === 'failed') {
           setMessage('Betalingen mislykkedes. Prøv igen.')
           setMessageColor('red.300')
@@ -133,6 +170,7 @@ export default function JoinPaymentPage() {
     load().catch(() => setLoading(false))
     return () => {
       ignore = true
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
     }
   }, [])
 
