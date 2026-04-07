@@ -95,7 +95,7 @@ export default function JoinZwiftIdPage() {
         <Stack spacing={4}>
           <StepProgressHeader currentStep={3} />
           <Heading color="white">Bliv medlem af DZR - Trin 3 af 3</Heading>
-          <Text color="gray.300">Gennemfoer betaling før du indtaster dit Zwift ID.</Text>
+          <Text color="gray.300">Gennemfør betaling før du indtaster dit Zwift ID.</Text>
           <Button as="a" href="/join/payment" colorScheme="red">
             Gå til trin 2
           </Button>
@@ -109,7 +109,7 @@ export default function JoinZwiftIdPage() {
       <Container maxW="4xl" py={10}>
         <Stack spacing={6}>
           <StepProgressHeader currentStep={4} />
-          <Heading color="white">Bliv medlem af DZR - indmeldelse gennemfoert</Heading>
+          <Heading color="white">Bliv medlem af DZR - indmeldelse gennemført</Heading>
           <Text color="gray.300">
             Alt er i orden. Dit kontingent er allerede betalt, og dit Zwift ID er allerede sat.
           </Text>
@@ -134,7 +134,7 @@ export default function JoinZwiftIdPage() {
           <Input value={zwiftId} onChange={(e) => setZwiftId(e.target.value)} bg="white" color="black" placeholder="fx 1234567" />
         </FormControl>
         <Button onClick={saveZwiftId} isLoading={saving || loading} colorScheme="red">
-          Færdiggør indmelselse
+          Færdiggør indmeldelse
         </Button>
 
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" bg="gray.900" p={4}>

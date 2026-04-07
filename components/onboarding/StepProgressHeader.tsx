@@ -7,14 +7,14 @@ type StepProgressHeaderProps = {
   currentStep: 1 | 2 | 3 | 4
 }
 
-const STEP_LABELS = ['Log ind med Discord', 'Betal kontingent', 'Tilfoej Zwift ID'] as const
+const STEP_LABELS = ['Log ind med Discord', 'Betal kontingent', 'Tilføj Zwift ID'] as const
 const STEP_HREFS = ['/join/discord', '/join/payment', '/join/zwift-id'] as const
 
 export default function StepProgressHeader({ currentStep }: StepProgressHeaderProps) {
   return (
     <Stack spacing={3}>
       <Text color="gray.300" fontSize="sm">
-        {currentStep <= 3 ? `Trin ${currentStep} af 3` : 'Gennemfoert'}
+        {currentStep <= 3 ? `Trin ${currentStep} af 3` : 'Gennemført'}
       </Text>
       <HStack spacing={3} align="stretch">
         {STEP_LABELS.map((label, idx) => {
