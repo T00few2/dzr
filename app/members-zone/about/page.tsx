@@ -222,6 +222,32 @@ export default function AboutPage() {
           </Card>
         </SimpleGrid>
 
+        {/* Vilkår for medlemskab */}
+        <Box borderWidth="1px" borderColor="gray.600" borderRadius="md" bg="gray.900">
+          <Accordion allowToggle>
+            <AccordionItem border="none">
+              <h2>
+                <AccordionButton _hover={{ bg: 'gray.800' }} py={3} px={4}>
+                  <Text flex="1" textAlign="left" color="gray.300" fontSize="sm">
+                    Vilkår for medlemskab
+                  </Text>
+                  <AccordionIcon color="gray.400" />
+                </AccordionButton>
+              </h2>
+              <AccordionPanel pb={3} pt={1} px={4} color="gray.300" fontSize="xs" lineHeight="tall">
+                <Text mb={2}>Ved betaling af kontingent accepterer du følgende vilkår:</Text>
+                <List spacing={1} ml={4}>
+                  <ListItem>• Medlemskabet gælder for den valgte periode og refunderes ikke ved opsigelse i denne periode</ListItem>
+                  <ListItem>• Medlemskabet udløber automatisk ved periodens afslutning uden yderligere forpligtelser</ListItem>
+                  <ListItem>• Betalt kontingent refunderes ikke, jf. foreningens vedtægter §5</ListItem>
+                  <ListItem>• Medlemskabet fornyes ikke automatisk - du skal selv forny dit medlemskab ved periodens udløb</ListItem>
+                  <ListItem>• Som klubmedlem har du stemmeret på generalforsamlinger</ListItem>
+                </List>
+              </AccordionPanel>
+            </AccordionItem>
+          </Accordion>
+        </Box>
+
         {/* Zone 5 — Organisatoriske oplysninger & vedtægter (collapsed) */}
         <Accordion allowToggle>
           <AccordionItem borderWidth="1px" borderColor="gray.700" borderRadius="lg" overflow="hidden">
@@ -272,34 +298,6 @@ export default function AboutPage() {
                     ))}
                   </SimpleGrid>
                   <Text color="gray.500" mt={3} fontSize="xs">Kontakt bestyrelsen via Discord</Text>
-                </Box>
-
-                <Divider borderColor="gray.700" />
-
-                {/* Terms */}
-                <Box borderWidth="1px" borderColor="gray.600" borderRadius="md" bg="gray.800">
-                  <Accordion allowToggle>
-                    <AccordionItem border="none">
-                      <h2>
-                        <AccordionButton _hover={{ bg: 'gray.700' }} py={2}>
-                          <Text flex="1" textAlign="left" color="gray.300" fontSize="sm">
-                            Vilkår for medlemskab
-                          </Text>
-                          <AccordionIcon color="gray.400" />
-                        </AccordionButton>
-                      </h2>
-                      <AccordionPanel pb={3} pt={1} color="gray.300" fontSize="xs" lineHeight="tall">
-                        <Text mb={2}>Ved betaling af kontingent accepterer du følgende vilkår:</Text>
-                        <List spacing={1} ml={4}>
-                          <ListItem>• Medlemskabet gælder for den valgte periode og refunderes ikke ved opsigelse i denne periode</ListItem>
-                          <ListItem>• Medlemskabet udløber automatisk ved periodens afslutning uden yderligere forpligtelser</ListItem>
-                          <ListItem>• Betalt kontingent refunderes ikke, jf. foreningens vedtægter §5</ListItem>
-                          <ListItem>• Medlemskabet fornyes ikke automatisk - du skal selv forny dit medlemskab ved periodens udløb</ListItem>
-                          <ListItem>• Som klubmedlem har du stemmeret på generalforsamlinger</ListItem>
-                        </List>
-                      </AccordionPanel>
-                    </AccordionItem>
-                  </Accordion>
                 </Box>
 
                 <Divider borderColor="gray.700" />
