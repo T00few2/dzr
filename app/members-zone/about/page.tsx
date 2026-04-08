@@ -14,7 +14,6 @@ import {
   Card,
   CardBody,
   CardHeader,
-  Circle,
   Container,
   Divider,
   Heading,
@@ -94,26 +93,20 @@ export default function AboutPage() {
         </Box>
 
         {/* Zone 2 — Three benefit pillars */}
-        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-          <Box textAlign="center" p={6} bg="gray.900" borderRadius="lg">
-            <Circle size="56px" bg="#ad1a2d" mx="auto" mb={4}>
-              <Icon as={FaTrophy} color="white" boxSize={6} />
-            </Circle>
-            <Heading size="md" color="white" mb={2}>Løb & Racing</Heading>
+        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={8}>
+          <Box textAlign="center">
+            <Icon as={FaTrophy} color="#ad1a2d" boxSize={8} mb={3} />
+            <Heading size="sm" color="white" mb={2}>Løb & Racing</Heading>
             <Text color="gray.400" fontSize="sm">Organiserede løb, DCU Forårsliga og holdmiljø på Zwift</Text>
           </Box>
-          <Box textAlign="center" p={6} bg="gray.900" borderRadius="lg">
-            <Circle size="56px" bg="#ad1a2d" mx="auto" mb={4}>
-              <Icon as={FaDiscord} color="white" boxSize={6} />
-            </Circle>
-            <Heading size="md" color="white" mb={2}>Discord Fællesskab</Heading>
+          <Box textAlign="center">
+            <Icon as={FaDiscord} color="#ad1a2d" boxSize={8} mb={3} />
+            <Heading size="sm" color="white" mb={2}>Discord Fællesskab</Heading>
             <Text color="gray.400" fontSize="sm">Aktiv community med koordinering af hold, events og kommunikation</Text>
           </Box>
-          <Box textAlign="center" p={6} bg="gray.900" borderRadius="lg">
-            <Circle size="56px" bg="#ad1a2d" mx="auto" mb={4}>
-              <Icon as={MdDirectionsBike} color="white" boxSize={6} />
-            </Circle>
-            <Heading size="md" color="white" mb={2}>Træning</Heading>
+          <Box textAlign="center">
+            <Icon as={MdDirectionsBike} color="#ad1a2d" boxSize={8} mb={3} />
+            <Heading size="sm" color="white" mb={2}>Træning</Heading>
             <Text color="gray.400" fontSize="sm">Strukturerede træningspas og zone 2-workouts for alle niveauer</Text>
           </Box>
         </SimpleGrid>

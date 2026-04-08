@@ -5,7 +5,6 @@ import {
   Badge,
   Box,
   Button,
-  Circle,
   Container,
   Divider,
   Flex,
@@ -38,19 +37,10 @@ interface BenefitCardProps {
 
 function BenefitCard({ icon, heading, text }: BenefitCardProps) {
   return (
-    <HStack
-      align="start"
-      spacing={4}
-      p={4}
-      bg="gray.900"
-      borderRadius="md"
-      borderLeft="3px solid #ad1a2d"
-    >
-      <Circle size="40px" bg="#ad1a2d" flexShrink={0}>
-        <Icon as={icon} color="white" boxSize={4} />
-      </Circle>
+    <HStack align="start" spacing={3}>
+      <Icon as={icon} color="#ad1a2d" boxSize={5} flexShrink={0} mt="1px" />
       <Box>
-        <Text color="white" fontWeight="semibold" fontSize="sm" mb={1}>
+        <Text color="white" fontWeight="semibold" fontSize="sm" mb={0.5}>
           {heading}
         </Text>
         <Text color="gray.400" fontSize="sm">
