@@ -38,20 +38,26 @@ interface BenefitCardProps {
 
 function BenefitCard({ icon, heading, text }: BenefitCardProps) {
   return (
-    <Box
+    <HStack
+      align="start"
+      spacing={4}
+      p={4}
       bg="gray.900"
       borderRadius="md"
-      borderTop="2px solid #ad1a2d"
-      p={4}
+      borderLeft="3px solid #ad1a2d"
     >
-      <Icon as={icon} boxSize={6} color="#ad1a2d" mb={2} />
-      <Text color="white" fontWeight="semibold" fontSize="sm" mb={1}>
-        {heading}
-      </Text>
-      <Text color="gray.400" fontSize="sm">
-        {text}
-      </Text>
-    </Box>
+      <Circle size="40px" bg="#ad1a2d" flexShrink={0}>
+        <Icon as={icon} color="white" boxSize={4} />
+      </Circle>
+      <Box>
+        <Text color="white" fontWeight="semibold" fontSize="sm" mb={1}>
+          {heading}
+        </Text>
+        <Text color="gray.400" fontSize="sm">
+          {text}
+        </Text>
+      </Box>
+    </HStack>
   )
 }
 
