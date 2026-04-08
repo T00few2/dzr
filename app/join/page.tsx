@@ -12,7 +12,6 @@ import {
   Heading,
   HStack,
   Icon,
-  SimpleGrid,
   Stack,
   Text,
   keyframes,
@@ -38,7 +37,7 @@ interface BenefitCardProps {
 
 function BenefitCard({ icon, heading, text }: BenefitCardProps) {
   return (
-    <HStack align="start" spacing={3}>
+    <HStack align="start" spacing={3} py={3}>
       <Icon as={icon} color="#ad1a2d" boxSize={5} flexShrink={0} mt="1px" />
       <Box>
         <Text color="white" fontWeight="semibold" fontSize="sm" mb={0.5}>
@@ -135,13 +134,15 @@ export default function JoinIndexPage() {
           <Heading size="sm" mb={4} textTransform="uppercase" letterSpacing="wider" color="gray.400">
             Hvad får du som klubmedlem?
           </Heading>
-          <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={4}>
-            <BenefitCard icon={FaUsers} heading="DZR fællesskab" text="Adgang til fællesskab og klubaktiviteter" />
-            <BenefitCard icon={FaTrophy} heading="Løb & holdmiljø" text="Deltagelse i organiserede løb og holdmiljø" />
-            <BenefitCard icon={MdCardMembership} heading="DCU e-licens" text="Mulighed for DCU e-licens via DZR" />
-            <BenefitCard icon={FaRoad} heading="DCU Forårsliga" text="Adgang til DCU Forårsliga som del af klubsetup" />
-            <BenefitCard icon={MdHowToVote} heading="Stemmeret" text="Stemmeret på DZRs generalforsamling" />
-          </SimpleGrid>
+          <Box bg="gray.900" borderRadius="lg" px={5}>
+            <Stack spacing={0} divider={<Divider borderColor="gray.800" />}>
+              <BenefitCard icon={FaUsers} heading="DZR fællesskab" text="Adgang til fællesskab og klubaktiviteter" />
+              <BenefitCard icon={FaTrophy} heading="Løb & holdmiljø" text="Deltagelse i organiserede løb og holdmiljø" />
+              <BenefitCard icon={MdCardMembership} heading="DCU e-licens" text="Mulighed for DCU e-licens via DZR" />
+              <BenefitCard icon={FaRoad} heading="DCU Forårsliga" text="Adgang til DCU Forårsliga som del af klubsetup" />
+              <BenefitCard icon={MdHowToVote} heading="Stemmeret" text="Stemmeret på DZRs generalforsamling" />
+            </Stack>
+          </Box>
         </Box>
 
         {/* Zone 3 — 3-step visual stepper */}
