@@ -203,6 +203,9 @@ export default function JoinIndexPage() {
             <Text color="gray.500" fontSize="xs" textAlign="center">
               3 hurtige trin · Discord-konto kræves · Gratis at oprette
             </Text>
+            <Text color="gray.600" fontSize="xs" textAlign="center">
+              Betaling håndteres sikkert via MobilePay
+            </Text>
           </Stack>
         </Box>
 
