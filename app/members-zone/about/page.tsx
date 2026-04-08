@@ -201,6 +201,7 @@ export default function AboutPage() {
                 <ListItem fontSize="sm">• Betalt kontingent</ListItem>
                 <ListItem fontSize="sm">• Stemmeret på generalforsamling</ListItem>
                 <ListItem fontSize="sm">• Mulighed for DCU e-licens via DZR</ListItem>
+                <ListItem fontSize="sm">• Adgang til DCU Forårsliga</ListItem>
                 <ListItem fontSize="sm">• Støt DZR 🫶</ListItem>
               </List>
             </CardBody>
