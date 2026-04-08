@@ -123,6 +123,7 @@ export default function AboutPage() {
                 _hover={{ bg: '#8a1524' }}
                 size="lg"
                 py={7}
+                flex={1}
                 borderRadius="0"
                 textTransform="uppercase"
                 letterSpacing="wide"
@@ -140,6 +141,7 @@ export default function AboutPage() {
                 _hover={{ bg: 'gray.800' }}
                 size="lg"
                 py={7}
+                flex={1}
                 borderRadius="0"
                 textTransform="uppercase"
                 letterSpacing="wide"
@@ -158,6 +160,7 @@ export default function AboutPage() {
                 _hover={{ bg: '#8a1524' }}
                 size="lg"
                 py={7}
+                flex={1}
                 borderRadius="0"
                 textTransform="uppercase"
                 letterSpacing="wide"
@@ -175,6 +178,7 @@ export default function AboutPage() {
                 _hover={{ bg: '#4752C4' }}
                 size="lg"
                 py={7}
+                flex={1}
                 borderRadius="0"
                 textTransform="uppercase"
                 letterSpacing="wide"
