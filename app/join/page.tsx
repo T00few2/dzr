@@ -15,7 +15,6 @@ import {
   SimpleGrid,
   Stack,
   Text,
-  VStack,
   keyframes,
 } from '@chakra-ui/react'
 import { FaDiscord, FaRoad, FaUsers } from 'react-icons/fa'
@@ -64,15 +63,27 @@ interface StepProps {
 
 function Step({ number, icon, label }: StepProps) {
   return (
-    <VStack spacing={2} flex={1}>
-      <Circle size="40px" bg="#ad1a2d" color="white" fontWeight="bold" fontSize="lg">
+    <Stack
+      direction={{ base: 'row', md: 'column' }}
+      spacing={{ base: 4, md: 2 }}
+      flex={1}
+      align="center"
+    >
+      <Circle
+        size={{ base: '36px', md: '40px' }}
+        bg="#ad1a2d"
+        color="white"
+        fontWeight="bold"
+        fontSize={{ base: 'md', md: 'lg' }}
+        flexShrink={0}
+      >
         {number}
       </Circle>
-      <Icon as={icon} boxSize={7} color="gray.300" />
-      <Text color="gray.300" fontSize="sm" textAlign="center">
+      <Icon as={icon} boxSize={{ base: 5, md: 7 }} color="gray.300" flexShrink={0} />
+      <Text color="gray.300" fontSize="sm" textAlign={{ base: 'left', md: 'center' }}>
         {label}
       </Text>
-    </VStack>
+    </Stack>
   )
 }
 
@@ -143,8 +154,8 @@ export default function JoinIndexPage() {
           </Heading>
           <Flex
             direction={{ base: 'column', md: 'row' }}
-            align={{ base: 'flex-start', md: 'center' }}
-            gap={{ base: 6, md: 0 }}
+            align={{ base: 'stretch', md: 'center' }}
+            gap={{ base: 3, md: 0 }}
           >
             <Step number={1} icon={FaDiscord} label="Log ind med Discord" />
             <Divider
