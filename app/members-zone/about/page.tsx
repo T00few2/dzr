@@ -81,7 +81,7 @@ export default function AboutPage() {
         {/* Zone 1 — Hero */}
         <Box textAlign="center">
           <Badge bg="#ad1a2d" color="white" px={3} py={1} borderRadius="full" mb={4}>
-            Bliv med i DZR
+            Bliv medlem af DZR
           </Badge>
           <Heading color="white" size="2xl" mb={4}>
             Race. Træn. Fællesskab.
