@@ -1,13 +1,84 @@
 'use client'
 
 import React from 'react'
-import { Badge, Box, Button, Container, Heading, List, ListItem, Stack, Text } from '@chakra-ui/react'
-import { FaDiscord } from 'react-icons/fa'
+import {
+  Badge,
+  Box,
+  Button,
+  Circle,
+  Container,
+  Divider,
+  Flex,
+  Heading,
+  HStack,
+  Icon,
+  SimpleGrid,
+  Stack,
+  Text,
+  VStack,
+  keyframes,
+} from '@chakra-ui/react'
+import { FaDiscord, FaRoad, FaUsers } from 'react-icons/fa'
+import { FaTrophy } from 'react-icons/fa6'
+import { MdCardMembership, MdDirectionsBike, MdHowToVote, MdPayment } from 'react-icons/md'
+import { IconType } from 'react-icons'
+
+const pulseShadow = keyframes`
+  0%   { box-shadow: 0 0 0 0 rgba(173, 26, 45, 0.7); }
+  70%  { box-shadow: 0 0 0 18px rgba(173, 26, 45, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(173, 26, 45, 0); }
+`
 
 type SettingsResponse = { minAmountDkk?: number; maxAmountDkk?: number }
 
+interface BenefitCardProps {
+  icon: IconType
+  heading: string
+  text: string
+}
+
+function BenefitCard({ icon, heading, text }: BenefitCardProps) {
+  return (
+    <Box
+      bg="gray.900"
+      borderRadius="md"
+      borderTop="2px solid #ad1a2d"
+      p={4}
+    >
+      <Icon as={icon} boxSize={6} color="#ad1a2d" mb={2} />
+      <Text color="white" fontWeight="semibold" fontSize="sm" mb={1}>
+        {heading}
+      </Text>
+      <Text color="gray.400" fontSize="sm">
+        {text}
+      </Text>
+    </Box>
+  )
+}
+
+interface StepProps {
+  number: number
+  icon: IconType
+  label: string
+}
+
+function Step({ number, icon, label }: StepProps) {
+  return (
+    <VStack spacing={2} flex={1}>
+      <Circle size="40px" bg="#ad1a2d" color="white" fontWeight="bold" fontSize="lg">
+        {number}
+      </Circle>
+      <Icon as={icon} boxSize={7} color="gray.300" />
+      <Text color="gray.300" fontSize="sm" textAlign="center">
+        {label}
+      </Text>
+    </VStack>
+  )
+}
+
 export default function JoinIndexPage() {
-  const [kontingentText, setKontingentText] = React.useState<string>('Kontingentet fastsættes i indmeldelsesflowet.')
+  const [kontingentText, setKontingentText] = React.useState<string>('Valgfrit beløb')
+  const [kontingentRange, setKontingentRange] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     let ignore = false
@@ -22,7 +93,8 @@ export default function JoinIndexPage() {
         const min = Number(data?.minAmountDkk)
         const max = Number(data?.maxAmountDkk)
         if (Number.isFinite(min) && Number.isFinite(max)) {
-          setKontingentText(`Kontingentet er valgfrit mellem ${min} og ${max} DKK.`)
+          setKontingentText(`${min}–${max} DKK`)
+          setKontingentRange(`Kontingentet er valgfrit mellem ${min} og ${max} DKK.`)
         }
       } catch {
         // Keep fallback text when settings cannot be loaded.
@@ -30,14 +102,14 @@ export default function JoinIndexPage() {
     }
 
     loadSettings()
-    return () => {
-      ignore = true
-    }
+    return () => { ignore = true }
   }, [])
 
   return (
     <Container maxW="5xl" py={{ base: 8, md: 14 }}>
-      <Stack spacing={8}>
+      <Stack spacing={12}>
+
+        {/* Zone 1 — Hero */}
         <Box textAlign="center">
           <Badge bg="#ad1a2d" color="white" px={3} py={1} borderRadius="full" mb={4}>
             Bliv medlem af DZR
@@ -50,41 +122,79 @@ export default function JoinIndexPage() {
           </Text>
         </Box>
 
+        {/* Zone 2 — Benefit Cards */}
+        <Box>
+          <Heading size="sm" mb={4} textTransform="uppercase" letterSpacing="wider" color="gray.400">
+            Hvad får du som klubmedlem?
+          </Heading>
+          <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={4}>
+            <BenefitCard icon={FaUsers} heading="DZR fællesskab" text="Adgang til fællesskab og klubaktiviteter" />
+            <BenefitCard icon={FaTrophy} heading="Løb & holdmiljø" text="Deltagelse i organiserede løb og holdmiljø" />
+            <BenefitCard icon={MdCardMembership} heading="DCU e-licens" text="Mulighed for DCU e-licens via DZR" />
+            <BenefitCard icon={FaRoad} heading="DCU Forårsliga" text="Adgang til DCU Forårsliga som del af klubsetup" />
+            <BenefitCard icon={MdHowToVote} heading="Stemmeret" text="Stemmeret på DZRs generalforsamling" />
+          </SimpleGrid>
+        </Box>
+
+        {/* Zone 3 — 3-step visual stepper */}
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="lg" bg="gray.900" p={{ base: 5, md: 8 }}>
-          <Stack spacing={5}>
-            <Heading color="white" size="md">
-              Hvad får du som klubmedlem?
-            </Heading>
-            <List spacing={2} color="gray.200">
-              <ListItem>• Adgang til DZR fællesskab og aktiviteter</ListItem>
-              <ListItem>• Deltagelse i vores organiserede løb og holdmiljø</ListItem>
-              <ListItem>• Mulighed for DCU e-licens via DZR</ListItem>
-              <ListItem>• Adgang til DCU Forårsliga som del af vores klubsetup</ListItem>
-              <ListItem>• Stemmeret på generalforsamlingen</ListItem>
-            </List>
-            <Text color="gray.300">
-              Indmeldelsen foregår i 3 enkle trin: log ind med Discord, betal kontingent, og indtast dit Zwift ID.
-            </Text>
-            <Text color="gray.300">{kontingentText}</Text>
-            <Text color="gray.300">
-              Discord er en central del af DZR-fællesskabet, hvor vi koordinerer hold, events og kommunikation.
-              Derfor bruger vi Discord-login i indmeldelsesflowet.
-            </Text>
-            <Text color="gray.300">
-              Har du ikke en Discord-konto endnu, kan du oprette en gratis konto i forbindelse med login.
-            </Text>
+          <Heading size="sm" mb={6} textTransform="uppercase" letterSpacing="wider" color="gray.400">
+            Sådan foregår det — 3 enkle trin
+          </Heading>
+          <Flex
+            direction={{ base: 'column', md: 'row' }}
+            align={{ base: 'flex-start', md: 'center' }}
+            gap={{ base: 6, md: 0 }}
+          >
+            <Step number={1} icon={FaDiscord} label="Log ind med Discord" />
+            <Divider
+              display={{ base: 'none', md: 'block' }}
+              borderColor="gray.600"
+              borderStyle="dashed"
+            />
+            <Step number={2} icon={MdPayment} label="Betal kontingent" />
+            <Divider
+              display={{ base: 'none', md: 'block' }}
+              borderColor="gray.600"
+              borderStyle="dashed"
+            />
+            <Step number={3} icon={MdDirectionsBike} label="Indtast dit Zwift ID" />
+          </Flex>
+          <Text color="gray.400" fontSize="sm" mt={6}>
+            Discord er en central del af DZR-fællesskabet, hvor vi koordinerer hold, events og kommunikation.
+            Har du ikke en Discord-konto endnu, kan du oprette en gratis konto i forbindelse med login.
+          </Text>
+        </Box>
+
+        {/* Zone 4 — Price + CTA */}
+        <Box borderWidth="1px" borderColor="gray.600" borderRadius="lg" bg="gray.900" p={{ base: 5, md: 8 }}>
+          <Stack spacing={4}>
+            <HStack spacing={2}>
+              <Icon as={MdPayment} color="green.300" boxSize={5} />
+              <Text color="green.300" fontWeight="semibold">
+                Kontingent: {kontingentText}
+              </Text>
+            </HStack>
+            {kontingentRange && (
+              <Text color="gray.400" fontSize="sm">{kontingentRange}</Text>
+            )}
             <Button
               as="a"
               href="/join/discord"
               colorScheme="red"
               size="lg"
               leftIcon={<FaDiscord />}
-              alignSelf="flex-start"
+              animation={`${pulseShadow} 2s infinite`}
+              w="full"
             >
               Start indmeldelse
             </Button>
+            <Text color="gray.500" fontSize="xs" textAlign="center">
+              3 hurtige trin · Discord-konto kræves · Gratis at oprette
+            </Text>
           </Stack>
         </Box>
+
       </Stack>
     </Container>
   )
