@@ -119,7 +119,7 @@ export default function JoinIndexPage() {
         {/* Zone 1 — Hero */}
         <Box textAlign="center">
           <Badge bg="#ad1a2d" color="white" px={3} py={1} borderRadius="full" mb={4}>
-            Bliv medlem af DZR
+            Bliv klubmedlem af DZR
           </Badge>
           <Heading color="white" size="2xl" mb={4}>
             Velkommen til Danish Zwift Racers
