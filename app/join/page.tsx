@@ -129,21 +129,7 @@ export default function JoinIndexPage() {
           </Text>
         </Box>
 
-        {/* Zone 2 — Benefit Cards */}
-        <Box borderWidth="1px" borderColor="gray.700" borderRadius="lg" bg="gray.900" p={{ base: 5, md: 8 }}>
-          <Heading size="sm" mb={4} textTransform="uppercase" letterSpacing="wider" color="gray.400">
-            Hvad får du som klubmedlem?
-          </Heading>
-          <Stack spacing={0} divider={<Divider borderColor="gray.700" />}>
-            <BenefitCard icon={FaUsers} heading="DZR fællesskab" text="Adgang til fællesskab og klubaktiviteter" />
-            <BenefitCard icon={FaTrophy} heading="Løb & holdmiljø" text="Deltagelse i organiserede løb og holdmiljø" />
-            <BenefitCard icon={MdCardMembership} heading="DCU e-licens" text="Mulighed for DCU e-licens via DZR" />
-            <BenefitCard icon={FaRoad} heading="DCU Forårsliga" text="Adgang til DCU Forårsliga som del af klubsetup" />
-            <BenefitCard icon={MdHowToVote} heading="Stemmeret" text="Stemmeret på DZRs generalforsamling" />
-          </Stack>
-        </Box>
-
-        {/* Zone 3 — 3-step visual stepper */}
+        {/* Zone 2 — 3-step visual stepper */}
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="lg" bg="gray.900" p={{ base: 5, md: 8 }}>
           <Heading size="sm" mb={6} textTransform="uppercase" letterSpacing="wider" color="gray.400">
             Sådan foregår det — 3 enkle trin
@@ -173,7 +159,7 @@ export default function JoinIndexPage() {
           </Text>
         </Box>
 
-        {/* Zone 4 — Price + CTA */}
+        {/* Zone 3 — Price + CTA */}
         <Box borderWidth="1px" borderColor="gray.600" borderRadius="lg" bg="gray.900" p={{ base: 5, md: 8 }}>
           <Stack spacing={4}>
             <HStack spacing={2}>
@@ -202,6 +188,20 @@ export default function JoinIndexPage() {
             <Text color="gray.600" fontSize="xs" textAlign="center">
               Betaling håndteres sikkert via MobilePay
             </Text>
+          </Stack>
+        </Box>
+
+        {/* Zone 4 — Benefit Cards */}
+        <Box borderWidth="1px" borderColor="gray.700" borderRadius="lg" bg="gray.900" p={{ base: 5, md: 8 }}>
+          <Heading size="sm" mb={4} textTransform="uppercase" letterSpacing="wider" color="gray.400">
+            Bliv klubmedlem af DZR
+          </Heading>
+          <Stack spacing={0} divider={<Divider borderColor="gray.700" />}>
+            <BenefitCard icon={FaUsers} heading="DZR fællesskab" text="Adgang til fællesskab og klubaktiviteter" />
+            <BenefitCard icon={FaTrophy} heading="Løb & holdmiljø" text="Deltagelse i organiserede løb og holdmiljø" />
+            <BenefitCard icon={MdCardMembership} heading="DCU e-licens" text="Mulighed for DCU e-licens via DZR" />
+            <BenefitCard icon={FaRoad} heading="DCU Forårsliga" text="Adgang til DCU Forårsliga som del af klubsetup" />
+            <BenefitCard icon={MdHowToVote} heading="Stemmeret" text="Stemmeret på DZRs generalforsamling" />
           </Stack>
         </Box>
 
