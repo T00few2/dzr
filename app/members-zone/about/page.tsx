@@ -167,7 +167,7 @@ export default function AboutPage() {
                 fontSize="md"
                 rightIcon={<FiArrowRight size="1.2em" />}
               >
-                Bliv klubmedlem
+                Klubmedlem
               </Button>
               <Button
                 as="a"
