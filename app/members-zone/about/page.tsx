@@ -97,7 +97,7 @@ export default function AboutPage() {
           <Box textAlign="center">
             <Icon as={FaTrophy} color="#ad1a2d" boxSize={8} mb={3} />
             <Heading size="sm" color="white" mb={2}>Løb & Racing</Heading>
-            <Text color="gray.400" fontSize="sm">Organiserede løb, DCU Forårsliga og holdmiljø på Zwift</Text>
+            <Text color="gray.400" fontSize="sm">Organiserede løb (Zwift Racing League, DIRT Racing Series, Club Ladder, Zwift Ligaen,..), DCU Forårsliga og holdmiljø på Zwift</Text>
           </Box>
           <Box textAlign="center">
             <Icon as={FaDiscord} color="#ad1a2d" boxSize={8} mb={3} />
@@ -167,7 +167,7 @@ export default function AboutPage() {
                 fontSize="md"
                 rightIcon={<FiArrowRight size="1.2em" />}
               >
-                Start indmeldelse
+                Bliv klubmedlem
               </Button>
               <Button
                 as="a"
@@ -185,7 +185,7 @@ export default function AboutPage() {
                 fontSize="md"
                 leftIcon={<FaDiscord size="1.2em" />}
               >
-                Prøv Community (gratis)
+                Bliv Community medlem (gratis)
               </Button>
             </Stack>
           )}
