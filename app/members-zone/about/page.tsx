@@ -167,7 +167,7 @@ export default function AboutPage() {
                 fontSize="md"
                 rightIcon={<FiArrowRight size="1.2em" />}
               >
-                Bliv klubmedlem
+                Klubmedlem
               </Button>
               <Button
                 as="a"
@@ -185,7 +185,7 @@ export default function AboutPage() {
                 fontSize="md"
                 leftIcon={<FaDiscord size="1.2em" />}
               >
-                Bliv Community medlem (gratis)
+                Community Medlem (gratis)
               </Button>
             </Stack>
           )}
