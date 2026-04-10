@@ -102,7 +102,7 @@ export default function AboutPage() {
           <Box textAlign="center">
             <Icon as={FaDiscord} color="#ad1a2d" boxSize={8} mb={3} />
             <Heading size="sm" color="white" mb={2}>Discord Fællesskab</Heading>
-            <Text color="gray.400" fontSize="sm">Aktiv community med koordinering af hold, events og kommunikation</Text>
+            <Text color="gray.400" fontSize="sm">Aktiv community med koordinering af hold og events</Text>
           </Box>
           <Box textAlign="center">
             <Icon as={MdDirectionsBike} color="#ad1a2d" boxSize={8} mb={3} />
