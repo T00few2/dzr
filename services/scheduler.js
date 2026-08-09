@@ -4,6 +4,7 @@ const { sweepGuildForNewMembers } = require("./newMemberService");
 const config = require("../config/config");
 const { getBotState, setBotState } = require("./firebase");
 const { syncZpRolesForGuild } = require("./zpRoleSync");
+const { maybePostScheduledQuiz } = require("./quizService");
 
 /**
  * Check for and send scheduled messages (both time-based and probability-based)
@@ -31,6 +32,9 @@ async function checkScheduledMessages(client) {
 
     // Assign ZwiftPower pace-group roles once per day (add-only)
     await checkZpRoleSync(client);
+
+    // Occasional Zwift route quiz (daily probability roll)
+    await maybePostScheduledQuiz(client);
     
   } catch (error) {
     console.error("❌ Error checking scheduled messages:", error);

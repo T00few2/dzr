@@ -704,6 +704,11 @@ const commands = [
         .setDescription("Optional note for the member")
         .setRequired(false)
     ),
+
+  // Zwift route quiz (ZwiftQuiz-style)
+  new SlashCommandBuilder()
+    .setName("quiz")
+    .setDescription("Post a Zwift route quiz — guess the route from the map shape"),
 ].map(cmd => cmd.toJSON());
 
 module.exports = commands; 

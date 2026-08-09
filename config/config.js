@@ -44,4 +44,11 @@ module.exports = {
   openai: {
     apiKey: process.env.OPENAI_API_KEY,        // OpenAI API key for AI chat features
   },
+  quiz: {
+    channelId: process.env.QUIZ_CHANNEL_ID || "1353477785674453104",
+    tz: process.env.QUIZ_TZ || "Europe/Paris",
+    hour: Number.parseInt(process.env.QUIZ_HOUR || "18", 10),
+    minute: Number.parseInt(process.env.QUIZ_MINUTE || "0", 10),
+    probability: Number.parseFloat(process.env.QUIZ_PROBABILITY || "0.4"),
+  },
 }; 

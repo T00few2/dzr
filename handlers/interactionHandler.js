@@ -48,6 +48,10 @@ const {
   handleProcessVerification,
   handleDisableVerification
 } = require("./verificationHandlers");
+const {
+  handleQuizButton,
+  startQuizFromInteraction,
+} = require("../services/quizService");
 const crypto = require("crypto");
 
 const HANDLER_ID = crypto.randomUUID().slice(0, 8);
@@ -178,6 +182,11 @@ async function handleInteractions(interaction) {
     console.log(`🔍 [${HANDLER_ID}] Handling interaction: ${interaction.type} - ${interaction.isCommand() ? interaction.commandName : 'N/A'} (ID: ${interaction.id})`);
 
     // Handle publish buttons
+    if (interaction.isButton() && interaction.customId.startsWith("quiz_answer_")) {
+      await handleQuizButton(interaction);
+      return;
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith("publish_")) {
       const uniqueId = interaction.customId.replace("publish_", "");
       await handlePublishButton(interaction, uniqueId);
@@ -548,6 +557,7 @@ async function handleInteractions(interaction) {
       "verification_status": handleVerificationStatus,
       "process_verification": handleProcessVerification,
       "disable_verification": handleDisableVerification,
+      "quiz": startQuizFromInteraction,
     };
 
     const handler = commandHandlers[commandName];

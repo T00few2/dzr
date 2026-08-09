@@ -12,6 +12,7 @@ const {
   handleMyZwiftId,
   handleSetZwiftId
 } = require("./commandHandlers");
+const { startQuizFromMessage } = require("../services/quizService");
 
 // Initialize OpenAI client
 let openai;
@@ -35,12 +36,47 @@ const MAX_CONVERSATION_LENGTH = 20; // Last 20 messages (10 exchanges)
 
 // AI Model Configuration - can be changed to test different models
 const AI_CONFIG = {
-  model: "gpt-4.1-mini",  // Options: "gpt-4o-mini", "gpt-4.1-mini", "gpt-4o", "gpt-4.1"
-  temperature: 0.3,       // Lower = more deterministic function selection
-  maxTokens: 800,         // Increased for better responses
+  model: "gpt-5-mini",    // Options: "gpt-5-mini", "gpt-4.1-mini", "gpt-5-nano", "gpt-4.1-nano"
+  temperature: 0.3,       // Used only by models that support sampling (not gpt-5-mini/nano)
+  maxTokens: 800,         // Max completion tokens for replies
   maxRetries: 2,          // Retry attempts for rate limits
   retryDelayMs: 2000,     // Base delay between retries
+  // gpt-5* defaults to medium reasoning (slower/costlier). low keeps Discord snappy for tool routing.
+  reasoningEffort: "low",
 };
+
+function isGpt5Family(model = AI_CONFIG.model) {
+  return typeof model === "string" && model.startsWith("gpt-5");
+}
+
+/**
+ * Build chat.completions params compatible with both 4.x and 5.x models.
+ * gpt-5-mini/nano reject custom temperature and require max_completion_tokens.
+ */
+function buildChatCompletionParams({ messages, tools, toolChoice, maxTokens, temperature }) {
+  const model = AI_CONFIG.model;
+  const params = {
+    model,
+    messages,
+  };
+
+  if (tools) {
+    params.tools = tools;
+    params.tool_choice = toolChoice || "auto";
+  }
+
+  if (isGpt5Family(model)) {
+    params.max_completion_tokens = maxTokens ?? AI_CONFIG.maxTokens;
+    if (AI_CONFIG.reasoningEffort) {
+      params.reasoning_effort = AI_CONFIG.reasoningEffort;
+    }
+  } else {
+    params.max_tokens = maxTokens ?? AI_CONFIG.maxTokens;
+    params.temperature = temperature ?? AI_CONFIG.temperature;
+  }
+
+  return params;
+}
 
 // Tool-calling safety
 const MAX_TOOL_ITERATIONS = 2;
@@ -56,6 +92,7 @@ const TOOLS_THAT_REPLY_DIRECTLY = new Set([
   "event_results",
   "my_zwiftid",
   "set_zwiftid",
+  "start_quiz",
 ]);
 
 function safeStringify(value) {
@@ -360,6 +397,17 @@ const toolDefinitions = [
           }
         },
         required: ["search"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "start_quiz",
+      description: "Start a Zwift route quiz in the current channel. Use when the user asks for a quiz, route quiz, or ZwiftQuiz-style question.",
+      parameters: {
+        type: "object",
+        properties: {}
       }
     }
   },
@@ -683,6 +731,17 @@ async function executeSingleToolCall(toolCall, message) {
         await handleEventResults(interaction);
         return { tool_call_id: toolCall.id, success: true };
       }
+
+      case "start_quiz": {
+        const result = await startQuizFromMessage(message);
+        return {
+          tool_call_id: toolCall.id,
+          success: !!result?.success,
+          message: result?.success
+            ? "Quiz posted in the channel."
+            : (result?.message || "Failed to start quiz"),
+        };
+      }
       
       case "my_zwiftid": {
         const options = {
@@ -938,6 +997,7 @@ You can help users with:
 - Finding event results
 - Providing information about DZR teams and race series
 - Answering questions using the admin-maintained knowledge base
+- Starting a Zwift route quiz (guess the route from the map shape) via start_quiz
 
 ## Important Rules
 1. **ALWAYS use a tool call** when the user wants to take an action (fetch stats, link ID, search, etc.)
@@ -959,7 +1019,25 @@ You can help users with:
 }
 
 /**
- * Call OpenAI API with retry logic for rate limits
+ * Normalize OpenAI / SDK error fields (code may live on error or error.error)
+ */
+function getOpenAIErrorInfo(error) {
+  const code = error?.code || error?.error?.code || null;
+  const type = error?.type || error?.error?.type || null;
+  const message = error?.message || error?.error?.message || "";
+  const status = error?.status ?? error?.statusCode ?? null;
+  const looksLikeQuota =
+    code === "insufficient_quota" ||
+    type === "insufficient_quota" ||
+    /quota|billing|payment|exceeded your current quota/i.test(message);
+  const looksLikeRateLimit =
+    !looksLikeQuota &&
+    (code === "rate_limit_exceeded" || status === 429);
+  return { code, type, message, status, looksLikeQuota, looksLikeRateLimit };
+}
+
+/**
+ * Call OpenAI API with retry logic for transient rate limits (not quota/billing)
  */
 async function callOpenAIWithRetry(params) {
   const { maxRetries, retryDelayMs } = AI_CONFIG;
@@ -968,10 +1046,11 @@ async function callOpenAIWithRetry(params) {
     try {
       return await openai.chat.completions.create(params);
     } catch (error) {
-      const isRateLimit = error.code === 'rate_limit_exceeded' || error.status === 429;
+      const info = getOpenAIErrorInfo(error);
       const isLastAttempt = attempt === maxRetries;
       
-      if (isRateLimit && !isLastAttempt) {
+      // Only retry transient rate limits — quota/billing 429s will never succeed
+      if (info.looksLikeRateLimit && !info.looksLikeQuota && !isLastAttempt) {
         const delay = retryDelayMs * Math.pow(2, attempt); // Exponential backoff
         console.log(`⏳ Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
         await new Promise(r => setTimeout(r, delay));
@@ -1076,14 +1155,14 @@ async function handleAIChatMessage(message, client) {
     }
     
     // Call OpenAI with retry logic
-    const response = await callOpenAIWithRetry({
-      model: AI_CONFIG.model,
-      messages: conversation,
-      tools: toolDefinitions,
-      tool_choice: "auto",
-      temperature: AI_CONFIG.temperature,
-      max_tokens: AI_CONFIG.maxTokens
-    });
+    const response = await callOpenAIWithRetry(
+      buildChatCompletionParams({
+        messages: conversation,
+        tools: toolDefinitions,
+        toolChoice: "auto",
+        maxTokens: AI_CONFIG.maxTokens,
+      })
+    );
     
     const responseMessage = response.choices[0].message;
     
@@ -1145,12 +1224,13 @@ async function handleAIChatMessage(message, client) {
               { role: "user", content: prompt }
             ];
 
-            const followUp = await callOpenAIWithRetry({
-              model: AI_CONFIG.model,
-              messages: followUpMessages,
-              temperature: 1.0, // Higher creativity for commentary
-              max_tokens: 300
-            });
+            const followUp = await callOpenAIWithRetry(
+              buildChatCompletionParams({
+                messages: followUpMessages,
+                maxTokens: 300,
+                temperature: 1.0, // Higher creativity on models that support sampling
+              })
+            );
 
             const followUpMessage = followUp.choices[0]?.message;
 
@@ -1208,14 +1288,14 @@ async function handleAIChatMessage(message, client) {
             ];
           }
 
-          const postTool = await callOpenAIWithRetry({
-            model: AI_CONFIG.model,
-            messages: conversation,
-            tools: toolDefinitions,
-            tool_choice: "auto",
-            temperature: AI_CONFIG.temperature,
-            max_tokens: AI_CONFIG.maxTokens
-          });
+          const postTool = await callOpenAIWithRetry(
+            buildChatCompletionParams({
+              messages: conversation,
+              tools: toolDefinitions,
+              toolChoice: "auto",
+              maxTokens: AI_CONFIG.maxTokens,
+            })
+          );
 
           const postToolMsg = postTool.choices[0]?.message;
           if (!postToolMsg) break;
@@ -1266,14 +1346,21 @@ async function handleAIChatMessage(message, client) {
     resetConversationTimeout(conversationKey);
     
   } catch (error) {
-    console.error("Error in AI chat handler:", error);
+    const info = getOpenAIErrorInfo(error);
+    console.error("Error in AI chat handler:", {
+      status: info.status,
+      code: info.code,
+      type: info.type,
+      message: info.message,
+      raw: error,
+    });
     
-    if (error.code === 'insufficient_quota') {
-      await message.reply("⚠️ OpenAI API quota exceeded. Please contact an administrator.");
-    } else if (error.code === 'invalid_api_key') {
-      await message.reply("⚠️ OpenAI API key is invalid. Please contact an administrator.");
-    } else if (error.status === 429) {
-      await message.reply("⚠️ Too many requests. Please wait a moment and try again.");
+    if (info.looksLikeQuota) {
+      await message.reply("⚠️ OpenAI API quota/billing issue. Check platform.openai.com billing and credits, then restart the bot.");
+    } else if (info.code === "invalid_api_key" || info.status === 401) {
+      await message.reply("⚠️ OpenAI API key is invalid or missing. Update OPENAI_API_KEY in the host env (e.g. Render) and restart.");
+    } else if (info.looksLikeRateLimit) {
+      await message.reply("⚠️ Too many requests to OpenAI. Please wait a moment and try again.");
     } else {
       await message.reply("⚠️ An error occurred while processing your message. Please try again.");
     }
