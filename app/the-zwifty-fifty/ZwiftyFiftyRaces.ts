@@ -350,4 +350,16 @@ export const ZwiftyFiftyRacesData = [
     sprintLaps: ['1','1'],
     bonus: ['3','2','1'],
   }),
+  new ZwiftyFiftyRacesTemplate({
+    route: 'Heart of Montmartre',
+    world: 'Paris',
+    linkRoute: 'https://zwiftinsider.com/route/heart-of-montmartre/',
+    laps: '1',
+    length: '77.68',
+    hm: '500',
+    climbs: ['Montmartre KOM'],
+    sprints: ['Montmartre KOM','Montmartre KOM','Montmartre KOM'],
+    sprintLaps: ['1','1','1'],
+    bonus: ['3','2','1'],
+  }),  
 ];
