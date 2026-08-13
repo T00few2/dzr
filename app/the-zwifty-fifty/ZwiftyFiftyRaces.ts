@@ -351,7 +351,7 @@ export const ZwiftyFiftyRacesData = [
     bonus: ['3','2','1'],
   }),
   new ZwiftyFiftyRacesTemplate({
-    route: 'Heart of Montmartre',
+    route: 'Heart Of Montmartre',
     world: 'Paris',
     linkRoute: 'https://zwiftinsider.com/route/heart-of-montmartre/',
     laps: '1',
