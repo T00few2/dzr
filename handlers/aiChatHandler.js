@@ -2,6 +2,7 @@ const OpenAI = require("openai");
 const { ChannelType } = require("discord.js");
 const config = require("../config/config");
 const { getAllBotKnowledge, getUserZwiftId, getDZRTeamsAndSeries } = require("../services/firebase");
+const { lookupZrlCategory } = require("../services/zrlCategory");
 const { 
   handleRiderStats, 
   handleTeamStats, 
@@ -138,6 +139,10 @@ function compactToolResult(result) {
   }
   if (result.metadata) base.metadata = result.metadata;
   if (result.series) base.series = result.series;
+  if (result.zrl) base.zrl = result.zrl;
+  if (typeof result.summary === "string") base.summary = result.summary.slice(0, 500);
+  if (Array.isArray(result.matches)) base.matches = result.matches.slice(0, 3);
+  if (Array.isArray(result.available)) base.available = result.available.slice(0, 20);
   if (typeof result.error === "string") base.error = result.error.slice(0, 300);
 
   // Fallback: keep only small scalar keys
@@ -261,16 +266,36 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "get_help_article",
-      description: "Fetch a short help/knowledge article configured by the admin (for onboarding, ZwiftID help, links, etc.).",
+      description: "Fetch help/knowledge articles configured by the admin (onboarding, ZwiftID, TrainerDX, club info, etc.). Call once per topic. For ZRL category placement, use zrl_category instead.",
       parameters: {
         type: "object",
         properties: {
           topic: {
             type: "string",
-            description: "Short topic or keyword describing what help is needed (e.g. 'zwiftid', 'membership', 'notifications')."
+            description: "Short topic or keyword describing what help is needed (e.g. 'zwiftid', 'TrainerDX', 'forening')."
           }
         },
         required: ["topic"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "zrl_category",
+      description: "Determine a rider's Zwift Racing League (ZRL) pace-group category by combining admin ZRL limits with the rider's current watt stats. Use this whenever someone asks which ZRL category/division/gruppe they or another rider belong to.",
+      parameters: {
+        type: "object",
+        properties: {
+          zwiftid: {
+            type: "string",
+            description: "The Zwift ID of the rider (numeric string)"
+          },
+          discord_username: {
+            type: "string",
+            description: "The Discord username or mention (e.g. '@Chris' or 'Chris'). Omit to use the person asking."
+          }
+        }
       }
     }
   },
@@ -795,6 +820,43 @@ async function executeSingleToolCall(toolCall, message) {
         return { tool_call_id: toolCall.id, success: true };
       }
 
+      case "zrl_category": {
+        let zwiftId = args.zwiftid ? String(args.zwiftid) : null;
+
+        if (!zwiftId && args.discord_username) {
+          const user = resolveUser(args.discord_username, message);
+          if (!user) {
+            return {
+              tool_call_id: toolCall.id,
+              success: false,
+              message: `Discord user ${args.discord_username} not found`,
+            };
+          }
+          zwiftId = await getUserZwiftId(user.id);
+          if (!zwiftId) {
+            const msg =
+              `❌ **${user.username}** has not linked their ZwiftID yet.\n\n` +
+              `Ask them to DM me their ZwiftID (numbers only) or the first 3+ letters of their Zwift name.`;
+            await message.reply(msg);
+            return { tool_call_id: toolCall.id, success: false, message: msg };
+          }
+        }
+
+        if (!zwiftId) {
+          zwiftId = await getUserZwiftId(message.author.id);
+          if (!zwiftId) {
+            const msg =
+              "❌ I couldn't find a linked ZwiftID for you.\n\n" +
+              "Reply with your ZwiftID (numbers only) or the first 3+ letters of your Zwift name, then ask again.";
+            await message.reply(msg);
+            return { tool_call_id: toolCall.id, success: false, message: msg };
+          }
+        }
+
+        const result = await lookupZrlCategory({ zwiftId });
+        return { tool_call_id: toolCall.id, ...result };
+      }
+
       case "get_help_article": {
         const topic = (args.topic || "").toString().toLowerCase();
         const all = await getAllBotKnowledge();
@@ -802,33 +864,45 @@ async function executeSingleToolCall(toolCall, message) {
           return { tool_call_id: toolCall.id, success: false, message: "No bot knowledge entries configured." };
         }
 
-        // Very simple matching: check key, title and tags for substring
         const scored = all.map(entry => {
           const key = (entry.key || entry.id || "").toString().toLowerCase();
           const title = (entry.title || "").toLowerCase();
+          const content = (entry.content || "").toLowerCase();
           const tags = Array.isArray(entry.tags) ? entry.tags.map(t => String(t).toLowerCase()) : [];
           let score = 0;
-          if (key.includes(topic)) score += 3;
+          if (key.includes(topic) || topic.includes(key)) score += 3;
           if (title.includes(topic)) score += 2;
-          if (tags.some(t => t.includes(topic))) score += 2;
+          if (tags.some(t => t.includes(topic) || topic.includes(t))) score += 2;
+          if (content.includes(topic)) score += 1;
           return { entry, score };
         }).filter(x => x.score > 0);
 
         if (scored.length === 0) {
-          return { tool_call_id: toolCall.id, success: false, message: `No knowledge entry matched topic '${topic}'.` };
+          return {
+            tool_call_id: toolCall.id,
+            success: false,
+            message: `No knowledge entry matched topic '${topic}'.`,
+            available: all.map(e => ({ key: e.key || e.id, title: e.title || "", tags: e.tags || [] })),
+          };
         }
 
         scored.sort((a, b) => b.score - a.score);
-        const best = scored[0].entry;
+        const matches = scored.slice(0, 3).map(({ entry }) => ({
+          key: entry.key || entry.id,
+          title: entry.title || "",
+          content: entry.content || "",
+          tags: entry.tags || []
+        }));
+        const best = matches[0];
 
-        // Return a compact payload for the model to use
         return {
           tool_call_id: toolCall.id,
           success: true,
-          key: best.key || best.id,
-          title: best.title || "",
-          content: best.content || "",
-          tags: best.tags || []
+          key: best.key,
+          title: best.title,
+          content: best.content,
+          tags: best.tags,
+          matches
         };
       }
 
@@ -979,12 +1053,39 @@ function resetConversationTimeout(userId) {
   conversationTimers.set(key, timer);
 }
 
+let knowledgeCatalogCache = { at: 0, items: [] };
+
+async function getKnowledgeCatalog() {
+  const now = Date.now();
+  if (now - knowledgeCatalogCache.at < 10 * 60 * 1000 && knowledgeCatalogCache.items.length > 0) {
+    return knowledgeCatalogCache.items;
+  }
+  try {
+    const all = await getAllBotKnowledge();
+    const items = (all || []).map((entry) => ({
+      key: entry.key || entry.id,
+      title: entry.title || "",
+      tags: Array.isArray(entry.tags) ? entry.tags : [],
+    }));
+    knowledgeCatalogCache = { at: now, items };
+    return items;
+  } catch (error) {
+    console.error("Failed to load bot knowledge catalog:", error);
+    return knowledgeCatalogCache.items;
+  }
+}
+
 /**
  * Build the system prompt with context
  */
-function buildSystemPrompt(message) {
+function buildSystemPrompt(message, knowledgeCatalog = []) {
   const serverName = message.guild?.name || 'Direct Message';
   const timestamp = new Date().toISOString();
+  const catalogLines = knowledgeCatalog.length
+    ? knowledgeCatalog
+        .map((item) => `- ${item.key}: ${item.title}${item.tags?.length ? ` [${item.tags.join(", ")}]` : ""}`)
+        .join("\n")
+    : "- (none configured)";
   
   return `You are a helpful Discord bot assistant for Danish Zwift Racers (DZR), a cycling club focused on virtual racing in Zwift.
 
@@ -997,20 +1098,28 @@ You can help users with:
 - Finding event results
 - Providing information about DZR teams and race series
 - Answering questions using the admin-maintained knowledge base
+- Determining Zwift Racing League (ZRL) category from rider watts + official limits via zrl_category
 - Starting a Zwift route quiz (guess the route from the map shape) via start_quiz
 
 ## Important Rules
-1. **ALWAYS use a tool call** when the user wants to take an action (fetch stats, link ID, search, etc.)
+1. **ALWAYS use a tool call** when the user wants to take an action (fetch stats, link ID, search, ZRL category, etc.)
 2. **Respond conversationally** only for greetings, clarifying questions, or general chat
 3. When users mention Discord users with @ (like @Chris), **preserve the mention format** in your tool calls
 4. If you're unsure what the user wants, **ask for clarification** rather than guessing
 5. Before inventing answers about DZR teams or help topics, **check the knowledge base** or team data first
+6. If a question needs two knowledge articles, call get_help_article once per topic and combine the results
+7. **ZRL category questions** ("hvilken ZRL kategori/gruppe/division er jeg?", "kan jeg køre B?", etc.): ALWAYS call zrl_category. Do not answer from memory, and do not use only rider_stats or get_help_article for this. Use the tool's summary and numbers as-is — do not recalculate.
+
+## Knowledge base
+Available articles (use get_help_article with the key or a tag):
+${catalogLines}
 
 ## Response Style
 - Be friendly, helpful, and concise
 - Use occasional Danish phrases since this is a Danish cycling club (e.g., "Godt træk!", "Kør stærkt!")
 - When providing commentary about riders, be playful and use cycling metaphors
 - Avoid overly technical jargon unless the user asks for details
+- For ZRL answers: state Open/Women's category, whether Development is possible, and that the official category is set at the start line
 
 ## Current Context
 - User: ${message.author.username} (ID: ${message.author.id})
@@ -1126,18 +1235,24 @@ async function handleAIChatMessage(message, client) {
 
     const userId = message.author.id;
     const conversationKey = getConversationKey(message);
+    const knowledgeCatalog = await getKnowledgeCatalog();
+    const systemPrompt = buildSystemPrompt(message, knowledgeCatalog);
     
     // Get or create conversation history
     let conversation = userConversations.get(conversationKey);
 
     if (!conversation) {
-      // Initialize new conversation with dynamic system prompt
       conversation = [
         {
           role: "system",
-          content: buildSystemPrompt(message)
+          content: systemPrompt
         }
       ];
+    } else {
+      conversation[0] = {
+        role: "system",
+        content: systemPrompt
+      };
     }
     
     // Add user message to conversation
@@ -1204,7 +1319,7 @@ async function handleAIChatMessage(message, client) {
         );
         const allSuccessful = toolResults.every(r => r.success);
 
-        if (hasStatsCall && allSuccessful) {
+        if (hasStatsCall && allSuccessful && shouldSkipGenericAnswer) {
           // Trim conversation before follow-up
           if (conversation.length > MAX_CONVERSATION_LENGTH + 1) {
             conversation = [
