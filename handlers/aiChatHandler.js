@@ -484,6 +484,27 @@ const toolDefinitions = [
 ];
 
 /**
+ * Reply to a message, falling back to a plain channel message if the reply itself
+ * fails (e.g. Discord can't find the message being replied to anymore — code 50035,
+ * MESSAGE_REFERENCE_UNKNOWN_MESSAGE). Never throws: a failed fallback is logged and
+ * swallowed so one bad reply can't crash the whole bot process via an unhandled
+ * rejection in the messageCreate handler.
+ */
+async function safeReply(message, content) {
+  try {
+    return await message.reply(content);
+  } catch (error) {
+    console.warn("⚠️ message.reply failed, falling back to channel.send:", error?.message || error);
+    try {
+      return await message.channel.send(content);
+    } catch (fallbackError) {
+      console.error("⚠️ channel.send fallback also failed:", fallbackError?.message || fallbackError);
+      return null;
+    }
+  }
+}
+
+/**
  * Create a synthetic interaction object to call existing command handlers
  */
 function createSyntheticInteraction(message, options = {}) {
@@ -514,7 +535,7 @@ function createSyntheticInteraction(message, options = {}) {
       synthetic.replied = true;
       // Handle different content types (string, object with embeds, etc.)
       if (typeof content === 'string') {
-        replyMessage = await message.reply(content);
+        replyMessage = await safeReply(message, content);
       } else {
         // For AI chat, skip ephemeral and send directly to channel
         // Remove "publish" button if present
@@ -522,7 +543,7 @@ function createSyntheticInteraction(message, options = {}) {
         if (cleanContent.components) {
           cleanContent.components = [];
         }
-        replyMessage = await message.reply(cleanContent);
+        replyMessage = await safeReply(message, cleanContent);
       }
       return replyMessage;
     },
@@ -540,13 +561,13 @@ function createSyntheticInteraction(message, options = {}) {
       // Otherwise, create the initial reply
       synthetic.replied = true;
       if (typeof content === 'string') {
-        replyMessage = await message.reply(content);
+        replyMessage = await safeReply(message, content);
       } else {
         const cleanContent = { ...content };
         if (cleanContent.components) {
           cleanContent.components = [];
         }
-        replyMessage = await message.reply(cleanContent);
+        replyMessage = await safeReply(message, cleanContent);
       }
       return replyMessage;
     },
@@ -659,7 +680,7 @@ async function executeSingleToolCall(toolCall, message) {
               "• your ZwiftID (numbers only), or\n" +
               "• the first 3+ letters of your Zwift name.\n\n" +
               "Then I’ll link it and fetch your stats.";
-            await message.reply(msg);
+            await safeReply(message, msg);
             return { tool_call_id: toolCall.id, success: false, message: msg };
           }
           options.strings.zwiftid = String(selfZwiftId);
@@ -671,7 +692,7 @@ async function executeSingleToolCall(toolCall, message) {
           if (args.discord_username) {
             const user = resolveUser(args.discord_username, message);
             if (!user) {
-              await message.reply(`❌ Could not find Discord user: ${args.discord_username}`);
+              await safeReply(message, `❌ Could not find Discord user: ${args.discord_username}`);
               return { tool_call_id: toolCall.id, success: false, message: `Discord user ${args.discord_username} not found` };
             }
             options.users.discorduser = user;
@@ -689,7 +710,7 @@ async function executeSingleToolCall(toolCall, message) {
         };
         
         if (!args.riders || !Array.isArray(args.riders)) {
-          await message.reply("❌ Please specify 2-8 riders to compare.");
+          await safeReply(message, "❌ Please specify 2-8 riders to compare.");
           return { tool_call_id: toolCall.id, success: false, message: "Invalid riders array" };
         }
         
@@ -697,7 +718,7 @@ async function executeSingleToolCall(toolCall, message) {
         for (let i = 0; i < Math.min(args.riders.length, 8); i++) {
           const user = resolveUser(args.riders[i], message);
           if (!user) {
-            await message.reply(`❌ Could not find Discord user: ${args.riders[i]}`);
+            await safeReply(message, `❌ Could not find Discord user: ${args.riders[i]}`);
             return { tool_call_id: toolCall.id, success: false, message: `Discord user ${args.riders[i]} not found` };
           }
           options.users[`rider${i + 1}`] = user;
@@ -722,7 +743,7 @@ async function executeSingleToolCall(toolCall, message) {
         if (args.discord_username) {
           const user = resolveUser(args.discord_username, message);
           if (!user) {
-            await message.reply(`❌ Could not find Discord user: ${args.discord_username}`);
+            await safeReply(message, `❌ Could not find Discord user: ${args.discord_username}`);
             return { tool_call_id: toolCall.id, success: false, message: `Discord user ${args.discord_username} not found` };
           }
           options.users.discorduser = user;
@@ -789,7 +810,7 @@ async function executeSingleToolCall(toolCall, message) {
       case "set_zwiftid": {
         // Check permissions
         if (!message.member?.permissions.has('ManageMessages')) {
-          await message.reply("❌ You need 'Manage Messages' permission to set Zwift IDs for other users.");
+          await safeReply(message, "❌ You need 'Manage Messages' permission to set Zwift IDs for other users.");
           return { tool_call_id: toolCall.id, success: false, message: "Missing Manage Messages permission" };
         }
         
@@ -801,7 +822,7 @@ async function executeSingleToolCall(toolCall, message) {
         if (args.discord_username) {
           const user = resolveUser(args.discord_username, message);
           if (!user) {
-            await message.reply(`❌ Could not find Discord user: ${args.discord_username}`);
+            await safeReply(message, `❌ Could not find Discord user: ${args.discord_username}`);
             return { tool_call_id: toolCall.id, success: false, message: `Discord user ${args.discord_username} not found` };
           }
           options.users.discorduser = user;
@@ -837,7 +858,7 @@ async function executeSingleToolCall(toolCall, message) {
             const msg =
               `❌ **${user.username}** has not linked their ZwiftID yet.\n\n` +
               `Ask them to DM me their ZwiftID (numbers only) or the first 3+ letters of their Zwift name.`;
-            await message.reply(msg);
+            await safeReply(message, msg);
             return { tool_call_id: toolCall.id, success: false, message: msg };
           }
         }
@@ -848,7 +869,7 @@ async function executeSingleToolCall(toolCall, message) {
             const msg =
               "❌ I couldn't find a linked ZwiftID for you.\n\n" +
               "Reply with your ZwiftID (numbers only) or the first 3+ letters of your Zwift name, then ask again.";
-            await message.reply(msg);
+            await safeReply(message, msg);
             return { tool_call_id: toolCall.id, success: false, message: msg };
           }
         }
@@ -964,12 +985,12 @@ async function executeSingleToolCall(toolCall, message) {
       }
       
       default:
-        await message.reply(`❌ Unknown command: ${name}`);
+        await safeReply(message, `❌ Unknown command: ${name}`);
         return { tool_call_id: toolCall.id, success: false, message: `Unknown command: ${name}` };
     }
   } catch (error) {
     console.error(`Error executing tool ${name}:`, error);
-    await message.reply("⚠️ An error occurred while executing the command. Please try again.");
+    await safeReply(message, "⚠️ An error occurred while executing the command. Please try again.");
     return { tool_call_id: toolCall.id, success: false, message: "Unhandled error executing command", error: error?.message };
   }
 }
@@ -1204,7 +1225,7 @@ async function handleAIChatMessage(message, client) {
       .trim();
 
     if (!cleanedMessage) {
-      await message.reply("👋 Hej! I can help you with rider stats, team comparisons, and more. Just ask me something like:\n• Show me stats for @Chris\n• Compare @John, @Mike, and @Sarah\n• What's my Zwift ID?\n• Find riders named Anders");
+      await safeReply(message, "👋 Hej! I can help you with rider stats, team comparisons, and more. Just ask me something like:\n• Show me stats for @Chris\n• Compare @John, @Mike, and @Sarah\n• What's my Zwift ID?\n• Find riders named Anders");
       return;
     }
 
@@ -1213,7 +1234,7 @@ async function handleAIChatMessage(message, client) {
     if (normalized === "mine stats" || normalized === "my stats") {
       const zwiftId = await getUserZwiftId(message.author.id);
       if (!zwiftId) {
-        await message.reply(
+        await safeReply(message,
           "❌ Du har endnu ikke linket et ZwiftID.\n\n" +
           "Svar på denne besked med dit ZwiftID (kun tal) eller de første 3+ bogstaver i dit Zwift-navn — så linker jeg det for dig.\n" +
           "(Alternativt: nævn mig igen i kanalen.)"
@@ -1228,7 +1249,7 @@ async function handleAIChatMessage(message, client) {
         await handleRiderStats(interaction);
       } catch (err) {
         console.error("Error handling 'mine stats' shortcut:", err);
-        await message.reply("⚠️ Der opstod en fejl, da jeg forsøgte at hente dine stats. Prøv igen lidt senere eller brug `/rider_stats` med dit ZwiftID.");
+        await safeReply(message, "⚠️ Der opstod en fejl, da jeg forsøgte at hente dine stats. Prøv igen lidt senere eller brug `/rider_stats` med dit ZwiftID.");
       }
       return;
     }
@@ -1355,7 +1376,7 @@ async function handleAIChatMessage(message, client) {
                 content: followUpMessage.content
               });
 
-              await message.reply(followUpMessage.content);
+              await safeReply(message, followUpMessage.content);
             } else {
               // Fallback to heuristic commentary
               const statsResult = toolResults.find(r => r.rider || r.team);
@@ -1363,13 +1384,13 @@ async function handleAIChatMessage(message, client) {
                 const fallback = buildRiderComment(statsResult.rider);
                 if (fallback) {
                   conversation.push({ role: "assistant", content: fallback });
-                  await message.reply(fallback);
+                  await safeReply(message, fallback);
                 }
               } else if (statsResult?.team) {
                 const fallback = buildTeamComment(statsResult.team);
                 if (fallback) {
                   conversation.push({ role: "assistant", content: fallback });
-                  await message.reply(fallback);
+                  await safeReply(message, fallback);
                 }
               }
             }
@@ -1381,13 +1402,13 @@ async function handleAIChatMessage(message, client) {
               const fallback = buildRiderComment(statsResult.rider);
               if (fallback) {
                 conversation.push({ role: "assistant", content: fallback });
-                await message.reply(fallback);
+                await safeReply(message, fallback);
               }
             } else if (statsResult?.team) {
               const fallback = buildTeamComment(statsResult.team);
               if (fallback) {
                 conversation.push({ role: "assistant", content: fallback });
-                await message.reply(fallback);
+                await safeReply(message, fallback);
               }
             }
           }
@@ -1432,10 +1453,10 @@ async function handleAIChatMessage(message, client) {
           // Otherwise, send its final content (if any).
           if (postToolMsg.content && postToolMsg.content.trim().length > 0) {
             conversation.push({ role: "assistant", content: postToolMsg.content });
-            await message.reply(postToolMsg.content);
+            await safeReply(message, postToolMsg.content);
           } else if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0) {
             // Hit the iteration cap and the model only offered more tool calls, no text.
-            await message.reply("⚠️ I wasn't able to finish that request after a few tool calls. Please try rephrasing or breaking it into a simpler question.");
+            await safeReply(message, "⚠️ I wasn't able to finish that request after a few tool calls. Please try rephrasing or breaking it into a simpler question.");
           }
         }
 
@@ -1448,7 +1469,7 @@ async function handleAIChatMessage(message, client) {
         content: responseMessage.content
       });
       
-      await message.reply(responseMessage.content);
+      await safeReply(message, responseMessage.content);
     }
     
     // Trim conversation if it has grown too long after processing
@@ -1476,13 +1497,13 @@ async function handleAIChatMessage(message, client) {
     });
     
     if (info.looksLikeQuota) {
-      await message.reply("⚠️ OpenAI API quota/billing issue. Check platform.openai.com billing and credits, then restart the bot.");
+      await safeReply(message, "⚠️ OpenAI API quota/billing issue. Check platform.openai.com billing and credits, then restart the bot.");
     } else if (info.code === "invalid_api_key" || info.status === 401) {
-      await message.reply("⚠️ OpenAI API key is invalid or missing. Update OPENAI_API_KEY in the host env (e.g. Render) and restart.");
+      await safeReply(message, "⚠️ OpenAI API key is invalid or missing. Update OPENAI_API_KEY in the host env (e.g. Render) and restart.");
     } else if (info.looksLikeRateLimit) {
-      await message.reply("⚠️ Too many requests to OpenAI. Please wait a moment and try again.");
+      await safeReply(message, "⚠️ Too many requests to OpenAI. Please wait a moment and try again.");
     } else {
-      await message.reply("⚠️ An error occurred while processing your message. Please try again.");
+      await safeReply(message, "⚠️ An error occurred while processing your message. Please try again.");
     }
   }
 }
