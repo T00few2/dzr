@@ -1415,8 +1415,10 @@ async function handleAIChatMessage(message, client) {
           const postToolMsg = postTool.choices[0]?.message;
           if (!postToolMsg) break;
 
-          // If the model wants to call more tools, continue the loop.
-          if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0) {
+          // If the model wants to call more tools, continue the loop — but only if we can
+          // actually execute them within MAX_TOOL_ITERATIONS. Otherwise we'd push an assistant
+          // message with unresolved tool_calls into history, which OpenAI rejects on the next turn.
+          if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0 && iteration + 1 < MAX_TOOL_ITERATIONS) {
             conversation.push({
               role: "assistant",
               content: postToolMsg.content || null,
@@ -1431,6 +1433,9 @@ async function handleAIChatMessage(message, client) {
           if (postToolMsg.content && postToolMsg.content.trim().length > 0) {
             conversation.push({ role: "assistant", content: postToolMsg.content });
             await message.reply(postToolMsg.content);
+          } else if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0) {
+            // Hit the iteration cap and the model only offered more tool calls, no text.
+            await message.reply("⚠️ I wasn't able to finish that request after a few tool calls. Please try rephrasing or breaking it into a simpler question.");
           }
         }
 
