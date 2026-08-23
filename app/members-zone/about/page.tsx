@@ -68,6 +68,7 @@ export default function AboutPage() {
     { name: 'Christian Kjær', role: 'Formand (Chairman)' },
     { name: 'Nick Niebling', role: 'Kasserer (Treasurer)' },
     { name: 'Mik Endersen', role: 'Bestyrelsesmedlem (Board Member)' },
+    { name: 'Mikkel Strandgaard', role: 'Bestyrelsesmedlem (Board Member)' },
   ];
 
   const membershipAmount = membershipSettings
@@ -97,7 +98,7 @@ export default function AboutPage() {
           <Box textAlign="center">
             <Icon as={FaTrophy} color="#ad1a2d" boxSize={8} mb={3} />
             <Heading size="sm" color="white" mb={2}>Løb & Racing</Heading>
-            <Text color="gray.400" fontSize="sm">Organiserede løb (Zwift Racing League, DIRT Racing Series, Club Ladder, Zwift Ligaen,..), DCU Forårsliga og holdmiljø på Zwift</Text>
+            <Text color="gray.400" fontSize="sm">Organiserede løb (Zwift Racing League, DIRT Racing Series, Club Ladder, Zwift Ligaen,..), DCU E-Serien og holdmiljø på Zwift</Text>
           </Box>
           <Box textAlign="center">
             <Icon as={FaDiscord} color="#ad1a2d" boxSize={8} mb={3} />
@@ -205,7 +206,7 @@ export default function AboutPage() {
                 <ListItem fontSize="sm">• Betalt kontingent</ListItem>
                 <ListItem fontSize="sm">• Stemmeret på generalforsamling</ListItem>
                 <ListItem fontSize="sm">• Mulighed for DCU e-licens via DZR</ListItem>
-                <ListItem fontSize="sm">• Adgang til DCU Forårsliga</ListItem>
+                <ListItem fontSize="sm">• Adgang til DCU E-Serien</ListItem>
                 <ListItem fontSize="sm">• Støt DZR 🫶</ListItem>
               </List>
             </CardBody>
@@ -288,7 +289,7 @@ export default function AboutPage() {
                   <Heading size="sm" color="gray.400" mb={4} textTransform="uppercase" letterSpacing="wider">
                     Bestyrelse
                   </Heading>
-                  <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
+                  <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={3}>
                     {boardMembers.map((member, index) => (
                       <Box key={index} bg="gray.800" borderWidth="1px" borderColor="gray.700" borderRadius="md" p={3}>
                         <HStack mb={1}>
