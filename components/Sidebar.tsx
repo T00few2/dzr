@@ -56,6 +56,7 @@ interface LinkItemProps {
   name: string
   href: string
   icon: IconType
+  children?: Array<{ name: string; href: string; icon: IconType }>
 }
 
 interface NavItemProps extends FlexProps {
@@ -74,7 +75,12 @@ interface SidebarProps extends BoxProps {
 
 const LinkItems: Array<LinkItemProps> = [
   { name: 'Home', href: '/', icon: MdDirectionsBike },
-  { name: 'About', href: '/members-zone/about', icon: MdInfo },
+  {
+    name: 'About',
+    href: '/about',
+    icon: MdInfo,
+    children: [{ name: 'Løb', href: '/about/racing', icon: FaTrophy }],
+  },
   { name: 'Puncheurs Summer Cup', href: 'puncheurs-summer-cup', icon: RiBoxingFill },
   //{ name: 'STAGES by DZR', href: '/stages', icon: MdOutlineTimer },
   // { name: 'The SANTA league', href: '/santa', icon: LiaMountainSolid },
@@ -107,9 +113,16 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
         <CloseButton display={'flex'} onClick={onClose} color='white' size={'s'} />
       </Flex>
       {LinkItems.map((link) => (
-        <NavItem key={link.name} icon={link.icon} href={link.href}>
-          {link.name}
-        </NavItem>
+        <Box key={link.name}>
+          <NavItem icon={link.icon} href={link.href}>
+            {link.name}
+          </NavItem>
+          {link.children?.map((child) => (
+            <NavItem key={child.href} icon={child.icon} href={child.href} pl="10">
+              {child.name}
+            </NavItem>
+          ))}
+        </Box>
       ))}
     </Box>
   )
@@ -303,7 +316,8 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
             </Flex>
             {session ? (
               <>
-                <ProfileNavItem href="/members-zone/about" icon={MdInfo}>About</ProfileNavItem>
+                <ProfileNavItem href="/about" icon={MdInfo}>About</ProfileNavItem>
+                <ProfileNavItem href="/about/racing" icon={FaTrophy}>Løb</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/racing" icon={FaTrophy}>Racing</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/stats-hub" icon={MdInsights}>Stats</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/my-pages" icon={FaUserCircle}>My Pages</ProfileNavItem>
@@ -311,7 +325,8 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
               </>
             ) : (
               <>
-                <ProfileNavItem href="/members-zone/about" icon={MdInfo}>About</ProfileNavItem>
+                <ProfileNavItem href="/about" icon={MdInfo}>About</ProfileNavItem>
+                <ProfileNavItem href="/about/racing" icon={FaTrophy}>Løb</ProfileNavItem>
                 <ProfileNavItem onClick={() => signIn()} icon={FiLogIn}>Log in</ProfileNavItem>
               </>
             )}

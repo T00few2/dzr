@@ -1,40 +1,37 @@
-import { Inter } from "next/font/google";
-import HeroSection from "@/components/HeroSection";
-import Features from "@/components/Features";
-import { Metadata } from "next";
-
-const inter = Inter({ subsets: ['latin']})
+import HeroSection from '@/components/HeroSection';
+import Features from '@/components/Features';
+import { Metadata } from 'next';
+import { JsonLd, sportsClubJsonLd } from '@/components/seo/JsonLd';
 
 export const metadata: Metadata = {
-  title: 'Danish Zwift Racers',
-  description: 'Join the Danish Zwift Racers community for virtual cycling races and training.',
-
-  metadataBase: new URL('https://www.dzrracingseries.com/'),
-
+  title: 'Danish Zwift Racers — Danish Zwift club and DCU E-Serien',
+  description:
+    'Danish Zwift Racers is a Danish online cycling club for e-cycling on Zwift and a member of Danmarks Cykle Union. Club members can race DCU E-Serien, Zwift Racing League, and Club Ladder.',
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     title: 'Danish Zwift Racers: Race, Train, and Ride Together on Zwift',
-    description: 'Join the Danish Zwift Racers community for virtual cycling races and training.',
-    url: 'https://www.dzrracingseries.com/',
+    description:
+      'A Danish Zwift club for e-cycling. Member of Danmarks Cykle Union. Race DCU E-Serien, Zwift Racing League, and Club Ladder.',
+    url: '/',
     siteName: 'DZR',
     images: [
       {
-        url: 'https://www.dzrracingseries.com/general/DZR_logo.svg',
+        url: '/general/DZR_logo.svg',
       },
     ],
     type: 'website',
     locale: 'en_US',
-  }
-}
+  },
+};
 
 export default function Home() {
   return (
     <>
-    <div >
-    <HeroSection />
-    <Features />
-    </div>
+      <JsonLd data={sportsClubJsonLd} />
+      <HeroSection />
+      <Features />
     </>
   );
 }
-
-

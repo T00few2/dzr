@@ -200,7 +200,7 @@ export default function JoinIndexPage() {
             <BenefitCard icon={FaUsers} heading="DZR fællesskab" text="Adgang til fællesskab og klubaktiviteter" />
             <BenefitCard icon={FaTrophy} heading="Løb & holdmiljø" text="Deltagelse i organiserede løb og holdmiljø" />
             <BenefitCard icon={MdCardMembership} heading="DCU e-licens" text="Mulighed for DCU e-licens via DZR" />
-            <BenefitCard icon={FaRoad} heading="DCU E-Serien" text="Adgang til DCU E-Serien som del af klubsetup" />
+            <BenefitCard icon={FaRoad} heading="DCU E-Serien" text="Adgang til DCU E-Serien som medlem af en DCU-klub (DZR)" />
             <BenefitCard icon={MdHowToVote} heading="Stemmeret" text="Stemmeret på DZRs generalforsamling" />
           </Stack>
         </Box>

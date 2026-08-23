@@ -20,7 +20,7 @@ export default function JoinCompletePage() {
         <StepProgressHeader currentStep={4} />
         <Heading color="white">Velkommen til DZR</Heading>
         <Text color="gray.300">Din indmeldelse er gennemført. Du kan nu fortsætte i fællesskabet og medlemsområderne.</Text>
-        <Button as="a" href="/members-zone/about" colorScheme="red">
+        <Button as="a" href="/about" colorScheme="red">
           Læs mere om DZR
         </Button>
         <Button

@@ -23,13 +23,13 @@ import {
   Button,
 } from '@chakra-ui/react'
 
-import { FaFacebook, FaTwitter, FaYoutube, FaDiscord } from 'react-icons/fa'
+import { FaFacebook, FaTwitter, FaYoutube } from 'react-icons/fa'
 import { ReactNode } from 'react'
 
 const pulseShadow = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(88, 101, 242, 0.7); }
-  70% { box-shadow: 0 0 0 20px rgba(88, 101, 242, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(88, 101, 242, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(173, 26, 45, 0.7); }
+  70% { box-shadow: 0 0 0 20px rgba(173, 26, 45, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(173, 26, 45, 0); }
 `;
 
 
@@ -51,13 +51,16 @@ export default function HeroSection() {
           lineHeight={'150%'}
           py={50}
           display={{ base: 'block', sm: 'block', md: 'block' }}><DZR_logo /></Heading>
+        <Text color="gray.300" fontSize={{ base: 'md', md: 'lg' }} maxW="3xl">
+          Danish Zwift Racers is a Danish online cycling club for e-cycling on Zwift and a member of Danmarks Cykle Union (DCU).
+          Club members can race DCU E-Serien, Zwift Racing League, and Club Ladder.
+        </Text>
         <DZR_slogan />
         <Stack direction={{ base: 'column', md: 'row' }} spacing={4} align={'center'} pt={4}>
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
               as={Link}
-              href='https://discord.gg/FBtCsddbmU'
-              isExternal
+              href="/join"
               style={{ textDecoration: 'none' }}
               rounded={'full'}
               size={'lg'}
@@ -65,14 +68,13 @@ export default function HeroSection() {
               px={8}
               py={6}
               colorScheme={'none'}
-              bg={'#5865F2'}
+              bg={'#ad1a2d'}
               color={'white'}
               animation={`${pulseShadow} 2s infinite`}
               transition={'background-color 0.2s ease'}
-              _hover={{ bg: '#4752C4' }}
-              leftIcon={<FaDiscord size="1.2em" />}
+              _hover={{ bg: '#8a1524' }}
             >
-              Join our Discord Community
+              Join DZR
             </Button>
           </motion.div>
         </Stack>

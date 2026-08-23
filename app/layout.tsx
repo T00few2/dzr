@@ -1,19 +1,18 @@
-// app/layout.tsx
-"use client";
+import type { Metadata } from 'next';
+import AppShell from './AppShell';
 
-import SidebarWithHeader from "@/components/Sidebar";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { AuthProvider } from "@/components/auth/AuthContext";
-
-import Sparkles from 'react-sparkle'
-// import Snowfall from "react-snowfall";
-
-require("dotenv").config();
-
-import { Providers } from "./providers";
-import DanishInviteBanner from "@/components/DanishInviteBanner";
-
+export const metadata: Metadata = {
+  metadataBase: new URL('https://www.dzrracingseries.com'),
+  title: {
+    default: 'Danish Zwift Racers',
+  },
+  description: 'Join the Danish Zwift Racers community for virtual cycling races and training.',
+  openGraph: {
+    siteName: 'DZR',
+    locale: 'en_US',
+    type: 'website',
+  },
+};
 
 export default function RootLayout({
   children,
@@ -23,23 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Providers>
-          <AuthProvider>
-            {/* Background Effects */}
-            {/* <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: -1 }}>
-              <Snowfall />
-            </div> */}
-
-            {/* Sidebar and Content */}
-            <SidebarWithHeader />
-            <div style={{ position: "relative", minHeight: "100vh", paddingTop: '80px' }}>{children}</div>
-            <DanishInviteBanner />
-
-            {/* Analytics and Performance */}
-            <Analytics />
-            <SpeedInsights />
-          </AuthProvider>
-        </Providers>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
