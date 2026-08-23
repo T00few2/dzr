@@ -3,9 +3,7 @@ import AppShell from './AppShell';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.dzrracingseries.com'),
-  title: {
-    default: 'Danish Zwift Racers',
-  },
+  title: 'Danish Zwift Racers',
   description: 'Join the Danish Zwift Racers community for virtual cycling races and training.',
   openGraph: {
     siteName: 'DZR',
