@@ -6,14 +6,14 @@ import { JsonLd, sportsClubJsonLd } from '@/components/seo/JsonLd';
 export const metadata: Metadata = {
   title: 'Danish Zwift Racers — Danish Zwift club and DCU E-Serien',
   description:
-    'Danish Zwift Racers is a Danish online cycling club for e-cycling on Zwift and a member of Danmarks Cykle Union. Club members can race DCU E-Serien, Zwift Racing League, and Club Ladder.',
+    'Danish Zwift Racers is a Danish online cycling club for e-cycling on Zwift and a member of Danmarks Cykle Union. We are active in DCU E-Serien, Zwift Racing League, ECRO, and Club Ladder and many other racing series on Zwift.',
   alternates: {
     canonical: '/',
   },
   openGraph: {
     title: 'Danish Zwift Racers: Race, Train, and Ride Together on Zwift',
     description:
-      'A Danish Zwift club for e-cycling. Member of Danmarks Cykle Union. Race DCU E-Serien, Zwift Racing League, and Club Ladder.',
+      'A Danish Zwift club for e-cycling. Member of Danmarks Cykle Union. Active in DCU E-Serien, Zwift Racing League, ECRO, Club Ladder, and other racing series on Zwift.',
     url: '/',
     siteName: 'DZR',
     images: [

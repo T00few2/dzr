@@ -72,7 +72,10 @@ const CustomCard: React.FC<Props> = ({ href, icon, heading, text1, text2 }) => {
 
 export default function Features() {
   return (
-    <Container maxW={{ base: '95vw', sm: '80vw', md: '70vw' }} display="flex"
+    <Container
+      maxW="5xl"
+      px={{ base: 6, md: 8 }}
+      display="flex"
       justifyContent="center"
       alignItems="center"
       flexDirection="column"
@@ -83,7 +86,7 @@ export default function Features() {
         </Box>
       </Stack>
       <Box width={'100%'}>
-        <SimpleGrid spacing={4} minChildWidth={'280px'} marginBlockEnd={4}>
+        <SimpleGrid spacing={4} minChildWidth={{ base: '100%', sm: '280px' }} marginBlockEnd={4}>
           
           {/* <CustomCard href='santa' icon = {LiaMountainSolid} heading = 'The SANTA league' text1 = "Head start your New Year&#39;s resolution" text2= '9:20 AM UTC | 3:20 PM UTC | 9:20 PM UTC' /> */}
           {/* <CustomCard href='asundayinhell' icon = {GiDevilMask} heading = 'A Sunday in Hell' text1 = 'Four back-to-back races' text2= 'First Sunday monthly' /> */}

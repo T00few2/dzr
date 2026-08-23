@@ -70,7 +70,7 @@ export const DZR_logo = () => {
           ref={textRef} 
           style={{ color: '#fffaf0' }}
           maxW={'5xl'} 
-          fontSize={{ base: '5xl', sm: '5xl', md: '7xl' }} 
+          fontSize={{ base: '3xl', sm: '5xl', md: '7xl' }} 
           fontWeight={900}
           textShadow='0 4px 20px rgba(173, 26, 45, 0.5)'
         >

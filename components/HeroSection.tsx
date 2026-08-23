@@ -36,9 +36,7 @@ const pulseShadow = keyframes`
 
 export default function HeroSection() {
   return (
-    <Container maxW={'5xl'}
-
-    >
+    <Container maxW={'5xl'} px={{ base: 6, md: 8 }}>
       <Stack
         textAlign={'center'}
         align={'center'}
@@ -53,7 +51,7 @@ export default function HeroSection() {
           display={{ base: 'block', sm: 'block', md: 'block' }}><DZR_logo /></Heading>
         <Text color="gray.300" fontSize={{ base: 'md', md: 'lg' }} maxW="3xl">
           Danish Zwift Racers is a Danish online cycling club for e-cycling on Zwift and a member of Danmarks Cykle Union (DCU).
-          Club members can race DCU E-Serien, Zwift Racing League, and Club Ladder.
+          We are active in DCU E-Serien, Zwift Racing League, ECRO, and Club Ladder and many other racing series on Zwift.
         </Text>
         <DZR_slogan />
         <Stack direction={{ base: 'column', md: 'row' }} spacing={4} align={'center'} pt={4}>
