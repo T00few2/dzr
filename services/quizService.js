@@ -13,7 +13,8 @@ const config = require("../config/config");
 const { renderRouteSilhouette } = require("../utils/routeMapRenderer");
 
 const CACHE_DIR = path.join(__dirname, "..", "data", "route-latlng");
-const QUIZ_TTL_MS = 15 * 60 * 1000; // auto-close after 15 minutes
+const QUIZ_TTL_MS = 4 * 60 * 60 * 1000; // auto-close after 4 hours
+const QUIZ_TTL_LABEL = "4 hours";
 const GEOMETRY_BASE_URL =
   process.env.QUIZ_GEOMETRY_BASE_URL ||
   "https://andipaetzold.github.io/zwiftquiz/routes";
@@ -151,7 +152,7 @@ function buildQuizEmbed({ answers, imageName, resolved = null, winner = null }) 
     embed.setDescription(
       "Which Zwift route is this?\nTap a button below. First correct answer wins!"
     );
-    embed.setFooter({ text: "Inspired by ZwiftQuiz · Closes in 15 minutes" });
+    embed.setFooter({ text: `Inspired by ZwiftQuiz · Closes in ${QUIZ_TTL_LABEL}` });
   }
 
   return embed;
@@ -264,7 +265,7 @@ async function postQuiz(channel, { requestedBy = null } = {}) {
   const embed = buildQuizEmbed({ answers, imageName });
   if (requestedBy) {
     embed.setFooter({
-      text: `Requested by ${requestedBy} · Inspired by ZwiftQuiz · Closes in 15 minutes`,
+      text: `Requested by ${requestedBy} · Inspired by ZwiftQuiz · Closes in ${QUIZ_TTL_LABEL}`,
     });
   }
 
