@@ -14,11 +14,27 @@ export function botHeaders() {
 }
 
 export async function discordGet(path: string) {
-  const res = await fetch(`https://discord.com/api/v10${path}`, { headers: botHeaders(), cache: 'no-store' })
+  return discordRequest(path)
+}
+
+export async function discordRequest(path: string, init?: { method?: string; body?: any }) {
+  const res = await fetch(`https://discord.com/api/v10${path}`, {
+    method: init?.method || 'GET',
+    headers: botHeaders(),
+    cache: 'no-store',
+    body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+  })
   const text = await res.text()
   let body: any = text
   try { body = text ? JSON.parse(text) : null } catch { /* keep text */ }
   return { ok: res.ok, status: res.status, body }
+}
+
+export async function editChannelMessage(channelId: string, messageId: string, payload: any) {
+  return discordRequest(`/channels/${channelId}/messages/${messageId}`, {
+    method: 'PATCH',
+    body: payload,
+  })
 }
 
 export async function listGuildMembers(max = 4000) {

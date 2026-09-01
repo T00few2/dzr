@@ -10,7 +10,7 @@ const CARDS = [
   { href: '/admin/stats', title: 'Discord stats', body: 'Recent server activity from Firestore' },
   { href: '/admin/content', title: 'Content', body: 'Welcome, scheduled, and role messages' },
   { href: '/admin/roles', title: 'Role panels', body: 'selfRoles panels used by the Discord bot' },
-  { href: '/admin/signups', title: 'Signup boards', body: 'signup_board_configs' },
+  { href: '/admin/signups', title: 'Signup boards', body: 'Live Discord signups, remove riders, board templates' },
   { href: '/admin/knowledge', title: 'Bot knowledge', body: 'Snippets for the Discord AI assistant' },
   { href: '/admin/outreach', title: 'Member outreach', body: 'DM members from a template' },
   { href: '/admin/growth', title: 'Club growth', body: 'Companion club roster counts and refresh' },
