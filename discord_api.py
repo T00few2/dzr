@@ -222,13 +222,12 @@ class DiscordAPI:
                         # Pace group from ZP
                         if 'zpCategory' in rider:
                             entry['zpCategory'] = rider.get('zpCategory')
-                        # Racing score (ZRS) and derived category
-                        score = rider.get('racingScore')
-                        if isinstance(score, (int, float)):
-                            entry['racingScore'] = score
-                            # Compute ZRS category using helper
+                        # Racing score (ZRS) from ZwiftRacing zrs.score, or legacy racingScore
+                        zrs_score = firebase.get_racing_score(rider)
+                        if zrs_score is not None:
+                            entry['racingScore'] = zrs_score
                             try:
-                                entry['zrsCategory'] = firebase.get_zrs_category(score)
+                                entry['zrsCategory'] = firebase.get_zrs_category(zrs_score)
                             except Exception:
                                 pass
                         # vELO (Zwift Racing mixed category and rating)

@@ -1166,7 +1166,11 @@ def send_member_outreach():
 
 @app.route('/api/initialize_rider_queue', methods=['POST'])
 def initialize_rider_queue():
-    """Initialize a queue of riders that need racing scores"""
+    """Legacy: queue riders that need racing scores from the Zwift profile API.
+
+    ZRS now comes from ZwiftRacing club_stats (`zrs.score` copied to `racingScore`).
+    This queue is no longer required for the Discord members view.
+    """
     try:
         # Get the latest club_stats
         club_stats = firebase.get_latest_document("club_stats")

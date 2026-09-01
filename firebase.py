@@ -203,6 +203,23 @@ zrs_category_rank = {
     'A': 5,  # 690-1000
 }
 
+def get_racing_score(rider: Any) -> Optional[float]:
+    """
+    ZRS from club_stats: `racingScore` (legacy Zwift overlay) or `zrs.score` (ZwiftRacing).
+    """
+    if not isinstance(rider, dict):
+        return None
+    score = rider.get('racingScore')
+    if isinstance(score, (int, float)):
+        return float(score)
+    zrs = rider.get('zrs')
+    if isinstance(zrs, dict):
+        zrs_score = zrs.get('score')
+        if isinstance(zrs_score, (int, float)):
+            return float(zrs_score)
+    return None
+
+
 def get_zrs_category(score: float) -> str:
     """
     Determine ZRS category based on racing score.
@@ -394,8 +411,8 @@ def compare_rider_categories(
                 })
                 
             # Compare Racing Scores (ZRSCategory)
-            today_score = today.get('racingScore')
-            yesterday_score = yesterday.get('racingScore')
+            today_score = get_racing_score(today)
+            yesterday_score = get_racing_score(yesterday)
             
             if (isinstance(today_score, (int, float)) and 
                 isinstance(yesterday_score, (int, float))):
