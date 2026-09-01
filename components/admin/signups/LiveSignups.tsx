@@ -77,16 +77,21 @@ export default function LiveSignups() {
       : board.isLatest
         ? ' This is the current panel in that channel.'
         : ' This is an old/reposted copy.'
-    if (!window.confirm(`Delete "${board.title}" in #${board.channelName}?${extra}\n\nThe Discord message and signup list will be removed.`)) return
+    if (!window.confirm(`Delete "${board.title}" in #${board.channelName}?${extra}\n\nThis removes the Discord message and any old copies of the same panel.`)) return
     setBusy(`delete:${board.id}`)
     try {
-      const res = await fetch(`/api/admin/signups/${encodeURIComponent(board.id)}`, { method: 'DELETE' })
+      const res = await fetch('/api/admin/signups/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ boardId: board.id }),
+      })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.error || 'Delete failed')
       toast({
         title: body.message || 'Deleted',
-        status: body.warning ? 'warning' : 'success',
+        status: body.discordFailed ? 'warning' : 'success',
       })
+      setSelectedId(null)
       await load()
     } catch (e: any) {
       toast({ title: e.message || 'Delete failed', status: 'error' })

@@ -4,13 +4,14 @@ export function guildId() {
   return process.env.DISCORD_GUILD_ID || DISCORD_GUILD_ID_DEFAULT
 }
 
-export function botHeaders() {
+export function botHeaders(withJson = true) {
   const token = process.env.DISCORD_BOT_TOKEN
   if (!token) throw new Error('DISCORD_BOT_TOKEN is not set')
-  return {
+  const headers: Record<string, string> = {
     Authorization: `Bot ${token}`,
-    'Content-Type': 'application/json',
   }
+  if (withJson) headers['Content-Type'] = 'application/json'
+  return headers
 }
 
 export async function discordGet(path: string) {
@@ -18,11 +19,12 @@ export async function discordGet(path: string) {
 }
 
 export async function discordRequest(path: string, init?: { method?: string; body?: any }) {
+  const hasBody = init?.body !== undefined
   const res = await fetch(`https://discord.com/api/v10${path}`, {
     method: init?.method || 'GET',
-    headers: botHeaders(),
+    headers: botHeaders(hasBody),
     cache: 'no-store',
-    body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+    body: hasBody ? JSON.stringify(init.body) : undefined,
   })
   const text = await res.text()
   let body: any = text
