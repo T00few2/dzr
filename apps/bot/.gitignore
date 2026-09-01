@@ -1,0 +1,7 @@
+.env
+
+# dependencies
+/node_modules
+
+# cached Zwift route geometry for quizzes
+/data/route-latlng/
