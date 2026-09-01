@@ -14,6 +14,7 @@ import {
   TabPanel,
 } from '@chakra-ui/react';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
+import { HOLDKAPTAJN_ROLE_ID } from '@/app/lib/sharedConstants';
 
 // Import child page components
 import dynamic from 'next/dynamic';
@@ -29,7 +30,7 @@ function RacingPageContent() {
   
   const roles: string[] = Array.isArray((session?.user as any)?.roles) ? (session?.user as any).roles : [];
   const isAdmin: boolean = Boolean((session?.user as any)?.isAdmin);
-  const isCaptain: boolean = roles.includes('1195878349617250405');
+  const isCaptain: boolean = roles.includes(HOLDKAPTAJN_ROLE_ID);
   
   // Get tab from URL or default to 0
   const tabFromUrl = searchParams?.get('tab');

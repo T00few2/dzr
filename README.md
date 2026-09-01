@@ -1,71 +1,54 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# DZR monorepo
 
-## Getting Started
+Canonical GitHub repo: `T00few2/dzr`.
 
-First, run the development server:
+Three runtimes stay separate. Do not add npm workspaces (Vercel must keep using the root Next `package.json` only).
 
-```bash
+| Path | App | Host |
+|---|---|---|
+| repo root | Next.js site + `/admin` + members zone | Vercel |
+| `apps/api` | Flask jobs / bot HTTP API | Cloud Run (`zwiftpower`) |
+| `apps/bot` | Discord bot | Render |
+
+## Website (this directory)
+
+```powershell
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Admin UI is `/admin` (Discord **Admin** role). Members zone is `/members-zone`.
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+## Flask API (`apps/api`)
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
-
-## Discord OAuth for Members Zone
-
-Configure environment variables (e.g. in `.env.local`):
-
-```
-DISCORD_CLIENT_ID=your_client_id
-DISCORD_CLIENT_SECRET=your_client_secret
-DISCORD_GUILD_ID=your_guild_id
-DISCORD_REQUIRED_ROLE_ID=1385216556166025347
-DISCORD_BOT_TOKEN=your_bot_token
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=generate_a_random_secret
+```powershell
+cd apps/api
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python main.py
 ```
 
-Set the Discord OAuth redirect URL to:
+Cloud Run continuous deploy currently still tracks `T00few2/zwiftpower`. After this repo is pushed, retarget CD to `T00few2/dzr` with source directory `apps/api`. Keep the existing service URL.
 
-```
-http://localhost:3000/api/auth/callback/discord
-```
+## Discord bot (`apps/bot`)
 
-The `members-zone` routes are protected by middleware that requires the Discord role ID `1385216556166025347`.
-
-## Klubmesterskab (KMS) Signups
-
-KMS signups are role-based. When a user signs up on `members-zone/klubmesterskab`, the API assigns Discord role `1413793742808416377` to that user in the configured guild. Withdrawing removes the role. The signup list is derived from guild members who have that role and cross-referenced with Zwift IDs.
-
-Environment requirements:
-
-```
-DISCORD_GUILD_ID=...
-DISCORD_BOT_TOKEN=...
+```powershell
+cd apps/bot
+npm install
+node bot.js
 ```
 
-Ensure the bot has permissions to manage roles and is higher than the KMS role in the role hierarchy.
+Render currently tracks `T00few2/bot`. After this repo is pushed, change Source to `T00few2/dzr`, Root Directory `apps/bot`, keep Build `npm install` and Start `node bot.js`.
+
+## Shared constants
+
+`packages/shared/constants.json` is the source of truth for Discord role IDs and Firestore collection names. Copies live in `apps/bot/constants.json` and `apps/api/constants.json` because Render and Cloud Run build those folders as the project root.
+
+## Old remotes
+
+`T00few2/bot` and `T00few2/zwiftpower` stay as rollback remotes until Cloud Run and Render have each deployed from this repo. Do not archive them on the first green deploy.
+
+Do not commit `service-account-key.json` or `.env` files.

@@ -29,6 +29,19 @@ yarn-error.log*
 .env*.local
 .env
 
+# nested apps (bot + Flask API)
+apps/bot/node_modules/
+apps/bot/.env
+apps/bot/data/route-latlng/
+apps/api/.env
+apps/api/__pycache__/
+apps/api/**/__pycache__/
+apps/api/.venv/
+apps/api/venv/
+apps/api/service-account-key.json
+**/.venv/
+**/venv/
+
 # vercel
 .vercel
 

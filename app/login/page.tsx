@@ -23,7 +23,9 @@ import {
 import { signIn } from 'next-auth/react';
 import { FaDiscord } from 'react-icons/fa';
 
-const REQUIRED_ROLE_ID = '1385216556166025347';
+import { VERIFIED_MEMBER_ROLE_ID } from '@/app/lib/sharedConstants';
+
+const REQUIRED_ROLE_ID = VERIFIED_MEMBER_ROLE_ID;
 
 function LoginContent() {
   const searchParams = useSearchParams();

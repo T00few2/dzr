@@ -51,6 +51,7 @@ import { GiDevilMask } from "react-icons/gi";
 import Sparkles from 'react-sparkle'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { FaUser, FaUserCircle } from 'react-icons/fa'
+import { HOLDKAPTAJN_ROLE_ID } from '@/app/lib/sharedConstants'
 
 interface LinkItemProps {
   name: string
@@ -231,7 +232,7 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
   const { isOpen: isProfileOpen, onOpen: openProfile, onClose: closeProfile } = useDisclosure()
   const roles: string[] = Array.isArray((session?.user as any)?.roles) ? (session?.user as any).roles : []
   const isAdmin: boolean = Boolean((session?.user as any)?.isAdmin)
-  const isCaptain: boolean = roles.includes('1195878349617250405')
+  const isCaptain: boolean = roles.includes(HOLDKAPTAJN_ROLE_ID)
   return (
     <Flex
       ml={0}
@@ -321,6 +322,9 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
                 <ProfileNavItem href="/members-zone/racing" icon={FaTrophy}>Racing</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/stats-hub" icon={MdInsights}>Stats</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/my-pages" icon={FaUserCircle}>My Pages</ProfileNavItem>
+                {isAdmin && (
+                  <ProfileNavItem href="/admin" icon={FiSettings}>Admin</ProfileNavItem>
+                )}
                 <ProfileNavItem onClick={() => signOut({ callbackUrl: '/' })} icon={FiLogOut}>Logout</ProfileNavItem>
               </>
             ) : (

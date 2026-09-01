@@ -414,7 +414,10 @@ async function handleEventResults(interaction) {
       return;
     }
 
-    const response = await axios.get(`https://zwiftpower-733125196297.us-central1.run.app/filter_events/11939?title=${encodeURIComponent(searchTerm)}`);
+    const response = await axios.get(
+      `${config.contentApi.baseUrl}/filter_events/11939?title=${encodeURIComponent(searchTerm)}`,
+      { headers: { Authorization: `Bearer ${config.contentApi.apiKey}` } }
+    );
     const data = response.data;
 
     if (!data.filtered_events || Object.keys(data.filtered_events).length === 0) {

@@ -1,9 +1,9 @@
 import NextAuth from "next-auth";
 import DiscordProvider from "next-auth/providers/discord";
+import { ADMIN_ROLE_ID, DISCORD_GUILD_ID_DEFAULT, VERIFIED_MEMBER_ROLE_ID } from "@/app/lib/sharedConstants";
 
-const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID as string;
-const REQUIRED_ROLE_ID = (process.env.DISCORD_REQUIRED_ROLE_ID || "1385216556166025347") as string;
-const ADMIN_ROLE_ID = '1195852714270277763';
+const DISCORD_GUILD_ID = (process.env.DISCORD_GUILD_ID || DISCORD_GUILD_ID_DEFAULT) as string;
+const REQUIRED_ROLE_ID = (process.env.DISCORD_REQUIRED_ROLE_ID || VERIFIED_MEMBER_ROLE_ID) as string;
 
 // Admin determination now uses a specific admin role id from the guild
 

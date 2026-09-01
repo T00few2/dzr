@@ -3,22 +3,7 @@ export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchClubdata, ClubData } from '@/app/utils/fetchZPdata';
-import * as admin from 'firebase-admin';
-
-// Initialize Firebase Admin SDK (if not already initialized)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.NEXT_PUBLIC_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-    databaseURL: `https://${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseio.com`,
-  });
-}
-
-// Firestore database reference
-const db = admin.firestore();
+import { adminDb } from '@/app/utils/firebaseAdminConfig';
 
 /**
  * GET /api/zr/[club]
@@ -49,7 +34,7 @@ export async function GET(
 
   // Prepare Firestore document reference
   const dateId = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-  const docRef = db.collection('club_stats').doc(dateId);
+  const docRef = adminDb.collection('club_stats').doc(dateId);
 
   // Let the data expire in 31 days
   const expiresAt = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000);

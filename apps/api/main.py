@@ -2,7 +2,9 @@ import os
 import time
 import inspect
 import logging
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for, flash
+import json
+from pathlib import Path
+from flask import Flask, request, jsonify, session, redirect, url_for, flash
 from dotenv import load_dotenv
 from functools import wraps
 import requests
@@ -19,6 +21,15 @@ from zwiftcommentator import ZwiftCommentator
 
 # Load environment variables from .env file
 load_dotenv()
+
+_CONST_PATH = Path(__file__).with_name("constants.json")
+try:
+    SHARED_CONSTANTS = json.loads(_CONST_PATH.read_text(encoding="utf-8"))
+except Exception:
+    SHARED_CONSTANTS = {}
+_SHARED_DISCORD = SHARED_CONSTANTS.get("discord") or {}
+_SHARED_ROLES = _SHARED_DISCORD.get("roles") or {}
+_SHARED_GUILD = _SHARED_DISCORD.get("guildId") or "your_discord_guild_id"
 
 app = Flask(__name__)
 
@@ -57,14 +68,14 @@ OPENAI_KEY = os.getenv("OPENAI_KEY", "your_openai_key")
 DISCORD_GOSSIP_ID = os.getenv("DISCORD_GOSSIP_ID", "your_discord_gossip_id")
 DISCORD_BOT_URL = os.getenv("DISCORD_BOT_URL", "your_discord_bot_url")
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "your_discord_bot_token")
-DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID", "your_discord_guild_id")
+DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID", _SHARED_GUILD)
 
 # Role IDs for filtering community/verified members (can be overridden via environment)
 COMMUNITY_MEMBER_ROLE_ID = os.getenv(
-    "DISCORD_COMMUNITY_MEMBER_ROLE_ID", "1195878123795910736"
+    "DISCORD_COMMUNITY_MEMBER_ROLE_ID", _SHARED_ROLES.get("communityMember", "1195878123795910736")
 )
 VERIFIED_MEMBER_ROLE_ID = os.getenv(
-    "DISCORD_VERIFIED_MEMBER_ROLE_ID", "1385216556166025347"
+    "DISCORD_VERIFIED_MEMBER_ROLE_ID", _SHARED_ROLES.get("verifiedMember", "1385216556166025347")
 )
 
 # Cache for verified Zwift IDs (to avoid enumerating all Discord members on every cron hit)
@@ -149,14 +160,10 @@ ZWIFT_CLUB_ID = os.getenv("ZWIFT_CLUB_ID", "")  # Optional default for roster re
 ZWIFTPOWER_CLUB_ID = os.getenv("ZWIFTPOWER_CLUB_ID", "")  # ZwiftPower team/club id for roster refresh (required)
 
 def login_required(f):
-    """Decorator to require Discord OAuth login with admin rights"""
+    """Human Flask admin UI is retired. Remaining HTML/session routes return 410."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user' not in session or 'discord_id' not in session:
-            # Store the URL they were trying to access
-            session['next_url'] = request.url
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
+        return admin_ui_gone()
     return decorated_function
 
 def check_discord_admin(discord_id, access_token):
@@ -195,6 +202,18 @@ def verify_api_key():
     
     token = auth_header.replace('Bearer ', '')
     return token == CONTENT_API_KEY
+
+
+def require_api_or_401():
+    if not verify_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    return None
+
+
+def admin_ui_gone():
+    return jsonify({
+        "error": "Admin UI moved to https://www.dzrracingseries.com/admin",
+    }), 410
 
 
 def _commit_in_batches(write_ops, batch_size: int = 450):
@@ -514,6 +533,9 @@ def get_authenticated_zwift_api() -> ZwiftAPI:
 def team_riders(club_id: int):
     """Get ZwiftPower registered team riders for a given club ID"""
     try:
+        unauthorized = require_api_or_401()
+        if unauthorized:
+            return unauthorized
         session = get_authenticated_session()
         zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
         zp.session = session
@@ -526,6 +548,9 @@ def team_riders(club_id: int):
 def team_results(club_id: int):
     """Get ZwiftPower weekly team results for a given club ID"""
     try:
+        unauthorized = require_api_or_401()
+        if unauthorized:
+            return unauthorized
         session = get_authenticated_session()
         zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
         zp.session = session
@@ -546,6 +571,9 @@ def filter_events(club_id: int):
         /filter_events/11939?title=Tour%20de%20Zwift
     """
     try:
+        unauthorized = require_api_or_401()
+        if unauthorized:
+            return unauthorized
         # Get the title pattern from query parameters
         title_pattern = request.args.get('title')
         if not title_pattern:
@@ -578,6 +606,9 @@ def filter_events(club_id: int):
 def rider_data(rider_id: int):
     """Get ZwiftPowerrider data for a given rider ID"""
     try:
+        unauthorized = require_api_or_401()
+        if unauthorized:
+            return unauthorized
         session = get_authenticated_session()
         zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
         zp.session = session
@@ -590,6 +621,9 @@ def rider_data(rider_id: int):
 def generate_and_post_commentary(club_id):
     """Generate weekly commentary on team results and post to Discord"""
     try:
+        unauthorized = require_api_or_401()
+        if unauthorized:
+            return unauthorized
         print(f"[DEBUG] Starting commentary generation for club ID: {club_id}")
 
         session = get_authenticated_session()
@@ -632,6 +666,9 @@ def generate_and_post_commentary(club_id):
 def generate_and_post_upgrades():
     """Generate commentary on upgrades and post to Discord"""
     try:
+        unauthorized = require_api_or_401()
+        if unauthorized:
+            return unauthorized
         print("[DEBUG] Starting upgrade comment generation...")
 
         today = datetime.now().strftime("%y%m%d")
@@ -677,6 +714,9 @@ def generate_and_post_upgrades():
 def get_users():
     """Retrieve all users from Firebase"""
     try:
+        unauthorized = require_api_or_401()
+        if unauthorized:
+            return unauthorized
         # Get limit parameter from query string, default to 100
         limit = request.args.get('limit', default=100, type=int)
         
@@ -786,16 +826,7 @@ def get_discord_members():
             companion_count = len([m for m in members if m.get("is_companion_member")])
             zwiftpower_count = len([m for m in members if m.get("is_zwiftpower_member")])
             
-            return render_template(
-                'discord_members.html',
-                members=members,
-                zwift_riders=zwift_riders,
-                linked_count=linked_count,
-                unlinked_count=unlinked_count,
-                member_role_count=member_role_count,
-                companion_count=companion_count,
-                zwiftpower_count=zwiftpower_count,
-            )
+            return admin_ui_gone()
         
         # For API requests, return JSON
         return jsonify({
@@ -874,11 +905,7 @@ def member_outreach_view():
                 m["reminder_count"] = 0
 
         if is_html_request:
-            return render_template(
-                "member_outreach.html",
-                members=filtered_members,
-                total=len(filtered_members),
-            )
+            return admin_ui_gone()
 
         # Fallback JSON (not the primary use case)
         return jsonify(
@@ -896,6 +923,9 @@ def member_outreach_view():
 def assign_zwift_id():
     """Assign a ZwiftID to a Discord user"""
     try:
+        unauthorized = require_api_or_401()
+        if unauthorized:
+            return unauthorized
         data = request.json
         if not data:
             return jsonify({"status": "error", "message": "No data provided"}), 400
@@ -1172,6 +1202,9 @@ def initialize_rider_queue():
     This queue is no longer required for the Discord members view.
     """
     try:
+        unauthorized = require_api_or_401()
+        if unauthorized:
+            return unauthorized
         # Get the latest club_stats
         club_stats = firebase.get_latest_document("club_stats")
         
@@ -1234,6 +1267,9 @@ def initialize_rider_queue():
 def process_rider_queue():
     """Process a batch of riders from the rider queue"""
     try:
+        unauthorized = require_api_or_401()
+        if unauthorized:
+            return unauthorized
         # Get parameters
         batch_size = request.json.get('batch_size', 3) if request.json else 3
         
@@ -1445,7 +1481,7 @@ def content_messages():
         
         if is_html_request:
             # For HTML requests, render the management interface
-            return render_template('content_messages.html', api_key=CONTENT_API_KEY)
+            return admin_ui_gone()
         else:
             # For API requests, return summary data
             welcome_messages = firebase.get_collection('welcome_messages', limit=100, include_id=True)
@@ -2207,10 +2243,10 @@ def membership_admin():
     Admin UI for managing Club Membership settings and viewing payments.
     """
     try:
-        return render_template('membership_admin.html', user=session.get('user', {}))
+        return admin_ui_gone()
     except Exception as e:
         flash(f'Error loading membership admin: {str(e)}', 'error')
-        return render_template('membership_admin.html', user=session.get('user', {}))
+        return admin_ui_gone()
 
 
 @app.route('/api/membership/settings', methods=['GET'])
@@ -2601,164 +2637,23 @@ def membership_reconcile_roles():
 @app.route('/login')
 def login():
     """Discord OAuth login page"""
-    return render_template('login.html', discord_oauth_url=DISCORD_OAUTH_URL)
+    return admin_ui_gone()
 
 @app.route('/auth/discord/callback')
 def discord_callback():
-    """Handle Discord OAuth callback"""
-    code = request.args.get('code')
-    if not code:
-        flash('Authorization failed', 'error')
-        return redirect(url_for('login'))
-    
-    try:
-        # Exchange code for access token
-        token_data = {
-            'client_id': DISCORD_CLIENT_ID,
-            'client_secret': DISCORD_CLIENT_SECRET,
-            'grant_type': 'authorization_code',
-            'code': code,
-            'redirect_uri': DISCORD_REDIRECT_URI
-        }
-        
-        token_response = requests.post('https://discord.com/api/oauth2/token', data=token_data)
-        if token_response.status_code != 200:
-            flash('Failed to get access token', 'error')
-            return redirect(url_for('login'))
-        
-        token_info = token_response.json()
-        access_token = token_info['access_token']
-        
-        # Get user info
-        headers = {
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json'
-        }
-        
-        user_response = requests.get('https://discord.com/api/users/@me', headers=headers)
-        if user_response.status_code != 200:
-            flash('Failed to get user information', 'error')
-            return redirect(url_for('login'))
-        
-        user_info = user_response.json()
-        discord_id = user_info['id']
-        username = user_info['username']
-        
-        # Check if user has admin rights
-        if not check_discord_admin(discord_id, access_token):
-            flash('Access denied: You need administrator rights in the DZR Discord server', 'error')
-            return redirect(url_for('login'))
-        
-        # Store user info in session
-        session['user'] = {
-            'discord_id': discord_id,
-            'username': username,
-            'avatar': user_info.get('avatar'),
-            'access_token': access_token
-        }
-        session['discord_id'] = discord_id
-        session['logged_in'] = True
-        
-        # Store user in Firebase (optional - for audit trail)
-        try:
-            firebase.db.collection('admin_logins').add({
-                'discord_id': discord_id,
-                'username': username,
-                'login_time': datetime.now(),
-                'ip_address': request.remote_addr
-            })
-        except Exception as e:
-            print(f"Failed to log admin login to Firebase: {e}")
-        
-        flash(f'Welcome, {username}!', 'success')
-        
-        # Redirect to the page they were trying to access
-        next_url = session.pop('next_url', None)
-        if next_url:
-            return redirect(next_url)
-        return redirect(url_for('dashboard'))
-        
-    except Exception as e:
-        print(f"Discord OAuth error: {e}")
-        flash('Authentication failed', 'error')
-        return redirect(url_for('login'))
+    """Human Discord OAuth for Flask HTML is retired. Use https://www.dzrracingseries.com/admin"""
+    return admin_ui_gone()
 
 @app.route('/logout')
 def logout():
-    """Logout and clear session"""
-    username = session.get('user', {}).get('username', 'Unknown')
     session.clear()
-    flash(f'Goodbye, {username}!', 'info')
-    return redirect(url_for('login'))
+    return admin_ui_gone()
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    """Admin Dashboard - Overview of Discord server stats and navigation"""
-    try:
-        # Get Discord server stats
-        discord_api = DiscordAPI(DISCORD_BOT_TOKEN, DISCORD_GUILD_ID)
-        
-        # Get basic server info
-        server_stats = {
-            'total_members': 0,
-            'linked_members': 0,
-            'unlinked_members': 0,
-            'server_name': 'DZR Discord Server'
-        }
-        
-        try:
-            # Get all members with ZwiftIDs merged
-            members = discord_api.merge_with_zwift_ids(include_role_names=True)
-            server_stats['total_members'] = len(members)
-            server_stats['linked_members'] = len([m for m in members if m.get('has_zwift_id')])
-            server_stats['unlinked_members'] = server_stats['total_members'] - server_stats['linked_members']
-        except Exception as e:
-            print(f"Error getting Discord stats: {e}")
-        
-        # Get content stats from Firebase
-        try:
-            welcome_messages = firebase.get_collection('welcome_messages', limit=100, include_id=True)
-            role_messages = firebase.get_collection('role_messages', limit=100, include_id=True)
-            scheduled_messages = firebase.get_collection('scheduled_messages', limit=100, include_id=True)
-            
-            content_stats = {
-                'total_welcome': len(welcome_messages),
-                'total_scheduled': len(scheduled_messages) + len(role_messages),
-                'active_welcome': len([m for m in welcome_messages if m.get('active', False)]),
-                'active_scheduled': len([m for m in scheduled_messages if m.get('active', False)]) + len([m for m in role_messages if m.get('active', False)])
-            }
-        except Exception as e:
-            print(f"Error getting content stats: {e}")
-            content_stats = {
-                'total_welcome': 0,
-                'total_scheduled': 0,
-                'active_welcome': 0,
-                'active_scheduled': 0
-            }
-        
-        # Get recent admin logins
-        try:
-            recent_logins = firebase.get_collection('admin_logins', limit=10, include_id=True)
-            # Sort by login_time if available
-            recent_logins.sort(key=lambda x: x.get('login_time', datetime.min), reverse=True)
-        except Exception as e:
-            print(f"Error getting recent logins: {e}")
-            recent_logins = []
-        
-        return render_template('dashboard.html', 
-                             user=session.get('user', {}),
-                             server_stats=server_stats,
-                             content_stats=content_stats,
-                             recent_logins=recent_logins[:5])  # Show only last 5
-        
-    except Exception as e:
-        flash(f'Error loading dashboard: {str(e)}', 'error')
-        return render_template('dashboard.html', 
-                             user=session.get('user', {}),
-                             server_stats={'total_members': 0, 'linked_members': 0, 'unlinked_members': 0},
-                             content_stats={'total_welcome': 0, 'total_scheduled': 0, 'active_welcome': 0, 'active_scheduled': 0},
-                             recent_logins=[])
+    """Admin Dashboard retired — use the Next.js /admin UI."""
+    return admin_ui_gone()
 
 @app.route('/api-overview')
 @login_required
@@ -2813,18 +2708,10 @@ def bot_knowledge():
         # Sort by key
         entries.sort(key=lambda e: e.get('key') or e.get('id') or '')
 
-        return render_template(
-            'bot_knowledge.html',
-            entries=entries,
-            user=session.get('user', {})
-        )
+        return admin_ui_gone()
     except Exception as e:
         flash(f'Error loading bot knowledge: {str(e)}', 'error')
-        return render_template(
-            'bot_knowledge.html',
-            entries=[],
-            user=session.get('user', {})
-        )
+        return admin_ui_gone()
 
 # Discord stats endpoints
 
@@ -3425,7 +3312,7 @@ def get_top_channels():
 def discord_stats():
     """Discord server statistics dashboard"""
     _record_daily_member_count_snapshot()
-    return render_template('discord_stats.html')
+    return admin_ui_gone()
 
 # Optional debug endpoint to verify data exists
 @app.route('/api/discord/stats/debug', methods=['GET'])
@@ -3459,15 +3346,11 @@ def debug_discord_stats():
 
 @app.route('/', methods=['GET'])
 def index():
-    """
-    Root page - redirects to dashboard if logged in, otherwise redirects to login
-    """
-    # If user is logged in, redirect to dashboard
-    if 'user' in session and 'discord_id' in session:
-        return redirect(url_for('dashboard'))
-    
-    # Otherwise redirect to login
-    return redirect(url_for('login'))
+    """Cloud Run health check. Admin UI lives on the Next.js site."""
+    return jsonify({
+        "service": "dzr-api",
+        "admin": "https://www.dzrracingseries.com/admin",
+    })
 
 def index_content():
     """
@@ -3518,7 +3401,7 @@ def index_content():
             "endpoints": output
         })
     else:
-        return render_template('api_overview.html', endpoints=output)
+        return admin_ui_gone()
 
 @app.route('/api/schedules/probability-due', methods=['GET'])
 def get_probability_due_messages():
@@ -3709,7 +3592,7 @@ def check_probability_and_select():
 @login_required
 def roles_overview():
     """Role management overview page"""
-    return render_template('roles_overview.html')
+    return admin_ui_gone()
 
 @app.route('/api/roles/panels', methods=['GET'])
 @login_required
@@ -4541,7 +4424,7 @@ def refresh_zwiftpower_club_roster():
 @login_required
 def companion_club_growth_page():
     """Admin UI: cumulative Zwift Companion club members over time (Firestore roster)."""
-    return render_template('companion_club_growth.html', user=session.get('user', {}))
+    return admin_ui_gone()
 
 
 @app.route('/api/zwift/club/roster/growth', methods=['GET'])
@@ -4559,7 +4442,7 @@ def companion_club_roster_growth_api():
 @login_required
 def signup_boards_page():
     """Signup boards management page"""
-    return render_template('signup_boards.html')
+    return admin_ui_gone()
 
 @app.route('/api/signup-boards', methods=['GET'])
 @login_required

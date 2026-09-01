@@ -1,10 +1,11 @@
 require("dotenv").config();
+const shared = require("./constants.json");
 
 module.exports = {
   discord: {
     token: process.env.DISCORD_BOT_TOKEN,
     clientId: process.env.DISCORD_CLIENT_ID,
-    guildId: process.env.DISCORD_GUILD_ID,
+    guildId: process.env.DISCORD_GUILD_ID || shared.discord.guildId,
     welcomeChannelId: process.env.DISCORD_WELCOME_CHANNEL_ID, // Optional: specific welcome channel
     approvalChannelId: process.env.DISCORD_APPROVAL_CHANNEL_ID, // Optional: channel for role approval requests
   },
@@ -24,7 +25,7 @@ module.exports = {
   },
   kms: {
     channelId: process.env.KMS_CHANNEL_ID, // Discord channel ID for Klubmesterskab updates
-    roleId: process.env.KMS_ROLE_ID || '1413793742808416377', // Klubmesterskab role ID
+    roleId: process.env.KMS_ROLE_ID || shared.discord.roles.kms, // Klubmesterskab role ID
     eventIso: process.env.KMS_EVENT_ISO, // ISO datetime for event start, e.g., 2025-10-28T18:30:00Z (19:30 CET)
   },
   firebase: {

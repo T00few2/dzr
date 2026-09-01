@@ -18,6 +18,7 @@ import { auth, db } from '@/app/utils/firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
 import SendMessage from '../discord-bot/SendMessage';
 import { useSession } from 'next-auth/react';
+import { HOLDKAPTAJN_ROLE_ID } from '@/app/lib/sharedConstants';
 
 interface Rider {
   id?: string;
@@ -87,7 +88,7 @@ const ZRLRider = () => {
       await addDoc(collection(db, 'riders'), riderData);
 
       // Post a message to Discord
-      const roleId = '1195878349617250405';
+      const roleId = HOLDKAPTAJN_ROLE_ID;
       const riderDisplay = discordId ? `<@${discordId}>` : name;
       const messageContent = `🚴 Ny rytter i gården 🚴\n\n${riderDisplay} er på fri transfer i ${raceSeries}.\nKører gerne ${division} klokken ${rideTime}.\nAttention <@&${roleId}>`;
 

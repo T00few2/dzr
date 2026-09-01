@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
+import { HOLDKAPTAJN_ROLE_ID } from '@/app/lib/sharedConstants';
 
 export async function POST(request: Request) {
   try {
@@ -9,8 +10,8 @@ export async function POST(request: Request) {
 
     const requesterDiscordId = String((token as any)?.discordId || '');
     const roles = (token as any)?.roles as string[] | undefined;
-    const teamCaptainRoleId = '1195878349617250405';
-    if (!Array.isArray(roles) || !roles.includes(teamCaptainRoleId)) {
+    const isAdmin = Boolean((token as any)?.isAdmin);
+    if (!isAdmin && (!Array.isArray(roles) || !roles.includes(HOLDKAPTAJN_ROLE_ID))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

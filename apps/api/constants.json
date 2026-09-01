@@ -1,0 +1,30 @@
+{
+  "siteOrigin": "https://www.dzrracingseries.com",
+  "discord": {
+    "guildId": "1195850595014299669",
+    "roles": {
+      "admin": "1195852714270277763",
+      "verifiedMember": "1385216556166025347",
+      "communityMember": "1195878123795910736",
+      "holdkaptajn": "1195878349617250405",
+      "kms": "1413793742808416377"
+    }
+  },
+  "firestore": {
+    "users": "users",
+    "memberships": "memberships",
+    "payments": "payments",
+    "systemSettings": "system_settings",
+    "welcomeMessages": "welcome_messages",
+    "scheduledMessages": "scheduled_messages",
+    "roleMessages": "role_messages",
+    "selfRoles": "selfRoles",
+    "signupBoardConfigs": "signup_board_configs",
+    "botKnowledge": "bot_knowledge",
+    "clubStats": "club_stats",
+    "companionClubMembers": "companion_club_members",
+    "zwiftpowerClubMembers": "zwiftpower_club_members",
+    "serverActivity": "server_activity",
+    "serverMemberCounts": "server_member_counts"
+  }
+}
