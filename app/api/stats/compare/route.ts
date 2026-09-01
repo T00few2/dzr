@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
+import { getRacingScore } from '@/app/utils/fetchZPdata';
 
 export async function GET(req: Request) {
   try {
@@ -32,7 +33,7 @@ export async function GET(req: Request) {
         const r = riders.find((x: any) => String(x?.riderId) === String(rid));
         seriesMap[rid].push({
           date: doc.id,
-          racingScore: typeof r?.racingScore === 'number' ? r.racingScore : null,
+          racingScore: getRacingScore(r),
           veloRating: typeof r?.race?.current?.rating === 'number' ? r.race.current.rating : null,
         });
       }

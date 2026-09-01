@@ -25,6 +25,9 @@ const db = admin.firestore();
  * Fetches the club data and stores it in Firestore under:
  * collection: "club_stats"
  * document: {YYYY-MM-DD}
+ *
+ * ZRS is taken from ZwiftRacing (`zrs.score`) and copied to `racingScore`
+ * so existing consumers do not need the Zwift profile queue.
  */
 export async function GET(
   request: NextRequest,

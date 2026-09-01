@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
+import { getRacingScore } from '@/app/utils/fetchZPdata';
 
 export async function GET() {
   try {
@@ -25,7 +26,7 @@ export async function GET() {
         name: r?.name ?? null,
         country: r?.country ?? null,
         zpCategory: r?.zpCategory ?? null,
-        racingScore: typeof r?.racingScore === 'number' ? r.racingScore : null,
+        racingScore: getRacingScore(r),
         veloRating: typeof r?.rating === 'number' ? r.rating : null,
         phenotype: r?.phenotype?.value ?? null,
         weight: r?.weight ?? null,

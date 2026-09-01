@@ -40,6 +40,8 @@ export interface ClubRiderData {
   race?: RaceData;
   handicaps?: HandicapsData;
   phenotype?: PhenotypeData;
+  racingScore?: number;
+  zrs?: ZrsData;
 }
 
 /** Partial definitions for sub-objects */
@@ -96,6 +98,30 @@ export interface PhenotypeData {
   bias?: number;
 }
 
+export interface ZrsData {
+  score?: number;
+  eventId?: string;
+  eventTime?: number;
+}
+
+/** ZRS from ZwiftRacing (`zrs.score`) or the older Zwift-profile overlay (`racingScore`). */
+export function getRacingScore(rider: any): number | null {
+  if (typeof rider?.racingScore === 'number' && Number.isFinite(rider.racingScore)) {
+    return rider.racingScore;
+  }
+  const zrsScore = rider?.zrs?.score;
+  if (typeof zrsScore === 'number' && Number.isFinite(zrsScore)) {
+    return zrsScore;
+  }
+  return null;
+}
+
+function withRacingScoreFromZrs<T extends Record<string, any>>(rider: T): T {
+  const score = getRacingScore(rider);
+  if (score === null || rider.racingScore === score) return rider;
+  return { ...rider, racingScore: score };
+}
+
   
 export async function fetchRiderdata(id: string): Promise<RiderData | null> {
     const authKey = process.env.ZR_AUTH_KEY;
@@ -119,7 +145,7 @@ export async function fetchRiderdata(id: string): Promise<RiderData | null> {
       }
   
       const data = await response.json();
-      return data as RiderData;
+      return withRacingScoreFromZrs(data) as RiderData;
     } catch (error) {
       console.error(`Error fetching data for ID=${id}:`, error);
       return null;
@@ -166,6 +192,9 @@ export async function fetchRiderdata(id: string): Promise<RiderData | null> {
       }
   
       const data = await response.json();
+      if (data && Array.isArray(data.riders)) {
+        data.riders = data.riders.map((rider: ClubRiderData) => withRacingScoreFromZrs(rider));
+      }
       return data
     } catch (error) {
       console.error(`Error fetching data for ID=${club}:`, error);

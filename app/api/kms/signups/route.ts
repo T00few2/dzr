@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
+import { getRacingScore } from '@/app/utils/fetchZPdata';
 
 type RiderRow = {
   riderId: number;
@@ -92,7 +93,7 @@ export async function GET(req: Request) {
         name: r?.name ?? null,
         country: r?.country ?? null,
         zpCategory: r?.zpCategory ?? null,
-        racingScore: typeof r?.racingScore === 'number' ? r.racingScore : null,
+        racingScore: getRacingScore(r),
         veloRating: typeof r?.race?.current?.rating === 'number' ? r.race.current.rating : null,
         max30Rating: typeof r?.race?.max30?.rating === 'number' ? r.race.max30.rating : null,
         max90Rating: typeof r?.race?.max90?.rating === 'number' ? r.race.max90.rating : null,
