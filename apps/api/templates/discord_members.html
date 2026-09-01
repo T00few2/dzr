@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Members - Zwift ID Assignment</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 100%;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background-color: #5865F2; /* Discord blue */
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .main {
+            display: block;
+        }
+        .members-list {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 100%;
+            min-width: 0;
+        }
+        .tools-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .tools-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .member-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            position: relative;
+        }
+        .member-card.has-zwift {
+            border-left: 5px solid #57F287; /* Discord green */
+        }
+        .member-card.no-zwift {
+            border-left: 5px solid #ED4245; /* Discord red */
+        }
+        .member-name {
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .member-info {
+            color: #777;
+            font-size: 14px;
+        }
+        .assign-btn {
+            background-color: #5865F2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            margin-top: 10px;
+            display: inline-block;
+        }
+        .assign-btn:hover {
+            background-color: #4752C4;
+        }
+        .assigned {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background-color: #57F287;
+            color: white;
+            border-radius: 4px;
+            padding: 8px 12px;
+        }
+        select, input, button {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #5865F2;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #4752C4;
+        }
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .filters select, .filters input {
+            flex: 1;
+        }
+        .role-tag {
+            display: inline-block;
+            background: #ddd;
+            color: #333;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        .zwift-info {
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .assignment-form {
+            margin-top: 20px;
+        }
+        .member-search {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+        }
+        .success-message, .error-message {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        .success-message {
+            background-color: #DFF2BF;
+            color: #4F8A10;
+        }
+        .error-message {
+            background-color: #FFBABA;
+            color: #D8000C;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .hidden {
+            display: none;
+        }
+        /* Keep the big members table from breaking the layout; scroll it horizontally instead */
+        #members-container {
+            overflow-x: auto;
+        }
+        #members-container table {
+            min-width: 1100px;
+        }
+        /* Collapsible tool sections (accordion-like) */
+        details.tool-section {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background: #fff;
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+        details.tool-section > summary {
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
+            padding: 12px 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8f9fb;
+        }
+        details.tool-section > summary::-webkit-details-marker {
+            display: none;
+        }
+        details.tool-section > summary::after {
+            content: '▸';
+            color: #666;
+            font-weight: 700;
+        }
+        details.tool-section[open] > summary::after {
+            content: '▾';
+        }
+        .tool-section-body {
+            padding: 12px;
+            background: #fff;
+        }
+        /* Small screens: stack tools above table in a single column */
+        @media (max-width: 1100px) {
+            .tools-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <h1>Discord Members - Zwift ID Assignment</h1>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <div style="display: flex; gap: 15px;">
+                    <span>Total: {{ members|length }}</span>
+                    <span>Linked: {{ linked_count }}</span>
+                    <span>Unlinked: {{ unlinked_count }}</span>
+                    {% if member_role_count is defined %}<span>With member role: {{ member_role_count }}</span>{% endif %}
+                    {% if companion_count is defined %}<span>Companion members: {{ companion_count }}</span>{% endif %}
+                    {% if zwiftpower_count is defined %}<span>ZwiftPower members: {{ zwiftpower_count }}</span>{% endif %}
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <a href="/dashboard" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; font-size: 0.9em;">← Dashboard</a>
+                    <a href="/logout" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; font-size: 0.9em;">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="tools-panel">
+            <div class="tools-grid">
+                <details class="tool-section">
+                    <summary>Verified Role Tools</summary>
+                    <div class="tool-section-body">
+                        <p style="margin-top: 0; color: #666;">
+                            Reconcile the <strong>Verified member</strong> role across the Discord server based on your current rules.
+                            Default is <strong>linked Zwift ID</strong> only.
+                        </p>
+
+                        <div style="border: 1px solid #eee; border-radius: 8px; padding: 12px; background: #fafafa;">
+                            <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                                <input type="checkbox" id="req-zwiftid" checked />
+                                <span>Require linked Zwift ID</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                                <input type="checkbox" id="req-companion" />
+                                <span>Require Companion club roster membership</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                                <input type="checkbox" id="req-zwiftpower" />
+                                <span>Require ZwiftPower club roster membership</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:10px; margin: 6px 0;">
+                                <input type="checkbox" id="dry-run" />
+                                <span>Dry run (show counts, don’t change Discord)</span>
+                            </label>
+
+                            <button id="reconcile-verified-btn" type="button" style="margin-top: 10px;" onclick="reconcileVerifiedRole()">
+                                Reconcile Verified member role
+                            </button>
+
+                            <div id="reconcile-success" class="success-message" style="display:none;"></div>
+                            <div id="reconcile-error" class="error-message" style="display:none;"></div>
+                            <div id="reconcile-loading" class="loading" style="display:none;">Reconciling...</div>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="tool-section" open>
+                    <summary>Assign Zwift ID</summary>
+                    <div class="tool-section-body">
+                        <div id="selected-member-info" class="hidden">
+                            <p>Selected: <span id="selected-member-name"></span></p>
+                            <p>Username: <span id="selected-member-username"></span></p>
+                            <p>Discord ID: <span id="selected-discord-id"></span></p>
+                        </div>
+                        
+                        <div id="no-selection-message">
+                            <p>Select a member from the list to assign a Zwift ID.</p>
+                        </div>
+                        
+                        <div id="assignment-form" class="assignment-form hidden">
+                            <label for="zwift-rider-select">Select Zwift Rider:</label>
+                            <input type="text" id="zwift-search" placeholder="Search Zwift riders...">
+                            <select id="zwift-rider-select" size="10" style="height: 200px;">
+                                {% for rider in zwift_riders %}
+                                <option value="{{ rider.riderId|string }}">{{ rider.name }} (ID: {{ rider.riderId }})</option>
+                                {% endfor %}
+                            </select>
+                            
+                            <button id="assign-btn" onclick="assignZwiftID()">Assign Zwift ID</button>
+                            <button id="cancel-btn" onclick="cancelAssignment()" style="background-color: #ED4245;">Cancel</button>
+                            
+                            <div id="success-message" class="success-message"></div>
+                            <div id="error-message" class="error-message"></div>
+                            <div id="loading" class="loading">Processing...</div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <div class="members-list">
+            <div class="filters">
+                <select id="filter-type">
+                    <option value="all">All Members</option>
+                    <option value="unlinked" selected>Unlinked Members</option>
+                    <option value="linked">Linked Members</option>
+                </select>
+                <input type="text" id="member-search" class="member-search" placeholder="Search members...">
+            </div>
+
+            <div class="filters" style="align-items: center;">
+                <label style="display: flex; align-items: center; white-space: nowrap;">
+                    <input type="checkbox" id="filter-member-role" checked>
+                    <span style="margin-left: 8px;">Only show members with member role</span>
+                </label>
+                <label style="display: flex; align-items: center; white-space: nowrap; margin-left: 16px;">
+                    <input type="checkbox" id="filter-companion-member">
+                    <span style="margin-left: 8px;">Only show companion club members</span>
+                </label>
+                <label style="display: flex; align-items: center; white-space: nowrap; margin-left: 16px;">
+                    <input type="checkbox" id="filter-zwiftpower-member">
+                    <span style="margin-left: 8px;">Only show ZwiftPower roster members</span>
+                </label>
+            </div>
+
+            <div class="filters" style="align-items: center;">
+                <select id="filter-zrs-cat">
+                    <option value="all">All ZRS</option>
+                </select>
+                <select id="filter-zp-cat">
+                    <option value="all">All Pace Groups</option>
+                </select>
+                <select id="filter-velo-cat">
+                    <option value="all">All vELO Categories</option>
+                </select>
+                <select id="filter-role">
+                    <option value="all">All Roles</option>
+                </select>
+            </div>
+
+            <div id="members-container">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th data-sort-key="riderName" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Name <span class="sort-indicator"></span></th>
+                            <th data-sort-key="discord" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Username <span class="sort-indicator"></span></th>
+                            <th data-sort-key="roles" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Roles <span class="sort-indicator"></span></th>
+                            <th data-sort-key="zwiftId" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Zwift ID <span class="sort-indicator"></span></th>
+                            <th data-sort-key="companion" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Companion <span class="sort-indicator"></span></th>
+                            <th data-sort-key="zwiftpower" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZwiftPower <span class="sort-indicator"></span></th>
+                            <th data-sort-key="zrsCat" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Cat <span class="sort-indicator"></span></th>
+                            <th data-sort-key="zrsScore" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">ZRS Score <span class="sort-indicator"></span></th>
+                            <th data-sort-key="zpCat" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Pace group <span class="sort-indicator"></span></th>
+                            <th data-sort-key="veloCat" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">vELO Cat <span class="sort-indicator"></span></th>
+                            <th data-sort-key="veloScore" style="cursor: pointer; text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">vELO Score <span class="sort-indicator"></span></th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for member in members %}
+                        <tr class="member-row {% if member.has_zwift_id %}has-zwift{% else %}no-zwift{% endif %}"
+                            data-has-zwift="{{ member.has_zwift_id|lower }}"
+                            data-has-member-role="{{ member.has_member_role|default(false)|lower }}"
+                            data-is-companion="{{ member.is_companion_member|default(false)|lower }}"
+                            data-is-zwiftpower="{{ member.is_zwiftpower_member|default(false)|lower }}"
+                            data-discord-id="{{ member.discordID }}"
+                            data-username="{{ member.username }}"
+                            data-display-name="{{ member.display_name }}"
+                            data-rider-name="{{ member.riderName|default('') }}"
+                            data-zrs-cat="{{ member.zrsCategory|default('') }}"
+                            data-zp-cat="{{ member.zpCategory|default('') }}"
+                            data-velo-cat="{{ member.veloCategoryName|default(member.veloCategory)|default('') }}"
+                            data-zrs-score="{{ member.racingScore|default('') }}"
+                            data-velo-score="{{ member.veloScore|default('') }}"
+                            data-zwift-id="{{ member.zwiftID|default('') }}">
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0; font-weight: 600;">{% if member.riderName is defined %}{{ member.riderName }}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">@{{ member.username }} ({{ member.discordID }})</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
+                                {% if member.roles %}
+                                    {% for role in member.roles %}
+                                    <span class="role-tag" style="background-color: #{{ '%06x' % role.color if role.color > 0 else 'dddddd' }}">{{ role.name }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.has_zwift_id %}{{ member.zwiftID }}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
+                                {% if member.is_companion_member %}
+                                    <span class="role-tag" style="background:#57F287; color:#fff;">Yes</span>
+                                {% else %}
+                                    <span class="role-tag" style="background:#ddd; color:#333;">No</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
+                                {% if member.is_zwiftpower_member %}
+                                    <span class="role-tag" style="background:#5865F2; color:#fff;">Yes</span>
+                                {% else %}
+                                    <span class="role-tag" style="background:#ddd; color:#333;">No</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.zrsCategory is defined %}{{ member.zrsCategory }}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.racingScore is defined %}{{ member.racingScore|round(0)|int }}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.zpCategory is defined %}{{ member.zpCategory }}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.veloCategoryName is defined or member.veloCategory is defined %}{% if member.veloCategoryName is defined %}{{ member.veloCategoryName }}{% else %}{{ member.veloCategory }}{% endif %}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">{% if member.veloScore is defined %}{{ member.veloScore|round(0)|int }}{% else %}-{% endif %}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">
+                                {% if member.has_zwift_id %}
+                                <button class="assign-btn" onclick="selectMemberForAssignment('{{ member.discordID }}')">Reassign</button>
+                                {% else %}
+                                <button class="assign-btn" onclick="selectMemberForAssignment('{{ member.discordID }}')">Assign</button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let selectedDiscordId = null;
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set initial filter to unlinked members
+            filterMembers('unlinked');
+            
+            // Setup search functionality
+            document.getElementById('member-search').addEventListener('input', function() {
+                applyFilters();
+            });
+            
+            // Setup filter change event
+            document.getElementById('filter-type').addEventListener('change', function() {
+                applyFilters();
+            });
+            
+            // Setup member role filter checkbox
+            document.getElementById('filter-member-role').addEventListener('change', function() {
+                applyFilters();
+            });
+
+            // Setup companion membership filter checkbox
+            document.getElementById('filter-companion-member').addEventListener('change', function() {
+                applyFilters();
+            });
+
+            // Setup ZwiftPower roster membership filter checkbox
+            document.getElementById('filter-zwiftpower-member').addEventListener('change', function() {
+                applyFilters();
+            });
+
+            // Build category filter options dynamically
+            buildCategoryFilters();
+            // Category filter listeners
+            document.getElementById('filter-zrs-cat').addEventListener('change', applyFilters);
+            document.getElementById('filter-zp-cat').addEventListener('change', applyFilters);
+            document.getElementById('filter-velo-cat').addEventListener('change', applyFilters);
+            document.getElementById('filter-role').addEventListener('change', applyFilters);
+
+            // Add sorting handlers
+            document.querySelectorAll('th[data-sort-key]').forEach(th => {
+                th.addEventListener('click', function() {
+                    const key = this.dataset.sortKey;
+                    if (window.currentSortKey === key) {
+                        window.currentSortDir = (window.currentSortDir === 'asc') ? 'desc' : 'asc';
+                    } else {
+                        window.currentSortKey = key;
+                        window.currentSortDir = 'asc';
+                    }
+                    updateSortIndicators();
+                    sortRows();
+                    applyFilters();
+                });
+            });
+            // Initialize sort state
+            window.currentSortKey = null;
+            window.currentSortDir = 'asc';
+        
+            // Setup Zwift rider search
+            document.getElementById('zwift-search').addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const select = document.getElementById('zwift-rider-select');
+                
+                Array.from(select.options).forEach(option => {
+                    const text = option.text.toLowerCase();
+                    option.style.display = text.includes(searchTerm) ? '' : 'none';
+                });
+            });
+            
+            // Initial filter application
+            applyFilters();
+        });
+        
+        function applyFilters() {
+            const searchTerm = document.getElementById('member-search').value.toLowerCase();
+            const filterType = document.getElementById('filter-type').value;
+            const filterMemberRole = document.getElementById('filter-member-role').checked;
+            const filterCompanion = document.getElementById('filter-companion-member').checked;
+            const filterZwiftPower = document.getElementById('filter-zwiftpower-member').checked;
+            const zrsCat = document.getElementById('filter-zrs-cat').value;
+            const zpCat = document.getElementById('filter-zp-cat').value;
+            const veloCat = document.getElementById('filter-velo-cat').value;
+            const roleFilter = document.getElementById('filter-role').value;
+            
+            document.querySelectorAll('tr.member-row').forEach(row => {
+                const displayName = (row.dataset.displayName || '').toLowerCase();
+                const username = (row.dataset.username || '').toLowerCase();
+                const hasZwift = row.dataset.hasZwift;
+                const rowZrsCat = row.dataset.zrsCat || '';
+                const rowZpCat = row.dataset.zpCat || '';
+                const rowVeloCat = row.dataset.veloCat || '';
+                
+                // Match search term
+                const matchesSearch = displayName.includes(searchTerm) || username.includes(searchTerm);
+                
+                // Match filter type
+                let matchesFilter = true;
+                if (filterType === 'linked' && hasZwift !== 'true') {
+                    matchesFilter = false;
+                } else if (filterType === 'unlinked' && hasZwift === 'true') {
+                    matchesFilter = false;
+                }
+                
+                // Match member role filter
+                let matchesMemberRole = true;
+                if (filterMemberRole) {
+                    if (row.dataset.hasMemberRole !== 'true') matchesMemberRole = false;
+                }
+
+                // Match companion membership filter
+                let matchesCompanion = true;
+                if (filterCompanion) {
+                    if (row.dataset.isCompanion !== 'true') matchesCompanion = false;
+                }
+
+                // Match ZwiftPower membership filter
+                let matchesZwiftPower = true;
+                if (filterZwiftPower) {
+                    if (row.dataset.isZwiftpower !== 'true') matchesZwiftPower = false;
+                }
+                // Match selected role from dropdown
+                let matchesSelectedRole = true;
+                if (roleFilter !== 'all') {
+                    const roleTags = row.querySelectorAll('.role-tag');
+                    const hasWantedRole = Array.from(roleTags).some(tag => tag.textContent.trim() === roleFilter);
+                    if (!hasWantedRole) {
+                        matchesSelectedRole = false;
+                    }
+                }
+
+                // Category filters
+                let matchesCats = true;
+                if (zrsCat !== 'all' && rowZrsCat !== zrsCat) matchesCats = false;
+                if (zpCat !== 'all') {
+                    if (zpCat === 'A/A+') {
+                        if (!(rowZpCat === 'A' || rowZpCat === 'A+')) matchesCats = false;
+                    } else if (rowZpCat !== zpCat) {
+                        matchesCats = false;
+                    }
+                }
+                if (veloCat !== 'all' && rowVeloCat !== veloCat) matchesCats = false;
+                
+                // Show or hide based on all conditions
+                row.style.display = (matchesSearch && matchesFilter && matchesMemberRole && matchesCompanion && matchesZwiftPower && matchesSelectedRole && matchesCats) ? 'table-row' : 'none';
+            });
+        }
+        
+        function filterMembers(type) {
+            document.getElementById('filter-type').value = type;
+            applyFilters();
+        }
+        
+        function selectMemberForAssignment(discordId) {
+            // Store the selected Discord ID
+            selectedDiscordId = discordId;
+            
+            // Find the member row
+            const row = document.querySelector(`tr.member-row[data-discord-id="${discordId}"]`);
+            const memberName = row ? row.dataset.displayName : '';
+            const memberUsername = row ? row.dataset.username : '';
+            
+            // Update the assignment panel
+            document.getElementById('selected-member-name').textContent = memberName;
+            document.getElementById('selected-member-username').textContent = memberUsername;
+            document.getElementById('selected-discord-id').textContent = discordId;
+            
+            // Show the assignment form and hide the no selection message
+            document.getElementById('selected-member-info').classList.remove('hidden');
+            document.getElementById('assignment-form').classList.remove('hidden');
+            document.getElementById('no-selection-message').classList.add('hidden');
+            
+            // Reset messages
+            document.getElementById('success-message').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+            
+            // Scroll to the assignment panel on mobile
+            if (window.innerWidth < 768) {
+                document.querySelector('.assignment-panel').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+        
+        function cancelAssignment() {
+            // Reset the selected Discord ID
+            selectedDiscordId = null;
+            
+            // Hide the assignment form and show the no selection message
+            document.getElementById('selected-member-info').classList.add('hidden');
+            document.getElementById('assignment-form').classList.add('hidden');
+            document.getElementById('no-selection-message').classList.remove('hidden');
+        }
+        
+        function assignZwiftID() {
+            // Make sure a Discord member is selected
+            if (!selectedDiscordId) {
+                showError('No Discord member selected.');
+                return;
+            }
+            
+            // Get the selected Zwift ID
+            const select = document.getElementById('zwift-rider-select');
+            if (select.selectedIndex === -1) {
+                showError('Please select a Zwift rider.');
+                return;
+            }
+            
+            const zwiftId = select.value;
+            const zwiftName = select.options[select.selectedIndex].text.split(' (ID:')[0];
+            
+            // Get the username from the member card
+            const memberRow = document.querySelector(`tr.member-row[data-discord-id="${selectedDiscordId}"]`);
+            const username = memberRow ? memberRow.dataset.username : '';
+            
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'block';
+            
+            // Make API call to assign the Zwift ID
+            fetch('/api/assign_zwift_id', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    discord_id: selectedDiscordId,
+                    zwift_id: zwiftId,
+                    username: username
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.status === 'success') {
+                    showSuccess(`Successfully assigned Zwift ID ${zwiftId} (${zwiftName}) to Discord member.`);
+                    
+                    // Update the UI to reflect the change
+                    const memberRow = document.querySelector(`tr.member-row[data-discord-id="${selectedDiscordId}"]`);
+                    if (memberRow) {
+                        memberRow.classList.remove('no-zwift');
+                        memberRow.classList.add('has-zwift');
+                        memberRow.dataset.hasZwift = 'true';
+                    }
+                    
+                    // Add Zwift info
+                    let zwiftInfo = memberRow.querySelector('.zwift-info');
+                    if (!zwiftInfo) {
+                        zwiftInfo = document.createElement('div');
+                        zwiftInfo.className = 'zwift-info';
+                        memberRow.appendChild(zwiftInfo);
+                    }
+                    
+                    zwiftInfo.innerHTML = `
+                        <strong>Zwift ID:</strong> ${zwiftId}
+                        <button class="assign-btn" onclick="selectMemberForAssignment('${selectedDiscordId}')">Reassign</button>
+                    `;
+                    
+                    // Remove the assign button if it exists
+                    const assignBtn = memberRow.querySelector('.assign-btn:not(.zwift-info .assign-btn)');
+                    if (assignBtn) {
+                        assignBtn.remove();
+                    }
+                    
+                    // Reset the form after a short delay to show the success message
+                    setTimeout(() => {
+                        // Check if we're viewing "unlinked" and if so, hide this member row
+                        if (document.getElementById('filter-type').value === 'unlinked') {
+                            memberRow.style.display = 'none';
+                        }
+                        
+                        // Clear search fields
+                        document.getElementById('zwift-search').value = '';
+                        document.getElementById('member-search').value = '';
+                        
+                        // Reset filter display (optional)
+                        applyFilters();
+                        
+                        cancelAssignment();
+                    }, 2000);
+                } else {
+                    showError(data.message || 'Failed to assign Zwift ID.');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showError('Error: ' + error.message);
+                console.error('Error:', error);
+            });
+        }
+        
+        async function reconcileVerifiedRole() {
+            const btn = document.getElementById('reconcile-verified-btn');
+            const loading = document.getElementById('reconcile-loading');
+            const okEl = document.getElementById('reconcile-success');
+            const errEl = document.getElementById('reconcile-error');
+
+            okEl.style.display = 'none';
+            errEl.style.display = 'none';
+            loading.style.display = 'block';
+            btn.disabled = true;
+
+            const payload = {
+                requireZwiftId: document.getElementById('req-zwiftid').checked,
+                requireCompanion: document.getElementById('req-companion').checked,
+                requireZwiftPower: document.getElementById('req-zwiftpower').checked,
+                dryRun: document.getElementById('dry-run').checked
+            };
+
+            try {
+                const res = await fetch('/api/discord/reconcile-verified-role', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.error || 'Reconcile failed');
+                }
+
+                const msg = `
+                    <strong>Done.</strong><br/>
+                    Total members: ${data.total_members ?? '-'}<br/>
+                    Eligible: ${data.eligible ?? '-'} | Ineligible: ${data.ineligible ?? '-'}<br/>
+                    Added: ${data.added ?? '-'} | Removed: ${data.removed ?? '-'} | Unchanged: ${data.unchanged ?? '-'}<br/>
+                    Errors: ${data.errors ?? '-'}<br/>
+                    <span style="color:#666;">${data.dry_run ? 'Dry run only (no Discord changes).' : 'Changes applied to Discord.'}</span>
+                `;
+                okEl.innerHTML = msg;
+                okEl.style.display = 'block';
+            } catch (e) {
+                errEl.textContent = e.message || String(e);
+                errEl.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+
+        function showSuccess(message) {
+            const successEl = document.getElementById('success-message');
+            successEl.textContent = message;
+            successEl.style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+        }
+        
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            document.getElementById('success-message').style.display = 'none';
+        }
+
+        function buildCategoryFilters() {
+            const zrsSet = new Set();
+            const zpSet = new Set();
+            const veloSet = new Set();
+            const roleSet = new Set();
+            document.querySelectorAll('tr.member-row').forEach(row => {
+                const zrs = (row.dataset.zrsCat || '').trim();
+                const zp = (row.dataset.zpCat || '').trim();
+                const velo = (row.dataset.veloCat || '').trim();
+                if (zrs) zrsSet.add(zrs);
+                if (zp) zpSet.add(zp);
+                if (velo) veloSet.add(velo);
+                row.querySelectorAll('.role-tag').forEach(tag => {
+                    const t = tag.textContent.trim();
+                    if (t) roleSet.add(t);
+                });
+            });
+            const zrsSel = document.getElementById('filter-zrs-cat');
+            const zpSel = document.getElementById('filter-zp-cat');
+            const veloSel = document.getElementById('filter-velo-cat');
+            const roleSel = document.getElementById('filter-role');
+            // preserve selection
+            const zrsPrev = zrsSel.value;
+            const zpPrev = zpSel.value;
+            const veloPrev = veloSel.value;
+            const rolePrev = roleSel.value;
+            // repopulate
+            zrsSel.innerHTML = '<option value="all">All ZRS</option>' + Array.from(zrsSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+            const zpOptions = Array.from(zpSet).sort();
+            // Always include combined A/A+ option if either A or A+ exists
+            const includeCombined = zpSet.has('A') || zpSet.has('A+');
+            const zpHtml = zpOptions.map(v=>`<option value="${v}">${v}</option>`).join('') + (includeCombined ? '<option value="A/A+">A/A+</option>' : '');
+            zpSel.innerHTML = '<option value="all">All Pace Groups</option>' + zpHtml;
+            veloSel.innerHTML = '<option value="all">All vELO Categories</option>' + Array.from(veloSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+            roleSel.innerHTML = '<option value="all">All Roles</option>' + Array.from(roleSet).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+            // restore selection if still valid
+            if ([...zrsSet].includes(zrsPrev)) zrsSel.value = zrsPrev; else zrsSel.value = 'all';
+            if ([...zpSet].includes(zpPrev) || (zpPrev === 'A/A+' && includeCombined)) zpSel.value = zpPrev; else zpSel.value = 'all';
+            if ([...veloSet].includes(veloPrev)) veloSel.value = veloPrev; else veloSel.value = 'all';
+            if ([...roleSet].includes(rolePrev)) roleSel.value = rolePrev; else roleSel.value = 'all';
+        }
+
+        function getSortValue(row, key) {
+            switch (key) {
+                case 'riderName':
+                    return (row.dataset.riderName || '').toLowerCase();
+                case 'name':
+                    return (row.dataset.displayName || '').toLowerCase();
+                case 'discord':
+                    return (row.dataset.username || '').toLowerCase();
+                case 'roles': {
+                    const roles = Array.from(row.querySelectorAll('.role-tag')).map(t => t.textContent.trim().toLowerCase());
+                    return roles[0] || '';
+                }
+                case 'zwiftId': {
+                    const v = row.dataset.zwiftId || '';
+                    const n = parseFloat(v);
+                    return isNaN(n) ? -Infinity : n;
+                }
+                case 'companion': {
+                    return row.dataset.isCompanion === 'true' ? 1 : 0;
+                }
+                case 'zwiftpower': {
+                    return row.dataset.isZwiftpower === 'true' ? 1 : 0;
+                }
+                case 'zrsCat':
+                    return (row.dataset.zrsCat || '').toUpperCase();
+                case 'zrsScore': {
+                    const v = row.dataset.zrsScore || '';
+                    const n = parseFloat(v);
+                    return isNaN(n) ? -Infinity : n;
+                }
+                case 'zpCat':
+                    return (row.dataset.zpCat || '').toUpperCase();
+                case 'veloCat':
+                    return (row.dataset.veloCat || '').toUpperCase();
+                case 'veloScore': {
+                    const v = row.dataset.veloScore || '';
+                    const n = parseFloat(v);
+                    return isNaN(n) ? -Infinity : n;
+                }
+                default:
+                    return '';
+            }
+        }
+
+        function sortRows() {
+            const tbody = document.querySelector('#members-container tbody');
+            const rows = Array.from(document.querySelectorAll('tr.member-row'));
+            if (!window.currentSortKey) {
+                // No sort; keep original order
+                return;
+            }
+            const key = window.currentSortKey;
+            const dir = window.currentSortDir === 'asc' ? 1 : -1;
+            rows.sort((a, b) => {
+                const va = getSortValue(a, key);
+                const vb = getSortValue(b, key);
+                if (va < vb) return -1 * dir;
+                if (va > vb) return 1 * dir;
+                return 0;
+            });
+            rows.forEach(r => tbody.appendChild(r));
+        }
+
+        function updateSortIndicators() {
+            document.querySelectorAll('th[data-sort-key] .sort-indicator').forEach(span => { span.textContent = ''; });
+            if (!window.currentSortKey) return;
+            const th = document.querySelector(`th[data-sort-key="${window.currentSortKey}"] .sort-indicator`);
+            if (th) th.textContent = window.currentSortDir === 'asc' ? '▲' : '▼';
+        }
+    </script>
+</body>
+</html> 

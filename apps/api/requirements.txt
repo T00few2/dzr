@@ -1,0 +1,8 @@
+Flask
+requests
+beautifulsoup4
+openai
+firebase-admin
+python-dotenv
+backoff
+pytz
