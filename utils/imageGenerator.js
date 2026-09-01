@@ -1,5 +1,16 @@
 const { createCanvas, loadImage } = require("canvas");
 
+function getRacingScore(rider) {
+  if (rider && typeof rider.racingScore === "number" && Number.isFinite(rider.racingScore)) {
+    return rider.racingScore;
+  }
+  const zrsScore = rider?.zrs?.score;
+  if (typeof zrsScore === "number" && Number.isFinite(zrsScore)) {
+    return zrsScore;
+  }
+  return null;
+}
+
 function roundRect(ctx, x, y, width, height, radius) {
   if (width < 2 * radius) radius = width / 2;
   if (height < 2 * radius) radius = height / 2;
@@ -150,9 +161,8 @@ async function generateTeamStatsImage(ridersArray) {
     let yOffset = topMargin;
     const xOffset = leftMargin + 180 + col * colWidth;
     ctx.fillText(rider.name, xOffset, yOffset);         yOffset += rowHeight;
-    const zrsValue = (rider && rider.racingScore !== undefined && rider.racingScore !== null)
-      ? String(Math.round(Number(rider.racingScore)))
-      : "-";
+    const racingScore = getRacingScore(rider);
+    const zrsValue = racingScore !== null ? String(Math.round(Number(racingScore))) : "-";
     ctx.fillText(zrsValue, xOffset, yOffset);             yOffset += rowHeight;
     ctx.fillText(rider.zpCategory, xOffset, yOffset);     yOffset += rowHeight;
     const veloCat = `${rider.race.current.mixed.category} (${rider.race.current.rating.toFixed(0)})`;
