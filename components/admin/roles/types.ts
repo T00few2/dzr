@@ -9,6 +9,20 @@ export type TextChannel = {
   id: string
   name: string
   position: number
+  parent_id?: string | null
+}
+
+export type CategoryChannel = {
+  id: string
+  name: string
+  position: number
+}
+
+export type PanelProvisioning = {
+  createVoice?: boolean
+  textCategoryId?: string | null
+  voiceCategoryId?: string | null
+  extraViewerRoleIds?: string[]
 }
 
 export type PanelRole = {
@@ -32,6 +46,9 @@ export type PanelRole = {
   captainDisplayName?: string | null
   roleColor?: number
   roleExists?: boolean
+  textChannelId?: string | null
+  voiceChannelId?: string | null
+  provisioned?: boolean
 }
 
 export type RolePanel = {
@@ -45,6 +62,7 @@ export type RolePanel = {
   approvalChannelId?: string | null
   order?: number
   panelMessageId?: string | null
+  provisioning?: PanelProvisioning
 }
 
 export const RACE_SERIES = ['WTRL ZRL', 'WTRL TTT', 'DRS', 'Club Ladder']
@@ -61,6 +79,12 @@ export function roleColorHex(color?: number) {
   return `#${Number(color).toString(16).padStart(6, '0')}`
 }
 
-export function channelName(channels: TextChannel[], id?: string | null) {
+export function channelName(channels: { id: string; name: string }[], id?: string | null) {
   return channels.find((c) => c.id === id)?.name || 'unknown'
+}
+
+export function parseRoleColor(hex: string): number | undefined {
+  const m = String(hex || '').replace('#', '').trim()
+  if (!/^[0-9a-fA-F]{6}$/.test(m)) return undefined
+  return parseInt(m, 16)
 }

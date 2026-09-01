@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/admin/_lib/auth'
+import { normalizeProvisioning } from '@/app/api/admin/_lib/provisioning'
 import {
   jsonError,
   loadSelfRolesDoc,
@@ -26,6 +27,9 @@ export async function PUT(req: Request, { params }: { params: { panelId: string 
     }
     if ('approvalChannelId' in data) {
       panel.approvalChannelId = data.approvalChannelId || null
+    }
+    if ('provisioning' in data) {
+      panel.provisioning = normalizeProvisioning(data.provisioning)
     }
 
     panel.updatedAt = nowIso()

@@ -137,6 +137,8 @@ export default function PanelSection({
               const color = roleColorHex(role.roleColor)
               const label = role.teamName || role.roleName || role.roleId
               const captain = role.captainDisplayName || role.teamCaptainId || '—'
+              const roleChannelId = role.textChannelId || panel.channelId
+              const roleChannelName = channelName(channels, roleChannelId)
               return (
                 <Tr
                   key={role.roleId}
@@ -201,7 +203,7 @@ export default function PanelSection({
                   </Td>
                   <Td>{captain}</Td>
                   <Td>{(role.requiredRoles || []).length}</Td>
-                  <Td>#{chName}</Td>
+                  <Td>#{roleChannelName}</Td>
                   <Td>
                     <Select
                       size="sm"

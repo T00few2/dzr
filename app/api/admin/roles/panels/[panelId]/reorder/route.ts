@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/admin/_lib/auth'
+import { deployPanelAndSave, withDeployWarning } from '@/app/api/admin/_lib/panelDeploy'
 import {
   jsonError,
   loadSelfRolesDoc,
@@ -35,7 +36,11 @@ export async function PUT(req: Request, { params }: { params: { panelId: string 
     panel.roles = providedIds.map((id: string) => roleMap[id])
     panel.updatedAt = nowIso()
     await saveSelfRolesDoc(doc)
-    return NextResponse.json({ success: true, message: 'Role order updated successfully' })
+    const deployError = await deployPanelAndSave(doc, panelId)
+    return NextResponse.json({
+      success: true,
+      message: withDeployWarning('Role order updated successfully', deployError),
+    })
   } catch (e: any) {
     return jsonError(e?.message || 'Failed to reorder roles', 500)
   }

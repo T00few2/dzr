@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/admin/_lib/auth'
+import { normalizeProvisioning } from '@/app/api/admin/_lib/provisioning'
 import {
   jsonError,
   loadSelfRolesDoc,
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
       panelMessageId: null,
       requiredRoles: Array.isArray(data.requiredRoles) ? data.requiredRoles.map(String) : [],
       approvalChannelId: data.approvalChannelId || null,
+      provisioning: normalizeProvisioning(data.provisioning),
       order: Object.keys(doc.panels).length + 1,
       createdAt: now,
       updatedAt: now,

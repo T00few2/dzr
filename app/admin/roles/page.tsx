@@ -16,8 +16,8 @@ import {
 } from '@chakra-ui/react'
 import PanelSidebar from '@/components/admin/roles/PanelSidebar'
 import PanelSection from '@/components/admin/roles/PanelSection'
-import { PanelModal, RoleModal, type RoleFormData } from '@/components/admin/roles/RoleModals'
-import type { GuildRole, PanelRole, RolePanel, TextChannel } from '@/components/admin/roles/types'
+import { DeleteRoleModal, PanelModal, RoleModal, type RoleFormData } from '@/components/admin/roles/RoleModals'
+import type { CategoryChannel, GuildRole, PanelRole, RolePanel, TextChannel } from '@/components/admin/roles/types'
 
 async function parseApi(res: Response) {
   const body = await res.json().catch(() => ({}))
@@ -33,12 +33,15 @@ export default function RolesAdminPage() {
   const [panels, setPanels] = useState<RolePanel[]>([])
   const [roles, setRoles] = useState<GuildRole[]>([])
   const [channels, setChannels] = useState<TextChannel[]>([])
+  const [categories, setCategories] = useState<CategoryChannel[]>([])
+  const [voiceChannels, setVoiceChannels] = useState<TextChannel[]>([])
   const [search, setSearch] = useState('')
   const [onlyTeams, setOnlyTeams] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   const [panelModal, setPanelModal] = useState<{ mode: 'create' | 'edit'; panel?: RolePanel } | null>(null)
   const [roleModal, setRoleModal] = useState<{ mode: 'add' | 'edit'; panelId: string; role?: PanelRole } | null>(null)
+  const [deleteModal, setDeleteModal] = useState<{ panel: RolePanel; role: PanelRole } | null>(null)
 
   async function load() {
     setLoading(true)
@@ -49,6 +52,8 @@ export default function RolesAdminPage() {
       setPanels(nextPanels)
       setRoles(body.roles || [])
       setChannels(body.channels || [])
+      setCategories(body.categories || [])
+      setVoiceChannels(body.voiceChannels || [])
       setSelectedIds((prev) => {
         if (!initialized.current) {
           initialized.current = true
@@ -132,8 +137,10 @@ export default function RolesAdminPage() {
 
   function rolePayload(data: RoleFormData) {
     return {
+      createDiscord: data.createDiscord,
       roleId: data.roleId,
       roleName: data.roleName,
+      roleColor: data.roleColor,
       description: data.description || null,
       emoji: data.emoji || null,
       buttonColor: data.buttonColor,
@@ -150,6 +157,9 @@ export default function RolesAdminPage() {
       sortIndex: data.sortIndex,
       visibility: data.visibility,
       captainDisplayName: data.captainDisplayName || null,
+      textChannelId: data.textChannelId || null,
+      voiceChannelId: data.voiceChannelId || null,
+      redeploy: data.redeploy,
     }
   }
 
@@ -191,15 +201,22 @@ export default function RolesAdminPage() {
     }
   }
 
-  async function removeRole(panel: RolePanel, role: PanelRole) {
-    if (!window.confirm(`Remove "${role.roleName}" from ${panel.name}?`)) return
+  async function removeRole(panel: RolePanel, role: PanelRole, deleteDiscordEntities: boolean) {
+    setSubmitting(true)
     try {
-      const res = await fetch(`/api/admin/roles/panels/${panel.panelId}/roles/${role.roleId}`, { method: 'DELETE' })
+      const res = await fetch(`/api/admin/roles/panels/${panel.panelId}/roles/${role.roleId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteDiscordEntities }),
+      })
       const body = await parseApi(res)
       notify(true, body.message)
+      setDeleteModal(null)
       await load()
     } catch (e: any) {
       notify(false, e.message)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -301,7 +318,7 @@ export default function RolesAdminPage() {
                 onDeletePanel={() => deletePanel(panel)}
                 onAddRole={() => setRoleModal({ mode: 'add', panelId: panel.panelId })}
                 onEditRole={(role) => setRoleModal({ mode: 'edit', panelId: panel.panelId, role })}
-                onRemoveRole={(role) => removeRole(panel, role)}
+                onRemoveRole={(role) => setDeleteModal({ panel, role })}
                 onInlinePatch={(roleId, field, value) => inlinePatch(panel.panelId, roleId, field, value)}
                 onReorder={(order) => reorder(panel.panelId, order)}
               />
@@ -315,6 +332,7 @@ export default function RolesAdminPage() {
         isOpen={!!panelModal}
         onClose={() => setPanelModal(null)}
         channels={channels}
+        categories={categories}
         roles={roles}
         initial={editingPanel || null}
         submitting={submitting}
@@ -332,8 +350,10 @@ export default function RolesAdminPage() {
         isOpen={!!roleModal}
         onClose={() => setRoleModal(null)}
         channels={channels}
+        voiceChannels={voiceChannels}
         roles={roles}
         usedRoleIds={(roleModalPanel?.roles || []).map((r) => r.roleId)}
+        panel={roleModalPanel || null}
         initial={roleModal?.role || null}
         submitting={submitting}
         onSubmit={(data) => {
@@ -343,6 +363,20 @@ export default function RolesAdminPage() {
           } else {
             addRole(roleModal.panelId, data)
           }
+        }}
+      />
+
+      <DeleteRoleModal
+        isOpen={!!deleteModal}
+        onClose={() => setDeleteModal(null)}
+        panel={deleteModal?.panel || null}
+        role={deleteModal?.role || null}
+        channels={channels}
+        voiceChannels={voiceChannels}
+        submitting={submitting}
+        onConfirm={(deleteDiscordEntities) => {
+          if (!deleteModal) return
+          removeRole(deleteModal.panel, deleteModal.role, deleteDiscordEntities)
         }}
       />
     </AdminShell>

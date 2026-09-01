@@ -55,16 +55,33 @@ export function guildRolesForSelect(roles: any[]) {
     .sort((a, b) => b.position - a.position)
 }
 
+function mapNamedChannel(c: any) {
+  return {
+    id: String(c.id),
+    name: c.name || 'unknown',
+    position: c.position ?? 0,
+    parent_id: c.parent_id ?? null,
+  }
+}
+
 export function textChannels(channels: any[]) {
   return channels
     .filter((c) => c?.type === 0)
-    .map((c) => ({
-      id: String(c.id),
-      name: c.name || 'unknown',
-      position: c.position ?? 0,
-      parent_id: c.parent_id ?? null,
-      nsfw: Boolean(c.nsfw),
-    }))
+    .map((c) => ({ ...mapNamedChannel(c), nsfw: Boolean(c.nsfw) }))
+    .sort((a, b) => a.position - b.position)
+}
+
+export function categoryChannels(channels: any[]) {
+  return channels
+    .filter((c) => c?.type === 4)
+    .map(mapNamedChannel)
+    .sort((a, b) => a.position - b.position)
+}
+
+export function voiceChannels(channels: any[]) {
+  return channels
+    .filter((c) => c?.type === 2)
+    .map(mapNamedChannel)
     .sort((a, b) => a.position - b.position)
 }
 
@@ -93,6 +110,14 @@ export function enrichPanels(panelsObj: Record<string, any>, guildRoles: any[]) 
       requiredRoles: panel?.requiredRoles || [],
       order: panel?.order ?? 0,
       panelMessageId: panel?.panelMessageId ?? null,
+      provisioning: {
+        createVoice: Boolean(panel?.provisioning?.createVoice),
+        textCategoryId: panel?.provisioning?.textCategoryId || null,
+        voiceCategoryId: panel?.provisioning?.voiceCategoryId || null,
+        extraViewerRoleIds: Array.isArray(panel?.provisioning?.extraViewerRoleIds)
+          ? panel.provisioning.extraViewerRoleIds.map(String)
+          : undefined,
+      },
     }
   })
   panels.sort((a, b) => (a.order || 0) - (b.order || 0))

@@ -1,7 +1,74 @@
-import { DISCORD_GUILD_ID_DEFAULT } from '@/app/lib/sharedConstants'
+import {
+  ADMIN_ROLE_ID,
+  COMMUNITY_MEMBER_ROLE_ID,
+  DISCORD_GUILD_ID_DEFAULT,
+  HOLDKAPTAJN_ROLE_ID,
+  KMS_ROLE_ID,
+  VERIFIED_MEMBER_ROLE_ID,
+} from '@/app/lib/sharedConstants'
 
 export function guildId() {
   return process.env.DISCORD_GUILD_ID || DISCORD_GUILD_ID_DEFAULT
+}
+
+export const ChannelType = {
+  GuildText: 0,
+  GuildVoice: 2,
+  GuildCategory: 4,
+} as const
+
+export const OverwriteType = {
+  Role: 0,
+  Member: 1,
+} as const
+
+export const PermissionFlags = {
+  ManageChannels: 1n << 4n,
+  AddReactions: 1n << 6n,
+  ViewChannel: 1n << 10n,
+  SendMessages: 1n << 11n,
+  ManageMessages: 1n << 13n,
+  EmbedLinks: 1n << 14n,
+  AttachFiles: 1n << 15n,
+  ReadMessageHistory: 1n << 16n,
+  Connect: 1n << 20n,
+  Speak: 1n << 21n,
+} as const
+
+export function permissionBits(...flags: bigint[]) {
+  return flags.reduce((a, b) => a | b, 0n).toString()
+}
+
+export function protectedRoleIds() {
+  return new Set([
+    guildId(),
+    ADMIN_ROLE_ID,
+    VERIFIED_MEMBER_ROLE_ID,
+    COMMUNITY_MEMBER_ROLE_ID,
+    HOLDKAPTAJN_ROLE_ID,
+    KMS_ROLE_ID,
+  ])
+}
+
+export function defaultExtraViewerRoleIds() {
+  return [ADMIN_ROLE_ID, HOLDKAPTAJN_ROLE_ID]
+}
+
+export function discordErrorMessage(res: { ok: boolean; status: number; body: any }, fallback: string) {
+  if (res.ok) return null
+  const msg = res.body?.message || (typeof res.body === 'string' && res.body ? res.body : null)
+  return msg ? `${fallback}: ${msg}` : `${fallback} (${res.status})`
+}
+
+export function slugifyChannelName(name: string) {
+  const slug = String(name || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100)
+  return slug || 'channel'
 }
 
 export function botHeaders(withJson = true) {
@@ -59,16 +126,137 @@ export async function listGuildMembers(max = 4000) {
   return members
 }
 
-export async function listGuildRoles() {
+export async function listAllGuildRoles() {
   const { ok, body } = await discordGet(`/guilds/${guildId()}/roles`)
   if (!ok || !Array.isArray(body)) return []
-  return body.filter((r: any) => r?.name !== '@everyone' && !r?.managed)
+  return body
+}
+
+export async function listGuildRoles() {
+  return (await listAllGuildRoles()).filter((r: any) => r?.name !== '@everyone' && !r?.managed)
 }
 
 export async function listGuildChannels() {
   const { ok, body } = await discordGet(`/guilds/${guildId()}/channels`)
   if (!ok || !Array.isArray(body)) return []
   return body
+}
+
+export async function getBotUser() {
+  const { ok, body } = await discordGet('/users/@me')
+  if (!ok || !body?.id) throw new Error(discordErrorMessage({ ok, status: 0, body }, 'Failed to identify bot user') || 'Failed to identify bot user')
+  return body as { id: string; username?: string }
+}
+
+export async function getBotMember() {
+  const bot = await getBotUser()
+  const { ok, body } = await discordGet(`/guilds/${guildId()}/members/${bot.id}`)
+  if (!ok || !body) throw new Error(discordErrorMessage({ ok, status: 0, body }, 'Failed to load bot guild member') || 'Failed to load bot guild member')
+  return { userId: String(bot.id), roleIds: Array.isArray(body.roles) ? body.roles.map(String) : [] }
+}
+
+export type PermissionOverwrite = {
+  id: string
+  type: number
+  allow?: string
+  deny?: string
+}
+
+export function privateChannelOverwrites(opts: {
+  roleId: string
+  botUserId: string
+  extraViewerRoleIds?: string[]
+  voice?: boolean
+}): PermissionOverwrite[] {
+  const view = PermissionFlags.ViewChannel
+  const textAllow = permissionBits(
+    view,
+    PermissionFlags.SendMessages,
+    PermissionFlags.ReadMessageHistory,
+    PermissionFlags.EmbedLinks,
+    PermissionFlags.AttachFiles,
+    PermissionFlags.AddReactions,
+  )
+  const voiceAllow = permissionBits(view, PermissionFlags.Connect, PermissionFlags.Speak)
+  const botAllow = opts.voice
+    ? permissionBits(view, PermissionFlags.Connect, PermissionFlags.Speak, PermissionFlags.ManageChannels)
+    : permissionBits(
+        view,
+        PermissionFlags.SendMessages,
+        PermissionFlags.ReadMessageHistory,
+        PermissionFlags.ManageChannels,
+        PermissionFlags.ManageMessages,
+        PermissionFlags.EmbedLinks,
+      )
+  const everyoneDeny = opts.voice ? permissionBits(view, PermissionFlags.Connect) : permissionBits(view)
+  const memberAllow = opts.voice ? voiceAllow : textAllow
+  const extraAllow = opts.voice
+    ? voiceAllow
+    : permissionBits(view, PermissionFlags.SendMessages, PermissionFlags.ReadMessageHistory)
+
+  const overwrites: PermissionOverwrite[] = [
+    { id: guildId(), type: OverwriteType.Role, deny: everyoneDeny },
+    { id: opts.roleId, type: OverwriteType.Role, allow: memberAllow },
+    { id: opts.botUserId, type: OverwriteType.Member, allow: botAllow },
+  ]
+  for (const extraId of opts.extraViewerRoleIds || []) {
+    if (!extraId || extraId === opts.roleId || extraId === guildId()) continue
+    overwrites.push({ id: extraId, type: OverwriteType.Role, allow: extraAllow })
+  }
+  return overwrites
+}
+
+export async function createGuildRole(opts: { name: string; color?: number }) {
+  const { ok, status, body } = await discordRequest(`/guilds/${guildId()}/roles`, {
+    method: 'POST',
+    body: {
+      name: opts.name,
+      mentionable: true,
+      hoist: false,
+      permissions: '0',
+      ...(typeof opts.color === 'number' && opts.color > 0 ? { color: opts.color } : {}),
+    },
+  })
+  if (!ok || !body?.id) throw new Error(discordErrorMessage({ ok, status, body }, 'Failed to create Discord role') || 'Failed to create Discord role')
+  return body as { id: string; name: string; color?: number; position?: number }
+}
+
+export async function createGuildChannel(opts: {
+  name: string
+  type: number
+  parentId?: string | null
+  permissionOverwrites: PermissionOverwrite[]
+}) {
+  const { ok, status, body } = await discordRequest(`/guilds/${guildId()}/channels`, {
+    method: 'POST',
+    body: {
+      name: opts.name,
+      type: opts.type,
+      parent_id: opts.parentId || undefined,
+      permission_overwrites: opts.permissionOverwrites,
+    },
+  })
+  if (!ok || !body?.id) throw new Error(discordErrorMessage({ ok, status, body }, 'Failed to create Discord channel') || 'Failed to create Discord channel')
+  return body as { id: string; name: string; type: number }
+}
+
+export async function deleteGuildRole(roleId: string) {
+  const { ok, status, body } = await discordRequest(`/guilds/${guildId()}/roles/${roleId}`, { method: 'DELETE' })
+  if (ok || status === 404) return
+  throw new Error(discordErrorMessage({ ok, status, body }, 'Failed to delete Discord role') || 'Failed to delete Discord role')
+}
+
+export async function deleteGuildChannel(channelId: string) {
+  const { ok, status, body } = await discordRequest(`/channels/${channelId}`, { method: 'DELETE' })
+  if (ok || status === 404) return
+  throw new Error(discordErrorMessage({ ok, status, body }, 'Failed to delete Discord channel') || 'Failed to delete Discord channel')
+}
+
+export async function sendChannelMessage(channelId: string, payload: any) {
+  return discordRequest(`/channels/${channelId}/messages`, {
+    method: 'POST',
+    body: payload,
+  })
 }
 
 export async function sendDm(userId: string, content: string) {

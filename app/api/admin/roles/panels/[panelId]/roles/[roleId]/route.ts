@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/admin/_lib/auth'
+import { deployPanelAndSave, withDeployWarning } from '@/app/api/admin/_lib/panelDeploy'
+import { deleteProvisionedDiscordEntities } from '@/app/api/admin/_lib/provisioning'
 import {
   isButtonColor,
   jsonError,
@@ -44,14 +46,21 @@ export async function PUT(
     if ('sortIndex' in data) role.sortIndex = data.sortIndex
     if ('visibility' in data) role.visibility = data.visibility
     if ('captainDisplayName' in data) role.captainDisplayName = data.captainDisplayName
+    if ('textChannelId' in data) role.textChannelId = data.textChannelId || null
+    if ('voiceChannelId' in data) role.voiceChannelId = data.voiceChannelId || null
 
     const now = nowIso()
     role.updatedAt = now
     panel.updatedAt = now
     await saveSelfRolesDoc(doc)
+
+    let deployError: string | null = null
+    if (data.redeploy) {
+      deployError = await deployPanelAndSave(doc, panelId)
+    }
     return NextResponse.json({
       success: true,
-      message: `Role '${role.roleName}' updated successfully`,
+      message: withDeployWarning(`Role '${role.roleName}' updated successfully`, deployError),
     })
   } catch (e: any) {
     return jsonError(e?.message || 'Failed to update role', 500)
@@ -66,16 +75,35 @@ export async function DELETE(
   if (auth.error) return auth.error
   try {
     const { panelId, roleId } = params
+    const data = await req.json().catch(() => ({}))
+    const deleteDiscordEntities = Boolean(data?.deleteDiscordEntities)
     const doc = await loadSelfRolesDoc()
     const panel = doc.panels[panelId]
     if (!panel) return jsonError('Panel not found', 404)
     if (!Array.isArray(panel.roles)) panel.roles = []
-    const before = panel.roles.length
+    const role = panel.roles.find((r: any) => String(r.roleId) === String(roleId))
+    if (!role) return jsonError('Role not found in panel', 404)
+
+    if (deleteDiscordEntities) {
+      await deleteProvisionedDiscordEntities({
+        role,
+        panel,
+        panelId,
+        panels: doc.panels,
+      })
+    }
+
     panel.roles = panel.roles.filter((r: any) => String(r.roleId) !== String(roleId))
-    if (panel.roles.length === before) return jsonError('Role not found in panel', 404)
     panel.updatedAt = nowIso()
     await saveSelfRolesDoc(doc)
-    return NextResponse.json({ success: true, message: 'Role removed from panel' })
+    const deployError = await deployPanelAndSave(doc, panelId)
+    return NextResponse.json({
+      success: true,
+      message: withDeployWarning(
+        deleteDiscordEntities ? 'Role and Discord entities deleted' : 'Role removed from panel',
+        deployError
+      ),
+    })
   } catch (e: any) {
     return jsonError(e?.message || 'Failed to remove role', 500)
   }
