@@ -104,56 +104,38 @@ export async function removeSignup(boardId: string, userId: string, optionValue?
 
 export async function deleteSignupBoard(boardId: string): Promise<
   | { error: string; status: number }
-  | { deleted: number; discordDeleted: number; discordFailed: number; discordError: string | null }
+  | { discordDeleted: boolean; discordError: string | null }
 > {
   const ref = adminDb.collection(SIGNUP_BOARDS_COLLECTION).doc(boardId)
   const snap = await ref.get()
   if (!snap.exists) return { error: 'Board not found', status: 404 as const }
 
-  const target = { id: snap.id, ...snap.data() } as any
-  const copiesSnap = await adminDb.collection(SIGNUP_BOARDS_COLLECTION).limit(500).get()
-  const copies = copiesSnap.docs
-    .map((d) => ({ id: d.id, ...d.data() } as any))
-    .filter((b) => sameSignupPanel(b, target))
+  const board = { id: snap.id, ...snap.data() } as any
+  const channelId = String(board.channelId || '')
+  const messageId = messageIdOf(board)
+  const guildId = String(board.guildId || '')
 
-  let discordDeleted = 0
-  let discordFailed = 0
+  let discordDeleted = false
   let discordError: string | null = null
-
-  for (const board of copies) {
-    const channelId = String(board.channelId || '')
-    const messageId = messageIdOf(board)
-    if (channelId && messageId) {
-      const res = await deleteChannelMessage(channelId, messageId)
-      if (res.ok || res.status === 404) {
-        discordDeleted += 1
-      } else {
-        discordFailed += 1
-        discordError = res.body?.message || `Discord ${res.status}`
-      }
+  if (channelId && messageId) {
+    const res = await deleteChannelMessage(channelId, messageId)
+    discordDeleted = res.ok || res.status === 404
+    if (!res.ok && res.status !== 404) {
+      discordError = res.body?.message || `Discord ${res.status}`
     }
-    await adminDb.collection(SIGNUP_BOARDS_COLLECTION).doc(board.id).delete()
   }
 
-  const guildId = String(target.guildId || '')
-  const channelId = String(target.channelId || '')
+  await ref.delete()
+
   if (guildId && channelId) {
     const stateRef = adminDb.collection('bot_state').doc(`signup_board_latest:${guildId}:${channelId}`)
     const stateSnap = await stateRef.get()
-    if (stateSnap.exists) {
-      const latestId = String(stateSnap.data()?.boardId || '')
-      if (!latestId || copies.some((b) => b.id === latestId)) {
-        await stateRef.delete()
-      }
+    if (stateSnap.exists && String(stateSnap.data()?.boardId) === boardId) {
+      await stateRef.delete()
     }
   }
 
-  return { deleted: copies.length, discordDeleted, discordFailed, discordError }
-}
-
-function sameSignupPanel(a: any, b: any) {
-  return String(a.channelId || '') === String(b.channelId || '')
-    && String(a.configId || '') === String(b.configId || '')
+  return { discordDeleted, discordError }
 }
 
 function messageIdOf(board: any) {

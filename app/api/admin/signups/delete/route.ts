@@ -14,16 +14,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: result.error }, { status: result.status })
   }
 
-  const message = result.discordFailed
-    ? `Removed ${result.deleted} panel record(s), but Discord still has ${result.discordFailed} message(s)`
-    : `Deleted ${result.deleted} panel record(s) and ${result.discordDeleted} Discord message(s)`
-
   return NextResponse.json({
     ok: true,
-    deleted: result.deleted,
     discordDeleted: result.discordDeleted,
-    discordFailed: result.discordFailed,
     warning: result.discordError || undefined,
-    message,
+    message: result.discordError
+      ? 'Panel deleted from Firestore; Discord message could not be deleted'
+      : 'Panel deleted',
   })
 }

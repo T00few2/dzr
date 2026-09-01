@@ -77,7 +77,7 @@ export default function LiveSignups() {
       : board.isLatest
         ? ' This is the current panel in that channel.'
         : ' This is an old/reposted copy.'
-    if (!window.confirm(`Delete "${board.title}" in #${board.channelName}?${extra}\n\nThis removes the Discord message and any old copies of the same panel.`)) return
+    if (!window.confirm(`Delete "${board.title}" in #${board.channelName}?${extra}\n\nThe Discord message and signup list will be removed.`)) return
     setBusy(`delete:${board.id}`)
     try {
       const res = await fetch('/api/admin/signups/delete', {
@@ -89,9 +89,8 @@ export default function LiveSignups() {
       if (!res.ok) throw new Error(body.error || 'Delete failed')
       toast({
         title: body.message || 'Deleted',
-        status: body.discordFailed ? 'warning' : 'success',
+        status: body.warning ? 'warning' : 'success',
       })
-      setSelectedId(null)
       await load()
     } catch (e: any) {
       toast({ title: e.message || 'Delete failed', status: 'error' })
