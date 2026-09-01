@@ -82,7 +82,7 @@ const LinkItems: Array<LinkItemProps> = [
     icon: MdInfo,
     children: [{ name: 'Løb', href: '/about/racing', icon: FaTrophy }],
   },
-  { name: 'Puncheurs Summer Cup', href: 'puncheurs-summer-cup', icon: RiBoxingFill },
+  { name: 'Puncheurs Summer Cup', href: '/puncheurs-summer-cup', icon: RiBoxingFill },
   //{ name: 'STAGES by DZR', href: '/stages', icon: MdOutlineTimer },
   // { name: 'The SANTA league', href: '/santa', icon: LiaMountainSolid },
   { name: 'DZR After Party Series', href: '/dzr-after-party', icon: LiaMountainSolid },

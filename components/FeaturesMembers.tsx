@@ -71,21 +71,21 @@ export default function FeaturesMembers() {
       <Box>
         <SimpleGrid spacing={4} minChildWidth={'300px'} marginBlockEnd={4}>
           <CustomCard 
-            href='members-zone/racing' 
+            href='/members-zone/racing' 
             icon={FaTrophy} 
             heading='Racing' 
             text1='Race Calendar, DZR Racing Teams' 
             text2='and Team Management' 
           />
           <CustomCard 
-            href='members-zone/stats-hub' 
+            href='/members-zone/stats-hub' 
             icon={MdInsights} 
             heading='Stats' 
             text1='Club Stats, rider comparisons' 
             text2='and performance tracking' 
           />
           <CustomCard 
-            href='members-zone/my-pages' 
+            href='/members-zone/my-pages' 
             icon={FaUserCircle} 
             heading='My Pages' 
             text1='Your profile and' 
