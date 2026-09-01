@@ -1,6 +1,6 @@
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { COLLECTIONS } from '@/app/lib/sharedConstants'
-import { editChannelMessage } from '@/app/api/admin/_lib/discord'
+import { deleteChannelMessage, editChannelMessage } from '@/app/api/admin/_lib/discord'
 
 export const SIGNUP_BOARDS_COLLECTION = 'signup_boards'
 
@@ -100,4 +100,40 @@ export async function removeSignup(boardId: string, userId: string, optionValue?
   }
 
   return { board, config, discordUpdated, discordError }
+}
+
+export async function deleteSignupBoard(boardId: string): Promise<
+  | { error: string; status: number }
+  | { discordDeleted: boolean; discordError: string | null }
+> {
+  const ref = adminDb.collection(SIGNUP_BOARDS_COLLECTION).doc(boardId)
+  const snap = await ref.get()
+  if (!snap.exists) return { error: 'Board not found', status: 404 as const }
+
+  const board = snap.data() as any
+  const channelId = board?.channelId
+  const messageId = board?.messageId
+  const guildId = board?.guildId
+
+  let discordDeleted = false
+  let discordError: string | null = null
+  if (channelId && messageId) {
+    const res = await deleteChannelMessage(channelId, messageId)
+    discordDeleted = res.ok || res.status === 404
+    if (!res.ok && res.status !== 404) {
+      discordError = res.body?.message || `Discord ${res.status}`
+    }
+  }
+
+  await ref.delete()
+
+  if (guildId && channelId) {
+    const stateRef = adminDb.collection('bot_state').doc(`signup_board_latest:${guildId}:${channelId}`)
+    const stateSnap = await stateRef.get()
+    if (stateSnap.exists && String(stateSnap.data()?.boardId) === boardId) {
+      await stateRef.delete()
+    }
+  }
+
+  return { discordDeleted, discordError }
 }

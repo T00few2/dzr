@@ -37,6 +37,12 @@ export async function editChannelMessage(channelId: string, messageId: string, p
   })
 }
 
+export async function deleteChannelMessage(channelId: string, messageId: string) {
+  return discordRequest(`/channels/${channelId}/messages/${messageId}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function listGuildMembers(max = 4000) {
   const members: any[] = []
   let after = '0'

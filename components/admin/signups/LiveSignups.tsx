@@ -23,6 +23,7 @@ type Board = {
   updatedAt: number
   total: number
   isLatest: boolean
+  isLegacy: boolean
   options: Option[]
 }
 
@@ -69,6 +70,30 @@ export default function LiveSignups() {
       ),
     })).filter((opt) => opt.riders.length > 0)
   }, [selected, q])
+
+  async function deleteBoard(board: Board) {
+    const extra = board.isLegacy
+      ? ' This is the legacy ZRL panel.'
+      : board.isLatest
+        ? ' This is the current panel in that channel.'
+        : ' This is an old/reposted copy.'
+    if (!window.confirm(`Delete "${board.title}" in #${board.channelName}?${extra}\n\nThe Discord message and signup list will be removed.`)) return
+    setBusy(`delete:${board.id}`)
+    try {
+      const res = await fetch(`/api/admin/signups/${encodeURIComponent(board.id)}`, { method: 'DELETE' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || 'Delete failed')
+      toast({
+        title: body.message || 'Deleted',
+        status: body.warning ? 'warning' : 'success',
+      })
+      await load()
+    } catch (e: any) {
+      toast({ title: e.message || 'Delete failed', status: 'error' })
+    } finally {
+      setBusy(null)
+    }
+  }
 
   async function removeRider(board: Board, rider: Rider, optionValue?: string) {
     const where = optionValue
@@ -154,6 +179,7 @@ export default function LiveSignups() {
                   <Text fontSize="sm" fontWeight="semibold">{b.title}</Text>
                   <Text fontSize="xs" color="gray.500">
                     #{b.channelName} · {b.total} signed up
+                    {b.isLegacy ? ' · legacy' : ''}
                     {!b.isLatest ? ' · old' : ''}
                   </Text>
                 </Box>
@@ -166,11 +192,27 @@ export default function LiveSignups() {
               <Text color="gray.400">Select a panel.</Text>
             ) : (
               <>
-                <Heading size="sm" mb={1}>{selected.title}</Heading>
-                <Text fontSize="sm" color="gray.400" mb={4}>
-                  #{selected.channelName} · {selected.total} riders
-                  {selected.updatedAt ? ` · updated ${new Date(selected.updatedAt).toLocaleString()}` : ''}
-                </Text>
+                <HStack justify="space-between" align="flex-start" mb={4} wrap="wrap" gap={3}>
+                  <Box>
+                    <Heading size="sm" mb={1}>
+                      {selected.title}
+                      {selected.isLegacy ? ' (legacy)' : ''}
+                    </Heading>
+                    <Text fontSize="sm" color="gray.400">
+                      #{selected.channelName} · {selected.total} riders
+                      {selected.updatedAt ? ` · updated ${new Date(selected.updatedAt).toLocaleString()}` : ''}
+                    </Text>
+                  </Box>
+                  <Button
+                    size="sm"
+                    colorScheme="red"
+                    variant="outline"
+                    isLoading={busy === `delete:${selected.id}`}
+                    onClick={() => deleteBoard(selected)}
+                  >
+                    Delete panel
+                  </Button>
+                </HStack>
                 {filteredOptions.length === 0 && (
                   <Text color="gray.500">No riders{q ? ' match the search' : ' on this panel'}.</Text>
                 )}

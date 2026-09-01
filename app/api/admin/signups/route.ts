@@ -59,6 +59,7 @@ export async function GET(req: Request) {
       updatedAt: data.updatedAt || 0,
       total: signupCount(signups),
       options,
+      isLegacy: !data.configId,
       isLatest: false,
     }
   })
