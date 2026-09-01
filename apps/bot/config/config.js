@@ -1,5 +1,5 @@
 require("dotenv").config();
-const shared = require("./constants.json");
+const shared = require("../constants.json");
 
 module.exports = {
   discord: {
