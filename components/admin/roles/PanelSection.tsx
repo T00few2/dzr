@@ -2,6 +2,8 @@
 
 import { useRef } from 'react'
 import {
+  Alert,
+  AlertIcon,
   Box,
   Button,
   Checkbox,
@@ -9,7 +11,6 @@ import {
   Heading,
   HStack,
   Input,
-  Select,
   Table,
   Tbody,
   Td,
@@ -25,29 +26,35 @@ export default function PanelSection({
   panel,
   channels,
   onlyTeams,
+  showAdvanced,
   onEditPanel,
   onDeletePanel,
   onAddRole,
   onEditRole,
   onRemoveRole,
   onInlinePatch,
-  onReorder,
 }: {
   panel: RolePanel
   channels: TextChannel[]
   onlyTeams: boolean
+  showAdvanced?: boolean
   onEditPanel: () => void
   onDeletePanel: () => void
   onAddRole: () => void
   onEditRole: (role: PanelRole) => void
   onRemoveRole: (role: PanelRole) => void
   onInlinePatch: (roleId: string, field: string, value: any) => void
-  onReorder: (roleOrder: string[]) => void
 }) {
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
-  const dragFrom = useRef<string | null>(null)
   const chName = channelName(channels, panel.channelId)
+  const isTeamPanel = Boolean(panel.provisioning?.createVoice)
+  const addLabel = isTeamPanel ? 'Add team' : 'Add series'
   const roles = (panel.roles || []).filter((r) => (onlyTeams ? !!r.isTeamRole : true))
+  const countLabel = isTeamPanel
+    ? `${roles.length} team${roles.length === 1 ? '' : 's'}`
+    : `${roles.length} series`
+  const missingCategories = !panel.provisioning?.textCategoryId
+    || (isTeamPanel && !panel.provisioning?.voiceCategoryId)
 
   function queue(roleId: string, field: string, value: any) {
     const key = `${roleId}:${field}`
@@ -56,32 +63,6 @@ export default function PanelSection({
       delete timers.current[key]
       onInlinePatch(roleId, field, value)
     }, 600)
-  }
-
-  function move(roleId: string, delta: number) {
-    const ids = (panel.roles || []).map((r) => r.roleId)
-    const i = ids.indexOf(roleId)
-    const j = i + delta
-    if (i < 0 || j < 0 || j >= ids.length) return
-    const next = [...ids]
-    const tmp = next[i]
-    next[i] = next[j]
-    next[j] = tmp
-    onReorder(next)
-  }
-
-  function onDrop(targetId: string) {
-    const fromId = dragFrom.current
-    dragFrom.current = null
-    if (!fromId || fromId === targetId) return
-    const ids = (panel.roles || []).map((r) => r.roleId)
-    const from = ids.indexOf(fromId)
-    const to = ids.indexOf(targetId)
-    if (from < 0 || to < 0) return
-    const next = [...ids]
-    next.splice(from, 1)
-    next.splice(to, 0, fromId)
-    onReorder(next)
   }
 
   return (
@@ -99,61 +80,49 @@ export default function PanelSection({
         <HStack spacing={3} wrap="wrap">
           <Heading size="sm">{panel.name || panel.panelId}</Heading>
           <Text fontSize="xs" color="gray.400" bg="black" px={2} py={0.5} rounded="sm">#{chName}</Text>
-          <Text fontSize="xs" color="gray.400">{roles.length} roles</Text>
+          <Text fontSize="xs" color="gray.400">{countLabel}</Text>
         </HStack>
         <HStack>
-          <Button size="sm" variant="outline" colorScheme="red" onClick={onEditPanel}>Edit</Button>
-          <Button size="sm" variant="outline" colorScheme="red" onClick={onDeletePanel}>Delete</Button>
-          <Button size="sm" colorScheme="red" onClick={onAddRole}>Add Role</Button>
+          <Button size="sm" variant="outline" colorScheme="red" onClick={onEditPanel}>Edit Panel</Button>
+          {showAdvanced && (
+            <Button size="sm" variant="outline" colorScheme="red" onClick={onDeletePanel}>Delete panel</Button>
+          )}
+          <Button size="sm" colorScheme="red" onClick={onAddRole}>{addLabel}</Button>
         </HStack>
       </Flex>
+      {missingCategories && (
+        <Alert status="warning" bg="black" color="white" rounded="none" borderBottom="1px solid" borderColor="whiteAlpha.200">
+          <AlertIcon />
+          Set Discord categories in Edit Panel before others can add teams.
+        </Alert>
+      )}
       <Box overflowX="auto">
         <Table size="sm">
           <Thead>
             <Tr>
-              <Th color="gray.400">Order</Th>
-              <Th color="gray.400">Role / Team</Th>
+              <Th color="gray.400">Role / team</Th>
               <Th color="gray.400">Series</Th>
               <Th color="gray.400">Division</Th>
               <Th color="gray.400">Time</Th>
               <Th color="gray.400">LF</Th>
               <Th color="gray.400">Captain</Th>
-              <Th color="gray.400">Prereqs</Th>
-              <Th color="gray.400">Channel</Th>
-              <Th color="gray.400">Vis</Th>
-              <Th color="gray.400">Sort</Th>
               <Th color="gray.400">Actions</Th>
             </Tr>
           </Thead>
           <Tbody>
             {roles.length === 0 && (
               <Tr>
-                <Td colSpan={12}>
-                  <Text color="gray.500" py={4}>No roles in this panel.</Text>
+                <Td colSpan={7}>
+                  <Text color="gray.500" py={4}>No {isTeamPanel ? 'teams' : 'series'} in this panel.</Text>
                 </Td>
               </Tr>
             )}
             {roles.map((role) => {
               const color = roleColorHex(role.roleColor)
               const label = role.teamName || role.roleName || role.roleId
-              const captain = role.captainDisplayName || role.teamCaptainId || '—'
-              const roleChannelId = role.textChannelId || panel.channelId
-              const roleChannelName = channelName(channels, roleChannelId)
+              const captain = role.captainDisplayName || '—'
               return (
-                <Tr
-                  key={role.roleId}
-                  draggable
-                  onDragStart={() => { dragFrom.current = role.roleId }}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => onDrop(role.roleId)}
-                >
-                  <Td whiteSpace="nowrap">
-                    <HStack spacing={1}>
-                      <Text cursor="grab" color="gray.500" title="Drag to reorder">⋮⋮</Text>
-                      <Button size="xs" variant="ghost" onClick={() => move(role.roleId, -1)}>↑</Button>
-                      <Button size="xs" variant="ghost" onClick={() => move(role.roleId, 1)}>↓</Button>
-                    </HStack>
-                  </Td>
+                <Tr key={role.roleId}>
                   <Td>
                     <Box
                       as="span"
@@ -168,9 +137,6 @@ export default function PanelSection({
                     >
                       {role.emoji ? `${role.emoji} ` : ''}{label}
                     </Box>
-                    {!role.isTeamRole && (
-                      <Text as="span" ml={2} fontSize="xs" color="gray.500">Non-team</Text>
-                    )}
                     {role.roleExists === false && (
                       <Text as="span" ml={2} fontSize="xs" color="red.400">Missing in Discord</Text>
                     )}
@@ -202,29 +168,6 @@ export default function PanelSection({
                     />
                   </Td>
                   <Td>{captain}</Td>
-                  <Td>{(role.requiredRoles || []).length}</Td>
-                  <Td>#{roleChannelName}</Td>
-                  <Td>
-                    <Select
-                      size="sm"
-                      defaultValue={role.visibility || 'public'}
-                      bg="black"
-                      onChange={(e) => queue(role.roleId, 'visibility', e.target.value)}
-                    >
-                      <option value="public">public</option>
-                      <option value="hidden">hidden</option>
-                    </Select>
-                  </Td>
-                  <Td>
-                    <Input
-                      size="sm"
-                      type="number"
-                      w="70px"
-                      defaultValue={Number.isFinite(Number(role.sortIndex)) ? Number(role.sortIndex) : 0}
-                      bg="black"
-                      onChange={(e) => queue(role.roleId, 'sortIndex', Number(e.target.value || 0))}
-                    />
-                  </Td>
                   <Td>
                     <HStack>
                       <Button size="xs" variant="outline" colorScheme="red" onClick={() => onEditRole(role)}>Edit</Button>

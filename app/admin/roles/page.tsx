@@ -5,6 +5,7 @@ import AdminShell from '@/components/admin/AdminShell'
 import {
   Box,
   Button,
+  Checkbox,
   Flex,
   HStack,
   SimpleGrid,
@@ -42,6 +43,7 @@ export default function RolesAdminPage() {
   const [panelModal, setPanelModal] = useState<{ mode: 'create' | 'edit'; panel?: RolePanel } | null>(null)
   const [roleModal, setRoleModal] = useState<{ mode: 'add' | 'edit'; panelId: string; role?: PanelRole } | null>(null)
   const [deleteModal, setDeleteModal] = useState<{ panel: RolePanel; role: PanelRole } | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -243,25 +245,6 @@ export default function RolesAdminPage() {
     }
   }
 
-  async function reorder(panelId: string, roleOrder: string[]) {
-    try {
-      const res = await fetch(`/api/admin/roles/panels/${panelId}/reorder`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roleOrder }),
-      })
-      await parseApi(res)
-      setPanels((prev) => prev.map((p) => {
-        if (p.panelId !== panelId) return p
-        const map: Record<string, PanelRole> = {}
-        for (const r of p.roles || []) map[r.roleId] = r
-        return { ...p, roles: roleOrder.map((id) => map[id]).filter(Boolean) }
-      }))
-    } catch (e: any) {
-      notify(false, e.message)
-    }
-  }
-
   const editingPanel = panelModal?.panel
   const roleModalPanel = roleModal ? panels.find((p) => p.panelId === roleModal.panelId) : null
 
@@ -282,15 +265,22 @@ export default function RolesAdminPage() {
         </Stat>
       </SimpleGrid>
 
-      <HStack mb={4} justify="flex-end">
+      <HStack mb={4} justify="flex-end" spacing={4}>
+        <Checkbox isChecked={showAdvanced} onChange={(e) => setShowAdvanced(e.target.checked)} colorScheme="red">
+          Advanced
+        </Checkbox>
         <Button onClick={() => load()} isLoading={loading} variant="outline" colorScheme="red">Refresh</Button>
-        <Button colorScheme="red" onClick={() => setPanelModal({ mode: 'create' })}>Create Panel</Button>
+        {showAdvanced && (
+          <Button colorScheme="red" onClick={() => setPanelModal({ mode: 'create' })}>Create Panel</Button>
+        )}
       </HStack>
 
       {panels.length === 0 && !loading ? (
         <Box textAlign="center" py={16} bg="gray.900" rounded="md" border="1px solid" borderColor="whiteAlpha.200">
           <Text mb={4} color="gray.400">No Role Panels Found</Text>
-          <Button colorScheme="red" onClick={() => setPanelModal({ mode: 'create' })}>Create Panel</Button>
+          {showAdvanced && (
+            <Button colorScheme="red" onClick={() => setPanelModal({ mode: 'create' })}>Create Panel</Button>
+          )}
         </Box>
       ) : (
         <Flex gap={4} direction={{ base: 'column', md: 'row' }} align="flex-start">
@@ -316,13 +306,13 @@ export default function RolesAdminPage() {
                 panel={panel}
                 channels={channels}
                 onlyTeams={onlyTeams}
+                showAdvanced={showAdvanced}
                 onEditPanel={() => setPanelModal({ mode: 'edit', panel })}
                 onDeletePanel={() => deletePanel(panel)}
                 onAddRole={() => setRoleModal({ mode: 'add', panelId: panel.panelId })}
                 onEditRole={(role) => setRoleModal({ mode: 'edit', panelId: panel.panelId, role })}
                 onRemoveRole={(role) => setDeleteModal({ panel, role })}
                 onInlinePatch={(roleId, field, value) => inlinePatch(panel.panelId, roleId, field, value)}
-                onReorder={(order) => reorder(panel.panelId, order)}
               />
             ))}
           </Box>

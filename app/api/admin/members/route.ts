@@ -24,11 +24,13 @@ export async function GET(req: Request) {
     const user = userByDiscord[discordID] || {}
     const role_ids = (m.roles || []).map(String)
     const zwiftId = String(user.zwiftId || '').trim()
+    const isBot = Boolean(m.user?.bot)
     return {
       discordID,
       username: m.user?.username || '',
       displayName: m.nick || m.user?.global_name || m.user?.username || '',
       avatar: m.user?.avatar || null,
+      bot: isBot,
       role_ids,
       zwiftId,
       has_member_role: role_ids.includes(COMMUNITY_MEMBER_ROLE_ID),

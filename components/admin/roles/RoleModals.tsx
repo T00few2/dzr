@@ -1,7 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
+  Accordion,
+  AccordionButton,
+  AccordionIcon,
+  AccordionItem,
+  AccordionPanel,
   Alert,
   AlertIcon,
   Box,
@@ -84,6 +89,100 @@ function ChannelSelect({
         <option key={c.id} value={c.id}>{prefix}{c.name}</option>
       ))}
     </Select>
+  )
+}
+
+type GuildMemberOption = {
+  discordID: string
+  displayName: string
+  username: string
+  bot?: boolean
+}
+
+function CaptainPicker({
+  members,
+  loading,
+  valueId,
+  fallbackLabel,
+  onSelect,
+}: {
+  members: GuildMemberOption[]
+  loading: boolean
+  valueId: string
+  fallbackLabel?: string
+  onSelect: (m: GuildMemberOption) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const selected = members.find((m) => m.discordID === valueId)
+  const q = query.trim().toLowerCase()
+  const filtered = useMemo(() => {
+    const list = !q
+      ? members
+      : members.filter((m) => (
+        m.displayName.toLowerCase().includes(q) || m.username.toLowerCase().includes(q)
+      ))
+    return list.slice(0, 25)
+  }, [members, q])
+  const closedLabel = selected?.displayName || fallbackLabel || ''
+
+  return (
+    <Box position="relative">
+      <Input
+        value={open ? query : closedLabel}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setOpen(true)
+        }}
+        onFocus={() => {
+          setQuery('')
+          setOpen(true)
+        }}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Search Discord members..."
+        {...inputBg}
+      />
+      {selected && !open && (
+        <Text fontSize="xs" color="gray.400" mt={1}>@{selected.username}</Text>
+      )}
+      {open && (
+        <Box
+          position="absolute"
+          zIndex={20}
+          w="100%"
+          maxH="220px"
+          overflowY="auto"
+          bg="gray.800"
+          border="1px solid"
+          borderColor="whiteAlpha.300"
+          rounded="md"
+          mt={1}
+        >
+          {loading && <Text p={2} fontSize="sm" color="gray.400">Loading members...</Text>}
+          {!loading && filtered.length === 0 && (
+            <Text p={2} fontSize="sm" color="gray.400">No matches</Text>
+          )}
+          {!loading && filtered.map((m) => (
+            <Box
+              key={m.discordID}
+              px={3}
+              py={2}
+              cursor="pointer"
+              _hover={{ bg: 'whiteAlpha.200' }}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                onSelect(m)
+                setQuery('')
+                setOpen(false)
+              }}
+            >
+              <Text fontSize="sm">{m.displayName}</Text>
+              <Text fontSize="xs" color="gray.400">@{m.username}</Text>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
   )
 }
 
@@ -347,9 +446,12 @@ export function RoleModal({
   const [voiceChannelId, setVoiceChannelId] = useState('')
   const [textCategoryId, setTextCategoryId] = useState('')
   const [voiceCategoryId, setVoiceCategoryId] = useState('')
+  const [members, setMembers] = useState<GuildMemberOption[]>([])
+  const [membersLoading, setMembersLoading] = useState(false)
 
   const canCreate = Boolean(panel?.provisioning?.textCategoryId)
   const createVoice = Boolean(panel?.provisioning?.createVoice)
+  const isTeamPanel = createVoice
 
   useEffect(() => {
     if (!isOpen) return
@@ -365,7 +467,7 @@ export function RoleModal({
     setTeamCaptainId(initial?.teamCaptainId || '')
     setRoleApprovalChannelId(initial?.roleApprovalChannelId || '')
     setIsTeamRole(!!initial?.isTeamRole)
-    setTeamName(initial?.teamName || '')
+    setTeamName(initial?.teamName || (panel?.provisioning?.createVoice ? (initial?.roleName || '') : ''))
     setRaceSeries(initial?.raceSeries || '')
     setDivision(initial?.division || '')
     setRideTime(initial?.rideTime || '')
@@ -377,8 +479,8 @@ export function RoleModal({
     setVoiceChannelId(initial?.voiceChannelId || '')
     setTextCategoryId(panel?.provisioning?.textCategoryId || '')
     setVoiceCategoryId(panel?.provisioning?.voiceCategoryId || '')
-    if (mode === 'add' && Boolean(panel?.provisioning?.textCategoryId)) {
-      setCreateDiscord(true)
+    if (mode === 'add') {
+      setCreateDiscord(Boolean(panel?.provisioning?.textCategoryId))
       if (panel?.provisioning?.createVoice) {
         setIsTeamRole(true)
         setRequiresApproval(true)
@@ -390,6 +492,26 @@ export function RoleModal({
       }
     }
   }, [isOpen, initial, mode, panel])
+
+  useEffect(() => {
+    if (!isOpen || !isTeamPanel) return
+    let cancelled = false
+    setMembersLoading(true)
+    fetch('/api/admin/members')
+      .then((res) => res.json())
+      .then((body) => {
+        if (cancelled) return
+        const list = ((body.members || []) as GuildMemberOption[]).filter((m) => m.discordID && !m.bot)
+        setMembers(list)
+      })
+      .catch(() => {
+        if (!cancelled) setMembers([])
+      })
+      .finally(() => {
+        if (!cancelled) setMembersLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [isOpen, isTeamPanel])
 
   const available = roles.filter((r) => r.id === roleId || !usedRoleIds.includes(r.id))
 
@@ -405,6 +527,12 @@ export function RoleModal({
       setRequiresApproval(false)
       setButtonColor('Danger')
     }
+    if (mode === 'add' && teamName.trim()) setRoleName(teamName.trim())
+  }
+
+  function setHoldName(value: string) {
+    setTeamName(value)
+    if (mode === 'add' && createDiscord) setRoleName(value)
   }
 
   function collect(): RoleFormData {
@@ -421,7 +549,7 @@ export function RoleModal({
       teamCaptainId,
       roleApprovalChannelId,
       isTeamRole,
-      teamName,
+      teamName: isTeamPanel ? (teamName || roleName) : teamName,
       raceSeries,
       division,
       rideTime,
@@ -441,174 +569,58 @@ export function RoleModal({
     ? !roleName.trim() || !canCreate || (createVoice && !voiceCategoryId)
     : !roleId
 
+  const title = mode === 'add'
+    ? (isTeamPanel ? 'Add team' : 'Add series')
+    : (isTeamPanel ? 'Edit team' : 'Edit series')
+
+  const primaryLabel = mode === 'add'
+    ? (createDiscord
+      ? (isTeamPanel ? 'Create team' : 'Create series')
+      : (isTeamPanel ? 'Add team' : 'Add series'))
+    : (isTeamPanel ? 'Update team' : 'Update series')
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl" scrollBehavior="inside">
       <ModalOverlay />
       <ModalContent bg="gray.900" color="white">
-        <ModalHeader>{mode === 'add' ? 'Add Role to Panel' : 'Edit Role'}</ModalHeader>
+        <ModalHeader>{title}</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
           <VStack spacing={4} align="stretch">
-            {mode === 'add' ? (
+            {mode === 'add' && createDiscord && !canCreate && (
+              <Alert status="warning" bg="black" color="white" rounded="md">
+                <AlertIcon />
+                Set Discord categories in Edit Panel before others can add teams.
+              </Alert>
+            )}
+
+            {isTeamPanel ? (
               <>
-                <FormControl>
-                  <FormLabel>Discord</FormLabel>
-                  <RadioGroup
-                    value={createDiscord ? 'create' : 'link'}
-                    onChange={(v) => applyCreateDefaults(v === 'create')}
-                  >
-                    <Stack>
-                      <Radio value="create" colorScheme="red" isDisabled={!canCreate}>
-                        Create in Discord
-                      </Radio>
-                      <Radio value="link" colorScheme="red">Link existing role</Radio>
-                    </Stack>
-                  </RadioGroup>
-                  {!canCreate && (
-                    <Alert status="warning" mt={2} bg="black" color="white" rounded="md">
-                      <AlertIcon />
-                      Set a text category in Edit Panel before creating Discord roles and channels.
-                    </Alert>
+                <FormControl isRequired={mode === 'add' && createDiscord}>
+                  <FormLabel>Team name</FormLabel>
+                  {mode === 'edit' ? (
+                    <Input
+                      value={teamName}
+                      onChange={(e) => setTeamName(e.target.value)}
+                      placeholder="e.g. Aero Albatrosses"
+                      {...inputBg}
+                    />
+                  ) : (
+                    <Input
+                      value={createDiscord ? roleName : teamName}
+                      onChange={(e) => setHoldName(e.target.value)}
+                      placeholder="e.g. Aero Albatrosses"
+                      {...inputBg}
+                    />
+                  )}
+                  {mode === 'add' && (
+                    <FormHelperText>
+                      Creates a Discord role plus private text and voice channels.
+                    </FormHelperText>
                   )}
                 </FormControl>
-                {createDiscord ? (
-                  <>
-                    <FormControl isRequired>
-                      <FormLabel>Role / team name</FormLabel>
-                      <Input
-                        value={roleName}
-                        onChange={(e) => setRoleName(e.target.value)}
-                        placeholder="e.g. Aero Albatrosses"
-                        {...inputBg}
-                      />
-                      <FormHelperText>
-                        {createVoice
-                          ? 'Creates a Discord role plus private text and voice channels.'
-                          : 'Creates a Discord role plus a private text channel.'}
-                      </FormHelperText>
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel>Role color (optional hex)</FormLabel>
-                      <Input
-                        value={roleColorHex}
-                        onChange={(e) => setRoleColorHex(e.target.value)}
-                        placeholder="#5865F2"
-                        {...inputBg}
-                      />
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel>Text channel category</FormLabel>
-                      <ChannelSelect
-                        channels={categories}
-                        value={textCategoryId}
-                        onChange={setTextCategoryId}
-                        includeEmptyLabel="Select a category..."
-                        prefix=""
-                      />
-                    </FormControl>
-                    {createVoice && (
-                      <FormControl isRequired>
-                        <FormLabel>Voice channel category</FormLabel>
-                        <ChannelSelect
-                          channels={categories}
-                          value={voiceCategoryId}
-                          onChange={setVoiceCategoryId}
-                          includeEmptyLabel="Select a category..."
-                          prefix=""
-                        />
-                        <FormHelperText>Voice channels go in this Discord category, not the text one.</FormHelperText>
-                      </FormControl>
-                    )}
-                  </>
-                ) : (
-                  <FormControl isRequired>
-                    <FormLabel>Role</FormLabel>
-                    <Select
-                      value={roleId}
-                      onChange={(e) => {
-                        const id = e.target.value
-                        setRoleId(id)
-                        setRoleName(roles.find((r) => r.id === id)?.name || '')
-                      }}
-                      {...inputBg}
-                    >
-                      <option value="">Select a role...</option>
-                      {available.map((r) => (
-                        <option key={r.id} value={r.id}>{r.name}</option>
-                      ))}
-                    </Select>
-                  </FormControl>
-                )}
-              </>
-            ) : (
-              <FormControl>
-                <FormLabel>Role Name</FormLabel>
-                <Input value={roleName} isReadOnly {...inputBg} />
-                <FormHelperText>Role name cannot be changed (managed by Discord)</FormHelperText>
-              </FormControl>
-            )}
-            <FormControl>
-              <FormLabel>Description</FormLabel>
-              <Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} {...inputBg} />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Emoji</FormLabel>
-              <Input value={emoji} maxLength={10} onChange={(e) => setEmoji(e.target.value)} placeholder="🔹" {...inputBg} />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Button Color</FormLabel>
-              <Select value={buttonColor} onChange={(e) => setButtonColor(e.target.value)} {...inputBg}>
-                {BUTTON_COLOR_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl>
-              <FormLabel>Required Roles (Prerequisites)</FormLabel>
-              <RoleChecklist roles={roles} selected={requiredRoles} onChange={setRequiredRoles} />
-              <FormHelperText>Users must have these roles before they can get this role</FormHelperText>
-            </FormControl>
-            <FormControl>
-              <Checkbox isChecked={requiresApproval} onChange={(e) => setRequiresApproval(e.target.checked)} colorScheme="red">
-                Requires Approval
-              </Checkbox>
-            </FormControl>
-            {requiresApproval && (
-              <>
                 <FormControl>
-                  <FormLabel>Team Captain</FormLabel>
-                  <Input
-                    value={teamCaptainId}
-                    onChange={(e) => setTeamCaptainId(e.target.value)}
-                    placeholder="User ID of team captain"
-                    {...inputBg}
-                  />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Role-Specific Approval Channel</FormLabel>
-                  <ChannelSelect
-                    channels={channels}
-                    value={roleApprovalChannelId}
-                    onChange={setRoleApprovalChannelId}
-                    includeEmptyLabel="Use panel default"
-                  />
-                </FormControl>
-              </>
-            )}
-            <FormControl>
-              <Checkbox isChecked={isTeamRole} onChange={(e) => setIsTeamRole(e.target.checked)} colorScheme="red">
-                Is Team Role
-              </Checkbox>
-              <FormHelperText>Enable to add team metadata used on the website</FormHelperText>
-            </FormControl>
-            {isTeamRole && (
-              <>
-                <FormControl>
-                  <FormLabel>Team Name</FormLabel>
-                  <Input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g., DZR A1" {...inputBg} />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Race Series</FormLabel>
+                  <FormLabel>Race series</FormLabel>
                   <Select value={raceSeries} onChange={(e) => setRaceSeries(e.target.value)} {...inputBg}>
                     <option value="">Select series...</option>
                     {RACE_SERIES.map((s) => (
@@ -621,60 +633,240 @@ export function RoleModal({
                   <Input value={division} onChange={(e) => setDivision(e.target.value)} placeholder="e.g., A1 / Doppio / Diamond" {...inputBg} />
                 </FormControl>
                 <FormControl>
-                  <FormLabel>Ride Time (HH:MM)</FormLabel>
+                  <FormLabel>Ride time (HH:MM)</FormLabel>
                   <Input value={rideTime} onChange={(e) => setRideTime(e.target.value)} placeholder="19:30" {...inputBg} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Captain</FormLabel>
+                  <CaptainPicker
+                    key={isOpen ? (initial?.roleId || 'add') : 'closed'}
+                    members={members}
+                    loading={membersLoading}
+                    valueId={teamCaptainId}
+                    fallbackLabel={captainDisplayName}
+                    onSelect={(m) => {
+                      setTeamCaptainId(m.discordID)
+                      setCaptainDisplayName(m.displayName)
+                    }}
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Captain display name</FormLabel>
+                  <Input
+                    value={captainDisplayName}
+                    onChange={(e) => setCaptainDisplayName(e.target.value)}
+                    placeholder="Shown on the website"
+                    {...inputBg}
+                  />
+                  <FormHelperText>Filled from Discord; you can shorten or override it.</FormHelperText>
                 </FormControl>
                 <FormControl>
                   <Checkbox isChecked={lookingForRiders} onChange={(e) => setLookingForRiders(e.target.checked)} colorScheme="red">
                     Looking for riders
                   </Checkbox>
                 </FormControl>
-                <FormControl>
-                  <FormLabel>Sort Index</FormLabel>
-                  <Input type="number" value={sortIndex} onChange={(e) => setSortIndex(Number(e.target.value || 0))} {...inputBg} />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Visibility</FormLabel>
-                  <Select value={visibility} onChange={(e) => setVisibility(e.target.value)} {...inputBg}>
-                    <option value="public">Public</option>
-                    <option value="hidden">Hidden</option>
-                  </Select>
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Captain Display Name (optional)</FormLabel>
-                  <Input
-                    value={captainDisplayName}
-                    onChange={(e) => setCaptainDisplayName(e.target.value)}
-                    placeholder="Shown on website"
-                    {...inputBg}
-                  />
-                </FormControl>
               </>
-            )}
-            {mode === 'edit' && (
+            ) : (
               <>
-                <FormControl>
-                  <FormLabel>Linked private text channel</FormLabel>
-                  <ChannelSelect
-                    channels={channels}
-                    value={textChannelId}
-                    onChange={setTextChannelId}
-                    includeEmptyLabel="None"
-                  />
-                  <FormHelperText>Attach a manually created channel so delete can remove it later</FormHelperText>
+                <FormControl isRequired={mode === 'add' && createDiscord}>
+                  <FormLabel>Name</FormLabel>
+                  {mode === 'edit' ? (
+                    <Input value={roleName} isReadOnly {...inputBg} />
+                  ) : (
+                    <Input
+                      value={roleName}
+                      onChange={(e) => setRoleName(e.target.value)}
+                      placeholder="e.g. Club Ladder"
+                      {...inputBg}
+                    />
+                  )}
+                  <FormHelperText>
+                    {mode === 'edit'
+                      ? 'Role name cannot be changed (managed by Discord)'
+                      : 'Creates a Discord role plus a private text channel.'}
+                  </FormHelperText>
                 </FormControl>
                 <FormControl>
-                  <FormLabel>Linked private voice channel</FormLabel>
-                  <ChannelSelect
-                    channels={voiceChannels}
-                    value={voiceChannelId}
-                    onChange={setVoiceChannelId}
-                    includeEmptyLabel="None"
-                    prefix=""
-                  />
+                  <FormLabel>Description (optional)</FormLabel>
+                  <Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} {...inputBg} />
                 </FormControl>
               </>
             )}
+
+            <Accordion allowToggle>
+              <AccordionItem border="1px solid" borderColor="whiteAlpha.200" rounded="md">
+                <AccordionButton>
+                  <Box flex="1" textAlign="left" fontWeight="semibold">Advanced</Box>
+                  <AccordionIcon />
+                </AccordionButton>
+                <AccordionPanel pb={4}>
+                  <VStack spacing={4} align="stretch">
+                    {mode === 'add' ? (
+                      <>
+                        <FormControl>
+                          <FormLabel>Discord</FormLabel>
+                          <RadioGroup
+                            value={createDiscord ? 'create' : 'link'}
+                            onChange={(v) => applyCreateDefaults(v === 'create')}
+                          >
+                            <Stack>
+                              <Radio value="create" colorScheme="red" isDisabled={!canCreate}>
+                                Create in Discord
+                              </Radio>
+                              <Radio value="link" colorScheme="red">Link existing role</Radio>
+                            </Stack>
+                          </RadioGroup>
+                          {!canCreate && (
+                            <Alert status="warning" mt={2} bg="black" color="white" rounded="md">
+                              <AlertIcon />
+                              Set Discord categories in Edit Panel before creating Discord roles and channels.
+                            </Alert>
+                          )}
+                        </FormControl>
+                        {createDiscord ? (
+                          <>
+                            <FormControl>
+                              <FormLabel>Role color (optional hex)</FormLabel>
+                              <Input
+                                value={roleColorHex}
+                                onChange={(e) => setRoleColorHex(e.target.value)}
+                                placeholder="#5865F2"
+                                {...inputBg}
+                              />
+                            </FormControl>
+                            <FormControl>
+                              <FormLabel>Override text channel category</FormLabel>
+                              <ChannelSelect
+                                channels={categories}
+                                value={textCategoryId}
+                                onChange={setTextCategoryId}
+                                includeEmptyLabel="Use panel default"
+                                prefix=""
+                              />
+                            </FormControl>
+                            {createVoice && (
+                              <FormControl isRequired>
+                                <FormLabel>Override voice channel category</FormLabel>
+                                <ChannelSelect
+                                  channels={categories}
+                                  value={voiceCategoryId}
+                                  onChange={setVoiceCategoryId}
+                                  includeEmptyLabel="Use panel default"
+                                  prefix=""
+                                />
+                              </FormControl>
+                            )}
+                          </>
+                        ) : (
+                          <FormControl isRequired>
+                            <FormLabel>Role</FormLabel>
+                            <Select
+                              value={roleId}
+                              onChange={(e) => {
+                                const id = e.target.value
+                                setRoleId(id)
+                                setRoleName(roles.find((r) => r.id === id)?.name || '')
+                              }}
+                              {...inputBg}
+                            >
+                              <option value="">Select a role...</option>
+                              {available.map((r) => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        )}
+                      </>
+                    ) : (
+                      <FormControl>
+                        <FormLabel>Discord role name</FormLabel>
+                        <Input value={roleName} isReadOnly {...inputBg} />
+                        <FormHelperText>Role name cannot be changed (managed by Discord)</FormHelperText>
+                      </FormControl>
+                    )}
+
+                    {isTeamPanel && (
+                      <FormControl>
+                        <FormLabel>Description</FormLabel>
+                        <Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} {...inputBg} />
+                      </FormControl>
+                    )}
+
+                    <FormControl>
+                      <FormLabel>Emoji</FormLabel>
+                      <Input value={emoji} maxLength={10} onChange={(e) => setEmoji(e.target.value)} placeholder="🔹" {...inputBg} />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>Button color</FormLabel>
+                      <Select value={buttonColor} onChange={(e) => setButtonColor(e.target.value)} {...inputBg}>
+                        {BUTTON_COLOR_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <FormControl>
+                      <Checkbox isChecked={isTeamRole} onChange={(e) => setIsTeamRole(e.target.checked)} colorScheme="red">
+                        Is team role
+                      </Checkbox>
+                    </FormControl>
+                    <FormControl>
+                      <Checkbox isChecked={requiresApproval} onChange={(e) => setRequiresApproval(e.target.checked)} colorScheme="red">
+                        Requires approval
+                      </Checkbox>
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>Required roles (prerequisites)</FormLabel>
+                      <RoleChecklist roles={roles} selected={requiredRoles} onChange={setRequiredRoles} />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>Approval channel override</FormLabel>
+                      <ChannelSelect
+                        channels={channels}
+                        value={roleApprovalChannelId}
+                        onChange={setRoleApprovalChannelId}
+                        includeEmptyLabel="Use panel default"
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>Visibility</FormLabel>
+                      <Select value={visibility} onChange={(e) => setVisibility(e.target.value)} {...inputBg}>
+                        <option value="public">Public</option>
+                        <option value="hidden">Hidden</option>
+                      </Select>
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>Sort index</FormLabel>
+                      <Input type="number" value={sortIndex} onChange={(e) => setSortIndex(Number(e.target.value || 0))} {...inputBg} />
+                    </FormControl>
+
+                    {mode === 'edit' && (
+                      <>
+                        <FormControl>
+                          <FormLabel>Linked private text channel</FormLabel>
+                          <ChannelSelect
+                            channels={channels}
+                            value={textChannelId}
+                            onChange={setTextChannelId}
+                            includeEmptyLabel="None"
+                          />
+                          <FormHelperText>Attach a manually created channel so delete can remove it later</FormHelperText>
+                        </FormControl>
+                        <FormControl>
+                          <FormLabel>Linked private voice channel</FormLabel>
+                          <ChannelSelect
+                            channels={voiceChannels}
+                            value={voiceChannelId}
+                            onChange={setVoiceChannelId}
+                            includeEmptyLabel="None"
+                            prefix=""
+                          />
+                        </FormControl>
+                      </>
+                    )}
+                  </VStack>
+                </AccordionPanel>
+              </AccordionItem>
+            </Accordion>
           </VStack>
         </ModalBody>
         <ModalFooter>
@@ -685,7 +877,7 @@ export function RoleModal({
             isDisabled={mode === 'add' && addDisabled}
             onClick={() => onSubmit(collect())}
           >
-            {mode === 'add' ? (createDiscord ? 'Create in Discord' : 'Add Role') : 'Update Role'}
+            {primaryLabel}
           </Button>
         </ModalFooter>
       </ModalContent>
