@@ -1,34 +1,34 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import AdminShell from '@/components/admin/AdminShell'
 import {
   Box,
   Button,
   Checkbox,
-  Flex,
   HStack,
-  SimpleGrid,
-  Stat,
-  StatLabel,
-  StatNumber,
+  Select,
   Text,
   useToast,
 } from '@chakra-ui/react'
-import PanelSidebar from '@/components/admin/roles/PanelSidebar'
 import PanelSection from '@/components/admin/roles/PanelSection'
 import { DeleteRoleModal, PanelModal, RoleModal, type RoleFormData } from '@/components/admin/roles/RoleModals'
 import type { CategoryChannel, GuildRole, PanelRole, RolePanel, TextChannel } from '@/components/admin/roles/types'
 
-async function parseApi(res: Response) {
-  const body = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(body.error || 'Request failed')
-  return body
+function defaultPanelId(panels: RolePanel[]) {
+  const hold = panels.find((p) => {
+    const name = String(p.name || '').toLowerCase()
+    const id = String(p.panelId || '').toLowerCase()
+    return name === 'hold' || id === 'hold'
+  })
+  if (hold) return hold.panelId
+  const teamPanel = panels.find((p) => p.provisioning?.createVoice)
+  if (teamPanel) return teamPanel.panelId
+  return panels[0]?.panelId || ''
 }
 
 export default function RolesAdminPage() {
   const toast = useToast()
-  const initialized = useRef(false)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [panels, setPanels] = useState<RolePanel[]>([])
@@ -36,16 +36,14 @@ export default function RolesAdminPage() {
   const [channels, setChannels] = useState<TextChannel[]>([])
   const [categories, setCategories] = useState<CategoryChannel[]>([])
   const [voiceChannels, setVoiceChannels] = useState<TextChannel[]>([])
-  const [search, setSearch] = useState('')
-  const [onlyTeams, setOnlyTeams] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [selectedPanelId, setSelectedPanelId] = useState('')
 
   const [panelModal, setPanelModal] = useState<{ mode: 'create' | 'edit'; panel?: RolePanel } | null>(null)
   const [roleModal, setRoleModal] = useState<{ mode: 'add' | 'edit'; panelId: string; role?: PanelRole } | null>(null)
   const [deleteModal, setDeleteModal] = useState<{ panel: RolePanel; role: PanelRole } | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  async function load() {
+  async function load(preferPanelId?: string) {
     setLoading(true)
     try {
       const res = await fetch('/api/admin/roles')
@@ -56,14 +54,10 @@ export default function RolesAdminPage() {
       setChannels(body.channels || [])
       setCategories(body.categories || [])
       setVoiceChannels(body.voiceChannels || [])
-      setSelectedIds((prev) => {
-        if (!initialized.current) {
-          initialized.current = true
-          return nextPanels.map((p) => p.panelId)
-        }
-        const ids = new Set(nextPanels.map((p) => p.panelId))
-        const kept = prev.filter((id) => ids.has(id))
-        return kept
+      setSelectedPanelId((prev) => {
+        if (preferPanelId && nextPanels.some((p) => p.panelId === preferPanelId)) return preferPanelId
+        if (prev && nextPanels.some((p) => p.panelId === prev)) return prev
+        return defaultPanelId(nextPanels)
       })
     } catch (e: any) {
       toast({ title: e.message || 'Failed to load roles', status: 'error' })
@@ -74,13 +68,7 @@ export default function RolesAdminPage() {
 
   useEffect(() => { load().catch(() => {}) }, [])
 
-  const visiblePanels = useMemo(() => {
-    const chosen = panels.filter((p) => selectedIds.includes(p.panelId))
-    return chosen.length ? chosen : panels.slice(0, 1)
-  }, [panels, selectedIds])
-
-  const totalRoles = panels.reduce((n, p) => n + (p.roles || []).length, 0)
-  const activeChannels = new Set(panels.map((p) => p.channelId).filter(Boolean)).size
+  const selectedPanel = panels.find((p) => p.panelId === selectedPanelId) || null
 
   function notify(ok: boolean, message: string) {
     toast({ title: message, status: ok ? 'success' : 'error' })
@@ -97,8 +85,7 @@ export default function RolesAdminPage() {
       const body = await parseApi(res)
       notify(true, body.message)
       setPanelModal(null)
-      initialized.current = false
-      await load()
+      await load(data.panelId)
     } catch (e: any) {
       notify(false, e.message)
     } finally {
@@ -224,23 +211,25 @@ export default function RolesAdminPage() {
     }
   }
 
-  async function inlinePatch(panelId: string, roleId: string, field: string, value: any) {
+  async function reorderRoles(panelId: string, roleOrder: string[]) {
+    const previous = panels.find((p) => p.panelId === panelId)?.roles
+    setPanels((prev) => prev.map((p) => {
+      if (p.panelId !== panelId) return p
+      const byId = new Map((p.roles || []).map((r) => [r.roleId, r]))
+      return { ...p, roles: roleOrder.map((id) => byId.get(id)).filter(Boolean) as PanelRole[] }
+    }))
     try {
-      const res = await fetch(`/api/admin/roles/panels/${panelId}/roles/${roleId}`, {
+      const res = await fetch(`/api/admin/roles/panels/${panelId}/reorder`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: value }),
+        body: JSON.stringify({ roleOrder }),
       })
-      await parseApi(res)
-      setPanels((prev) => prev.map((p) => {
-        if (p.panelId !== panelId) return p
-        return {
-          ...p,
-          roles: (p.roles || []).map((r) => (r.roleId === roleId ? { ...r, [field]: value } : r)),
-        }
-      }))
-      toast({ title: 'Updated', status: 'success', duration: 1500 })
+      const body = await parseApi(res)
+      notify(true, body.message)
     } catch (e: any) {
+      if (previous) {
+        setPanels((prev) => prev.map((p) => (p.panelId === panelId ? { ...p, roles: previous } : p)))
+      }
       notify(false, e.message)
     }
   }
@@ -250,29 +239,30 @@ export default function RolesAdminPage() {
 
   return (
     <AdminShell title="Role Management">
-      <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4} mb={4}>
-        <Stat bg="gray.900" p={4} rounded="md" border="1px solid" borderColor="whiteAlpha.200">
-          <StatLabel color="gray.400">Total Panels</StatLabel>
-          <StatNumber>{panels.length}</StatNumber>
-        </Stat>
-        <Stat bg="gray.900" p={4} rounded="md" border="1px solid" borderColor="whiteAlpha.200">
-          <StatLabel color="gray.400">Total Roles</StatLabel>
-          <StatNumber>{totalRoles}</StatNumber>
-        </Stat>
-        <Stat bg="gray.900" p={4} rounded="md" border="1px solid" borderColor="whiteAlpha.200">
-          <StatLabel color="gray.400">Active Channels</StatLabel>
-          <StatNumber>{activeChannels}</StatNumber>
-        </Stat>
-      </SimpleGrid>
-
-      <HStack mb={4} justify="flex-end" spacing={4}>
-        <Checkbox isChecked={showAdvanced} onChange={(e) => setShowAdvanced(e.target.checked)} colorScheme="red">
-          Advanced
-        </Checkbox>
-        <Button onClick={() => load()} isLoading={loading} variant="outline" colorScheme="red">Refresh</Button>
-        {showAdvanced && (
-          <Button colorScheme="red" onClick={() => setPanelModal({ mode: 'create' })}>Create Panel</Button>
+      <HStack mb={4} justify="space-between" spacing={4} wrap="wrap">
+        {panels.length > 0 && (
+          <Select
+            maxW="320px"
+            value={selectedPanelId}
+            onChange={(e) => setSelectedPanelId(e.target.value)}
+            bg="black"
+            color="white"
+            sx={{ option: { color: '#171923', bg: 'white' } }}
+          >
+            {panels.map((p) => (
+              <option key={p.panelId} value={p.panelId}>{p.name || p.panelId}</option>
+            ))}
+          </Select>
         )}
+        <HStack spacing={4} ml="auto">
+          <Checkbox isChecked={showAdvanced} onChange={(e) => setShowAdvanced(e.target.checked)} colorScheme="red">
+            Advanced
+          </Checkbox>
+          <Button onClick={() => load()} isLoading={loading} variant="outline" colorScheme="red">Refresh</Button>
+          {showAdvanced && (
+            <Button colorScheme="red" onClick={() => setPanelModal({ mode: 'create' })}>Create Panel</Button>
+          )}
+        </HStack>
       </HStack>
 
       {panels.length === 0 && !loading ? (
@@ -282,42 +272,19 @@ export default function RolesAdminPage() {
             <Button colorScheme="red" onClick={() => setPanelModal({ mode: 'create' })}>Create Panel</Button>
           )}
         </Box>
-      ) : (
-        <Flex gap={4} direction={{ base: 'column', md: 'row' }} align="flex-start">
-          <PanelSidebar
-            panels={panels}
-            channels={channels}
-            search={search}
-            onSearch={setSearch}
-            onlyTeams={onlyTeams}
-            onOnlyTeams={setOnlyTeams}
-            selectedIds={selectedIds}
-            onToggle={(id, checked) => {
-              setSelectedIds((prev) => checked ? [...prev, id] : prev.filter((x) => x !== id))
-            }}
-            onSelectAll={(checked) => {
-              setSelectedIds(checked ? panels.map((p) => p.panelId) : [])
-            }}
-          />
-          <Box flex="1" minW={0}>
-            {visiblePanels.map((panel) => (
-              <PanelSection
-                key={panel.panelId}
-                panel={panel}
-                channels={channels}
-                onlyTeams={onlyTeams}
-                showAdvanced={showAdvanced}
-                onEditPanel={() => setPanelModal({ mode: 'edit', panel })}
-                onDeletePanel={() => deletePanel(panel)}
-                onAddRole={() => setRoleModal({ mode: 'add', panelId: panel.panelId })}
-                onEditRole={(role) => setRoleModal({ mode: 'edit', panelId: panel.panelId, role })}
-                onRemoveRole={(role) => setDeleteModal({ panel, role })}
-                onInlinePatch={(roleId, field, value) => inlinePatch(panel.panelId, roleId, field, value)}
-              />
-            ))}
-          </Box>
-        </Flex>
-      )}
+      ) : selectedPanel ? (
+        <PanelSection
+          panel={selectedPanel}
+          channels={channels}
+          showAdvanced={showAdvanced}
+          onEditPanel={() => setPanelModal({ mode: 'edit', panel: selectedPanel })}
+          onDeletePanel={() => deletePanel(selectedPanel)}
+          onAddRole={() => setRoleModal({ mode: 'add', panelId: selectedPanel.panelId })}
+          onEditRole={(role) => setRoleModal({ mode: 'edit', panelId: selectedPanel.panelId, role })}
+          onRemoveRole={(role) => setDeleteModal({ panel: selectedPanel, role })}
+          onReorder={(roleIds) => reorderRoles(selectedPanel.panelId, roleIds)}
+        />
+      ) : null}
 
       <PanelModal
         mode={panelModal?.mode || 'create'}
