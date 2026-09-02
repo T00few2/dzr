@@ -166,24 +166,45 @@ export type PermissionOverwrite = {
   deny?: string
 }
 
+export function findBotRoleId(guildRoles: any[], botUserId: string) {
+  const tagged = guildRoles.find((r: any) => String(r?.tags?.bot_id || '') === String(botUserId))
+  if (tagged?.id) return String(tagged.id)
+  const clientId = process.env.DISCORD_CLIENT_ID
+  if (clientId && guildRoles.some((r: any) => String(r.id) === clientId)) return clientId
+  return null
+}
+
 export function privateChannelOverwrites(opts: {
   roleId: string
-  botUserId: string
-  extraViewerRoleIds?: string[]
+  botRoleId?: string | null
   voice?: boolean
 }): PermissionOverwrite[] {
-  const view = permissionBits(PermissionFlags.ViewChannel)
-  const botAllow = permissionBits(PermissionFlags.ViewChannel, PermissionFlags.ManageChannels)
+  const view = PermissionFlags.ViewChannel
+  const connect = PermissionFlags.Connect
+  const everyoneDeny = opts.voice ? permissionBits(view, connect) : permissionBits(view)
+  const memberAllow = opts.voice ? permissionBits(view, connect, PermissionFlags.Speak) : permissionBits(view)
+  const botAllow = opts.voice
+    ? permissionBits(view, connect, PermissionFlags.Speak, PermissionFlags.ManageChannels)
+    : permissionBits(view, PermissionFlags.ManageChannels)
+
   const overwrites: PermissionOverwrite[] = [
-    { id: guildId(), type: OverwriteType.Role, deny: view },
-    { id: opts.roleId, type: OverwriteType.Role, allow: view },
-    { id: opts.botUserId, type: OverwriteType.Member, allow: botAllow },
+    { id: guildId(), type: OverwriteType.Role, deny: everyoneDeny },
+    { id: opts.roleId, type: OverwriteType.Role, allow: memberAllow },
+    { id: ADMIN_ROLE_ID, type: OverwriteType.Role, allow: memberAllow },
   ]
-  for (const extraId of opts.extraViewerRoleIds || []) {
-    if (!extraId || extraId === opts.roleId || extraId === guildId()) continue
-    overwrites.push({ id: extraId, type: OverwriteType.Role, allow: view })
+  if (opts.botRoleId) {
+    overwrites.push({ id: opts.botRoleId, type: OverwriteType.Role, allow: botAllow })
   }
   return overwrites
+}
+
+export async function replaceChannelOverwrites(channelId: string, overwrites: PermissionOverwrite[]) {
+  const { ok, status, body } = await discordRequest(`/channels/${channelId}`, {
+    method: 'PATCH',
+    body: { permission_overwrites: overwrites },
+  })
+  if (ok) return
+  throw new Error(discordErrorMessage({ ok, status, body }, 'Failed to set channel permissions') || 'Failed to set channel permissions')
 }
 
 export async function createGuildChannel(opts: {

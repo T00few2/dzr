@@ -234,7 +234,7 @@ export function PanelModal({
               </FormControl>
             )}
             <FormHelperText>
-              New channels are private to the created Discord role and the bot. Category roles such as Member or Holdkaptajn are removed.
+              New channels are private and unsynced. Access is Admin, DZR Bot, and the created team role (same as Zephyrus Zwifters). Member and Holdkaptajn are not copied from the category.
             </FormHelperText>
           </VStack>
         </ModalBody>
