@@ -59,7 +59,7 @@ export function discordErrorMessage(res: { ok: boolean; status: number; body: an
   const code = res.body?.code
   const msg = res.body?.message || (typeof res.body === 'string' && res.body ? res.body : null)
   if (code === 50013 || /missing permissions/i.test(String(msg || ''))) {
-    return `${fallback}: Discord missing access. Drag the bot role above Holdkaptajn in Server Settings → Roles, and make sure the bot can view the target category.`
+    return `${fallback}: Discord missing access on the target category. Open that category's permissions and allow DZR Bot View Channel + Manage Channels (do not sync from a locked parent).`
   }
   return msg ? `${fallback}: ${msg}` : `${fallback} (${res.status})`
 }
@@ -172,30 +172,70 @@ export function privateChannelOverwrites(opts: {
   extraViewerRoleIds?: string[]
   voice?: boolean
 }): PermissionOverwrite[] {
-  const view = PermissionFlags.ViewChannel
-  const textAllow = permissionBits(
-    view,
-    PermissionFlags.SendMessages,
-    PermissionFlags.ReadMessageHistory,
-  )
-  const voiceAllow = permissionBits(view, PermissionFlags.Connect, PermissionFlags.Speak)
-  const botAllow = opts.voice
-    ? permissionBits(view, PermissionFlags.Connect, PermissionFlags.Speak, PermissionFlags.ManageChannels)
-    : permissionBits(view, PermissionFlags.SendMessages, PermissionFlags.ReadMessageHistory, PermissionFlags.ManageChannels)
-  const everyoneDeny = opts.voice ? permissionBits(view, PermissionFlags.Connect) : permissionBits(view)
-  const memberAllow = opts.voice ? voiceAllow : textAllow
-  const extraAllow = memberAllow
-
+  const view = permissionBits(PermissionFlags.ViewChannel)
+  const botAllow = permissionBits(PermissionFlags.ViewChannel, PermissionFlags.ManageChannels)
   const overwrites: PermissionOverwrite[] = [
-    { id: guildId(), type: OverwriteType.Role, deny: everyoneDeny },
-    { id: opts.roleId, type: OverwriteType.Role, allow: memberAllow },
+    { id: guildId(), type: OverwriteType.Role, deny: view },
+    { id: opts.roleId, type: OverwriteType.Role, allow: view },
     { id: opts.botUserId, type: OverwriteType.Member, allow: botAllow },
   ]
   for (const extraId of opts.extraViewerRoleIds || []) {
     if (!extraId || extraId === opts.roleId || extraId === guildId()) continue
-    overwrites.push({ id: extraId, type: OverwriteType.Role, allow: extraAllow })
+    overwrites.push({ id: extraId, type: OverwriteType.Role, allow: view })
   }
   return overwrites
+}
+
+export async function createGuildChannel(opts: {
+  name: string
+  type: number
+  parentId?: string | null
+  permissionOverwrites?: PermissionOverwrite[]
+}) {
+  const attempt = async (body: Record<string, unknown>) => {
+    const { ok, status, body: resBody } = await discordRequest(`/guilds/${guildId()}/channels`, {
+      method: 'POST',
+      body,
+    })
+    return { ok, status, body: resBody }
+  }
+
+  const base: Record<string, unknown> = {
+    name: opts.name,
+    type: opts.type,
+  }
+  if (opts.parentId) base.parent_id = opts.parentId
+
+  if (opts.permissionOverwrites?.length) {
+    const withOverwrites = await attempt({ ...base, permission_overwrites: opts.permissionOverwrites })
+    if (withOverwrites.ok && withOverwrites.body?.id) {
+      return withOverwrites.body as { id: string; name: string; type: number }
+    }
+    const fallback = await attempt(base)
+    if (fallback.ok && fallback.body?.id) {
+      return fallback.body as { id: string; name: string; type: number }
+    }
+    throw new Error(
+      discordErrorMessage(withOverwrites, 'Failed to create Discord channel') || 'Failed to create Discord channel'
+    )
+  }
+
+  const created = await attempt(base)
+  if (!created.ok || !created.body?.id) {
+    throw new Error(discordErrorMessage(created, 'Failed to create Discord channel') || 'Failed to create Discord channel')
+  }
+  return created.body as { id: string; name: string; type: number }
+}
+
+export async function putChannelOverwrite(channelId: string, overwrite: PermissionOverwrite) {
+  return discordRequest(`/channels/${channelId}/permissions/${overwrite.id}`, {
+    method: 'PUT',
+    body: {
+      type: overwrite.type,
+      allow: overwrite.allow || '0',
+      deny: overwrite.deny || '0',
+    },
+  })
 }
 
 export async function createGuildRole(opts: { name: string; color?: number }) {
@@ -213,24 +253,6 @@ export async function createGuildRole(opts: { name: string; color?: number }) {
   return body as { id: string; name: string; color?: number; position?: number }
 }
 
-export async function createGuildChannel(opts: {
-  name: string
-  type: number
-  parentId?: string | null
-  permissionOverwrites: PermissionOverwrite[]
-}) {
-  const { ok, status, body } = await discordRequest(`/guilds/${guildId()}/channels`, {
-    method: 'POST',
-    body: {
-      name: opts.name,
-      type: opts.type,
-      parent_id: opts.parentId || undefined,
-      permission_overwrites: opts.permissionOverwrites,
-    },
-  })
-  if (!ok || !body?.id) throw new Error(discordErrorMessage({ ok, status, body }, 'Failed to create Discord channel') || 'Failed to create Discord channel')
-  return body as { id: string; name: string; type: number }
-}
 
 export async function deleteGuildRole(roleId: string) {
   const { ok, status, body } = await discordRequest(`/guilds/${guildId()}/roles/${roleId}`, { method: 'DELETE' })

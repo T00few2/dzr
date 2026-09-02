@@ -9,6 +9,7 @@ import {
   listAllGuildRoles,
   privateChannelOverwrites,
   protectedRoleIds,
+  putChannelOverwrite,
   slugifyChannelName,
 } from '@/app/api/admin/_lib/discord'
 
@@ -68,6 +69,23 @@ export async function provisionDiscordRole(opts: {
   )
   const channelName = slugifyChannelName(opts.name)
   const role = await createGuildRole({ name: opts.name, color: opts.color })
+  const coreOverwrites = privateChannelOverwrites({
+    roleId: role.id,
+    botUserId: bot.userId,
+  })
+
+  async function lockChannel(channelId: string) {
+    for (const overwrite of coreOverwrites) {
+      await putChannelOverwrite(channelId, overwrite)
+    }
+    for (const extraId of extraViewerRoleIds) {
+      await putChannelOverwrite(channelId, {
+        id: extraId,
+        type: 0,
+        allow: coreOverwrites[1]?.allow || '0',
+      }).catch(() => {})
+    }
+  }
 
   let textChannelId: string | null = null
   let voiceChannelId: string | null = null
@@ -76,27 +94,20 @@ export async function provisionDiscordRole(opts: {
       name: channelName,
       type: ChannelType.GuildText,
       parentId: opts.textCategoryId,
-      permissionOverwrites: privateChannelOverwrites({
-        roleId: role.id,
-        botUserId: bot.userId,
-        extraViewerRoleIds,
-      }),
+      permissionOverwrites: coreOverwrites,
     })
     textChannelId = text.id
+    await lockChannel(text.id)
 
     if (opts.createVoice) {
       const voice = await createGuildChannel({
         name: channelName,
         type: ChannelType.GuildVoice,
         parentId: opts.voiceCategoryId || opts.textCategoryId,
-        permissionOverwrites: privateChannelOverwrites({
-          roleId: role.id,
-          botUserId: bot.userId,
-          extraViewerRoleIds,
-          voice: true,
-        }),
+        permissionOverwrites: coreOverwrites,
       })
       voiceChannelId = voice.id
+      await lockChannel(voice.id)
     }
   } catch (err) {
     if (voiceChannelId) await deleteGuildChannel(voiceChannelId).catch(() => {})
