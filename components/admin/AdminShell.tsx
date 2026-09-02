@@ -1,6 +1,6 @@
 'use client'
 
-import { Box, Button, Container, Flex, Heading, HStack, Link } from '@chakra-ui/react'
+import { Box, Button, Container, Flex, Heading } from '@chakra-ui/react'
 import { Global } from '@emotion/react'
 import NextLink from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -48,9 +48,6 @@ export default function AdminShell({ title, children }: { title: string; childre
           ))}
         </Flex>
         {children}
-        <HStack mt={10} spacing={4} fontSize="sm" color="gray.400">
-          <Link as={NextLink} href="/members-zone">Members zone</Link>
-        </HStack>
       </Container>
     </Box>
   )

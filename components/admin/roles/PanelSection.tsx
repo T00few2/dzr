@@ -16,6 +16,7 @@ import {
   Text,
   Th,
   Thead,
+  Tooltip,
   Tr,
 } from '@chakra-ui/react'
 import { MdDragIndicator } from 'react-icons/md'
@@ -113,7 +114,11 @@ export default function PanelSection({
               <Th color="gray.400">Series</Th>
               <Th color="gray.400">Division</Th>
               <Th color="gray.400">Time</Th>
-              <Th color="gray.400">LF</Th>
+              <Th color="gray.400">
+                <Tooltip label="Looking for riders" placement="top" hasArrow>
+                  <Text as="span" cursor="help" borderBottom="1px dotted" borderColor="gray.500">LfR</Text>
+                </Tooltip>
+              </Th>
               <Th color="gray.400">Captain</Th>
               <Th color="gray.400">Actions</Th>
             </Tr>
@@ -193,7 +198,7 @@ export default function PanelSection({
                   <Td>{role.raceSeries || '—'}</Td>
                   <Td>{role.division || '—'}</Td>
                   <Td>{role.rideTime || '—'}</Td>
-                  <Td>{role.lookingForRiders ? 'Yes' : '—'}</Td>
+                  <Td>{role.lookingForRiders ? 'Yes' : 'No'}</Td>
                   <Td>{captain}</Td>
                   <Td>
                     <HStack>
