@@ -26,12 +26,10 @@ import {
   Textarea,
   VStack,
 } from '@chakra-ui/react'
-import { HOLDKAPTAJN_ROLE_ID } from '@/app/lib/sharedConstants'
 import type { CategoryChannel, GuildRole, PanelRole, RolePanel, TextChannel } from './types'
 import { BUTTON_COLOR_OPTIONS, RACE_SERIES, channelName, parseRoleColor } from './types'
 
 const inputBg = { bg: 'black' }
-const DEFAULT_VIEWERS = [HOLDKAPTAJN_ROLE_ID]
 
 function RoleChecklist({
   roles,
@@ -134,7 +132,6 @@ export function PanelModal({
   const [createVoice, setCreateVoice] = useState(false)
   const [textCategoryId, setTextCategoryId] = useState('')
   const [voiceCategoryId, setVoiceCategoryId] = useState('')
-  const [extraViewerRoleIds, setExtraViewerRoleIds] = useState<string[]>(DEFAULT_VIEWERS)
 
   useEffect(() => {
     if (!isOpen) return
@@ -148,11 +145,6 @@ export function PanelModal({
     setCreateVoice(!!initial?.provisioning?.createVoice)
     setTextCategoryId(initial?.provisioning?.textCategoryId || '')
     setVoiceCategoryId(initial?.provisioning?.voiceCategoryId || '')
-    setExtraViewerRoleIds(
-      Array.isArray(initial?.provisioning?.extraViewerRoleIds)
-        ? initial!.provisioning!.extraViewerRoleIds!
-        : DEFAULT_VIEWERS
-    )
   }, [isOpen, initial])
 
   return (
@@ -241,10 +233,9 @@ export function PanelModal({
                 />
               </FormControl>
             )}
-            <FormControl>
-              <FormLabel>Staff roles that can always see new private channels</FormLabel>
-              <RoleChecklist roles={roles} selected={extraViewerRoleIds} onChange={setExtraViewerRoleIds} />
-            </FormControl>
+            <FormHelperText>
+              New channels are private to the created Discord role and the bot. Category roles such as Member or Holdkaptajn are removed.
+            </FormHelperText>
           </VStack>
         </ModalBody>
         <ModalFooter>
@@ -265,7 +256,7 @@ export function PanelModal({
                 createVoice,
                 textCategoryId,
                 voiceCategoryId,
-                extraViewerRoleIds,
+                extraViewerRoleIds: [],
               },
             })}
           >

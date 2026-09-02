@@ -3,9 +3,12 @@ import {
   createGuildChannel,
   createGuildRole,
   defaultExtraViewerRoleIds,
+  deleteChannelOverwrite,
   deleteGuildChannel,
   deleteGuildRole,
   getBotMember,
+  getChannel,
+  guildId,
   listAllGuildRoles,
   privateChannelOverwrites,
   protectedRoleIds,
@@ -35,24 +38,6 @@ export function normalizeProvisioning(raw: any): PanelProvisioning {
   }
 }
 
-function extraViewersBotCanOverwrite(
-  extraViewerRoleIds: string[],
-  botRoleIds: string[],
-  guildRoles: any[]
-) {
-  const byId = new Map(guildRoles.map((r: any) => [String(r.id), r]))
-  const botHighest = Math.max(
-    0,
-    ...botRoleIds.map((id) => Number(byId.get(id)?.position ?? 0))
-  )
-  return extraViewerRoleIds.filter((id) => {
-    const role = byId.get(String(id))
-    if (!role) return false
-    if (role.managed) return false
-    return Number(role.position ?? 0) < botHighest
-  })
-}
-
 export async function provisionDiscordRole(opts: {
   name: string
   color?: number
@@ -61,29 +46,24 @@ export async function provisionDiscordRole(opts: {
   voiceCategoryId?: string | null
   extraViewerRoleIds?: string[]
 }) {
-  const [bot, guildRoles] = await Promise.all([getBotMember(), listAllGuildRoles()])
-  const extraViewerRoleIds = extraViewersBotCanOverwrite(
-    opts.extraViewerRoleIds || defaultExtraViewerRoleIds(),
-    bot.roleIds,
-    guildRoles
-  )
+  const bot = await getBotMember()
   const channelName = slugifyChannelName(opts.name)
   const role = await createGuildRole({ name: opts.name, color: opts.color })
   const coreOverwrites = privateChannelOverwrites({
     roleId: role.id,
     botUserId: bot.userId,
   })
+  const keepOverwriteIds = new Set([guildId(), role.id, bot.userId])
 
   async function lockChannel(channelId: string) {
+    const channel = await getChannel(channelId)
+    for (const overwrite of channel?.permission_overwrites || []) {
+      if (!keepOverwriteIds.has(String(overwrite.id))) {
+        await deleteChannelOverwrite(channelId, String(overwrite.id)).catch(() => {})
+      }
+    }
     for (const overwrite of coreOverwrites) {
       await putChannelOverwrite(channelId, overwrite)
-    }
-    for (const extraId of extraViewerRoleIds) {
-      await putChannelOverwrite(channelId, {
-        id: extraId,
-        type: 0,
-        allow: coreOverwrites[1]?.allow || '0',
-      }).catch(() => {})
     }
   }
 

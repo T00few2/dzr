@@ -51,7 +51,7 @@ export function protectedRoleIds() {
 }
 
 export function defaultExtraViewerRoleIds() {
-  return [HOLDKAPTAJN_ROLE_ID]
+  return [] as string[]
 }
 
 export function discordErrorMessage(res: { ok: boolean; status: number; body: any }, fallback: string) {
@@ -236,6 +236,20 @@ export async function putChannelOverwrite(channelId: string, overwrite: Permissi
       deny: overwrite.deny || '0',
     },
   })
+}
+
+export async function deleteChannelOverwrite(channelId: string, overwriteId: string) {
+  const { ok, status, body } = await discordRequest(`/channels/${channelId}/permissions/${overwriteId}`, {
+    method: 'DELETE',
+  })
+  if (ok || status === 404) return
+  throw new Error(discordErrorMessage({ ok, status, body }, 'Failed to remove channel permission') || 'Failed to remove channel permission')
+}
+
+export async function getChannel(channelId: string) {
+  const { ok, body } = await discordGet(`/channels/${channelId}`)
+  if (!ok || !body?.id) return null
+  return body as { id: string; permission_overwrites?: PermissionOverwrite[] }
 }
 
 export async function createGuildRole(opts: { name: string; color?: number }) {
