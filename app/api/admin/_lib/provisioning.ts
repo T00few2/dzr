@@ -1,6 +1,7 @@
 import { ADMIN_ROLE_ID } from '@/app/lib/sharedConstants'
 import {
   ChannelType,
+  applyChannelOverwrite,
   createGuildChannel,
   createGuildRole,
   defaultExtraViewerRoleIds,
@@ -14,7 +15,6 @@ import {
   listAllGuildRoles,
   privateChannelOverwrites,
   protectedRoleIds,
-  replaceChannelOverwrites,
   slugifyChannelName,
 } from '@/app/api/admin/_lib/discord'
 
@@ -62,17 +62,29 @@ export async function provisionDiscordRole(opts: {
       botRoleId,
       voice,
     })
-    try {
-      await replaceChannelOverwrites(channelId, overwrites)
-    } catch {
-      const withoutAdmin = overwrites.filter((o) => o.id !== ADMIN_ROLE_ID)
-      await replaceChannelOverwrites(channelId, withoutAdmin).catch(() => {})
+    for (const overwrite of overwrites) {
+      await applyChannelOverwrite(channelId, overwrite, {
+        optional: overwrite.id === ADMIN_ROLE_ID,
+      })
     }
     const channel = await getChannel(channelId)
     for (const overwrite of channel?.permission_overwrites || []) {
-      if (!keepOverwriteIds.has(String(overwrite.id))) {
-        await deleteChannelOverwrite(channelId, String(overwrite.id)).catch(() => {})
-      }
+      const id = String(overwrite.id)
+      if (keepOverwriteIds.has(id)) continue
+      await deleteChannelOverwrite(channelId, id)
+    }
+    const after = await getChannel(channelId)
+    const leftover = (after?.permission_overwrites || []).filter((overwrite) => (
+      !keepOverwriteIds.has(String(overwrite.id))
+    ))
+    if (leftover.length) {
+      const names = leftover.map((overwrite) => {
+        const guildRole = guildRoles.find((r: any) => String(r.id) === String(overwrite.id))
+        return guildRole?.name || overwrite.id
+      })
+      throw new Error(
+        `Could not remove extra channel roles (${names.join(', ')}). Put DZR Bot above those roles and allow View Channel + Manage Channels on the category.`
+      )
     }
   }
 

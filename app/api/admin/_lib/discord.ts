@@ -174,6 +174,15 @@ export function findBotRoleId(guildRoles: any[], botUserId: string) {
   return null
 }
 
+function completeOverwrite(overwrite: PermissionOverwrite): PermissionOverwrite {
+  return {
+    id: String(overwrite.id),
+    type: overwrite.type,
+    allow: overwrite.allow || '0',
+    deny: overwrite.deny || '0',
+  }
+}
+
 export function privateChannelOverwrites(opts: {
   roleId: string
   botRoleId?: string | null
@@ -188,14 +197,14 @@ export function privateChannelOverwrites(opts: {
     : permissionBits(view, PermissionFlags.ManageChannels)
 
   const overwrites: PermissionOverwrite[] = [
-    { id: guildId(), type: OverwriteType.Role, deny: everyoneDeny },
-    { id: opts.roleId, type: OverwriteType.Role, allow: memberAllow },
-    { id: ADMIN_ROLE_ID, type: OverwriteType.Role, allow: memberAllow },
+    { id: guildId(), type: OverwriteType.Role, allow: '0', deny: everyoneDeny },
+    { id: opts.roleId, type: OverwriteType.Role, allow: memberAllow, deny: '0' },
+    { id: ADMIN_ROLE_ID, type: OverwriteType.Role, allow: memberAllow, deny: '0' },
   ]
   if (opts.botRoleId) {
-    overwrites.push({ id: opts.botRoleId, type: OverwriteType.Role, allow: botAllow })
+    overwrites.push({ id: opts.botRoleId, type: OverwriteType.Role, allow: botAllow, deny: '0' })
   }
-  return overwrites
+  return overwrites.map(completeOverwrite)
 }
 
 export async function replaceChannelOverwrites(channelId: string, overwrites: PermissionOverwrite[]) {
@@ -228,16 +237,18 @@ export async function createGuildChannel(opts: {
   if (opts.parentId) base.parent_id = opts.parentId
 
   if (opts.permissionOverwrites?.length) {
-    const withOverwrites = await attempt({ ...base, permission_overwrites: opts.permissionOverwrites })
-    if (withOverwrites.ok && withOverwrites.body?.id) {
-      return withOverwrites.body as { id: string; name: string; type: number }
+    const full = opts.permissionOverwrites.map(completeOverwrite)
+    const withoutAdmin = full.filter((overwrite) => overwrite.id !== ADMIN_ROLE_ID)
+    let last = await attempt({ ...base, permission_overwrites: withoutAdmin })
+    if (last.ok && last.body?.id) {
+      return last.body as { id: string; name: string; type: number }
     }
-    const fallback = await attempt(base)
-    if (fallback.ok && fallback.body?.id) {
-      return fallback.body as { id: string; name: string; type: number }
+    last = await attempt({ ...base, permission_overwrites: full })
+    if (last.ok && last.body?.id) {
+      return last.body as { id: string; name: string; type: number }
     }
     throw new Error(
-      discordErrorMessage(withOverwrites, 'Failed to create Discord channel') || 'Failed to create Discord channel'
+      discordErrorMessage(last, 'Failed to create Discord channel') || 'Failed to create Discord channel'
     )
   }
 
@@ -249,14 +260,29 @@ export async function createGuildChannel(opts: {
 }
 
 export async function putChannelOverwrite(channelId: string, overwrite: PermissionOverwrite) {
-  return discordRequest(`/channels/${channelId}/permissions/${overwrite.id}`, {
+  const payload = completeOverwrite(overwrite)
+  return discordRequest(`/channels/${channelId}/permissions/${payload.id}`, {
     method: 'PUT',
     body: {
-      type: overwrite.type,
-      allow: overwrite.allow || '0',
-      deny: overwrite.deny || '0',
+      type: payload.type,
+      allow: payload.allow,
+      deny: payload.deny,
     },
   })
+}
+
+export async function applyChannelOverwrite(
+  channelId: string,
+  overwrite: PermissionOverwrite,
+  opts?: { optional?: boolean }
+) {
+  const res = await putChannelOverwrite(channelId, overwrite)
+  if (res.ok) return
+  if (opts?.optional) return
+  throw new Error(
+    discordErrorMessage({ ok: res.ok, status: res.status, body: res.body }, 'Failed to set channel permission')
+    || 'Failed to set channel permission'
+  )
 }
 
 export async function deleteChannelOverwrite(channelId: string, overwriteId: string) {
