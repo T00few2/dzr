@@ -34,6 +34,24 @@ export function normalizeProvisioning(raw: any): PanelProvisioning {
   }
 }
 
+function extraViewersBotCanOverwrite(
+  extraViewerRoleIds: string[],
+  botRoleIds: string[],
+  guildRoles: any[]
+) {
+  const byId = new Map(guildRoles.map((r: any) => [String(r.id), r]))
+  const botHighest = Math.max(
+    0,
+    ...botRoleIds.map((id) => Number(byId.get(id)?.position ?? 0))
+  )
+  return extraViewerRoleIds.filter((id) => {
+    const role = byId.get(String(id))
+    if (!role) return false
+    if (role.managed) return false
+    return Number(role.position ?? 0) < botHighest
+  })
+}
+
 export async function provisionDiscordRole(opts: {
   name: string
   color?: number
@@ -42,8 +60,12 @@ export async function provisionDiscordRole(opts: {
   voiceCategoryId?: string | null
   extraViewerRoleIds?: string[]
 }) {
-  const bot = await getBotMember()
-  const extraViewerRoleIds = opts.extraViewerRoleIds || defaultExtraViewerRoleIds()
+  const [bot, guildRoles] = await Promise.all([getBotMember(), listAllGuildRoles()])
+  const extraViewerRoleIds = extraViewersBotCanOverwrite(
+    opts.extraViewerRoleIds || defaultExtraViewerRoleIds(),
+    bot.roleIds,
+    guildRoles
+  )
   const channelName = slugifyChannelName(opts.name)
   const role = await createGuildRole({ name: opts.name, color: opts.color })
 

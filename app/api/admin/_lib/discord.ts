@@ -56,7 +56,11 @@ export function defaultExtraViewerRoleIds() {
 
 export function discordErrorMessage(res: { ok: boolean; status: number; body: any }, fallback: string) {
   if (res.ok) return null
+  const code = res.body?.code
   const msg = res.body?.message || (typeof res.body === 'string' && res.body ? res.body : null)
+  if (code === 50013 || /missing permissions/i.test(String(msg || ''))) {
+    return `${fallback}: Discord missing access. Drag the bot role above Holdkaptajn in Server Settings → Roles, and make sure the bot can view the target category.`
+  }
   return msg ? `${fallback}: ${msg}` : `${fallback} (${res.status})`
 }
 
