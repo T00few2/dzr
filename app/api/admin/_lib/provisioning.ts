@@ -26,6 +26,14 @@ export type PanelProvisioning = {
   textCategoryId: string | null
   voiceCategoryId: string | null
   extraViewerRoleIds: string[]
+  roleColor: number | null
+}
+
+function parseStoredRoleColor(raw: any): number | null {
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return Math.floor(raw)
+  const m = String(raw || '').replace('#', '').trim()
+  if (!/^[0-9a-fA-F]{6}$/.test(m)) return null
+  return parseInt(m, 16)
 }
 
 export function normalizeProvisioning(raw: any): PanelProvisioning {
@@ -40,6 +48,7 @@ export function normalizeProvisioning(raw: any): PanelProvisioning {
     textCategoryId: raw?.textCategoryId ? String(raw.textCategoryId) : null,
     voiceCategoryId: raw?.voiceCategoryId ? String(raw.voiceCategoryId) : null,
     extraViewerRoleIds,
+    roleColor: parseStoredRoleColor(raw?.roleColor),
   }
 }
 

@@ -41,9 +41,12 @@ export async function POST(req: Request, { params }: { params: { panelId: string
         if (provisioning.createVoice && !voiceCategoryId) {
           return jsonError('Select a voice channel category')
         }
+        const roleColor = typeof data.roleColor === 'number' && data.roleColor > 0
+          ? data.roleColor
+          : provisioning.roleColor || undefined
         created = await provisionDiscordRole({
           name: roleName,
-          color: typeof data.roleColor === 'number' ? data.roleColor : undefined,
+          color: roleColor,
           createVoice: provisioning.createVoice,
           textCategoryId,
           voiceCategoryId: voiceCategoryId || null,

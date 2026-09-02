@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Accordion,
   AccordionButton,
@@ -15,6 +15,7 @@ import {
   FormControl,
   FormHelperText,
   FormLabel,
+  HStack,
   Input,
   Modal,
   ModalBody,
@@ -32,7 +33,7 @@ import {
   VStack,
 } from '@chakra-ui/react'
 import type { CategoryChannel, GuildRole, PanelRole, RolePanel, TextChannel } from './types'
-import { BUTTON_COLOR_OPTIONS, RACE_SERIES, channelName, parseRoleColor } from './types'
+import { BUTTON_COLOR_OPTIONS, RACE_SERIES, channelName, hexFromRoleColor, parseRoleColor } from './types'
 
 const inputBg = { bg: 'black', color: 'white' }
 const selectProps = {
@@ -44,6 +45,13 @@ const selectProps = {
       bg: 'white',
     },
   },
+}
+
+function teamDescriptionFrom(series: string, division: string) {
+  const s = String(series || '').trim()
+  const d = String(division || '').trim()
+  if (s && d) return `${s} (${d})`
+  return s
 }
 
 function RoleChecklist({
@@ -99,6 +107,41 @@ function ChannelSelect({
         <option key={c.id} value={c.id}>{prefix}{c.name}</option>
       ))}
     </Select>
+  )
+}
+
+function RoleColorField({
+  value,
+  onChange,
+  helper,
+}: {
+  value: string
+  onChange: (hex: string) => void
+  helper?: string
+}) {
+  const picker = /^#[0-9a-fA-F]{6}$/i.test(value) ? value : '#5865F2'
+  return (
+    <FormControl>
+      <FormLabel>Role color</FormLabel>
+      <HStack>
+        <Input
+          type="color"
+          value={picker}
+          onChange={(e) => onChange(e.target.value)}
+          w="56px"
+          p={1}
+          minW="56px"
+          {...inputBg}
+        />
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#5865F2"
+          {...inputBg}
+        />
+      </HStack>
+      {helper ? <FormHelperText>{helper}</FormHelperText> : null}
+    </FormControl>
   )
 }
 
@@ -228,6 +271,7 @@ export function PanelModal({
       textCategoryId: string
       voiceCategoryId: string
       extraViewerRoleIds: string[]
+      roleColor?: number | null
     }
   }) => void
 }) {
@@ -241,6 +285,7 @@ export function PanelModal({
   const [createVoice, setCreateVoice] = useState(false)
   const [textCategoryId, setTextCategoryId] = useState('')
   const [voiceCategoryId, setVoiceCategoryId] = useState('')
+  const [defaultRoleColorHex, setDefaultRoleColorHex] = useState('')
 
   useEffect(() => {
     if (!isOpen) return
@@ -254,6 +299,7 @@ export function PanelModal({
     setCreateVoice(!!initial?.provisioning?.createVoice)
     setTextCategoryId(initial?.provisioning?.textCategoryId || '')
     setVoiceCategoryId(initial?.provisioning?.voiceCategoryId || '')
+    setDefaultRoleColorHex(hexFromRoleColor(initial?.provisioning?.roleColor))
   }, [isOpen, initial])
 
   return (
@@ -342,6 +388,11 @@ export function PanelModal({
                 />
               </FormControl>
             )}
+            <RoleColorField
+              value={defaultRoleColorHex}
+              onChange={setDefaultRoleColorHex}
+              helper="Used for every new Discord role created in this panel. You can still change it on Create team / Create series."
+            />
             <Text fontSize="sm" color="gray.400">
               New channels are private and unsynced. Access is Admin, DZR Bot, and the created team role (same as Zephyrus Zwifters). Member and Holdkaptajn are not copied from the category.
             </Text>
@@ -365,7 +416,8 @@ export function PanelModal({
                 createVoice,
                 textCategoryId,
                 voiceCategoryId,
-                extraViewerRoleIds: [],
+                extraViewerRoleIds: initial?.provisioning?.extraViewerRoleIds || [],
+                roleColor: parseRoleColor(defaultRoleColorHex) || null,
               },
             })}
           >
@@ -458,6 +510,7 @@ export function RoleModal({
   const [voiceCategoryId, setVoiceCategoryId] = useState('')
   const [members, setMembers] = useState<GuildMemberOption[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
+  const lastAutoDescription = useRef('')
 
   const canCreate = Boolean(panel?.provisioning?.textCategoryId)
   const createVoice = Boolean(panel?.provisioning?.createVoice)
@@ -468,8 +521,11 @@ export function RoleModal({
     setCreateDiscord(false)
     setRoleId(initial?.roleId || '')
     setRoleName(initial?.roleName || '')
-    setRoleColorHex('')
+    setRoleColorHex(mode === 'add'
+      ? hexFromRoleColor(panel?.provisioning?.roleColor)
+      : hexFromRoleColor(initial?.roleColor))
     setDescription(initial?.description || '')
+    lastAutoDescription.current = teamDescriptionFrom(initial?.raceSeries || '', initial?.division || '')
     setEmoji(initial?.emoji || '')
     setButtonColor(initial?.buttonColor || 'Secondary')
     setRequiredRoles(initial?.requiredRoles || [])
@@ -545,13 +601,25 @@ export function RoleModal({
     if (mode === 'add' && createDiscord) setRoleName(value)
   }
 
+  function applyTeamDescription(nextSeries: string, nextDivision: string) {
+    const next = teamDescriptionFrom(nextSeries, nextDivision)
+    setDescription((prev) => {
+      if (!prev.trim() || prev === lastAutoDescription.current) {
+        lastAutoDescription.current = next
+        return next
+      }
+      return prev
+    })
+  }
+
   function collect(): RoleFormData {
+    const autoDescription = teamDescriptionFrom(raceSeries, division)
     return {
       createDiscord: mode === 'add' && createDiscord,
       roleId,
       roleName,
       roleColor: parseRoleColor(roleColorHex),
-      description,
+      description: isTeamPanel ? (description.trim() || autoDescription) : description,
       emoji,
       buttonColor,
       requiredRoles,
@@ -629,9 +697,24 @@ export function RoleModal({
                     </FormHelperText>
                   )}
                 </FormControl>
+                {mode === 'add' && createDiscord && (
+                  <RoleColorField
+                    value={roleColorHex}
+                    onChange={setRoleColorHex}
+                    helper="Defaults from Edit Panel; change it for this team only."
+                  />
+                )}
                 <FormControl>
                   <FormLabel>Race series</FormLabel>
-                  <Select value={raceSeries} onChange={(e) => setRaceSeries(e.target.value)} {...selectProps}>
+                  <Select
+                    value={raceSeries}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setRaceSeries(next)
+                      applyTeamDescription(next, division)
+                    }}
+                    {...selectProps}
+                  >
                     <option value="">Select series...</option>
                     {RACE_SERIES.map((s) => (
                       <option key={s} value={s}>{s}</option>
@@ -640,7 +723,16 @@ export function RoleModal({
                 </FormControl>
                 <FormControl>
                   <FormLabel>Division</FormLabel>
-                  <Input value={division} onChange={(e) => setDivision(e.target.value)} placeholder="e.g., A1 / Doppio / Diamond" {...inputBg} />
+                  <Input
+                    value={division}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setDivision(next)
+                      applyTeamDescription(raceSeries, next)
+                    }}
+                    placeholder="e.g., A1 / Doppio / Diamond"
+                    {...inputBg}
+                  />
                 </FormControl>
                 <FormControl>
                   <FormLabel>Ride time (HH:MM)</FormLabel>
@@ -696,6 +788,13 @@ export function RoleModal({
                       : 'Creates a Discord role plus a private text channel.'}
                   </FormHelperText>
                 </FormControl>
+                {mode === 'add' && createDiscord && (
+                  <RoleColorField
+                    value={roleColorHex}
+                    onChange={setRoleColorHex}
+                    helper="Defaults from Edit Panel; change it for this series only."
+                  />
+                )}
                 <FormControl>
                   <FormLabel>Description (optional)</FormLabel>
                   <Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} {...inputBg} />
@@ -735,15 +834,6 @@ export function RoleModal({
                         </FormControl>
                         {createDiscord ? (
                           <>
-                            <FormControl>
-                              <FormLabel>Role color (optional hex)</FormLabel>
-                              <Input
-                                value={roleColorHex}
-                                onChange={(e) => setRoleColorHex(e.target.value)}
-                                placeholder="#5865F2"
-                                {...inputBg}
-                              />
-                            </FormControl>
                             <FormControl>
                               <FormLabel>Override text channel category</FormLabel>
                               <ChannelSelect
@@ -798,7 +888,14 @@ export function RoleModal({
                     {isTeamPanel && (
                       <FormControl>
                         <FormLabel>Description</FormLabel>
-                        <Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} {...inputBg} />
+                        <Textarea
+                          rows={2}
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="DRS (Platinum)"
+                          {...inputBg}
+                        />
+                        <FormHelperText>Filled from series and division; you can override it.</FormHelperText>
                       </FormControl>
                     )}
 

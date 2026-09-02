@@ -117,6 +117,9 @@ export function enrichPanels(panelsObj: Record<string, any>, guildRoles: any[]) 
         extraViewerRoleIds: Array.isArray(panel?.provisioning?.extraViewerRoleIds)
           ? panel.provisioning.extraViewerRoleIds.map(String)
           : undefined,
+        roleColor: typeof panel?.provisioning?.roleColor === 'number' && panel.provisioning.roleColor > 0
+          ? panel.provisioning.roleColor
+          : null,
       },
     }
   })

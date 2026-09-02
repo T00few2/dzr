@@ -23,6 +23,7 @@ export type PanelProvisioning = {
   textCategoryId?: string | null
   voiceCategoryId?: string | null
   extraViewerRoleIds?: string[]
+  roleColor?: number | null
 }
 
 export type PanelRole = {
@@ -81,6 +82,12 @@ export function roleColorHex(color?: number) {
 
 export function channelName(channels: { id: string; name: string }[], id?: string | null) {
   return channels.find((c) => c.id === id)?.name || 'unknown'
+}
+
+export function hexFromRoleColor(color?: number | null) {
+  const n = Number(color)
+  if (!Number.isFinite(n) || n <= 0) return ''
+  return `#${n.toString(16).padStart(6, '0')}`
 }
 
 export function parseRoleColor(hex: string): number | undefined {
