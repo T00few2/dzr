@@ -45,6 +45,12 @@ module.exports = {
   openai: {
     apiKey: process.env.OPENAI_API_KEY,        // OpenAI API key for AI chat features
   },
+  strava: {
+    clientId: process.env.STRAVA_CLIENT_ID,
+    clientSecret: process.env.STRAVA_CLIENT_SECRET,
+    connectSecret: process.env.STRAVA_CONNECT_SECRET,
+    siteOrigin: process.env.STRAVA_CONNECT_BASE_URL || shared.siteOrigin,
+  },
   quiz: {
     channelId: process.env.QUIZ_CHANNEL_ID || "1353477785674453104",
     tz: process.env.QUIZ_TZ || "Europe/Paris",

@@ -12,6 +12,7 @@ const CARDS = [
   { href: '/admin/roles', title: 'Role panels', body: 'selfRoles panels used by the Discord bot' },
   { href: '/admin/signups', title: 'Signup boards', body: 'Live Discord signups, remove riders, board templates' },
   { href: '/admin/knowledge', title: 'Bot knowledge', body: 'Snippets for the Discord AI assistant' },
+  { href: '/admin/coach', title: 'DZR Coach', body: 'Strava sign-ups and coaching token usage' },
   { href: '/admin/outreach', title: 'Member outreach', body: 'DM members from a template' },
   { href: '/admin/growth', title: 'Club growth', body: 'Companion club roster counts and refresh' },
 ]

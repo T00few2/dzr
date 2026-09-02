@@ -220,6 +220,45 @@ async function getAllBotKnowledge() {
 }
 
 /**
+ * Paid DZR club membership for the current year (Vipps).
+ * Verified Member Discord role is not enough.
+ */
+async function isPaidClubMember(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return false;
+  const year = new Date().getUTCFullYear();
+  try {
+    const membershipSnap = await db.collection("memberships").doc(id).get();
+    const membership = membershipSnap.exists ? membershipSnap.data() || {} : {};
+    if (
+      String(membership.currentStatus || "") === "club" &&
+      typeof membership.coveredThroughYear === "number" &&
+      membership.coveredThroughYear >= year
+    ) {
+      return true;
+    }
+
+    const paymentsSnap = await db
+      .collection("payments")
+      .where("userId", "==", id)
+      .where("status", "==", "succeeded")
+      .get();
+
+    let maxCovered = null;
+    paymentsSnap.forEach((doc) => {
+      const covered = doc.data()?.coveredThroughYear;
+      if (typeof covered === "number" && (maxCovered == null || covered > maxCovered)) {
+        maxCovered = covered;
+      }
+    });
+    return maxCovered != null && maxCovered >= year;
+  } catch (err) {
+    console.error("isPaidClubMember failed", err?.message || err);
+    return false;
+  }
+}
+
+/**
  * Get all signup board configurations
  */
 async function getSignupBoardConfigs() {
@@ -230,6 +269,56 @@ async function getSignupBoardConfigs() {
     id: doc.id,
     ...doc.data()
   }));
+}
+
+const COACH_USAGE_COLLECTION = "coach_usage";
+const COACH_USAGE_EVENTS_COLLECTION = "coach_usage_events";
+
+/**
+ * Increment coaching LLM usage for a Discord user. Never throws to the caller.
+ */
+async function recordCoachUsage({ discordId, username, model, promptTokens, completionTokens, totalTokens, openaiCalls }) {
+  const id = String(discordId || "").trim();
+  if (!id) return;
+  const prompt = Math.max(0, Number(promptTokens) || 0);
+  const completion = Math.max(0, Number(completionTokens) || 0);
+  const total = Math.max(0, Number(totalTokens) || prompt + completion);
+  const calls = Math.max(1, Number(openaiCalls) || 1);
+  if (total <= 0 && calls <= 0) return;
+
+  const now = new Date();
+  const ref = db.collection(COACH_USAGE_COLLECTION).doc(id);
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const prev = snap.exists ? snap.data() || {} : {};
+      tx.set(ref, {
+        discordId: id,
+        username: username || prev.username || null,
+        promptTokens: Number(prev.promptTokens || 0) + prompt,
+        completionTokens: Number(prev.completionTokens || 0) + completion,
+        totalTokens: Number(prev.totalTokens || 0) + total,
+        openaiCalls: Number(prev.openaiCalls || 0) + calls,
+        messageCount: Number(prev.messageCount || 0) + 1,
+        lastModel: model || prev.lastModel || null,
+        firstUsedAt: prev.firstUsedAt || now,
+        lastUsedAt: now,
+        updatedAt: now,
+      }, { merge: true });
+    });
+    await db.collection(COACH_USAGE_EVENTS_COLLECTION).add({
+      discordId: id,
+      username: username || null,
+      model: model || null,
+      promptTokens: prompt,
+      completionTokens: completion,
+      totalTokens: total,
+      openaiCalls: calls,
+      at: now,
+    });
+  } catch (err) {
+    console.error("recordCoachUsage failed:", err?.message || err);
+  }
 }
 
 module.exports = {
@@ -247,4 +336,6 @@ module.exports = {
   getBotKnowledge,
   getAllBotKnowledge,
   getSignupBoardConfigs,
+  isPaidClubMember,
+  recordCoachUsage,
 }; 

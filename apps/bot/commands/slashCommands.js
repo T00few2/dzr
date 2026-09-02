@@ -55,6 +55,10 @@ const commands = [
   new SlashCommandBuilder()
     .setName("whoami")
     .setDescription("Retrieve your linked ZwiftID"),
+  // coach (club members only; continues in DM)
+  new SlashCommandBuilder()
+    .setName("coach")
+    .setDescription("Start a private Strava coaching chat in a DM (club members only)"),
   // team_stats
   new SlashCommandBuilder()
     .setName("team_stats")

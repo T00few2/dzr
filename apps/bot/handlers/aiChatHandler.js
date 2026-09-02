@@ -1,7 +1,7 @@
 const OpenAI = require("openai");
 const { ChannelType } = require("discord.js");
 const config = require("../config/config");
-const { getAllBotKnowledge, getUserZwiftId, getDZRTeamsAndSeries } = require("../services/firebase");
+const { getAllBotKnowledge, getUserZwiftId, getDZRTeamsAndSeries, recordCoachUsage } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
 const { 
   handleRiderStats, 
@@ -14,6 +14,8 @@ const {
   handleSetZwiftId
 } = require("./commandHandlers");
 const { startQuizFromMessage } = require("../services/quizService");
+const strava = require("../services/stravaService");
+const { handoffCoachingFromMessage, NOT_CLUB_MEMBER_TEXT } = require("../services/coachDm");
 
 // Initialize OpenAI client
 let openai;
@@ -30,10 +32,14 @@ try {
 // Store conversations per user
 const userConversations = new Map();
 const conversationTimers = new Map();
+const conversationModes = new Map(); // conversationKey -> 'coach' | 'club'
 
 // Configuration
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const MAX_CONVERSATION_LENGTH = 20; // Last 20 messages (10 exchanges)
+const MAX_TOOL_ITERATIONS = 2;
+const COACH_MAX_TOOL_ITERATIONS = 4;
+const COACH_MAX_TOKENS = 1200;
 
 // AI Model Configuration - can be changed to test different models
 const AI_CONFIG = {
@@ -79,8 +85,7 @@ function buildChatCompletionParams({ messages, tools, toolChoice, maxTokens, tem
   return params;
 }
 
-// Tool-calling safety
-const MAX_TOOL_ITERATIONS = 2;
+// Tool-calling safety (club assistant). Coaching uses COACH_MAX_TOOL_ITERATIONS.
 
 // These tools already produce user-visible Discord messages via existing handlers.
 // If we also ask the LLM to "respond with results" afterwards, it often becomes duplicate/noisy.
@@ -137,6 +142,16 @@ function compactToolResult(result) {
     base.content = typeof result.content === "string" ? result.content.slice(0, 2000) : undefined;
     base.tags = Array.isArray(result.tags) ? result.tags.slice(0, 25) : undefined;
   }
+  if (result.zwiftpower) base.zwiftpower = result.zwiftpower;
+  if (result.athlete) base.athlete = result.athlete;
+  if (result.stats) base.stats = result.stats;
+  if (result.zones) base.zones = result.zones;
+  if (Array.isArray(result.activities)) base.activities = result.activities.slice(0, 40);
+  if (result.activity) base.activity = result.activity;
+  if (typeof result.days === "number") base.days = result.days;
+  if (result.needs_reconnect) base.needs_reconnect = true;
+  if (result.not_club_member) base.not_club_member = true;
+  if (typeof result.connectUrl === "string") base.connectUrl = result.connectUrl.slice(0, 500);
   if (result.metadata) base.metadata = result.metadata;
   if (result.series) base.series = result.series;
   if (result.zrl) base.zrl = result.zrl;
@@ -163,6 +178,30 @@ function getConversationKey(message) {
   const channelId = message?.channelId || message?.channel?.id || "unknown_channel";
   const guildId = message?.guild?.id || message?.guildId || "dm";
   return `${guildId}:${channelId}:${userId}`;
+}
+
+function markCoachingMode(userId, dmChannelId) {
+  if (!userId || !dmChannelId) return;
+  conversationModes.set(`dm:${dmChannelId}:${userId}`, "coach");
+}
+
+function isCoachingIntent(text) {
+  const t = String(text || "").toLowerCase();
+  if (!t) return false;
+  const patterns = [
+    /\b\/?coach(ing)?\b/,
+    /\bcoach me\b/,
+    /\btrænings(råd|plan|coach)\b/,
+    /\bhvad skal jeg træne\b/,
+    /\bhow should i train\b/,
+    /\bhow was my (ride|run|workout|training|session|week)\b/,
+    /\btraining (advice|plan|load)\b/,
+    /\bshould i (ride|rest|train|taper)\b/,
+    /\bskal jeg (køre|træne|hvile)\b/,
+    /\brecovery advice\b/,
+    /\bovertraining\b/,
+  ];
+  return patterns.some((p) => p.test(t));
 }
 
 async function isReplyToBot(message, client) {
@@ -483,6 +522,74 @@ const toolDefinitions = [
   }
 ];
 
+const coachToolDefinitions = [
+  {
+    type: "function",
+    function: {
+      name: "get_athlete_profile",
+      description: "Get the asking athlete's Strava profile (weight, FTP if present, clubs). Always the caller — never another member.",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_athlete_stats",
+      description: "Get the asking athlete's Strava totals (recent / YTD / all-time ride and run volume).",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_athlete_zones",
+      description: "Get the asking athlete's Strava heart-rate and power zones.",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_recent_activities",
+      description: "List the asking athlete's recent Strava activities (summaries only). Use this first, then get_activity_details for one session they asked about.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: {
+            type: "number",
+            description: "Lookback window in days (1-28). Default 14."
+          }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_activity_details",
+      description: "Get details for one of the asking athlete's Strava activities by id from get_recent_activities.",
+      parameters: {
+        type: "object",
+        properties: {
+          activity_id: {
+            type: "string",
+            description: "Strava activity id"
+          }
+        },
+        required: ["activity_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_zwiftpower_context",
+      description: "Optional ZwiftPower snapshot for the asking athlete (category, phenotype, FTP) if they have a linked Zwift ID.",
+      parameters: { type: "object", properties: {} }
+    }
+  }
+];
+
 /**
  * Reply to a message, falling back to a plain channel message if the reply itself
  * fails (e.g. Discord can't find the message being replied to anymore — code 50035,
@@ -500,6 +607,32 @@ async function safeReply(message, content) {
     } catch (fallbackError) {
       console.error("⚠️ channel.send fallback also failed:", fallbackError?.message || fallbackError);
       return null;
+    }
+  }
+}
+
+async function safeReplyChunks(message, content) {
+  const text = String(content || "");
+  if (text.length <= 1900) {
+    return safeReply(message, text);
+  }
+  const chunks = [];
+  let remaining = text;
+  while (remaining.length > 1900) {
+    let idx = remaining.lastIndexOf("\n", 1900);
+    if (idx < 900) idx = remaining.lastIndexOf(" ", 1900);
+    if (idx < 900) idx = 1900;
+    chunks.push(remaining.slice(0, idx).trim());
+    remaining = remaining.slice(idx).trim();
+  }
+  if (remaining) chunks.push(remaining);
+  let first = true;
+  for (const chunk of chunks) {
+    if (first) {
+      await safeReply(message, chunk);
+      first = false;
+    } else {
+      await message.channel.send(chunk);
     }
   }
 }
@@ -983,6 +1116,27 @@ async function executeSingleToolCall(toolCall, message) {
           series: series,
         };
       }
+
+      case "get_athlete_profile":
+      case "get_athlete_stats":
+      case "get_athlete_zones":
+      case "get_recent_activities":
+      case "get_activity_details":
+      case "get_zwiftpower_context": {
+        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+        if (!eligible) {
+          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+        }
+        const discordId = message.author.id;
+        let coachResult;
+        if (name === "get_athlete_profile") coachResult = await strava.getAthleteProfile(discordId);
+        else if (name === "get_athlete_stats") coachResult = await strava.getAthleteStats(discordId);
+        else if (name === "get_athlete_zones") coachResult = await strava.getAthleteZones(discordId);
+        else if (name === "get_recent_activities") coachResult = await strava.getRecentActivities(discordId, { days: args.days });
+        else if (name === "get_activity_details") coachResult = await strava.getActivityDetails(discordId, args.activity_id);
+        else coachResult = await strava.getZwiftPowerContext(discordId);
+        return { tool_call_id: toolCall.id, ...(coachResult || { success: false, message: "No data" }) };
+      }
       
       default:
         await safeReply(message, `❌ Unknown command: ${name}`);
@@ -1040,6 +1194,11 @@ function clearConversation(userId) {
       conversationTimers.delete(k);
     }
   }
+  for (const k of Array.from(conversationModes.keys())) {
+    if (typeof k === "string" && k.endsWith(`:${key}`)) {
+      conversationModes.delete(k);
+    }
+  }
 
   console.log(`🧹 Cleared conversation(s) for user ${key}`);
 }
@@ -1052,6 +1211,7 @@ function clearConversationForKey(conversationKey) {
     clearTimeout(timer);
     conversationTimers.delete(key);
   }
+  conversationModes.delete(key);
   console.log(`🧹 Cleared conversation for key ${key}`);
 }
 
@@ -1148,6 +1308,28 @@ ${catalogLines}
 - Time: ${timestamp}`;
 }
 
+function buildCoachSystemPrompt(message) {
+  const timestamp = new Date().toISOString();
+  return `You are DZR Coach, a cycling coach for Danish Zwift Racers. You chat in a private Discord DM with one athlete.
+
+## Data
+You may only use tools to read THIS athlete's Strava data (the Discord user talking to you). Never request or invent another rider's activities.
+Typical flow: get_recent_activities first, then get_activity_details for a specific session, plus profile/stats/zones as needed. get_zwiftpower_context is optional extra (category/phenotype).
+
+## Coaching style
+- Reply in the user's language (Danish or English).
+- Be a practical endurance coach: load, recovery, easy days, intensity distribution, race prep.
+- Cite specific recent sessions (date, duration, power/HR) from tool results. Never invent numbers that were not returned by a tool.
+- If tools fail, say so and ask them to reconnect Strava if needs_reconnect/connectUrl is present.
+- Not medical advice. Do not prescribe training through illness, injury, chest pain, or disordered eating. Suggest seeing a professional when relevant.
+- Do not give doping, extreme restriction, or dangerous overtraining advice.
+- Keep replies concise (Discord). Use short bullets when listing sessions.
+
+## Current context
+- Athlete Discord: ${message.author.username} (ID: ${message.author.id})
+- Time: ${timestamp}`;
+}
+
 /**
  * Normalize OpenAI / SDK error fields (code may live on error or error.error)
  */
@@ -1164,6 +1346,40 @@ function getOpenAIErrorInfo(error) {
     !looksLikeQuota &&
     (code === "rate_limit_exceeded" || status === 429);
   return { code, type, message, status, looksLikeQuota, looksLikeRateLimit };
+}
+
+function extractTokenUsage(response) {
+  const u = response?.usage || {};
+  const promptTokens = Number(u.prompt_tokens ?? u.input_tokens ?? 0) || 0;
+  const completionTokens = Number(u.completion_tokens ?? u.output_tokens ?? 0) || 0;
+  const totalTokens = Number(u.total_tokens ?? 0) || promptTokens + completionTokens;
+  return { promptTokens, completionTokens, totalTokens };
+}
+
+function addTokenUsage(tally, response) {
+  if (!tally) return;
+  const u = extractTokenUsage(response);
+  tally.promptTokens += u.promptTokens;
+  tally.completionTokens += u.completionTokens;
+  tally.totalTokens += u.totalTokens;
+  tally.calls += 1;
+}
+
+async function flushCoachUsage(tally, message) {
+  if (!tally || tally.calls <= 0) return;
+  try {
+    await recordCoachUsage({
+      discordId: message.author.id,
+      username: message.author.username,
+      model: AI_CONFIG.model,
+      promptTokens: tally.promptTokens,
+      completionTokens: tally.completionTokens,
+      totalTokens: tally.totalTokens,
+      openaiCalls: tally.calls,
+    });
+  } catch (err) {
+    console.error("flushCoachUsage failed:", err?.message || err);
+  }
 }
 
 /**
@@ -1215,6 +1431,8 @@ async function handleAIChatMessage(message, client) {
   }
   
   try {
+    let coachUsageTally = null;
+
     // Show typing indicator
     await message.channel.sendTyping();
 
@@ -1226,6 +1444,15 @@ async function handleAIChatMessage(message, client) {
 
     if (!cleanedMessage) {
       await safeReply(message, "👋 Hej! I can help you with rider stats, team comparisons, and more. Just ask me something like:\n• Show me stats for @Chris\n• Compare @John, @Mike, and @Sarah\n• What's my Zwift ID?\n• Find riders named Anders");
+      return;
+    }
+
+    // Coaching in guild channels always moves to a private DM.
+    if (!isDM && isCoachingIntent(cleanedMessage)) {
+      const result = await handoffCoachingFromMessage(message, client);
+      if (result?.ok && result.dmChannelId) {
+        markCoachingMode(message.author.id, result.dmChannelId);
+      }
       return;
     }
 
@@ -1254,10 +1481,49 @@ async function handleAIChatMessage(message, client) {
       return;
     }
 
-    const userId = message.author.id;
     const conversationKey = getConversationKey(message);
-    const knowledgeCatalog = await getKnowledgeCatalog();
-    const systemPrompt = buildSystemPrompt(message, knowledgeCatalog);
+    const wasCoach = conversationModes.get(conversationKey) === "coach";
+    const isCoachSession = isDM && (isCoachingIntent(cleanedMessage) || wasCoach);
+
+    if (isCoachSession) {
+      const eligible = await strava.hasClubMemberRole(message.author.id, client, message.guild);
+      if (!eligible) {
+        conversationModes.delete(conversationKey);
+        await safeReply(message, NOT_CLUB_MEMBER_TEXT);
+        return;
+      }
+      if (!wasCoach) {
+        userConversations.delete(conversationKey);
+      }
+      conversationModes.set(conversationKey, "coach");
+      const connected = await strava.isStravaConnected(message.author.id);
+      if (!connected) {
+        const url = strava.getConnectUrl(message.author.id);
+        await safeReply(
+          message,
+          "🔗 Forbind Strava først (linket gælder 15 min):\n" +
+            (url || "Connect-link kunne ikke oprettes. Tjek STRAVA_CONNECT_SECRET.")
+        );
+        return;
+      }
+    }
+
+    const knowledgeCatalog = isCoachSession ? [] : await getKnowledgeCatalog();
+    const systemPrompt = isCoachSession
+      ? buildCoachSystemPrompt(message)
+      : buildSystemPrompt(message, knowledgeCatalog);
+    const activeTools = isCoachSession ? coachToolDefinitions : toolDefinitions;
+    const maxTokens = isCoachSession ? COACH_MAX_TOKENS : AI_CONFIG.maxTokens;
+    const maxIters = isCoachSession ? COACH_MAX_TOOL_ITERATIONS : MAX_TOOL_ITERATIONS;
+    const replyFn = isCoachSession ? safeReplyChunks : safeReply;
+    coachUsageTally = isCoachSession
+      ? { promptTokens: 0, completionTokens: 0, totalTokens: 0, calls: 0 }
+      : null;
+    const callAndTrack = async (params) => {
+      const response = await callOpenAIWithRetry(params);
+      if (coachUsageTally) addTokenUsage(coachUsageTally, response);
+      return response;
+    };
     
     // Get or create conversation history
     let conversation = userConversations.get(conversationKey);
@@ -1291,12 +1557,12 @@ async function handleAIChatMessage(message, client) {
     }
     
     // Call OpenAI with retry logic
-    const response = await callOpenAIWithRetry(
+    const response = await callAndTrack(
       buildChatCompletionParams({
         messages: conversation,
-        tools: toolDefinitions,
+        tools: activeTools,
         toolChoice: "auto",
-        maxTokens: AI_CONFIG.maxTokens,
+        maxTokens,
       })
     );
     
@@ -1317,7 +1583,7 @@ async function handleAIChatMessage(message, client) {
       let toolResults = [];
       let iteration = 0;
 
-      while (currentToolCalls && currentToolCalls.length > 0 && iteration < MAX_TOOL_ITERATIONS) {
+      while (currentToolCalls && currentToolCalls.length > 0 && iteration < maxIters) {
         // Execute all tool calls (parallel if multiple)
         toolResults = await executeToolCalls(currentToolCalls, message);
 
@@ -1360,7 +1626,7 @@ async function handleAIChatMessage(message, client) {
               { role: "user", content: prompt }
             ];
 
-            const followUp = await callOpenAIWithRetry(
+            const followUp = await callAndTrack(
               buildChatCompletionParams({
                 messages: followUpMessages,
                 maxTokens: 300,
@@ -1424,12 +1690,12 @@ async function handleAIChatMessage(message, client) {
             ];
           }
 
-          const postTool = await callOpenAIWithRetry(
+          const postTool = await callAndTrack(
             buildChatCompletionParams({
               messages: conversation,
-              tools: toolDefinitions,
+              tools: activeTools,
               toolChoice: "auto",
-              maxTokens: AI_CONFIG.maxTokens,
+              maxTokens,
             })
           );
 
@@ -1437,9 +1703,9 @@ async function handleAIChatMessage(message, client) {
           if (!postToolMsg) break;
 
           // If the model wants to call more tools, continue the loop — but only if we can
-          // actually execute them within MAX_TOOL_ITERATIONS. Otherwise we'd push an assistant
+          // actually execute them within maxIters. Otherwise we'd push an assistant
           // message with unresolved tool_calls into history, which OpenAI rejects on the next turn.
-          if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0 && iteration + 1 < MAX_TOOL_ITERATIONS) {
+          if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0 && iteration + 1 < maxIters) {
             conversation.push({
               role: "assistant",
               content: postToolMsg.content || null,
@@ -1453,7 +1719,7 @@ async function handleAIChatMessage(message, client) {
           // Otherwise, send its final content (if any).
           if (postToolMsg.content && postToolMsg.content.trim().length > 0) {
             conversation.push({ role: "assistant", content: postToolMsg.content });
-            await safeReply(message, postToolMsg.content);
+            await replyFn(message, postToolMsg.content);
           } else if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0) {
             // Hit the iteration cap and the model only offered more tool calls, no text.
             await safeReply(message, "⚠️ I wasn't able to finish that request after a few tool calls. Please try rephrasing or breaking it into a simpler question.");
@@ -1469,7 +1735,7 @@ async function handleAIChatMessage(message, client) {
         content: responseMessage.content
       });
       
-      await safeReply(message, responseMessage.content);
+      await replyFn(message, responseMessage.content);
     }
     
     // Trim conversation if it has grown too long after processing
@@ -1485,6 +1751,8 @@ async function handleAIChatMessage(message, client) {
     
     // Reset timeout
     resetConversationTimeout(conversationKey);
+
+    await flushCoachUsage(coachUsageTally, message);
     
   } catch (error) {
     const info = getOpenAIErrorInfo(error);
@@ -1505,11 +1773,13 @@ async function handleAIChatMessage(message, client) {
     } else {
       await safeReply(message, "⚠️ An error occurred while processing your message. Please try again.");
     }
+    await flushCoachUsage(coachUsageTally, message);
   }
 }
 
 module.exports = {
   handleAIChatMessage,
   clearConversation, // Export for testing/admin commands
+  markCoachingMode,
   AI_CONFIG // Export for external configuration if needed
 };
