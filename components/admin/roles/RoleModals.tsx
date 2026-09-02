@@ -26,12 +26,12 @@ import {
   Textarea,
   VStack,
 } from '@chakra-ui/react'
-import { ADMIN_ROLE_ID, HOLDKAPTAJN_ROLE_ID } from '@/app/lib/sharedConstants'
+import { HOLDKAPTAJN_ROLE_ID } from '@/app/lib/sharedConstants'
 import type { CategoryChannel, GuildRole, PanelRole, RolePanel, TextChannel } from './types'
 import { BUTTON_COLOR_OPTIONS, RACE_SERIES, channelName, parseRoleColor } from './types'
 
 const inputBg = { bg: 'black' }
-const DEFAULT_VIEWERS = [ADMIN_ROLE_ID, HOLDKAPTAJN_ROLE_ID]
+const DEFAULT_VIEWERS = [HOLDKAPTAJN_ROLE_ID]
 
 function RoleChecklist({
   roles,

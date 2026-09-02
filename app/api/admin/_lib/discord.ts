@@ -51,7 +51,7 @@ export function protectedRoleIds() {
 }
 
 export function defaultExtraViewerRoleIds() {
-  return [ADMIN_ROLE_ID, HOLDKAPTAJN_ROLE_ID]
+  return [HOLDKAPTAJN_ROLE_ID]
 }
 
 export function discordErrorMessage(res: { ok: boolean; status: number; body: any }, fallback: string) {
@@ -177,26 +177,14 @@ export function privateChannelOverwrites(opts: {
     view,
     PermissionFlags.SendMessages,
     PermissionFlags.ReadMessageHistory,
-    PermissionFlags.EmbedLinks,
-    PermissionFlags.AttachFiles,
-    PermissionFlags.AddReactions,
   )
   const voiceAllow = permissionBits(view, PermissionFlags.Connect, PermissionFlags.Speak)
   const botAllow = opts.voice
     ? permissionBits(view, PermissionFlags.Connect, PermissionFlags.Speak, PermissionFlags.ManageChannels)
-    : permissionBits(
-        view,
-        PermissionFlags.SendMessages,
-        PermissionFlags.ReadMessageHistory,
-        PermissionFlags.ManageChannels,
-        PermissionFlags.ManageMessages,
-        PermissionFlags.EmbedLinks,
-      )
+    : permissionBits(view, PermissionFlags.SendMessages, PermissionFlags.ReadMessageHistory, PermissionFlags.ManageChannels)
   const everyoneDeny = opts.voice ? permissionBits(view, PermissionFlags.Connect) : permissionBits(view)
   const memberAllow = opts.voice ? voiceAllow : textAllow
-  const extraAllow = opts.voice
-    ? voiceAllow
-    : permissionBits(view, PermissionFlags.SendMessages, PermissionFlags.ReadMessageHistory)
+  const extraAllow = memberAllow
 
   const overwrites: PermissionOverwrite[] = [
     { id: guildId(), type: OverwriteType.Role, deny: everyoneDeny },
