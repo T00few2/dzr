@@ -342,9 +342,9 @@ export function PanelModal({
                 />
               </FormControl>
             )}
-            <FormHelperText>
+            <Text fontSize="sm" color="gray.400">
               New channels are private and unsynced. Access is Admin, DZR Bot, and the created team role (same as Zephyrus Zwifters). Member and Holdkaptajn are not copied from the category.
-            </FormHelperText>
+            </Text>
           </VStack>
         </ModalBody>
         <ModalFooter>
