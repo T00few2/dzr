@@ -58,8 +58,11 @@ export function discordErrorMessage(res: { ok: boolean; status: number; body: an
   if (res.ok) return null
   const code = res.body?.code
   const msg = res.body?.message || (typeof res.body === 'string' && res.body ? res.body : null)
+  if (code === 50001 || /missing access/i.test(String(msg || ''))) {
+    return `${fallback}: Discord missing access. DZR Bot needs View Channel on the category (and Manage Channels) so it can edit the new private channel.`
+  }
   if (code === 50013 || /missing permissions/i.test(String(msg || ''))) {
-    return `${fallback}: Discord missing permissions. The bot can usually create the channel, but cannot set overwrites on roles above it. Put DZR Bot just below Admin, and allow View Channel + Manage Channels on the category.`
+    return `${fallback}: Discord missing permissions. Put DZR Bot just below Admin, and allow View Channel + Manage Channels on the category.`
   }
   return msg ? `${fallback}: ${msg}` : `${fallback} (${res.status})`
 }
@@ -196,15 +199,48 @@ export function privateChannelOverwrites(opts: {
     ? permissionBits(view, connect, PermissionFlags.Speak, PermissionFlags.ManageChannels)
     : permissionBits(view, PermissionFlags.ManageChannels)
 
-  const overwrites: PermissionOverwrite[] = [
+  const overwrites: PermissionOverwrite[] = []
+  if (opts.botRoleId) {
+    overwrites.push({ id: opts.botRoleId, type: OverwriteType.Role, allow: botAllow, deny: '0' })
+  }
+  overwrites.push(
     { id: guildId(), type: OverwriteType.Role, allow: '0', deny: everyoneDeny },
     { id: opts.roleId, type: OverwriteType.Role, allow: memberAllow, deny: '0' },
     { id: ADMIN_ROLE_ID, type: OverwriteType.Role, allow: memberAllow, deny: '0' },
+  )
+  return overwrites.map(completeOverwrite)
+}
+
+export function botAccessOverwrites(opts: {
+  botUserId: string
+  botRoleId?: string | null
+  voice?: boolean
+}): PermissionOverwrite[] {
+  const view = PermissionFlags.ViewChannel
+  const connect = PermissionFlags.Connect
+  const everyoneDeny = opts.voice ? permissionBits(view, connect) : permissionBits(view)
+  const botAllow = opts.voice
+    ? permissionBits(view, connect, PermissionFlags.Speak, PermissionFlags.ManageChannels)
+    : permissionBits(view, PermissionFlags.ManageChannels)
+  const overwrites: PermissionOverwrite[] = [
+    { id: guildId(), type: OverwriteType.Role, allow: '0', deny: everyoneDeny },
+    { id: opts.botUserId, type: OverwriteType.Member, allow: botAllow, deny: '0' },
   ]
   if (opts.botRoleId) {
     overwrites.push({ id: opts.botRoleId, type: OverwriteType.Role, allow: botAllow, deny: '0' })
   }
   return overwrites.map(completeOverwrite)
+}
+
+export async function placeRoleBelowBot(roleId: string, botRoleId: string | null, guildRoles: any[]) {
+  if (!botRoleId) return
+  const botRole = guildRoles.find((r: any) => String(r.id) === String(botRoleId))
+  const botPos = Number(botRole?.position || 0)
+  if (!Number.isFinite(botPos) || botPos < 2) return
+  await discordRequest(`/guilds/${guildId()}/roles/${roleId}`, {
+    method: 'PATCH',
+    body: { position: botPos - 1 },
+  })
 }
 
 export async function replaceChannelOverwrites(channelId: string, overwrites: PermissionOverwrite[]) {
@@ -286,6 +322,40 @@ export async function applyChannelOverwrite(
   throw new Error(
     discordErrorMessage({ ok: res.ok, status: res.status, body: res.body }, 'Failed to set channel permission')
     || 'Failed to set channel permission'
+  )
+}
+
+export async function ensureBotCanManageChannel(channelId: string, opts: {
+  botUserId: string
+  botRoleId?: string | null
+  voice?: boolean
+}) {
+  const view = PermissionFlags.ViewChannel
+  const connect = PermissionFlags.Connect
+  const botAllow = opts.voice
+    ? permissionBits(view, connect, PermissionFlags.Speak, PermissionFlags.ManageChannels)
+    : permissionBits(view, PermissionFlags.ManageChannels)
+  if (opts.botRoleId) {
+    const roleRes = await putChannelOverwrite(channelId, {
+      id: opts.botRoleId,
+      type: OverwriteType.Role,
+      allow: botAllow,
+      deny: '0',
+    })
+    if (roleRes.ok) return
+  }
+  const memberRes = await putChannelOverwrite(channelId, {
+    id: opts.botUserId,
+    type: OverwriteType.Member,
+    allow: botAllow,
+    deny: '0',
+  })
+  if (memberRes.ok) return
+  throw new Error(
+    discordErrorMessage(
+      { ok: memberRes.ok, status: memberRes.status, body: memberRes.body },
+      'Failed to grant DZR Bot access to the new channel'
+    ) || 'Failed to grant DZR Bot access to the new channel'
   )
 }
 

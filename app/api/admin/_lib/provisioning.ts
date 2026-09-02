@@ -2,17 +2,20 @@ import { ADMIN_ROLE_ID } from '@/app/lib/sharedConstants'
 import {
   ChannelType,
   applyChannelOverwrite,
+  botAccessOverwrites,
   createGuildChannel,
   createGuildRole,
   defaultExtraViewerRoleIds,
   deleteChannelOverwrite,
   deleteGuildChannel,
   deleteGuildRole,
+  ensureBotCanManageChannel,
   findBotRoleId,
   getBotMember,
   getChannel,
   guildId,
   listAllGuildRoles,
+  placeRoleBelowBot,
   privateChannelOverwrites,
   protectedRoleIds,
   slugifyChannelName,
@@ -52,11 +55,17 @@ export async function provisionDiscordRole(opts: {
   const botRoleId = findBotRoleId(guildRoles, bot.userId)
   const channelName = slugifyChannelName(opts.name)
   const role = await createGuildRole({ name: opts.name, color: opts.color })
+  await placeRoleBelowBot(role.id, botRoleId, guildRoles)
   const keepOverwriteIds = new Set(
     [guildId(), role.id, ADMIN_ROLE_ID, botRoleId].filter(Boolean).map(String)
   )
 
   async function lockChannel(channelId: string, voice: boolean) {
+    await ensureBotCanManageChannel(channelId, {
+      botUserId: bot.userId,
+      botRoleId,
+      voice,
+    })
     const overwrites = privateChannelOverwrites({
       roleId: role.id,
       botRoleId,
@@ -64,19 +73,20 @@ export async function provisionDiscordRole(opts: {
     })
     for (const overwrite of overwrites) {
       await applyChannelOverwrite(channelId, overwrite, {
-        optional: overwrite.id === ADMIN_ROLE_ID,
+        optional: overwrite.id === ADMIN_ROLE_ID || overwrite.id === botRoleId,
       })
     }
     const channel = await getChannel(channelId)
     for (const overwrite of channel?.permission_overwrites || []) {
       const id = String(overwrite.id)
-      if (keepOverwriteIds.has(id)) continue
+      if (keepOverwriteIds.has(id) || id === bot.userId) continue
       await deleteChannelOverwrite(channelId, id)
     }
     const after = await getChannel(channelId)
-    const leftover = (after?.permission_overwrites || []).filter((overwrite) => (
-      !keepOverwriteIds.has(String(overwrite.id))
-    ))
+    const leftover = (after?.permission_overwrites || []).filter((overwrite) => {
+      const id = String(overwrite.id)
+      return !keepOverwriteIds.has(id) && id !== bot.userId
+    })
     if (leftover.length) {
       const names = leftover.map((overwrite) => {
         const guildRole = guildRoles.find((r: any) => String(r.id) === String(overwrite.id))
@@ -95,6 +105,10 @@ export async function provisionDiscordRole(opts: {
       name: channelName,
       type: ChannelType.GuildText,
       parentId: opts.textCategoryId,
+      permissionOverwrites: botAccessOverwrites({
+        botUserId: bot.userId,
+        botRoleId,
+      }),
     })
     textChannelId = text.id
     await lockChannel(text.id, false)
@@ -104,6 +118,11 @@ export async function provisionDiscordRole(opts: {
         name: channelName,
         type: ChannelType.GuildVoice,
         parentId: opts.voiceCategoryId || opts.textCategoryId,
+        permissionOverwrites: botAccessOverwrites({
+          botUserId: bot.userId,
+          botRoleId,
+          voice: true,
+        }),
       })
       voiceChannelId = voice.id
       await lockChannel(voice.id, true)
