@@ -59,7 +59,7 @@ export function discordErrorMessage(res: { ok: boolean; status: number; body: an
   const code = res.body?.code
   const msg = res.body?.message || (typeof res.body === 'string' && res.body ? res.body : null)
   if (code === 50013 || /missing permissions/i.test(String(msg || ''))) {
-    return `${fallback}: Discord missing access on the target category. Open that category's permissions and allow DZR Bot View Channel + Manage Channels (do not sync from a locked parent).`
+    return `${fallback}: Discord missing permissions. The bot can usually create the channel, but cannot set overwrites on roles above it. Put DZR Bot just below Admin, and allow View Channel + Manage Channels on the category.`
   }
   return msg ? `${fallback}: ${msg}` : `${fallback} (${res.status})`
 }
@@ -246,6 +246,10 @@ export async function createGuildChannel(opts: {
     last = await attempt({ ...base, permission_overwrites: full })
     if (last.ok && last.body?.id) {
       return last.body as { id: string; name: string; type: number }
+    }
+    const fallback = await attempt(base)
+    if (fallback.ok && fallback.body?.id) {
+      return fallback.body as { id: string; name: string; type: number }
     }
     throw new Error(
       discordErrorMessage(last, 'Failed to create Discord channel') || 'Failed to create Discord channel'

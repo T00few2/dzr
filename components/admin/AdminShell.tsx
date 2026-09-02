@@ -1,6 +1,7 @@
 'use client'
 
 import { Box, Button, Container, Flex, Heading, HStack, Link } from '@chakra-ui/react'
+import { Global } from '@emotion/react'
 import NextLink from 'next/link'
 import { usePathname } from 'next/navigation'
 import React from 'react'
@@ -22,6 +23,14 @@ export default function AdminShell({ title, children }: { title: string; childre
   const pathname = usePathname()
   return (
     <Box minH="100vh" bg="black" color="white" pt={{ base: 24, md: 28 }} pb={16}>
+      <Global
+        styles={`
+          select option {
+            color: #171923;
+            background-color: #fff;
+          }
+        `}
+      />
       <Container maxW="7xl">
         <Heading size="lg" mb={4}>{title}</Heading>
         <Flex gap={2} wrap="wrap" mb={8}>

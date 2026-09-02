@@ -95,7 +95,6 @@ export async function provisionDiscordRole(opts: {
       name: channelName,
       type: ChannelType.GuildText,
       parentId: opts.textCategoryId,
-      permissionOverwrites: privateChannelOverwrites({ roleId: role.id, botRoleId }),
     })
     textChannelId = text.id
     await lockChannel(text.id, false)
@@ -105,7 +104,6 @@ export async function provisionDiscordRole(opts: {
         name: channelName,
         type: ChannelType.GuildVoice,
         parentId: opts.voiceCategoryId || opts.textCategoryId,
-        permissionOverwrites: privateChannelOverwrites({ roleId: role.id, botRoleId, voice: true }),
       })
       voiceChannelId = voice.id
       await lockChannel(voice.id, true)

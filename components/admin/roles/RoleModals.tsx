@@ -34,7 +34,17 @@ import {
 import type { CategoryChannel, GuildRole, PanelRole, RolePanel, TextChannel } from './types'
 import { BUTTON_COLOR_OPTIONS, RACE_SERIES, channelName, parseRoleColor } from './types'
 
-const inputBg = { bg: 'black' }
+const inputBg = { bg: 'black', color: 'white' }
+const selectProps = {
+  bg: 'black',
+  color: 'white',
+  sx: {
+    option: {
+      color: '#171923',
+      bg: 'white',
+    },
+  },
+}
 
 function RoleChecklist({
   roles,
@@ -83,7 +93,7 @@ function ChannelSelect({
   prefix?: string
 }) {
   return (
-    <Select value={value} onChange={(e) => onChange(e.target.value)} {...inputBg}>
+    <Select value={value} onChange={(e) => onChange(e.target.value)} {...selectProps}>
       <option value="">{includeEmptyLabel || placeholder || 'Select a channel...'}</option>
       {channels.map((c) => (
         <option key={c.id} value={c.id}>{prefix}{c.name}</option>
@@ -621,7 +631,7 @@ export function RoleModal({
                 </FormControl>
                 <FormControl>
                   <FormLabel>Race series</FormLabel>
-                  <Select value={raceSeries} onChange={(e) => setRaceSeries(e.target.value)} {...inputBg}>
+                  <Select value={raceSeries} onChange={(e) => setRaceSeries(e.target.value)} {...selectProps}>
                     <option value="">Select series...</option>
                     {RACE_SERIES.map((s) => (
                       <option key={s} value={s}>{s}</option>
@@ -767,7 +777,7 @@ export function RoleModal({
                                 setRoleId(id)
                                 setRoleName(roles.find((r) => r.id === id)?.name || '')
                               }}
-                              {...inputBg}
+                              {...selectProps}
                             >
                               <option value="">Select a role...</option>
                               {available.map((r) => (
@@ -798,7 +808,7 @@ export function RoleModal({
                     </FormControl>
                     <FormControl>
                       <FormLabel>Button color</FormLabel>
-                      <Select value={buttonColor} onChange={(e) => setButtonColor(e.target.value)} {...inputBg}>
+                      <Select value={buttonColor} onChange={(e) => setButtonColor(e.target.value)} {...selectProps}>
                         {BUTTON_COLOR_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
@@ -829,7 +839,7 @@ export function RoleModal({
                     </FormControl>
                     <FormControl>
                       <FormLabel>Visibility</FormLabel>
-                      <Select value={visibility} onChange={(e) => setVisibility(e.target.value)} {...inputBg}>
+                      <Select value={visibility} onChange={(e) => setVisibility(e.target.value)} {...selectProps}>
                         <option value="public">Public</option>
                         <option value="hidden">Hidden</option>
                       </Select>
