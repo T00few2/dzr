@@ -159,6 +159,8 @@ export default function RolesAdminPage() {
       captainDisplayName: data.captainDisplayName || null,
       textChannelId: data.textChannelId || null,
       voiceChannelId: data.voiceChannelId || null,
+      textCategoryId: data.textCategoryId || null,
+      voiceCategoryId: data.voiceCategoryId || null,
       redeploy: data.redeploy,
     }
   }
@@ -351,6 +353,7 @@ export default function RolesAdminPage() {
         onClose={() => setRoleModal(null)}
         channels={channels}
         voiceChannels={voiceChannels}
+        categories={categories}
         roles={roles}
         usedRoleIds={(roleModalPanel?.roles || []).map((r) => r.roleId)}
         panel={roleModalPanel || null}

@@ -33,15 +33,20 @@ export async function POST(req: Request, { params }: { params: { panelId: string
       if (createDiscord) {
         if (!roleName) return jsonError('Role name is required')
         const provisioning = normalizeProvisioning(panel.provisioning)
-        if (!provisioning.textCategoryId) {
-          return jsonError('Set a text category in Edit Panel before creating Discord roles')
+        const textCategoryId = String(data.textCategoryId || provisioning.textCategoryId || '').trim()
+        const voiceCategoryId = String(data.voiceCategoryId || provisioning.voiceCategoryId || '').trim()
+        if (!textCategoryId) {
+          return jsonError('Set a text category in Edit Panel or the Add Role form')
+        }
+        if (provisioning.createVoice && !voiceCategoryId) {
+          return jsonError('Select a voice channel category')
         }
         created = await provisionDiscordRole({
           name: roleName,
           color: typeof data.roleColor === 'number' ? data.roleColor : undefined,
           createVoice: provisioning.createVoice,
-          textCategoryId: provisioning.textCategoryId,
-          voiceCategoryId: provisioning.voiceCategoryId,
+          textCategoryId,
+          voiceCategoryId: voiceCategoryId || null,
           extraViewerRoleIds: provisioning.extraViewerRoleIds,
         })
         roleId = created.roleId

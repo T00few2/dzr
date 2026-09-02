@@ -291,6 +291,8 @@ export type RoleFormData = {
   captainDisplayName: string
   textChannelId: string
   voiceChannelId: string
+  textCategoryId?: string
+  voiceCategoryId?: string
   redeploy?: boolean
 }
 
@@ -300,6 +302,7 @@ export function RoleModal({
   onClose,
   channels,
   voiceChannels,
+  categories,
   roles,
   usedRoleIds,
   panel,
@@ -312,6 +315,7 @@ export function RoleModal({
   onClose: () => void
   channels: TextChannel[]
   voiceChannels: TextChannel[]
+  categories: CategoryChannel[]
   roles: GuildRole[]
   usedRoleIds: string[]
   panel?: RolePanel | null
@@ -341,6 +345,8 @@ export function RoleModal({
   const [captainDisplayName, setCaptainDisplayName] = useState('')
   const [textChannelId, setTextChannelId] = useState('')
   const [voiceChannelId, setVoiceChannelId] = useState('')
+  const [textCategoryId, setTextCategoryId] = useState('')
+  const [voiceCategoryId, setVoiceCategoryId] = useState('')
 
   const canCreate = Boolean(panel?.provisioning?.textCategoryId)
   const createVoice = Boolean(panel?.provisioning?.createVoice)
@@ -369,6 +375,8 @@ export function RoleModal({
     setCaptainDisplayName(initial?.captainDisplayName || '')
     setTextChannelId(initial?.textChannelId || '')
     setVoiceChannelId(initial?.voiceChannelId || '')
+    setTextCategoryId(panel?.provisioning?.textCategoryId || '')
+    setVoiceCategoryId(panel?.provisioning?.voiceCategoryId || '')
     if (mode === 'add' && Boolean(panel?.provisioning?.textCategoryId)) {
       setCreateDiscord(true)
       if (panel?.provisioning?.createVoice) {
@@ -423,12 +431,14 @@ export function RoleModal({
       captainDisplayName,
       textChannelId,
       voiceChannelId,
+      textCategoryId,
+      voiceCategoryId,
       redeploy: mode === 'edit',
     }
   }
 
   const addDisabled = createDiscord
-    ? !roleName.trim() || !canCreate
+    ? !roleName.trim() || !canCreate || (createVoice && !voiceCategoryId)
     : !roleId
 
   return (
@@ -486,6 +496,29 @@ export function RoleModal({
                         {...inputBg}
                       />
                     </FormControl>
+                    <FormControl>
+                      <FormLabel>Text channel category</FormLabel>
+                      <ChannelSelect
+                        channels={categories}
+                        value={textCategoryId}
+                        onChange={setTextCategoryId}
+                        includeEmptyLabel="Select a category..."
+                        prefix=""
+                      />
+                    </FormControl>
+                    {createVoice && (
+                      <FormControl isRequired>
+                        <FormLabel>Voice channel category</FormLabel>
+                        <ChannelSelect
+                          channels={categories}
+                          value={voiceCategoryId}
+                          onChange={setVoiceCategoryId}
+                          includeEmptyLabel="Select a category..."
+                          prefix=""
+                        />
+                        <FormHelperText>Voice channels go in this Discord category, not the text one.</FormHelperText>
+                      </FormControl>
+                    )}
                   </>
                 ) : (
                   <FormControl isRequired>
