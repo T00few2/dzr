@@ -39,7 +39,8 @@ const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const MAX_CONVERSATION_LENGTH = 20; // Last 20 messages (10 exchanges)
 const MAX_TOOL_ITERATIONS = 2;
 const COACH_MAX_TOOL_ITERATIONS = 4;
-const COACH_MAX_TOKENS = 1200;
+const COACH_MAX_TOKENS = 16000;
+const COACH_REASONING_EFFORT = "low";
 
 // AI Model Configuration - can be changed to test different models
 const AI_CONFIG = {
@@ -60,7 +61,7 @@ function isGpt5Family(model = AI_CONFIG.model) {
  * Build chat.completions params compatible with both 4.x and 5.x models.
  * gpt-5-mini/nano reject custom temperature and require max_completion_tokens.
  */
-function buildChatCompletionParams({ messages, tools, toolChoice, maxTokens, temperature }) {
+function buildChatCompletionParams({ messages, tools, toolChoice, maxTokens, temperature, reasoningEffort }) {
   const model = AI_CONFIG.model;
   const params = {
     model,
@@ -74,8 +75,9 @@ function buildChatCompletionParams({ messages, tools, toolChoice, maxTokens, tem
 
   if (isGpt5Family(model)) {
     params.max_completion_tokens = maxTokens ?? AI_CONFIG.maxTokens;
-    if (AI_CONFIG.reasoningEffort) {
-      params.reasoning_effort = AI_CONFIG.reasoningEffort;
+    const effort = reasoningEffort || AI_CONFIG.reasoningEffort;
+    if (effort) {
+      params.reasoning_effort = effort;
     }
   } else {
     params.max_tokens = maxTokens ?? AI_CONFIG.maxTokens;
@@ -598,12 +600,17 @@ const coachToolDefinitions = [
  * rejection in the messageCreate handler.
  */
 async function safeReply(message, content) {
+  const payload = typeof content === "string" ? content.trim() : content;
+  if (payload == null || payload === "") {
+    console.warn("⚠️ safeReply skipped empty content");
+    return null;
+  }
   try {
-    return await message.reply(content);
+    return await message.reply(payload);
   } catch (error) {
     console.warn("⚠️ message.reply failed, falling back to channel.send:", error?.message || error);
     try {
-      return await message.channel.send(content);
+      return await message.channel.send(payload);
     } catch (fallbackError) {
       console.error("⚠️ channel.send fallback also failed:", fallbackError?.message || fallbackError);
       return null;
@@ -1356,6 +1363,46 @@ function extractTokenUsage(response) {
   return { promptTokens, completionTokens, totalTokens };
 }
 
+function getMessageText(message) {
+  const content = message?.content;
+  if (typeof content === "string") return content.trim();
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part.text === "string") return part.text;
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+  return "";
+}
+
+function fallbackCoachFromTools(toolResults) {
+  const withActivities = (toolResults || []).find((r) => Array.isArray(r.activities) && r.activities.length);
+  if (withActivities) {
+    const lines = withActivities.activities.slice(0, 12).map((a) => {
+      const date = String(a.start_date || "").slice(0, 10) || "ukendt dato";
+      const km = typeof a.distance_m === "number" ? `${(a.distance_m / 1000).toFixed(1)} km` : "";
+      const min = typeof a.moving_time === "number" ? `${Math.round(a.moving_time / 60)} min` : "";
+      const name = a.name || a.sport_type || "pas";
+      return `• ${date} — ${name}${km ? `, ${km}` : ""}${min ? `, ${min}` : ""}`;
+    });
+    return (
+      "Jeg hentede dine seneste Strava-pas, men selve coaching-teksten blev tom (modellen brugte tokens på reasoning). Her er ugen kort:\n\n" +
+      lines.join("\n") +
+      "\n\nSpørg gerne igen, fx *hvordan var i går?*"
+    );
+  }
+  const failed = (toolResults || []).find((r) => r && r.success === false && r.message);
+  if (failed?.needs_reconnect && failed.connectUrl) {
+    return `🔗 Strava-forbindelsen skal fornys:\n${failed.connectUrl}`;
+  }
+  if (failed?.message) return String(failed.message).slice(0, 1500);
+  return "Jeg hentede dine data, men kunne ikke skrive svaret færdigt. Prøv at spørge igen om lidt.";
+}
+
 function addTokenUsage(tally, response) {
   if (!tally) return;
   const u = extractTokenUsage(response);
@@ -1563,6 +1610,7 @@ async function handleAIChatMessage(message, client) {
         tools: activeTools,
         toolChoice: "auto",
         maxTokens,
+        reasoningEffort: isCoachSession ? COACH_REASONING_EFFORT : undefined,
       })
     );
     
@@ -1696,11 +1744,19 @@ async function handleAIChatMessage(message, client) {
               tools: activeTools,
               toolChoice: "auto",
               maxTokens,
+              reasoningEffort: isCoachSession ? COACH_REASONING_EFFORT : undefined,
             })
           );
 
           const postToolMsg = postTool.choices[0]?.message;
           if (!postToolMsg) break;
+
+          console.log("🤖 Post-tool model reply", {
+            finish_reason: postTool.choices[0]?.finish_reason,
+            contentLen: getMessageText(postToolMsg).length,
+            toolCalls: postToolMsg.tool_calls?.length || 0,
+            usage: postTool.usage,
+          });
 
           // If the model wants to call more tools, continue the loop — but only if we can
           // actually execute them within maxIters. Otherwise we'd push an assistant
@@ -1716,10 +1772,33 @@ async function handleAIChatMessage(message, client) {
             continue;
           }
 
-          // Otherwise, send its final content (if any).
-          if (postToolMsg.content && postToolMsg.content.trim().length > 0) {
-            conversation.push({ role: "assistant", content: postToolMsg.content });
-            await replyFn(message, postToolMsg.content);
+          let text = getMessageText(postToolMsg);
+
+          // gpt-5 can spend the whole completion budget on reasoning and return empty content.
+          if (!text && isCoachSession) {
+            const retry = await callAndTrack(
+              buildChatCompletionParams({
+                messages: [
+                  ...conversation,
+                  {
+                    role: "user",
+                    content: "Skriv nu coaching-svaret til atleten ud fra tool-resultaterne. Ingen flere tool calls. Kort og konkret.",
+                  },
+                ],
+                maxTokens: COACH_MAX_TOKENS,
+                reasoningEffort: COACH_REASONING_EFFORT,
+              })
+            );
+            text = getMessageText(retry.choices[0]?.message);
+          }
+
+          if (text) {
+            conversation.push({ role: "assistant", content: text });
+            await replyFn(message, text);
+          } else if (isCoachSession) {
+            const fallback = fallbackCoachFromTools(toolResults);
+            conversation.push({ role: "assistant", content: fallback });
+            await replyFn(message, fallback);
           } else if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0) {
             // Hit the iteration cap and the model only offered more tool calls, no text.
             await safeReply(message, "⚠️ I wasn't able to finish that request after a few tool calls. Please try rephrasing or breaking it into a simpler question.");
@@ -1730,12 +1809,18 @@ async function handleAIChatMessage(message, client) {
       }
     } else {
       // Model responded conversationally (no tool calls)
+      let text = getMessageText(responseMessage);
+      if (!text && isCoachSession) {
+        text = "Jeg er klar som DZR Coach, men fik et tomt modelsvar. Prøv at spørge igen, fx *Hvordan var min uge?*";
+      }
       conversation.push({
         role: "assistant",
-        content: responseMessage.content
+        content: text
       });
       
-      await replyFn(message, responseMessage.content);
+      if (text) {
+        await replyFn(message, text);
+      }
     }
     
     // Trim conversation if it has grown too long after processing
