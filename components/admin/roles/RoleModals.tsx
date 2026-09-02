@@ -399,7 +399,7 @@ export function PanelModal({
           </VStack>
         </ModalBody>
         <ModalFooter>
-          <Button variant="ghost" mr={3} onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" color="white" _hover={{ bg: 'whiteAlpha.200' }} mr={3} onClick={onClose}>Cancel</Button>
           <Button
             colorScheme="red"
             isLoading={submitting}
@@ -968,7 +968,7 @@ export function RoleModal({
           </VStack>
         </ModalBody>
         <ModalFooter>
-          <Button variant="ghost" mr={3} onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" color="white" _hover={{ bg: 'whiteAlpha.200' }} mr={3} onClick={onClose}>Cancel</Button>
           <Button
             colorScheme="red"
             isLoading={submitting}
@@ -1033,7 +1033,7 @@ export function DeleteRoleModal({
           </VStack>
         </ModalBody>
         <ModalFooter>
-          <Button variant="ghost" mr={3} onClick={onClose} isDisabled={submitting}>Cancel</Button>
+          <Button variant="ghost" color="white" _hover={{ bg: 'whiteAlpha.200' }} mr={3} onClick={onClose} isDisabled={submitting}>Cancel</Button>
           <Button
             variant="outline"
             colorScheme="red"
