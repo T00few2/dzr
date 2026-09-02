@@ -697,13 +697,6 @@ export function RoleModal({
                     </FormHelperText>
                   )}
                 </FormControl>
-                {mode === 'add' && createDiscord && (
-                  <RoleColorField
-                    value={roleColorHex}
-                    onChange={setRoleColorHex}
-                    helper="Defaults from Edit Panel; change it for this team only."
-                  />
-                )}
                 <FormControl>
                   <FormLabel>Race series</FormLabel>
                   <Select
@@ -788,13 +781,6 @@ export function RoleModal({
                       : 'Creates a Discord role plus a private text channel.'}
                   </FormHelperText>
                 </FormControl>
-                {mode === 'add' && createDiscord && (
-                  <RoleColorField
-                    value={roleColorHex}
-                    onChange={setRoleColorHex}
-                    helper="Defaults from Edit Panel; change it for this series only."
-                  />
-                )}
                 <FormControl>
                   <FormLabel>Description (optional)</FormLabel>
                   <Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} {...inputBg} />
@@ -834,6 +820,11 @@ export function RoleModal({
                         </FormControl>
                         {createDiscord ? (
                           <>
+                            <RoleColorField
+                              value={roleColorHex}
+                              onChange={setRoleColorHex}
+                              helper="Defaults from Edit Panel; change it for this role only."
+                            />
                             <FormControl>
                               <FormLabel>Override text channel category</FormLabel>
                               <ChannelSelect
