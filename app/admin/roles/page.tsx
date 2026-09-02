@@ -15,6 +15,12 @@ import PanelSection from '@/components/admin/roles/PanelSection'
 import { DeleteRoleModal, PanelModal, RoleModal, type RoleFormData } from '@/components/admin/roles/RoleModals'
 import type { CategoryChannel, GuildRole, PanelRole, RolePanel, TextChannel } from '@/components/admin/roles/types'
 
+async function parseApi(res: Response) {
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.error || 'Request failed')
+  return body
+}
+
 function defaultPanelId(panels: RolePanel[]) {
   const hold = panels.find((p) => {
     const name = String(p.name || '').toLowerCase()
