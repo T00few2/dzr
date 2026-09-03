@@ -1,5 +1,14 @@
 const admin = require("firebase-admin");
 const config = require("../config/config");
+const shared = require("../constants.json");
+const {
+  emptyProfile,
+  publicFields,
+  snapshotProfile,
+  mergeCoachProfileData,
+  formatCoachProfileForPrompt,
+  summarizePatch,
+} = require("./coachProfile");
 
 // Initialize Firebase
 const privateKey = config.firebase.privateKey;
@@ -271,8 +280,113 @@ async function getSignupBoardConfigs() {
   }));
 }
 
-const COACH_USAGE_COLLECTION = "coach_usage";
-const COACH_USAGE_EVENTS_COLLECTION = "coach_usage_events";
+const COACH_USAGE_COLLECTION = shared.firestore?.coachUsage || "coach_usage";
+const COACH_USAGE_EVENTS_COLLECTION = shared.firestore?.coachUsageEvents || "coach_usage_events";
+const COACH_PROFILES_COLLECTION = shared.firestore?.coachProfiles || "coach_profiles";
+
+function coachProfileRef(discordId) {
+  return db.collection(COACH_PROFILES_COLLECTION).doc(String(discordId));
+}
+
+function toPlainProfile(data) {
+  const src = data && typeof data === "object" ? data : {};
+  const pending = src.pendingConfirmation && typeof src.pendingConfirmation === "object"
+    ? {
+        summary: String(src.pendingConfirmation.summary || "").slice(0, 280),
+        snapshotBefore: snapshotProfile(src.pendingConfirmation.snapshotBefore || {}),
+        askedAt: src.pendingConfirmation.askedAt || null,
+      }
+    : null;
+  return {
+    ...publicFields(src),
+    discordId: src.discordId || null,
+    updatedAt: src.updatedAt || null,
+    updatedBy: src.updatedBy === "user" || src.updatedBy === "coach" ? src.updatedBy : null,
+    pendingConfirmation: pending,
+  };
+}
+
+/**
+ * Durable coaching constraints for one Discord user.
+ */
+async function getCoachProfile(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return { ...emptyProfile(), pendingConfirmation: null };
+  const snap = await coachProfileRef(id).get();
+  if (!snap.exists) return { ...emptyProfile(), discordId: id, pendingConfirmation: null };
+  return toPlainProfile({ discordId: id, ...snap.data() });
+}
+
+async function mergeCoachProfile(discordId, patch, { summary } = {}) {
+  const id = String(discordId || "").trim();
+  if (!id) throw new Error("discordId required");
+  const ref = coachProfileRef(id);
+  const snap = await ref.get();
+  const existing = snap.exists ? snap.data() || {} : {};
+  const snapshotBefore = snapshotProfile(existing);
+  const merged = mergeCoachProfileData(existing, patch);
+  const now = new Date();
+  const pendingConfirmation = {
+    summary: summarizePatch(patch, summary),
+    snapshotBefore,
+    askedAt: now,
+  };
+  const doc = {
+    discordId: id,
+    ...merged,
+    pendingConfirmation,
+    updatedAt: now,
+    updatedBy: "coach",
+  };
+  await ref.set(doc);
+  return toPlainProfile(doc);
+}
+
+async function confirmCoachProfile(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) throw new Error("discordId required");
+  const ref = coachProfileRef(id);
+  const snap = await ref.get();
+  if (!snap.exists || !snap.data()?.pendingConfirmation) {
+    return { success: false, message: "Nothing pending to confirm." };
+  }
+  await ref.set(
+    {
+      pendingConfirmation: admin.firestore.FieldValue.delete(),
+      updatedAt: new Date(),
+      updatedBy: "coach",
+    },
+    { merge: true }
+  );
+  const next = await getCoachProfile(id);
+  return { success: true, confirmed: true, summary: snap.data().pendingConfirmation?.summary || null, profile: next };
+}
+
+async function rejectCoachProfile(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) throw new Error("discordId required");
+  const ref = coachProfileRef(id);
+  const snap = await ref.get();
+  const existing = snap.exists ? snap.data() || {} : {};
+  const pending = existing.pendingConfirmation;
+  if (!pending) {
+    return { success: false, message: "Nothing pending to undo." };
+  }
+  const restored = snapshotProfile(pending.snapshotBefore || emptyProfile());
+  const now = new Date();
+  await ref.set({
+    discordId: id,
+    ...restored,
+    updatedAt: now,
+    updatedBy: "coach",
+  });
+  return {
+    success: true,
+    rejected: true,
+    summary: pending.summary || null,
+    profile: toPlainProfile({ discordId: id, ...restored, updatedAt: now, updatedBy: "coach" }),
+  };
+}
 
 /**
  * Increment coaching LLM usage for a Discord user. Never throws to the caller.
@@ -338,4 +452,9 @@ module.exports = {
   getSignupBoardConfigs,
   isPaidClubMember,
   recordCoachUsage,
+  getCoachProfile,
+  mergeCoachProfile,
+  confirmCoachProfile,
+  rejectCoachProfile,
+  formatCoachProfileForPrompt,
 }; 

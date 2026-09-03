@@ -5,6 +5,7 @@ import { Box, Heading, Text, Flex, Badge, SimpleGrid, Button, Spinner } from '@c
 import { useSession } from 'next-auth/react'
 import { AuthContext } from '@/components/auth/AuthContext'
 import Link from 'next/link'
+import CoachMemoryEditor from './CoachMemoryEditor'
 
 export default function ProfilePage() {
   const { data: session, status } = useSession()
@@ -245,6 +246,8 @@ export default function ProfilePage() {
           </Button>
         )}
       </Box>
+
+      <CoachMemoryEditor />
 
       {/* Discord Info */}
       <Box borderWidth={'1px'} borderColor={'gray.700'} borderRadius={'md'} p={4}>

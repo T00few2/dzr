@@ -1,7 +1,17 @@
 const OpenAI = require("openai");
 const { ChannelType } = require("discord.js");
 const config = require("../config/config");
-const { getAllBotKnowledge, getUserZwiftId, getDZRTeamsAndSeries, recordCoachUsage } = require("../services/firebase");
+const {
+  getAllBotKnowledge,
+  getUserZwiftId,
+  getDZRTeamsAndSeries,
+  recordCoachUsage,
+  getCoachProfile,
+  mergeCoachProfile,
+  confirmCoachProfile,
+  rejectCoachProfile,
+  formatCoachProfileForPrompt,
+} = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
 const { 
   handleRiderStats, 
@@ -589,6 +599,105 @@ const coachToolDefinitions = [
       description: "Optional ZwiftPower snapshot for the asking athlete (category, phenotype, FTP) if they have a linked Zwift ID.",
       parameters: { type: "object", properties: {} }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_athlete_memory",
+      description: "Save durable facts the athlete just stated: ride frequency, sports, weekly slots, injuries, goals, AND coaching-style preferences (short messages, language, tone). Do not save a busy Strava week as a rule. After saving, tell them what you stored and ask them to confirm with yes/no.",
+      parameters: {
+        type: "object",
+        properties: {
+          ridesPerWeek: {
+            type: "object",
+            description: "Typical ride count per week, e.g. {min:3,max:4}",
+            properties: {
+              min: { type: "number" },
+              max: { type: "number" }
+            }
+          },
+          sports: {
+            type: "array",
+            items: { type: "string" },
+            description: "Sports they do, e.g. cycling, running, strength"
+          },
+          weekly: {
+            type: "array",
+            description: "Fixed weekly slots",
+            items: {
+              type: "object",
+              properties: {
+                sport: { type: "string" },
+                days: { type: "array", items: { type: "string" } }
+              }
+            }
+          },
+          injuries: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                text: { type: "string" },
+                started: { type: "string" },
+                status: { type: "string", enum: ["active", "recovered"] }
+              }
+            }
+          },
+          goals: {
+            type: "array",
+            items: { type: "string" }
+          },
+          notes: {
+            type: "string",
+            description: "Other durable constraint in the athlete's own words"
+          },
+          style: {
+            type: "object",
+            description: "How they want the coach to write. Save when they ask for short messages, Danish/English, a tone, or similar.",
+            properties: {
+              length: {
+                type: "string",
+                enum: ["short", "normal", "detailed"],
+                description: "short = few sentences / tight bullets"
+              },
+              language: {
+                type: "string",
+                enum: ["da", "en"],
+                description: "da = always Danish, en = always English"
+              },
+              tone: {
+                type: "string",
+                enum: ["direct", "encouraging", "casual"]
+              },
+              notes: {
+                type: "string",
+                description: "Other style requests, e.g. bullets only, no emojis"
+              }
+            }
+          },
+          summary: {
+            type: "string",
+            description: "Short phrase listing only the facts just saved, for the confirmation question"
+          }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "confirm_athlete_memory",
+      description: "Call when the athlete confirms the last saved memory (yes / ja / det stemmer).",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "reject_athlete_memory",
+      description: "Call when the athlete rejects the last saved memory (no / nej / forkert). Undoes only that last auto-save.",
+      parameters: { type: "object", properties: {} }
+    }
   }
 ];
 
@@ -784,7 +893,7 @@ async function executeSingleToolCall(toolCall, message) {
   let args;
   
   try {
-    args = JSON.parse(argsString);
+    args = JSON.parse(argsString || "{}");
   } catch (error) {
     console.error("Error parsing function arguments:", error);
     return { 
@@ -1144,6 +1253,76 @@ async function executeSingleToolCall(toolCall, message) {
         else coachResult = await strava.getZwiftPowerContext(discordId);
         return { tool_call_id: toolCall.id, ...(coachResult || { success: false, message: "No data" }) };
       }
+
+      case "update_athlete_memory":
+      case "confirm_athlete_memory":
+      case "reject_athlete_memory": {
+        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+        if (!eligible) {
+          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+        }
+        const discordId = message.author.id;
+        const myPagesUrl = "https://www.dzrracingseries.com/members-zone/my-pages";
+        try {
+          if (name === "update_athlete_memory") {
+            const patch = {};
+            if (args.ridesPerWeek !== undefined) patch.ridesPerWeek = args.ridesPerWeek;
+            if (args.sports !== undefined) patch.sports = args.sports;
+            if (args.weekly !== undefined) patch.weekly = args.weekly;
+            if (args.injuries !== undefined) patch.injuries = args.injuries;
+            if (args.goals !== undefined) patch.goals = args.goals;
+            if (args.notes !== undefined) patch.notes = args.notes;
+            if (args.style !== undefined) patch.style = args.style;
+            if (!Object.keys(patch).length) {
+              return { tool_call_id: toolCall.id, success: false, message: "No memory fields provided." };
+            }
+            const profile = await mergeCoachProfile(discordId, patch, { summary: args.summary });
+            const { pendingConfirmation, ...stored } = profile;
+            return {
+              tool_call_id: toolCall.id,
+              success: true,
+              saved: true,
+              summary: pendingConfirmation?.summary || args.summary || null,
+              profile: {
+                ridesPerWeek: stored.ridesPerWeek,
+                sports: stored.sports,
+                weekly: stored.weekly,
+                injuries: stored.injuries,
+                goals: stored.goals,
+                notes: stored.notes,
+                style: stored.style,
+              },
+              instruction:
+                "Tell the athlete exactly what you saved (only those fields) and ask them to confirm with ja/nej. Do not ask again on later turns unless you save something new.",
+            };
+          }
+          if (name === "confirm_athlete_memory") {
+            const result = await confirmCoachProfile(discordId);
+            return {
+              tool_call_id: toolCall.id,
+              success: result.success,
+              confirmed: result.confirmed || false,
+              message: result.message || null,
+              summary: result.summary || null,
+            };
+          }
+          const result = await rejectCoachProfile(discordId);
+          return {
+            tool_call_id: toolCall.id,
+            success: result.success,
+            rejected: result.rejected || false,
+            message: result.message || null,
+            summary: result.summary || null,
+            editUrl: myPagesUrl,
+            instruction: result.success
+              ? "Say you undid the last save. For older memory they can edit under My Pages (Profile)."
+              : undefined,
+          };
+        } catch (err) {
+          console.error("coach memory tool failed:", err?.message || err);
+          return { tool_call_id: toolCall.id, success: false, message: "Could not update coach memory." };
+        }
+      }
       
       default:
         await safeReply(message, `❌ Unknown command: ${name}`);
@@ -1315,22 +1494,48 @@ ${catalogLines}
 - Time: ${timestamp}`;
 }
 
-function buildCoachSystemPrompt(message) {
+async function buildCoachSystemPrompt(message) {
   const timestamp = new Date().toISOString();
+  let memoryBlock = "No durable athlete constraints stored yet.";
+  let pendingLine = "";
+  try {
+    const profile = await getCoachProfile(message.author.id);
+    memoryBlock = formatCoachProfileForPrompt(profile);
+    if (profile?.pendingConfirmation?.summary) {
+      pendingLine = `\nLast save awaiting ja/nej: ${profile.pendingConfirmation.summary}`;
+    }
+  } catch (err) {
+    console.error("getCoachProfile failed:", err?.message || err);
+  }
+
   return `You are DZR Coach, a cycling coach for Danish Zwift Racers. You chat in a private Discord DM with one athlete.
 
 ## Data
 You may only use tools to read THIS athlete's Strava data (the Discord user talking to you). Never request or invent another rider's activities.
 Typical flow: get_recent_activities first, then get_activity_details for a specific session, plus profile/stats/zones as needed. get_zwiftpower_context is optional extra (category/phenotype).
 
+## Athlete constraints (durable memory)
+${memoryBlock}${pendingLine}
+
+Obey ride frequency and weekly slots over last week's Strava volume. Never prescribe through an active injury.
+If they ask to change or delete older memory, tell them to edit it on https://www.dzrracingseries.com/members-zone/my-pages (Profile tab). You may only undo the last auto-save with reject_athlete_memory when they say nej/forkert.
+
+## Memory tools
+- When the athlete states a durable fact (rides per week, other sports, fixed strength days, injury, goal) OR a coaching-style preference (short messages, always Danish, direct tone, bullets only, etc.), call update_athlete_memory with only those fields.
+- Do not infer rules from a busy Strava week. Do not invent memory.
+- After update_athlete_memory succeeds, your reply MUST include what you saved and ask: "Stemmer det? Svar ja eller nej." (or English if they write English). Ask only when something new was just stored.
+- If they reply ja / det stemmer to a pending save, call confirm_athlete_memory.
+- If they reply nej / forkert, call reject_athlete_memory (undoes only that last save).
+- If they ignore the question, keep the save and do not ask again.
+
 ## Coaching style
-- Reply in the user's language (Danish or English).
+- Reply in the user's language (Danish or English) unless Athlete constraints specify a language.
 - Be a practical endurance coach: load, recovery, easy days, intensity distribution, race prep.
 - Cite specific recent sessions (date, duration, power/HR) from tool results. Never invent numbers that were not returned by a tool.
 - If tools fail, say so and ask them to reconnect Strava if needs_reconnect/connectUrl is present.
 - Not medical advice. Do not prescribe training through illness, injury, chest pain, or disordered eating. Suggest seeing a professional when relevant.
 - Do not give doping, extreme restriction, or dangerous overtraining advice.
-- Keep replies concise (Discord). Use short bullets when listing sessions.
+- Keep replies concise (Discord) unless they asked for detailed replies. Use short bullets when listing sessions. If style.length is short, stay very brief.
 
 ## Current context
 - Athlete Discord: ${message.author.username} (ID: ${message.author.id})
@@ -1557,7 +1762,7 @@ async function handleAIChatMessage(message, client) {
 
     const knowledgeCatalog = isCoachSession ? [] : await getKnowledgeCatalog();
     const systemPrompt = isCoachSession
-      ? buildCoachSystemPrompt(message)
+      ? await buildCoachSystemPrompt(message)
       : buildSystemPrompt(message, knowledgeCatalog);
     const activeTools = isCoachSession ? coachToolDefinitions : toolDefinitions;
     const maxTokens = isCoachSession ? COACH_MAX_TOKENS : AI_CONFIG.maxTokens;
