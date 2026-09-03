@@ -121,6 +121,25 @@ function safeStringify(value) {
   }
 }
 
+const MY_PAGES_URL = "https://www.dzrracingseries.com/members-zone/my-pages";
+
+function formatMemoryConfirmMessages(summary) {
+  const parts = String(summary || "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const bullets = (parts.length ? parts : ["dine træningsrammer"])
+    .map((p) => `• ${p}`)
+    .join("\n");
+  const confirmMessageDa =
+    `Jeg har gemt følgende til fremtidige samtaler:\n${bullets}\n\n` +
+    `Skriv **nej** hvis du ikke vil have det gemt. Du kan altid se og slette det under Mine sider:\n${MY_PAGES_URL}`;
+  const confirmMessageEn =
+    `I've saved the following for future conversations:\n${bullets}\n\n` +
+    `Reply **no** if you don't want this stored. You can always view and delete it on My Pages:\n${MY_PAGES_URL}`;
+  return { confirmMessageDa, confirmMessageEn };
+}
+
 /**
  * Compact tool results before adding them to the model context.
  * Big payloads (e.g. teams arrays) quickly degrade model performance & cost.
@@ -168,6 +187,14 @@ function compactToolResult(result) {
   if (result.series) base.series = result.series;
   if (result.zrl) base.zrl = result.zrl;
   if (typeof result.summary === "string") base.summary = result.summary.slice(0, 500);
+  if (typeof result.confirmMessageDa === "string") base.confirmMessageDa = result.confirmMessageDa.slice(0, 1500);
+  if (typeof result.confirmMessageEn === "string") base.confirmMessageEn = result.confirmMessageEn.slice(0, 1500);
+  if (typeof result.instruction === "string") base.instruction = result.instruction.slice(0, 800);
+  if (typeof result.editUrl === "string") base.editUrl = result.editUrl.slice(0, 300);
+  if (result.saved) base.saved = true;
+  if (result.confirmed) base.confirmed = true;
+  if (result.rejected) base.rejected = true;
+  if (result.profile && typeof result.profile === "object") base.profile = result.profile;
   if (Array.isArray(result.matches)) base.matches = result.matches.slice(0, 3);
   if (Array.isArray(result.available)) base.available = result.available.slice(0, 20);
   if (typeof result.error === "string") base.error = result.error.slice(0, 300);
@@ -604,7 +631,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "update_athlete_memory",
-      description: "Save durable facts the athlete just stated: ride frequency, sports, weekly slots, injuries, goals, AND coaching-style preferences (short messages, language, tone). Do not save a busy Strava week as a rule. After saving, tell them what you stored and ask them to confirm with yes/no.",
+      description: "Save durable facts the athlete just stated: ride frequency, sports, weekly slots, injuries, goals, AND coaching-style preferences (short messages, language, tone). Do not save a busy Strava week as a rule. Do not save language just because the current message is in Danish or English. After saving, use the provided confirmMessage in your reply.",
       parameters: {
         type: "object",
         properties: {
@@ -1262,7 +1289,6 @@ async function executeSingleToolCall(toolCall, message) {
           return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
         }
         const discordId = message.author.id;
-        const myPagesUrl = "https://www.dzrracingseries.com/members-zone/my-pages";
         try {
           if (name === "update_athlete_memory") {
             const patch = {};
@@ -1278,11 +1304,15 @@ async function executeSingleToolCall(toolCall, message) {
             }
             const profile = await mergeCoachProfile(discordId, patch, { summary: args.summary });
             const { pendingConfirmation, ...stored } = profile;
+            const summary = pendingConfirmation?.summary || args.summary || null;
+            const { confirmMessageDa, confirmMessageEn } = formatMemoryConfirmMessages(summary);
             return {
               tool_call_id: toolCall.id,
               success: true,
               saved: true,
-              summary: pendingConfirmation?.summary || args.summary || null,
+              summary,
+              confirmMessageDa,
+              confirmMessageEn,
               profile: {
                 ridesPerWeek: stored.ridesPerWeek,
                 sports: stored.sports,
@@ -1293,7 +1323,7 @@ async function executeSingleToolCall(toolCall, message) {
                 style: stored.style,
               },
               instruction:
-                "Tell the athlete exactly what you saved (only those fields) and ask them to confirm with ja/nej. Do not ask again on later turns unless you save something new.",
+                "Paste confirmMessageDa (or confirmMessageEn if they wrote English) as the memory notice. You may add a short coaching reply after it. Do not shorten it to 'Gemte:'. Even if they prefer short messages, keep this full notice.",
             };
           }
           if (name === "confirm_athlete_memory") {
@@ -1313,9 +1343,9 @@ async function executeSingleToolCall(toolCall, message) {
             rejected: result.rejected || false,
             message: result.message || null,
             summary: result.summary || null,
-            editUrl: myPagesUrl,
+            editUrl: MY_PAGES_URL,
             instruction: result.success
-              ? "Say you undid the last save. For older memory they can edit under My Pages (Profile)."
+              ? `Say you undid the last save. For older memory they can edit under My Pages: ${MY_PAGES_URL}`
               : undefined,
           };
         } catch (err) {
@@ -1518,12 +1548,13 @@ Typical flow: get_recent_activities first, then get_activity_details for a speci
 ${memoryBlock}${pendingLine}
 
 Obey ride frequency and weekly slots over last week's Strava volume. Never prescribe through an active injury.
-If they ask to change or delete older memory, tell them to edit it on https://www.dzrracingseries.com/members-zone/my-pages (Profile tab). You may only undo the last auto-save with reject_athlete_memory when they say nej/forkert.
+If they ask to change or delete older memory, tell them to edit it on ${MY_PAGES_URL} (Profile tab). You may only undo the last auto-save with reject_athlete_memory when they say nej/forkert.
 
 ## Memory tools
 - When the athlete states a durable fact (rides per week, other sports, fixed strength days, injury, goal) OR a coaching-style preference (short messages, always Danish, direct tone, bullets only, etc.), call update_athlete_memory with only those fields.
 - Do not infer rules from a busy Strava week. Do not invent memory.
-- After update_athlete_memory succeeds, your reply MUST include what you saved and ask: "Stemmer det? Svar ja eller nej." (or English if they write English). Ask only when something new was just stored.
+- Do not save language (da/en) just because this message is in Danish or English. Only save language if they explicitly want replies always in that language.
+- After update_athlete_memory succeeds, include the tool's confirmMessageDa (or confirmMessageEn) verbatim as the memory notice. Do not replace it with a one-liner like "Gemte: ...". This notice is allowed even when they prefer short coaching replies. Ask only when something new was just stored.
 - If they reply ja / det stemmer to a pending save, call confirm_athlete_memory.
 - If they reply nej / forkert, call reject_athlete_memory (undoes only that last save).
 - If they ignore the question, keep the save and do not ask again.
