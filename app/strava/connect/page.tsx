@@ -32,8 +32,8 @@ function ConnectForm() {
   return (
     <VStack align="stretch" spacing={5}>
       <Text color="gray.300">
-        DZR Coach uses your Strava data to give you personal training advice in a private Discord DM.
-        Only paid club members (current year) can connect — Verified Member is not enough.
+        DZR Coach bruger dine Strava-data til at give dig personlige træningsråd i en privat Discord-DM.
+        Kun betalende klubmedlemmer for indeværende år kan forbinde.
       </Text>
 
       <Box bg="gray.900" borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4}>
