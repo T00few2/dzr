@@ -16,6 +16,7 @@ const {
 } = require("./handlers/statsHandler");
 const { handleZwiftIdMessage, handleZwiftIdConfirmation } = require("./handlers/zwiftIdMessageHandler");
 const { handleAIChatMessage } = require("./handlers/aiChatHandler");
+const { migrateAllCoachProfiles } = require("./services/firebase");
 
 // Setup keep-alive server
 setupKeepAliveServer();
@@ -150,6 +151,10 @@ client.once("ready", () => {
   
   // Start the message scheduler
   startScheduler(client);
+
+  migrateAllCoachProfiles().catch((err) => {
+    console.warn("coach memory encryption backfill failed:", err?.message || err);
+  });
 });
 
 // Graceful shutdown handling

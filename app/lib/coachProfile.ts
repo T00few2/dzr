@@ -1,4 +1,5 @@
 import { COLLECTIONS } from '@/app/lib/sharedConstants'
+import { unwrapCoachMemoryDoc } from '@/app/lib/tokenCrypto'
 
 export const COACH_PROFILES_COLLECTION = COLLECTIONS.coachProfiles || 'coach_profiles'
 
@@ -247,7 +248,8 @@ export function publicCoachFields(data: unknown, source: 'user' | 'coach' = 'use
 }
 
 export function toClientCoachProfile(data: unknown, discordId: string) {
-  const src = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+  const raw = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+  const src = unwrapCoachMemoryDoc({ ...raw, discordId })
   const fields = publicCoachFields(src, src.updatedBy === 'coach' ? 'coach' : 'user')
   return {
     ...fields,

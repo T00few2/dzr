@@ -8,6 +8,12 @@ import {
   publicCoachFields,
   toClientCoachProfile,
 } from '@/app/lib/coachProfile'
+import {
+  canEncryptCoachMemory,
+  needsCoachMemoryMigration,
+  persistCoachMemoryDoc,
+  unwrapCoachMemoryDoc,
+} from '@/app/lib/tokenCrypto'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -17,6 +23,12 @@ async function sessionMember(req: Request) {
   const discordId = String((session as any)?.discordId || '').trim()
   if (!discordId) return { discordId: '', eligible: false }
   return { discordId, eligible: await hasClubMemberRole(discordId) }
+}
+
+function warnIfPlaintext() {
+  if (!canEncryptCoachMemory()) {
+    console.warn('COACH_MEMORY_KEY / STRAVA_CONNECT_SECRET missing; storing coach memory in plaintext')
+  }
 }
 
 export async function GET(req: Request) {
@@ -29,9 +41,27 @@ export async function GET(req: Request) {
       return NextResponse.json({ eligible: false, profile: emptyCoachProfile() })
     }
 
-    const snap = await adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId).get()
-    const profile = snap.exists
-      ? toClientCoachProfile({ ...snap.data(), discordId }, discordId)
+    const ref = adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId)
+    const snap = await ref.get()
+    const raw = snap.exists ? { ...(snap.data() || {}), discordId } : null
+    if (raw && needsCoachMemoryMigration(raw)) {
+      try {
+        const unwrapped = unwrapCoachMemoryDoc(raw)
+        await ref.set(
+          persistCoachMemoryDoc({
+            discordId,
+            updatedAt: unwrapped.updatedAt ?? null,
+            updatedBy: unwrapped.updatedBy ?? null,
+            ...publicCoachFields(unwrapped, unwrapped.updatedBy === 'coach' ? 'coach' : 'user'),
+            pendingConfirmation: unwrapped.pendingConfirmation ?? null,
+          })
+        )
+      } catch (err: any) {
+        console.warn('coach memory encryption migrate failed:', err?.message || err)
+      }
+    }
+    const profile = raw
+      ? toClientCoachProfile(raw, discordId)
       : { ...emptyCoachProfile(), discordId, updatedAt: null, updatedBy: null }
 
     return NextResponse.json({ eligible: true, profile })
@@ -54,12 +84,16 @@ export async function PUT(req: Request) {
     const body = await req.json().catch(() => ({}))
     const fields = publicCoachFields(body, 'user')
     const now = new Date()
-    await adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId).set({
-      discordId,
-      ...fields,
-      updatedAt: now,
-      updatedBy: 'user',
-    })
+    warnIfPlaintext()
+    await adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId).set(
+      persistCoachMemoryDoc({
+        discordId,
+        ...fields,
+        pendingConfirmation: null,
+        updatedAt: now,
+        updatedBy: 'user',
+      })
+    )
 
     return NextResponse.json({
       ok: true,
@@ -88,7 +122,7 @@ export async function DELETE(req: Request) {
     const clearNotes = url.searchParams.get('notes') === '1'
     const ref = adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId)
     const snap = await ref.get()
-    const existing = snap.exists ? snap.data() || {} : {}
+    const existing = unwrapCoachMemoryDoc({ ...(snap.exists ? snap.data() || {} : {}), discordId })
     const current = publicCoachFields(existing, existing.updatedBy === 'coach' ? 'coach' : 'user')
     const now = new Date()
 
@@ -114,12 +148,16 @@ export async function DELETE(req: Request) {
       })
     }
 
-    await ref.set({
-      discordId,
-      ...current,
-      updatedAt: now,
-      updatedBy: 'user',
-    })
+    warnIfPlaintext()
+    await ref.set(
+      persistCoachMemoryDoc({
+        discordId,
+        ...current,
+        pendingConfirmation: null,
+        updatedAt: now,
+        updatedBy: 'user',
+      })
+    )
 
     return NextResponse.json({
       ok: true,

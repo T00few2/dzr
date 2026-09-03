@@ -217,7 +217,7 @@ export default function CoachMemoryEditor() {
     <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
       <Heading size="sm" mb={2}>DZR Coach memory</Heading>
       <Text color="gray.400" mb={4} fontSize="sm">
-        Coach gemmer træningsrammer og skrivestil fra dine Discord-DMs og spørger ja/nej. Skader gemmes med dine egne ord, ikke som diagnose. Data bruges kun til din private coaching og sendes til OpenAI når du chatter med coachen. Her kan du rette eller slette det.
+        Coach gemmer træningsrammer og skrivestil fra dine Discord-DMs og spørger ja/nej. Skader gemmes med dine egne ord, ikke som diagnose. Data bruges kun til din private coaching og sendes til OpenAI når du chatter med coachen. Det gemmes krypteret og kan rettes eller slettes her.
       </Text>
 
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
