@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { STRAVA_CONNECTIONS_COLLECTION } from '@/app/lib/stravaAuth'
+import { readStravaTokens } from '@/app/lib/tokenCrypto'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,7 +17,14 @@ export async function POST(req: Request) {
 
     const ref = adminDb.collection(STRAVA_CONNECTIONS_COLLECTION).doc(discordId)
     const snap = await ref.get()
-    const accessToken = snap.exists ? String(snap.get('accessToken') || '') : ''
+    let accessToken = ''
+    if (snap.exists) {
+      try {
+        accessToken = readStravaTokens(snap.data() || {}).accessToken
+      } catch (err) {
+        console.warn('strava disconnect: could not decrypt token (continuing with local delete)', err)
+      }
+    }
 
     if (accessToken) {
       try {

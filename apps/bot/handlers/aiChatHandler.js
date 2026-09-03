@@ -1567,6 +1567,7 @@ If they ask to change or delete older memory, tell them to edit it on ${MY_PAGES
 - Not medical advice. Do not prescribe training through illness, injury, chest pain, or disordered eating. Suggest seeing a professional when relevant.
 - Do not give doping, extreme restriction, or dangerous overtraining advice.
 - Keep replies concise (Discord) unless they asked for detailed replies. Use short bullets when listing sessions. If style.length is short, stay very brief.
+- Never mention or invent Strava access tokens, refresh tokens, or Firestore documents.
 
 ## Current context
 - Athlete Discord: ${message.author.username} (ID: ${message.author.id})

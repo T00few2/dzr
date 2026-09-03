@@ -40,9 +40,10 @@ function ConnectForm() {
         </Text>
         <UnorderedList color="gray.300" spacing={2} pl={2}>
           <ListItem>DZR læser din Strava-profil, zoner og aktiviteter (read-only).</ListItem>
-          <ListItem>Aktivitetssammendrag og dine beskeder sendes til OpenAI for at generere coaching-svar.</ListItem>
-          <ListItem>Vi gemmer kun dine Strava-tokens (ikke hele træningshistorikken) og kun til coaching i Discord.</ListItem>
-          <ListItem>Du kan afbryde forbindelsen når som helst her på siden eller under Strava → Settings → My Apps.</ListItem>
+          <ListItem>Aktivitetssammendrag, dine beskeder og eventuel coach-memory sendes til OpenAI for at generere coaching-svar.</ListItem>
+          <ListItem>Strava-tokens gemmes krypteret og bruges kun til coaching i Discord. Vi gemmer ikke hele din træningshistorik.</ListItem>
+          <ListItem>Træningsrammer du fortæller coachen (fx 3–4 ture/uge, skader, skrivestil) gemmes som coach-memory. Du kan se og slette det under Mine sider.</ListItem>
+          <ListItem>Du kan afbryde Strava-forbindelsen når som helst her på siden eller under Strava → Settings → My Apps.</ListItem>
         </UnorderedList>
       </Box>
 

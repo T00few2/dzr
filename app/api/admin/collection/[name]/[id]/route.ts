@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/admin/_lib/auth'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import { COLLECTIONS } from '@/app/lib/sharedConstants'
-
-const ALLOWED = new Set(Object.values(COLLECTIONS))
+import { isBlockedAdminCollection } from '@/app/api/admin/_lib/collections'
 
 function coerceAdminFields(data: Record<string, any>) {
   if (typeof data.tags === 'string') {
@@ -20,7 +18,7 @@ function coerceAdminFields(data: Record<string, any>) {
 export async function PUT(req: Request, { params }: { params: { name: string; id: string } }) {
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
-  if (!ALLOWED.has(params.name)) return NextResponse.json({ error: 'Unknown collection' }, { status: 400 })
+  if (isBlockedAdminCollection(params.name)) return NextResponse.json({ error: 'Collection is not available here' }, { status: 403 })
   const body = await req.json().catch(() => ({}))
   const data = coerceAdminFields({ ...body })
   delete data.id
@@ -32,7 +30,7 @@ export async function PUT(req: Request, { params }: { params: { name: string; id
 export async function DELETE(req: Request, { params }: { params: { name: string; id: string } }) {
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
-  if (!ALLOWED.has(params.name)) return NextResponse.json({ error: 'Unknown collection' }, { status: 400 })
+  if (isBlockedAdminCollection(params.name)) return NextResponse.json({ error: 'Collection is not available here' }, { status: 403 })
   await adminDb.collection(params.name).doc(params.id).delete()
   return NextResponse.json({ ok: true })
 }

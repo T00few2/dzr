@@ -1,7 +1,15 @@
 const crypto = require("crypto");
+const admin = require("firebase-admin");
 const config = require("../config/config");
 const shared = require("../constants.json");
 const { db, getUserZwiftId, getLatestClubStats, isPaidClubMember } = require("./firebase");
+const {
+  canEncryptTokens,
+  encryptedTokenFields,
+  hasStravaRefreshToken,
+  needsTokenMigration,
+  readStravaTokens,
+} = require("./tokenCrypto");
 
 const COLLECTION = shared.firestore.stravaConnections || "strava_connections";
 const STRAVA_API = "https://www.strava.com/api/v3";
@@ -42,22 +50,62 @@ async function hasClubMemberRole(userId) {
 async function getConnection(discordId) {
   const snap = await db.collection(COLLECTION).doc(String(discordId)).get();
   if (!snap.exists) return null;
-  return { id: snap.id, ...snap.data() };
+  const data = snap.data() || {};
+  let tokens;
+  try {
+    tokens = readStravaTokens(data);
+  } catch (err) {
+    console.error("strava token decrypt failed:", err?.message || err);
+    return null;
+  }
+  const conn = {
+    id: snap.id,
+    ...data,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  };
+  if (needsTokenMigration(data) && tokens.refreshToken) {
+    try {
+      await persistEncryptedTokens(discordId, tokens.accessToken, tokens.refreshToken);
+    } catch (err) {
+      console.warn("strava token migration failed:", err?.message || err);
+    }
+  }
+  return conn;
+}
+
+async function persistEncryptedTokens(discordId, accessToken, refreshToken) {
+  const patch = encryptedTokenFields(accessToken, refreshToken);
+  if (canEncryptTokens()) {
+    patch.accessToken = admin.firestore.FieldValue.delete();
+    patch.refreshToken = admin.firestore.FieldValue.delete();
+  }
+  patch.updatedAt = new Date();
+  await db.collection(COLLECTION).doc(String(discordId)).set(patch, { merge: true });
 }
 
 async function isStravaConnected(discordId) {
-  const conn = await getConnection(discordId);
-  return !!(conn && conn.refreshToken);
+  const snap = await db.collection(COLLECTION).doc(String(discordId)).get();
+  if (!snap.exists) return false;
+  return hasStravaRefreshToken(snap.data() || {});
 }
 
 async function saveTokens(discordId, patch) {
-  await db.collection(COLLECTION).doc(String(discordId)).set(
-    {
-      ...patch,
-      updatedAt: new Date(),
-    },
-    { merge: true }
-  );
+  const next = { ...patch, updatedAt: new Date() };
+  if (next.accessToken != null || next.refreshToken != null) {
+    const existing = await db.collection(COLLECTION).doc(String(discordId)).get();
+    const current = existing.exists ? readStravaTokens(existing.data() || {}) : { accessToken: "", refreshToken: "" };
+    const access = next.accessToken != null ? String(next.accessToken) : current.accessToken;
+    const refresh = next.refreshToken != null ? String(next.refreshToken) : current.refreshToken;
+    Object.assign(next, encryptedTokenFields(access, refresh));
+    if (canEncryptTokens()) {
+      next.accessToken = admin.firestore.FieldValue.delete();
+      next.refreshToken = admin.firestore.FieldValue.delete();
+    } else {
+      console.warn("STRAVA_TOKEN_KEY / STRAVA_CONNECT_SECRET missing; storing Strava tokens in plaintext");
+    }
+  }
+  await db.collection(COLLECTION).doc(String(discordId)).set(next, { merge: true });
 }
 
 async function refreshAccessToken(conn, discordId) {
@@ -84,7 +132,6 @@ async function refreshAccessToken(conn, discordId) {
     const err = new Error("Strava token refresh failed");
     err.status = res.status;
     err.code = res.status === 400 || res.status === 401 ? "needs_reconnect" : "refresh_failed";
-    err.body = body;
     throw err;
   }
 

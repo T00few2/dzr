@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/admin/_lib/auth'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import { COLLECTIONS } from '@/app/lib/sharedConstants'
-
-const ALLOWED = new Set(Object.values(COLLECTIONS))
+import { isBlockedAdminCollection, redactAdminDoc } from '@/app/api/admin/_lib/collections'
 
 function coerceAdminFields(data: Record<string, any>) {
   if (typeof data.tags === 'string') {
@@ -21,9 +19,9 @@ export async function GET(req: Request, { params }: { params: { name: string } }
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
   const name = params.name
-  if (!ALLOWED.has(name)) return NextResponse.json({ error: 'Unknown collection' }, { status: 400 })
+  if (isBlockedAdminCollection(name)) return NextResponse.json({ error: 'Collection is not available here' }, { status: 403 })
   const snap = await adminDb.collection(name).limit(500).get()
-  const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+  const docs = snap.docs.map((d) => redactAdminDoc(d.id, d.data() || {}))
   return NextResponse.json({ docs })
 }
 
@@ -31,7 +29,7 @@ export async function POST(req: Request, { params }: { params: { name: string } 
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
   const name = params.name
-  if (!ALLOWED.has(name)) return NextResponse.json({ error: 'Unknown collection' }, { status: 400 })
+  if (isBlockedAdminCollection(name)) return NextResponse.json({ error: 'Collection is not available here' }, { status: 403 })
   const body = await req.json().catch(() => ({}))
   const id = typeof body.id === 'string' && body.id.trim() ? String(body.id).trim() : undefined
   const data = coerceAdminFields({ ...body })

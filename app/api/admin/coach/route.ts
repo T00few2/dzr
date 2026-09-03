@@ -3,6 +3,7 @@ import { requireAdmin } from '@/app/api/admin/_lib/auth'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { COLLECTIONS } from '@/app/lib/sharedConstants'
 import { toIso } from '@/app/lib/stravaAuth'
+import { hasStravaRefreshToken } from '@/app/lib/tokenCrypto'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -50,7 +51,7 @@ export async function GET(req: Request) {
       username: usage?.username || user.username || null,
       athleteName,
       athleteId: conn?.athleteId ?? null,
-      connected: !!conn?.refreshToken,
+      connected: hasStravaRefreshToken(conn),
       connectedAt: tsToIso(conn?.connectedAt),
       messageCount: Number(usage?.messageCount || 0),
       openaiCalls: Number(usage?.openaiCalls || 0),

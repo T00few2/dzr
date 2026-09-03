@@ -9,6 +9,7 @@ import {
   STRAVA_CONNECTIONS_COLLECTION,
   verifySignedToken,
 } from '@/app/lib/stravaAuth'
+import { canEncryptTokens, encryptedTokenFields } from '@/app/lib/tokenCrypto'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -63,11 +64,14 @@ export async function GET(req: Request) {
     if (!athleteId) return errorRedirect(req, 'token_exchange_failed')
 
     const now = admin.firestore.FieldValue.serverTimestamp()
-    await adminDb.collection(STRAVA_CONNECTIONS_COLLECTION).doc(discordId).set({
+    const accessToken = String(tokenBody.access_token)
+    const refreshToken = String(tokenBody.refresh_token)
+    if (!canEncryptTokens()) {
+      console.warn('STRAVA_TOKEN_KEY / STRAVA_CONNECT_SECRET missing; storing Strava tokens in plaintext')
+    }
+    const doc: Record<string, unknown> = {
       discordId,
       athleteId: Number(athleteId),
-      accessToken: String(tokenBody.access_token),
-      refreshToken: String(tokenBody.refresh_token),
       expiresAt: Number(tokenBody.expires_at) || Math.floor(Date.now() / 1000) + 20000,
       scopes: String(tokenBody.scope || ''),
       athleteFirstname: athlete.firstname || null,
@@ -75,7 +79,13 @@ export async function GET(req: Request) {
       consentAt: now,
       connectedAt: now,
       updatedAt: now,
-    })
+      ...encryptedTokenFields(accessToken, refreshToken),
+    }
+    if (!canEncryptTokens()) {
+      doc.accessToken = accessToken
+      doc.refreshToken = refreshToken
+    }
+    await adminDb.collection(STRAVA_CONNECTIONS_COLLECTION).doc(discordId).set(doc)
 
     try {
       await sendDm(

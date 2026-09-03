@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { hasClubMemberRole, STRAVA_CONNECTIONS_COLLECTION, toIso } from '@/app/lib/stravaAuth'
+import { hasStravaRefreshToken } from '@/app/lib/tokenCrypto'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -21,6 +22,9 @@ export async function GET(req: Request) {
     }
 
     const data = snap.data() || {}
+    if (!hasStravaRefreshToken(data)) {
+      return NextResponse.json({ connected: false, eligible })
+    }
     const first = String(data.athleteFirstname || '').trim()
     const last = String(data.athleteLastname || '').trim()
     const athleteName = [first, last].filter(Boolean).join(' ') || null
