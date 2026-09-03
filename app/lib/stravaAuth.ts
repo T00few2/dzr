@@ -78,15 +78,96 @@ export function siteOrigin(): string {
   return SITE_ORIGIN
 }
 
-export function stravaAuthorizeUrl(opts: { clientId: string; redirectUri: string; state: string }): string {
+export function stravaAuthorizeUrl(opts: { clientId: string; redirectUri: string; state: string; force?: boolean }): string {
   const url = new URL('https://www.strava.com/oauth/authorize')
   url.searchParams.set('client_id', opts.clientId)
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('redirect_uri', opts.redirectUri)
-  url.searchParams.set('approval_prompt', 'auto')
+  url.searchParams.set('approval_prompt', opts.force ? 'force' : 'auto')
   url.searchParams.set('scope', STRAVA_SCOPES)
   url.searchParams.set('state', opts.state)
   return url.toString()
+}
+
+async function refreshAccessToken(refreshToken: string): Promise<string> {
+  const clientId = getStravaClientId()
+  const clientSecret = getStravaClientSecret()
+  if (!clientId || !clientSecret || !refreshToken) return ''
+  const res = await fetch('https://www.strava.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }),
+    cache: 'no-store',
+  })
+  const body = await res.json().catch(() => null)
+  return res.ok && body?.access_token ? String(body.access_token) : ''
+}
+
+/**
+ * Revoke DZR's grant on Strava so the app disappears from the athlete's My Apps.
+ * Tries /oauth/revoke (refresh token) then legacy /oauth/deauthorize.
+ */
+export async function revokeStravaGrant(opts: {
+  accessToken?: string
+  refreshToken?: string
+  expiresAt?: number
+}): Promise<boolean> {
+  const clientId = getStravaClientId()
+  const clientSecret = getStravaClientSecret()
+  const refreshToken = String(opts.refreshToken || '').trim()
+  let accessToken = String(opts.accessToken || '').trim()
+  const expiresAt = Number(opts.expiresAt) || 0
+  const now = Math.floor(Date.now() / 1000)
+
+  if (clientId && clientSecret && refreshToken) {
+    try {
+      const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+      const res = await fetch('https://www.strava.com/oauth/revoke', {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${basic}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          token: refreshToken,
+          token_type_hint: 'refresh_token',
+        }),
+        cache: 'no-store',
+      })
+      if (res.ok) return true
+    } catch (err) {
+      console.warn('strava /oauth/revoke failed', err)
+    }
+  }
+
+  if ((!accessToken || expiresAt <= now + 60) && refreshToken) {
+    try {
+      accessToken = await refreshAccessToken(refreshToken)
+    } catch (err) {
+      console.warn('strava refresh before deauthorize failed', err)
+    }
+  }
+
+  if (accessToken) {
+    try {
+      const res = await fetch('https://www.strava.com/oauth/deauthorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ access_token: accessToken }),
+        cache: 'no-store',
+      })
+      if (res.ok) return true
+    } catch (err) {
+      console.warn('strava /oauth/deauthorize failed', err)
+    }
+  }
+
+  return false
 }
 
 /**

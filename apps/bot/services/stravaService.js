@@ -3,13 +3,12 @@ const admin = require("firebase-admin");
 const config = require("../config/config");
 const shared = require("../constants.json");
 const { db, getUserZwiftId, getLatestClubStats, isPaidClubMember } = require("./firebase");
-const {
-  canEncryptTokens,
-  encryptedTokenFields,
-  hasStravaRefreshToken,
-  needsTokenMigration,
-  readStravaTokens,
-} = require("./tokenCrypto");
+  const {
+    canEncryptTokens,
+    encryptedTokenFields,
+    needsTokenMigration,
+    readStravaTokens,
+  } = require("./tokenCrypto");
 
 const COLLECTION = shared.firestore.stravaConnections || "strava_connections";
 const STRAVA_API = "https://www.strava.com/api/v3";
@@ -40,7 +39,7 @@ function getConnectUrl(discordId) {
   const token = mintConnectToken(discordId);
   if (!token) return null;
   const origin = String(config.strava?.siteOrigin || shared.siteOrigin || "").replace(/\/+$/, "");
-  return `${origin}/strava/connect?token=${encodeURIComponent(token)}`;
+  return `${origin}/strava/connect?token=${encodeURIComponent(token)}&force=1`;
 }
 
 async function hasClubMemberRole(userId) {
@@ -85,9 +84,8 @@ async function persistEncryptedTokens(discordId, accessToken, refreshToken) {
 }
 
 async function isStravaConnected(discordId) {
-  const snap = await db.collection(COLLECTION).doc(String(discordId)).get();
-  if (!snap.exists) return false;
-  return hasStravaRefreshToken(snap.data() || {});
+  const conn = await getConnection(discordId);
+  return Boolean(conn && String(conn.refreshToken || "").trim());
 }
 
 async function saveTokens(discordId, patch) {

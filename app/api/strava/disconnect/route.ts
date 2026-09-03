@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import { STRAVA_CONNECTIONS_COLLECTION } from '@/app/lib/stravaAuth'
+import { revokeStravaGrant, STRAVA_CONNECTIONS_COLLECTION } from '@/app/lib/stravaAuth'
 import { readStravaTokens } from '@/app/lib/tokenCrypto'
 
 export const dynamic = 'force-dynamic'
@@ -17,30 +17,28 @@ export async function POST(req: Request) {
 
     const ref = adminDb.collection(STRAVA_CONNECTIONS_COLLECTION).doc(discordId)
     const snap = await ref.get()
-    let accessToken = ''
-    if (snap.exists) {
-      try {
-        accessToken = readStravaTokens(snap.data() || {}).accessToken
-      } catch (err) {
-        console.warn('strava disconnect: could not decrypt token (continuing with local delete)', err)
-      }
-    }
+    let revokedOnStrava = false
 
-    if (accessToken) {
+    if (snap.exists) {
+      const data = snap.data() || {}
       try {
-        await fetch('https://www.strava.com/oauth/deauthorize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ access_token: accessToken }),
-          cache: 'no-store',
+        const tokens = readStravaTokens(data)
+        revokedOnStrava = await revokeStravaGrant({
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresAt: Number(data.expiresAt) || 0,
         })
       } catch (err) {
-        console.warn('strava deauthorize failed (continuing with local delete)', err)
+        console.warn('strava disconnect: could not decrypt/revoke (continuing with local delete)', err)
       }
+      await ref.delete()
     }
 
-    await ref.delete()
-    return NextResponse.json({ connected: false })
+    return NextResponse.json({
+      connected: false,
+      revokedOnStrava,
+      stravaAppsUrl: 'https://www.strava.com/settings/apps',
+    })
   } catch (err: any) {
     console.error('strava disconnect error:', err)
     return NextResponse.json({ error: err?.message || 'Disconnect failed' }, { status: 500 })

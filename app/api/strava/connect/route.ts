@@ -53,6 +53,7 @@ export async function GET(req: Request) {
       clientId,
       redirectUri: getStravaRedirectUri(req),
       state,
+      force: params.get('force') === '1',
     })
     return NextResponse.redirect(authorizeUrl)
   } catch (err: any) {

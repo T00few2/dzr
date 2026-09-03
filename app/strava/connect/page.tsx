@@ -18,14 +18,16 @@ import Link from 'next/link'
 function ConnectForm() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token') || ''
+  const force = searchParams.get('force') === '1'
   const [agreed, setAgreed] = useState(false)
 
   const href = useMemo(() => {
     const url = new URL('/api/strava/connect', typeof window !== 'undefined' ? window.location.origin : 'https://www.dzrracingseries.com')
     url.searchParams.set('consent', '1')
     if (token) url.searchParams.set('token', token)
+    if (force) url.searchParams.set('force', '1')
     return `${url.pathname}${url.search}`
-  }, [token])
+  }, [token, force])
 
   return (
     <VStack align="stretch" spacing={5}>
