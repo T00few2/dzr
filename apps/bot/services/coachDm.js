@@ -15,6 +15,30 @@ function sendNoEmbeds(channel, content) {
   return channel.send({ content, flags: MessageFlags.SuppressEmbeds });
 }
 
+function stravaConnectText(discordId) {
+  const url = strava.getConnectUrl(discordId);
+  return (
+    "**Strava**\n" +
+    "For at give dig træningsråd skal jeg have adgang til dine Strava-aktiviteter.\n\n" +
+    "1. Klik på linket (gyldigt 15 minutter)\n" +
+    "2. Læs samtykket og forbind Strava\n" +
+    "3. Kom tilbage hertil og spørg fx: *Hvordan var min uge?*\n\n" +
+    (url ? noEmbedUrl(url) : "⚠️ Connect-link kunne ikke oprettes (STRAVA_CONNECT_SECRET mangler).")
+  );
+}
+
+function unconnectedCoachText(discordId) {
+  return `${coachHowItWorksText({ includeStartHint: false })}\n\n${stravaConnectText(discordId)}`;
+}
+
+async function markHowItWorksSentSafe(discordId) {
+  try {
+    await markCoachHowItWorksSent(discordId);
+  } catch (err) {
+    console.warn("markCoachHowItWorksSent failed:", err?.message || err);
+  }
+}
+
 async function sendCoachingIntroDm(user, client, guild = null) {
   const eligible = await strava.hasClubMemberRole(user.id, client, guild);
   if (!eligible) {
@@ -38,26 +62,15 @@ async function sendCoachingIntroDm(user, client, guild = null) {
   const connected = await strava.isStravaConnected(user.id);
   const alreadyExplained = Boolean(profile?.howItWorksSentAt);
   try {
-    if (!alreadyExplained) {
-      await sendNoEmbeds(dm, coachHowItWorksText({ includeStartHint: false }));
-      try {
-        await markCoachHowItWorksSent(user.id);
-      } catch (err) {
-        console.warn("markCoachHowItWorksSent failed:", err?.message || err);
-      }
+    if (!connected) {
+      await sendNoEmbeds(dm, unconnectedCoachText(user.id));
+      await markHowItWorksSentSafe(user.id);
+      return { ok: true, connected: false, dmChannelId: dm.id };
     }
 
-    if (!connected) {
-      const url = strava.getConnectUrl(user.id);
-      await sendNoEmbeds(
-        dm,
-        "For at give dig træningsråd skal jeg have adgang til dine Strava-aktiviteter.\n\n" +
-          "1. Klik på linket (gyldigt 15 minutter)\n" +
-          "2. Læs samtykket og forbind Strava\n" +
-          "3. Kom tilbage hertil og spørg fx: *Hvordan var min uge?*\n\n" +
-          (url ? noEmbedUrl(url) : "⚠️ Connect-link kunne ikke oprettes (STRAVA_CONNECT_SECRET mangler).")
-      );
-      return { ok: true, connected: false, dmChannelId: dm.id };
+    if (!alreadyExplained) {
+      await sendNoEmbeds(dm, coachHowItWorksText({ includeStartHint: false }));
+      await markHowItWorksSentSafe(user.id);
     }
 
     if (alreadyExplained) {
@@ -135,6 +148,7 @@ module.exports = {
   handleCoach,
   sendCoachingIntroDm,
   handoffCoachingFromMessage,
+  unconnectedCoachText,
   NOT_CLUB_MEMBER_TEXT,
   DM_CLOSED_TEXT,
 };

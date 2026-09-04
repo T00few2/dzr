@@ -43,7 +43,7 @@ export async function resetCoachProfileToDefault(discordId: string) {
       ...reset,
       updatedAt: now,
       updatedBy: 'user',
-      howItWorksSentAt: existing.howItWorksSentAt || null,
+      howItWorksSentAt: null,
     })
   )
 }

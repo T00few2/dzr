@@ -145,9 +145,8 @@ export async function GET(req: Request) {
     }
 
     if (userId) {
-      const { ensureDefaultCoachProfile, sendCoachHowItWorksIfNeeded } = await import('@/app/lib/ensureCoachProfile')
+      const { ensureDefaultCoachProfile } = await import('@/app/lib/ensureCoachProfile')
       await ensureDefaultCoachProfile(String(userId))
-      await sendCoachHowItWorksIfNeeded(String(userId))
       const roleSync = await syncClubMemberRole({
         userId,
         coveredThroughYear,

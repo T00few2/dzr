@@ -1,13 +1,10 @@
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import { sendDm } from '@/app/api/admin/_lib/discord'
 import {
   COACH_PROFILES_COLLECTION,
   defaultCoachProfile,
-  publicCoachFields,
   toClientCoachProfile,
 } from '@/app/lib/coachProfile'
-import { persistCoachMemoryDoc, unwrapCoachMemoryDoc } from '@/app/lib/tokenCrypto'
-import { coachHowItWorksText } from '@/app/lib/coachHowItWorks'
+import { persistCoachMemoryDoc } from '@/app/lib/tokenCrypto'
 
 function profileRef(discordId: string) {
   return adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId)
@@ -33,32 +30,4 @@ export async function ensureDefaultCoachProfile(discordId: string) {
     })
   )
   return toClientCoachProfile({ ...fields, discordId: id, updatedAt: now, updatedBy: 'user' }, id)
-}
-
-export async function sendCoachHowItWorksIfNeeded(discordId: string) {
-  const id = String(discordId || '').trim()
-  if (!id) return
-  try {
-    await ensureDefaultCoachProfile(id)
-    const ref = profileRef(id)
-    const snap = await ref.get()
-    const existing = unwrapCoachMemoryDoc({ ...(snap.exists ? snap.data() || {} : {}), discordId: id })
-    if (existing.howItWorksSentAt) return
-    const ok = await sendDm(id, coachHowItWorksText({ includeStartHint: true }))
-    if (!ok) {
-      console.warn('coach how-it-works DM failed for', id)
-      return
-    }
-    await ref.set(
-      persistCoachMemoryDoc({
-        discordId: id,
-        ...publicCoachFields(existing),
-        updatedAt: existing.updatedAt || new Date(),
-        updatedBy: 'user',
-        howItWorksSentAt: new Date().toISOString(),
-      })
-    )
-  } catch (err: any) {
-    console.warn('sendCoachHowItWorksIfNeeded failed:', err?.message || err)
-  }
 }

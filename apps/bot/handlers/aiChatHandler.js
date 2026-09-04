@@ -23,7 +23,7 @@ const {
 } = require("./commandHandlers");
 const { startQuizFromMessage } = require("../services/quizService");
 const strava = require("../services/stravaService");
-const { handoffCoachingFromMessage, NOT_CLUB_MEMBER_TEXT } = require("../services/coachDm");
+const { handoffCoachingFromMessage, unconnectedCoachText, NOT_CLUB_MEMBER_TEXT } = require("../services/coachDm");
 const { formatCoachProfileForPrompt } = require("../services/coachProfile");
 const { MY_PAGES_COACH_URL, noEmbedUrl } = require("../services/coachHowItWorks");
 const {
@@ -1763,12 +1763,7 @@ async function handleAIChatMessage(message, client) {
       conversationModes.set(conversationKey, "coach");
       const connected = await strava.isStravaConnected(message.author.id);
       if (!connected) {
-        const url = strava.getConnectUrl(message.author.id);
-        await safeReply(
-          message,
-          "🔗 Forbind Strava først (linket gælder 15 min):\n" +
-            (url ? noEmbedUrl(url) : "Connect-link kunne ikke oprettes. Tjek STRAVA_CONNECT_SECRET.")
-        );
+        await safeReply(message, unconnectedCoachText(message.author.id));
         return;
       }
     }

@@ -103,9 +103,8 @@ export async function POST(req: Request) {
           updatedAt: paidAt,
         }, { merge: true })
 
-        const { ensureDefaultCoachProfile, sendCoachHowItWorksIfNeeded } = await import('@/app/lib/ensureCoachProfile')
+        const { ensureDefaultCoachProfile } = await import('@/app/lib/ensureCoachProfile')
         await ensureDefaultCoachProfile(String(userId))
-        await sendCoachHowItWorksIfNeeded(String(userId))
 
         const roleSync = await syncClubMemberRole({
           userId,
