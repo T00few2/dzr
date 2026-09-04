@@ -3,7 +3,7 @@ import { requireAdmin } from '@/app/api/admin/_lib/auth'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { COLLECTIONS } from '@/app/lib/sharedConstants'
 import { toIso } from '@/app/lib/stravaAuth'
-import { hasStravaRefreshToken } from '@/app/lib/tokenCrypto'
+import { hasStravaRefreshToken, unwrapCoachMemoryDoc } from '@/app/lib/tokenCrypto'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,10 +16,11 @@ export async function GET(req: Request) {
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
 
-  const [connectionsSnap, usageSnap, usersSnap] = await Promise.all([
+  const [connectionsSnap, usageSnap, usersSnap, profilesSnap] = await Promise.all([
     adminDb.collection(COLLECTIONS.stravaConnections).get(),
     adminDb.collection(COLLECTIONS.coachUsage).get(),
     adminDb.collection(COLLECTIONS.users).get(),
+    adminDb.collection(COLLECTIONS.coachProfiles).get(),
   ])
 
   const usersById = new Map<string, any>()
@@ -37,7 +38,13 @@ export async function GET(req: Request) {
     usageById.set(doc.id, { id: doc.id, ...(doc.data() || {}) })
   })
 
-  const ids = new Set<string>([...connectionsById.keys(), ...usageById.keys()])
+  const notesOptInById = new Map<string, boolean>()
+  profilesSnap.forEach((doc) => {
+    const profile = unwrapCoachMemoryDoc({ ...(doc.data() || {}), discordId: doc.id })
+    notesOptInById.set(doc.id, profile.notesOptIn === true)
+  })
+
+  const ids = new Set<string>([...connectionsById.keys(), ...usageById.keys(), ...notesOptInById.keys()])
 
   const people = Array.from(ids).map((discordId) => {
     const conn = connectionsById.get(discordId) || null
@@ -53,6 +60,7 @@ export async function GET(req: Request) {
       athleteId: conn?.athleteId ?? null,
       connected: hasStravaRefreshToken(conn),
       connectedAt: tsToIso(conn?.connectedAt),
+      notesOptIn: notesOptInById.get(discordId) === true,
       messageCount: Number(usage?.messageCount || 0),
       openaiCalls: Number(usage?.openaiCalls || 0),
       promptTokens: Number(usage?.promptTokens || 0),
@@ -110,6 +118,7 @@ export async function GET(req: Request) {
   const totals = people.reduce(
     (acc, p) => {
       acc.connected += p.connected ? 1 : 0
+      acc.notesOn += p.notesOptIn ? 1 : 0
       acc.messageCount += p.messageCount
       acc.openaiCalls += p.openaiCalls
       acc.promptTokens += p.promptTokens
@@ -117,7 +126,7 @@ export async function GET(req: Request) {
       acc.totalTokens += p.totalTokens
       return acc
     },
-    { connected: 0, messageCount: 0, openaiCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+    { connected: 0, notesOn: 0, messageCount: 0, openaiCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 }
   )
 
   return NextResponse.json({
