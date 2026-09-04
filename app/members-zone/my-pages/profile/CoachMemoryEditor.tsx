@@ -11,7 +11,6 @@ import {
   Box,
   Button,
   Checkbox,
-  Collapse,
   Flex,
   FormControl,
   FormLabel,
@@ -103,7 +102,6 @@ export default function CoachMemoryEditor() {
   const [ridesMin, setRidesMin] = useState('')
   const [ridesMax, setRidesMax] = useState('')
   const [clearConfirm, setClearConfirm] = useState<ClearConfirm | null>(null)
-  const [notesOpen, setNotesOpen] = useState(false)
   const cancelClearRef = useRef<HTMLButtonElement>(null)
 
   function applyProfile(profile: CoachProfile) {
@@ -629,7 +627,7 @@ export default function CoachMemoryEditor() {
           </RadioGroup>
         </FormControl>
       </SimpleGrid>
-      <FormControl mb={6}>
+      <FormControl mb={4}>
         <FormLabel>Other style notes</FormLabel>
         <Input
           placeholder="e.g. bullets only, no emojis"
@@ -640,6 +638,21 @@ export default function CoachMemoryEditor() {
         />
       </FormControl>
 
+      <Checkbox
+        isChecked={form.notesOptIn === true}
+        onChange={(e) => setForm((prev) => ({ ...prev, notesOptIn: e.target.checked }))}
+        colorScheme="red"
+        alignItems="flex-start"
+        mb={2}
+      >
+        <Text color="gray.200" fontSize="sm">
+          Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går, eller at jeg kører et løb den 18. oktober). Coachen bruger dem kun, når dette er slået til.
+        </Text>
+      </Checkbox>
+      <Text color="gray.400" fontSize="sm" mb={4}>
+        Husk at trykke Save settings, når du slår det til eller fra.
+      </Text>
+
       <Flex wrap="wrap" gap={2}>
         <Button onClick={save} isLoading={saving} size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }}>
           Save settings
@@ -647,33 +660,14 @@ export default function CoachMemoryEditor() {
         <Button onClick={() => setClearConfirm({ kind: 'settings' })} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
           Clear settings
         </Button>
-        <Button
-          onClick={() => setNotesOpen((open) => !open)}
-          size="sm"
-          {...secondaryButtonProps}
-          borderColor={notesOpen ? 'gray.300' : 'gray.500'}
-        >
-          {notesOpen ? 'Hide notes' : 'Notes'}
-        </Button>
       </Flex>
     </Box>
 
-      <Collapse in={notesOpen} animateOpacity>
+      {form.notesOptIn === true && (
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
           <Heading size="sm" mb={2}>Chat-noter</Heading>
-          <Checkbox
-            isChecked={form.notesOptIn === true}
-            onChange={(e) => setForm((prev) => ({ ...prev, notesOptIn: e.target.checked }))}
-            colorScheme="red"
-            alignItems="flex-start"
-            mb={3}
-          >
-            <Text color="gray.200" fontSize="sm">
-              Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går, eller at jeg kører et løb den 18. oktober). Coachen bruger dem kun, når dette er slået til.
-            </Text>
-          </Checkbox>
           <Text color="gray.400" fontSize="sm" mb={3}>
-            Noterne er ikke faste regler. Du kan se og slette dem her. Husk at trykke Save settings, når du slår det til eller fra.
+            Noterne er ikke faste regler. Du kan se og slette dem her.
           </Text>
           {notesLoading ? (
             <Spinner size="sm" mb={4} />
@@ -727,7 +721,7 @@ export default function CoachMemoryEditor() {
             Clear notes
           </Button>
         </Box>
-      </Collapse>
+      )}
 
       <Button
         onClick={() => setClearConfirm({ kind: 'all' })}
