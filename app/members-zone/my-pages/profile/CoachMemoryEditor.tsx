@@ -34,6 +34,14 @@ const DAYS: Array<{ id: string; label: string }> = [
   { id: 'sun', label: 'Søn' },
 ]
 
+const secondaryButtonProps = {
+  variant: 'outline' as const,
+  color: 'gray.100',
+  borderColor: 'gray.500',
+  bg: 'gray.800',
+  _hover: { bg: 'gray.700', borderColor: 'gray.400', color: 'white' },
+}
+
 function emptyForm(): CoachProfile {
   return {
     ridesPerWeek: null,
@@ -322,7 +330,7 @@ export default function CoachMemoryEditor() {
             borderColor="gray.600"
             size="sm"
           />
-          <Button size="sm" onClick={addExtraSport} variant="outline">Add</Button>
+          <Button size="sm" onClick={addExtraSport} {...secondaryButtonProps}>Add</Button>
         </HStack>
         {form.sports.filter((s) => !SPORT_OPTIONS.includes(s)).length > 0 && (
           <Text mt={2} fontSize="sm" color="gray.400">
@@ -334,7 +342,7 @@ export default function CoachMemoryEditor() {
       <Box mb={4}>
         <Flex justify="space-between" align="center" mb={2}>
           <FormLabel mb={0}>Fixed weekly slots</FormLabel>
-          <Button size="xs" onClick={addWeekly} variant="outline">Add slot</Button>
+          <Button size="xs" onClick={addWeekly} {...secondaryButtonProps}>Add slot</Button>
         </Flex>
         <Stack spacing={3}>
           {form.weekly.map((row, index) => (
@@ -376,7 +384,8 @@ export default function CoachMemoryEditor() {
                 <Button
                   size="xs"
                   variant="ghost"
-                  colorScheme="red"
+                  color="red.300"
+                  _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
                   onClick={() => setForm((prev) => ({ ...prev, weekly: prev.weekly.filter((_, i) => i !== index) }))}
                 >
                   Delete
@@ -390,7 +399,7 @@ export default function CoachMemoryEditor() {
       <Box mb={4}>
         <Flex justify="space-between" align="center" mb={2}>
           <FormLabel mb={0}>Injuries / limits</FormLabel>
-          <Button size="xs" onClick={addInjury} variant="outline">Add</Button>
+          <Button size="xs" onClick={addInjury} {...secondaryButtonProps}>Add</Button>
         </Flex>
         <Stack spacing={3}>
           {form.injuries.map((inj, index) => (
@@ -424,7 +433,8 @@ export default function CoachMemoryEditor() {
               <Button
                 size="sm"
                 variant="ghost"
-                colorScheme="red"
+                color="red.300"
+                _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
                 onClick={() => setForm((prev) => ({ ...prev, injuries: prev.injuries.filter((_, i) => i !== index) }))}
               >
                 Delete
@@ -452,7 +462,8 @@ export default function CoachMemoryEditor() {
               <Button
                 size="sm"
                 variant="ghost"
-                colorScheme="red"
+                color="red.300"
+                _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
                 onClick={() => setForm((prev) => ({ ...prev, goals: prev.goals.filter((_, i) => i !== index) }))}
               >
                 Delete
@@ -471,7 +482,7 @@ export default function CoachMemoryEditor() {
           />
           <Button
             size="sm"
-            variant="outline"
+            {...secondaryButtonProps}
             onClick={() => {
               const value = newGoal.trim()
               if (!value) return
@@ -577,7 +588,8 @@ export default function CoachMemoryEditor() {
               <Button
                 size="xs"
                 variant="ghost"
-                colorScheme="red"
+                color="red.300"
+                _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
                 onClick={() => deleteChatNote(note.id)}
                 isDisabled={saving}
               >
@@ -590,6 +602,9 @@ export default function CoachMemoryEditor() {
             size="sm"
             variant="outline"
             colorScheme="red"
+            color="red.300"
+            borderColor="red.400"
+            _hover={{ bg: 'whiteAlpha.100' }}
             onClick={deleteAllChatNotes}
             isLoading={saving}
           >
@@ -602,7 +617,7 @@ export default function CoachMemoryEditor() {
         <Button onClick={save} isLoading={saving} size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }}>
           Save memory
         </Button>
-        <Button onClick={clearAll} isLoading={saving} size="sm" variant="outline" colorScheme="red">
+        <Button onClick={clearAll} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
           Clear all
         </Button>
       </HStack>

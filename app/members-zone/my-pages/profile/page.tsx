@@ -252,6 +252,9 @@ export default function ProfilePage() {
                 size="sm"
                 variant="outline"
                 colorScheme="red"
+                color="red.300"
+                borderColor="red.400"
+                _hover={{ bg: 'whiteAlpha.100' }}
               >
                 Disconnect Strava
               </Button>
