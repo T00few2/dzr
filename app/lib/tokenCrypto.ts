@@ -200,7 +200,7 @@ export function unwrapCoachMemoryDoc(data: Record<string, unknown> | null | unde
     discordId: (src.discordId as string) || null,
     updatedAt: src.updatedAt ?? null,
     updatedBy: src.updatedBy ?? null,
-    howItWorksSentAt: src.howItWorksSentAt ?? fromPlain.howItWorksSentAt ?? null,
+    howItWorksSentAt: src.howItWorksSentAt ?? null,
     notesOptIn: fromPlain.notesOptIn === true || src.notesOptIn === true,
   }
 }
