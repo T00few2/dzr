@@ -101,7 +101,7 @@ export async function GET(req: Request) {
       console.warn('strava callback: could not DM user', discordId, dmErr)
     }
 
-    return NextResponse.redirect(new URL('/strava/connected', req.url))
+    return NextResponse.redirect(new URL('/members-zone/my-pages?tab=2&strava=connected', req.url))
   } catch (err: any) {
     console.error('strava callback error:', err)
     return errorRedirect(req, 'callback_failed')

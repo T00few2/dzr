@@ -14,6 +14,7 @@ import {
 } from '@chakra-ui/react';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
 import dynamic from 'next/dynamic';
+import StravaConnectedModal from './StravaConnectedModal';
 
 const Profile = dynamic(() => import('./profile/page'), { ssr: false });
 const Membership = dynamic(() => import('./membership/page'), { ssr: false });
@@ -39,6 +40,7 @@ function MyPagesPageContent() {
   const searchParams = useSearchParams();
   const [isClub, setIsClub] = useState<boolean | null>(null);
   const [tabIndex, setTabIndex] = useState(0);
+  const [stravaConnectedOpen, setStravaConnectedOpen] = useState(false);
 
   React.useEffect(() => {
     if (status === 'unauthenticated') {
@@ -70,6 +72,17 @@ function MyPagesPageContent() {
     if (isClub === null) return;
     setTabIndex(parseTabIndex(searchParams?.get('tab') ?? null, isClub));
   }, [isClub, searchParams]);
+
+  React.useEffect(() => {
+    if (searchParams?.get('strava') === 'connected') setStravaConnectedOpen(true);
+  }, [searchParams]);
+
+  const closeStravaConnected = () => {
+    setStravaConnectedOpen(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('strava');
+    window.history.replaceState({}, '', url);
+  };
 
   const handleTabChange = (index: number) => {
     setTabIndex(index);
@@ -121,6 +134,7 @@ function MyPagesPageContent() {
           )}
         </TabPanels>
       </Tabs>
+      <StravaConnectedModal isOpen={stravaConnectedOpen} onClose={closeStravaConnected} />
     </Container>
   );
 }

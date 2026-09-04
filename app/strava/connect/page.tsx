@@ -33,7 +33,7 @@ function ConnectForm() {
     <VStack align="stretch" spacing={5}>
       <Text color="gray.300">
         DZR Coach bruger dine Strava-data til at give dig personlige træningsråd i en privat Discord-DM.
-        Kun betalende klubmedlemmer for indeværende år kan forbinde.
+        Kun betalende klubmedlemmer kan forbinde.
       </Text>
 
       <Box bg="gray.900" borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4}>
