@@ -139,7 +139,7 @@ export default function CoachPage() {
         )}
       </Box>
 
-      <CoachMemoryEditor />
+      {strava?.connected && <CoachMemoryEditor />}
     </Box>
   )
 }
