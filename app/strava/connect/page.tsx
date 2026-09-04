@@ -3,7 +3,6 @@
 import React, { Suspense, useMemo, useState } from 'react'
 import {
   Box,
-  Button,
   Checkbox,
   Container,
   Heading,
@@ -14,6 +13,7 @@ import {
 } from '@chakra-ui/react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import ConnectWithStravaButton from '@/components/ConnectWithStravaButton'
 
 function ConnectForm() {
   const searchParams = useSearchParams()
@@ -60,17 +60,7 @@ function ConnectForm() {
         </Text>
       </Checkbox>
 
-      <Button
-        as="a"
-        href={href}
-        isDisabled={!agreed}
-        bg="#ad1a2d"
-        color="white"
-        _hover={{ bg: '#8c1524' }}
-        _disabled={{ opacity: 0.5, cursor: 'not-allowed' }}
-      >
-        Connect Strava
-      </Button>
+      <ConnectWithStravaButton href={href} disabled={!agreed} />
 
       <Text fontSize="sm" color="gray.500">
         Mangler du klubmedlemskab?{' '}

@@ -20,6 +20,7 @@ import {
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import CoachMemoryEditor from '../profile/CoachMemoryEditor'
+import ConnectWithStravaButton from '@/components/ConnectWithStravaButton'
 
 const secondaryButtonProps = {
   variant: 'outline' as const,
@@ -150,9 +151,7 @@ export default function CoachPage() {
           <Text>Coaching er kun for betalende klubmedlemmer. Forny medlemskab under Membership, eller gå til /join.</Text>
         ) : (
           <>
-            <Button as="a" href="/strava/connect?force=1" size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }}>
-              Connect Strava
-            </Button>
+            <ConnectWithStravaButton href="/strava/connect?force=1" />
             {stravaNotice && (
               <Text mt={3} fontSize="sm" color="orange.200">
                 {stravaNotice}{' '}
