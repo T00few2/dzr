@@ -1,17 +1,42 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
-import { Box, Heading, Text, SimpleGrid, Button, Spinner, useToast, Link as ChakraLink } from '@chakra-ui/react'
+import React, { useEffect, useRef, useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
+  Box,
+  Heading,
+  Text,
+  SimpleGrid,
+  Button,
+  Spinner,
+  useToast,
+  Link as ChakraLink,
+} from '@chakra-ui/react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import CoachMemoryEditor from '../profile/CoachMemoryEditor'
 
+const secondaryButtonProps = {
+  variant: 'outline' as const,
+  color: 'gray.100',
+  borderColor: 'gray.500',
+  bg: 'gray.800',
+  _hover: { bg: 'gray.700', borderColor: 'gray.400', color: 'white' },
+}
+
 export default function CoachPage() {
   const { data: session, status } = useSession()
   const toast = useToast()
+  const cancelDisconnectRef = useRef<HTMLButtonElement>(null)
   const [strava, setStrava] = useState<{ connected: boolean; eligible?: boolean; athleteName?: string | null; connectedAt?: string | null } | null>(null)
   const [stravaBusy, setStravaBusy] = useState(false)
   const [stravaNotice, setStravaNotice] = useState<string | null>(null)
+  const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false)
 
   async function loadStravaStatus() {
     const res = await fetch('/api/strava/status', { cache: 'no-store' })
@@ -46,7 +71,7 @@ export default function CoachPage() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         toast({ title: data?.error || 'Disconnect failed', status: 'error' })
-        return
+        return false
       }
       await loadStravaStatus()
       if (data?.revokedOnStrava) {
@@ -58,6 +83,7 @@ export default function CoachPage() {
           'DZR no longer has your tokens, but Strava may still list the app. Remove it under Strava → Settings → My Apps if it is still there.'
         )
       }
+      return true
     } finally {
       setStravaBusy(false)
     }
@@ -107,7 +133,7 @@ export default function CoachPage() {
             </Box>
             <Box>
               <Button
-                onClick={disconnectStrava}
+                onClick={() => setDisconnectConfirmOpen(true)}
                 isLoading={stravaBusy}
                 size="sm"
                 variant="outline"
@@ -140,6 +166,50 @@ export default function CoachPage() {
       </Box>
 
       {strava?.connected && <CoachMemoryEditor />}
+
+      <AlertDialog
+        isOpen={disconnectConfirmOpen}
+        leastDestructiveRef={cancelDisconnectRef}
+        onClose={() => {
+          if (!stravaBusy) setDisconnectConfirmOpen(false)
+        }}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent bg="gray.800" color="gray.100" borderWidth="1px" borderColor="gray.600">
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Disconnect Strava?
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              Strava-forbindelsen afbrydes. Coach-profilen nulstilles, og alle chat-noter slettes. Det kan ikke fortrydes.
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button
+                ref={cancelDisconnectRef}
+                onClick={() => setDisconnectConfirmOpen(false)}
+                isDisabled={stravaBusy}
+                {...secondaryButtonProps}
+                size="sm"
+              >
+                Cancel
+              </Button>
+              <Button
+                ml={3}
+                size="sm"
+                bg="#ad1a2d"
+                color="white"
+                _hover={{ bg: '#8c1524' }}
+                onClick={async () => {
+                  const ok = await disconnectStrava()
+                  if (ok) setDisconnectConfirmOpen(false)
+                }}
+                isLoading={stravaBusy}
+              >
+                Disconnect Strava
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Box>
   )
 }

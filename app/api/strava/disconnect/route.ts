@@ -3,6 +3,7 @@ import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { revokeStravaGrant, STRAVA_CONNECTIONS_COLLECTION } from '@/app/lib/stravaAuth'
 import { readStravaTokens } from '@/app/lib/tokenCrypto'
+import { clearCoachProfileAndNotes } from '@/app/lib/clearCoachData'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -14,6 +15,8 @@ export async function POST(req: Request) {
     if (!discordId) {
       return NextResponse.json({ error: 'Not logged in' }, { status: 401 })
     }
+
+    await clearCoachProfileAndNotes(discordId)
 
     const ref = adminDb.collection(STRAVA_CONNECTIONS_COLLECTION).doc(discordId)
     const snap = await ref.get()

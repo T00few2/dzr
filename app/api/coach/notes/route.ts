@@ -8,6 +8,7 @@ import {
   toClientCoachChatNote,
 } from '@/app/lib/coachChatNotes'
 import { canEncryptCoachMemory } from '@/app/lib/tokenCrypto'
+import { deleteAllCoachChatNotes } from '@/app/lib/clearCoachData'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -74,14 +75,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Specify id or all=1' }, { status: 400 })
     }
 
-    while (true) {
-      const snap = await col.limit(400).get()
-      if (snap.empty) break
-      const batch = adminDb.batch()
-      snap.docs.forEach((doc) => batch.delete(doc.ref))
-      await batch.commit()
-      if (snap.size < 400) break
-    }
+    await deleteAllCoachChatNotes(discordId)
 
     return NextResponse.json({ ok: true, notes: [] })
   } catch (err: any) {
