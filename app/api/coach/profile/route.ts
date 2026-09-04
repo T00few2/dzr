@@ -82,7 +82,11 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}))
+    const ref = adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId)
+    const snap = await ref.get()
+    const existing = unwrapCoachMemoryDoc({ ...(snap.exists ? snap.data() || {} : {}), discordId })
     const fields = publicCoachFields(body, 'user')
+    fields.notes = publicCoachFields(existing, existing.updatedBy === 'coach' ? 'coach' : 'user').notes
     const now = new Date()
     warnIfPlaintext()
     await adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId).set(

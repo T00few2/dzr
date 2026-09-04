@@ -200,6 +200,73 @@ export function unwrapCoachMemoryDoc(data: Record<string, unknown> | null | unde
   }
 }
 
+export type CoachChatNoteKind = 'feeling' | 'plan' | 'preference_transient' | 'life'
+
+export type CoachChatNotePlain = {
+  id?: string | null
+  discordId?: string | null
+  at?: unknown
+  text?: unknown
+  kind?: unknown
+  noteEnc?: unknown
+}
+
+const CHAT_NOTE_KINDS = new Set<CoachChatNoteKind>([
+  'feeling',
+  'plan',
+  'preference_transient',
+  'life',
+])
+
+function packChatNote(plain: CoachChatNotePlain) {
+  const kind = String(plain.kind || '').trim().toLowerCase()
+  return {
+    text: String(plain.text || '').slice(0, 280),
+    kind: (CHAT_NOTE_KINDS.has(kind as CoachChatNoteKind) ? kind : 'life') as CoachChatNoteKind,
+  }
+}
+
+export function unwrapChatNoteDoc(data: Record<string, unknown> | null | undefined): {
+  id: string | null
+  discordId: string | null
+  at: string | null
+  text: string
+  kind: CoachChatNoteKind
+} {
+  const src = data && typeof data === 'object' ? data : {}
+  let packed: ReturnType<typeof packChatNote> | null = null
+  if (src.noteEnc) {
+    const json = decryptWithKey(getCoachKey(), src.noteEnc, 'coach chat note')
+    const parsed = JSON.parse(json || '{}')
+    packed = packChatNote(parsed && typeof parsed === 'object' ? parsed : {})
+  }
+  const fromPlain = packed || packChatNote(src)
+  return {
+    id: (src.id as string) || null,
+    discordId: (src.discordId as string) || null,
+    at: toIso(src.at),
+    text: fromPlain.text,
+    kind: fromPlain.kind,
+  }
+}
+
+export function persistChatNoteDoc(plain: CoachChatNotePlain): Record<string, unknown> {
+  const packed = packChatNote(plain)
+  const meta = {
+    discordId: plain.discordId || null,
+    at: plain.at || new Date(),
+  }
+  const key = getCoachKey()
+  if (!key) {
+    return { ...meta, ...packed }
+  }
+  return {
+    ...meta,
+    noteEnc: encryptWithKey(key, JSON.stringify(packed)),
+    noteEncVersion: 1,
+  }
+}
+
 export function persistCoachMemoryDoc(plain: CoachMemoryPlain): Record<string, unknown> {
   const packed = packCoachMemory(plain)
   const meta = {
@@ -231,6 +298,7 @@ export const SECRET_DOC_KEYS = [
   'accessTokenEnc',
   'refreshTokenEnc',
   'memoryEnc',
+  'noteEnc',
   'privateKey',
   'idToken',
   'clientSecret',

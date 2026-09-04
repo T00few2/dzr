@@ -18,10 +18,10 @@ import {
   Spinner,
   Stack,
   Text,
-  Textarea,
   useToast,
 } from '@chakra-ui/react'
 import type { CoachInjury, CoachProfile, CoachWeeklySlot } from '@/app/lib/coachProfile'
+import type { CoachChatNote } from '@/app/lib/coachChatNotes'
 
 const SPORT_OPTIONS = ['cycling', 'running', 'swimming', 'strength']
 const DAYS: Array<{ id: string; label: string }> = [
@@ -52,6 +52,8 @@ export default function CoachMemoryEditor() {
   const [saving, setSaving] = useState(false)
   const [eligible, setEligible] = useState<boolean | null>(null)
   const [form, setForm] = useState<CoachProfile>(emptyForm())
+  const [chatNotes, setChatNotes] = useState<CoachChatNote[]>([])
+  const [notesLoading, setNotesLoading] = useState(true)
   const [extraSport, setExtraSport] = useState('')
   const [newGoal, setNewGoal] = useState('')
   const [ridesMin, setRidesMin] = useState('')
@@ -75,19 +77,29 @@ export default function CoachMemoryEditor() {
     let ignore = false
     async function load() {
       try {
-        const res = await fetch('/api/coach/profile', { cache: 'no-store' })
-        if (res.status === 401) {
+        const [profileRes, notesRes] = await Promise.all([
+          fetch('/api/coach/profile', { cache: 'no-store' }),
+          fetch('/api/coach/notes', { cache: 'no-store' }),
+        ])
+        if (profileRes.status === 401) {
           if (!ignore) setEligible(false)
           return
         }
-        const data = await res.json()
+        const data = await profileRes.json()
         if (ignore) return
         setEligible(data?.eligible !== false)
         if (data?.profile) applyProfile(data.profile)
+        if (notesRes.ok) {
+          const notesData = await notesRes.json().catch(() => ({}))
+          if (!ignore && Array.isArray(notesData?.notes)) setChatNotes(notesData.notes)
+        }
       } catch {
         if (!ignore) setEligible(false)
       } finally {
-        if (!ignore) setLoading(false)
+        if (!ignore) {
+          setLoading(false)
+          setNotesLoading(false)
+        }
       }
     }
     load()
@@ -193,6 +205,45 @@ export default function CoachMemoryEditor() {
     }
   }
 
+  function formatNoteAt(at: string | null) {
+    if (!at) return ''
+    const date = new Date(at)
+    if (Number.isNaN(date.getTime())) return at.slice(0, 10)
+    return date.toLocaleString('da-DK', { dateStyle: 'medium', timeStyle: 'short' })
+  }
+
+  async function deleteChatNote(id: string) {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/coach/notes?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast({ title: data?.error || 'Could not delete note', status: 'error' })
+        return
+      }
+      setChatNotes(Array.isArray(data?.notes) ? data.notes : [])
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteAllChatNotes() {
+    if (!window.confirm('Slet alle chat-noter fra DZR Coach?')) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/coach/notes?all=1', { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast({ title: data?.error || 'Could not delete notes', status: 'error' })
+        return
+      }
+      setChatNotes([])
+      toast({ title: 'Chat-noter slettet', status: 'info' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
@@ -217,7 +268,7 @@ export default function CoachMemoryEditor() {
     <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
       <Heading size="sm" mb={2}>DZR Coach memory</Heading>
       <Text color="gray.400" mb={4} fontSize="sm">
-        Coach gemmer træningsrammer og skrivestil fra dine Discord-DMs og spørger ja/nej. Skader gemmes med dine egne ord, ikke som diagnose. Data bruges kun til din private coaching og sendes til OpenAI når du chatter med coachen. Det gemmes krypteret og kan rettes eller slettes her.
+        Coach gemmer træningsrammer og skrivestil fra dine Discord-DMs og spørger ja/nej. Skader gemmes med dine egne ord, ikke som diagnose. Kortvarige ting (fx “jeg er syg i dag”) gemmes som daterede chat-noter, ikke som faste regler. Data bruges kun til din private coaching og sendes til OpenAI når du chatter med coachen. Det gemmes krypteret og kan rettes eller slettes her.
       </Text>
 
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
@@ -433,17 +484,6 @@ export default function CoachMemoryEditor() {
         </HStack>
       </Box>
 
-      <FormControl mb={4}>
-        <FormLabel>Notes</FormLabel>
-        <Textarea
-          value={form.notes}
-          onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-          bg="gray.800"
-          borderColor="gray.600"
-          rows={3}
-        />
-      </FormControl>
-
       <Heading size="xs" mb={3} color="gray.300">Coaching style</Heading>
       <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4} mb={4}>
         <FormControl>
@@ -507,6 +547,56 @@ export default function CoachMemoryEditor() {
           borderColor="gray.600"
         />
       </FormControl>
+
+      <Heading size="xs" mb={3} color="gray.300">Chat-noter</Heading>
+      <Text color="gray.400" fontSize="sm" mb={3}>
+        Daterede uddrag fra dine coach-DMs (fx hvordan en tur føltes, eller at du var syg i går). Ikke faste regler. Du kan slette dem her.
+      </Text>
+      {notesLoading ? (
+        <Spinner size="sm" mb={6} />
+      ) : chatNotes.length === 0 ? (
+        <Text color="gray.500" fontSize="sm" mb={6}>Ingen chat-noter endnu.</Text>
+      ) : (
+        <Stack spacing={3} mb={4}>
+          {chatNotes.map((note) => (
+            <Flex
+              key={note.id}
+              gap={3}
+              align="flex-start"
+              justify="space-between"
+              bg="gray.800"
+              borderWidth="1px"
+              borderColor="gray.600"
+              borderRadius="md"
+              p={3}
+            >
+              <Box>
+                <Text fontSize="xs" color="gray.500">{formatNoteAt(note.at)}</Text>
+                <Text fontSize="sm" color="gray.100">{note.text}</Text>
+              </Box>
+              <Button
+                size="xs"
+                variant="ghost"
+                colorScheme="red"
+                onClick={() => deleteChatNote(note.id)}
+                isDisabled={saving}
+              >
+                Slet
+              </Button>
+            </Flex>
+          ))}
+          <Button
+            alignSelf="flex-start"
+            size="sm"
+            variant="outline"
+            colorScheme="red"
+            onClick={deleteAllChatNotes}
+            isLoading={saving}
+          >
+            Slet alle chat-noter
+          </Button>
+        </Stack>
+      )}
 
       <HStack>
         <Button onClick={save} isLoading={saving} size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }}>

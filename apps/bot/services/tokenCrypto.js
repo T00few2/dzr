@@ -181,6 +181,51 @@ function unwrapCoachMemoryDoc(data) {
   };
 }
 
+function packChatNote(plain) {
+  const src = plain && typeof plain === "object" ? plain : {};
+  const kind = String(src.kind || "").trim().toLowerCase();
+  const allowed = new Set(["feeling", "plan", "preference_transient", "life"]);
+  return {
+    text: String(src.text || "").slice(0, 280),
+    kind: allowed.has(kind) ? kind : "life",
+  };
+}
+
+function unwrapChatNoteDoc(data) {
+  const src = data && typeof data === "object" ? data : {};
+  let packed = null;
+  if (src.noteEnc) {
+    const json = decryptWithKey(getCoachKey(), src.noteEnc, "coach chat note");
+    const parsed = JSON.parse(json || "{}");
+    packed = packChatNote(parsed && typeof parsed === "object" ? parsed : {});
+  }
+  const fromPlain = packed || packChatNote(src);
+  return {
+    id: src.id || null,
+    discordId: src.discordId || null,
+    at: toIso(src.at),
+    text: fromPlain.text,
+    kind: fromPlain.kind,
+  };
+}
+
+function persistChatNoteDoc(plain) {
+  const packed = packChatNote(plain);
+  const meta = {
+    discordId: plain?.discordId || null,
+    at: plain?.at || new Date(),
+  };
+  const key = getCoachKey();
+  if (!key) {
+    return { ...meta, ...packed };
+  }
+  return {
+    ...meta,
+    noteEnc: encryptWithKey(key, JSON.stringify(packed)),
+    noteEncVersion: 1,
+  };
+}
+
 function persistCoachMemoryDoc(plain) {
   const packed = packCoachMemory(plain);
   const meta = {
@@ -219,4 +264,6 @@ module.exports = {
   unwrapCoachMemoryDoc,
   persistCoachMemoryDoc,
   needsCoachMemoryMigration,
+  unwrapChatNoteDoc,
+  persistChatNoteDoc,
 };

@@ -4,6 +4,7 @@ import { redactSecrets } from '@/app/lib/tokenCrypto'
 const BLOCKED = new Set([
   COLLECTIONS.stravaConnections,
   COLLECTIONS.coachProfiles,
+  COLLECTIONS.coachChatNotes,
   COLLECTIONS.payments,
 ])
 

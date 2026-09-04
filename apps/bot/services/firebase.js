@@ -14,7 +14,15 @@ const {
   unwrapCoachMemoryDoc,
   persistCoachMemoryDoc,
   needsCoachMemoryMigration,
+  unwrapChatNoteDoc,
+  persistChatNoteDoc,
 } = require("./tokenCrypto");
+const {
+  MAX_NOTES_PER_ATHLETE,
+  MAX_EXTRACT_NOTES,
+  sanitizeNote,
+  isNearDuplicate,
+} = require("./coachChatNotes");
 
 // Initialize Firebase
 const privateKey = config.firebase.privateKey;
@@ -32,6 +40,113 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
+const COACH_CHAT_NOTES_COLLECTION = shared.firestore?.coachChatNotes || "coach_chat_notes";
+
+function coachChatNotesCol(discordId) {
+  return db.collection(COACH_CHAT_NOTES_COLLECTION).doc(String(discordId)).collection("notes");
+}
+
+function coachChatNotesParent(discordId) {
+  return db.collection(COACH_CHAT_NOTES_COLLECTION).doc(String(discordId));
+}
+
+function unwrapNoteDocSafe(doc) {
+  try {
+    const note = unwrapChatNoteDoc({ ...(doc.data() || {}), id: doc.id });
+    if (!note?.text) return null;
+    return note;
+  } catch (err) {
+    console.warn("unwrapChatNoteDoc failed:", err?.message || err);
+    return null;
+  }
+}
+
+async function listCoachChatNotes(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return [];
+  const snap = await coachChatNotesCol(id).orderBy("at", "desc").limit(MAX_NOTES_PER_ATHLETE).get();
+  return snap.docs.map(unwrapNoteDocSafe).filter(Boolean);
+}
+
+async function pruneCoachChatNotes(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return;
+  const snap = await coachChatNotesCol(id).orderBy("at", "asc").get();
+  const overflow = snap.size - MAX_NOTES_PER_ATHLETE;
+  if (overflow <= 0) return;
+  const batch = db.batch();
+  snap.docs.slice(0, overflow).forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+}
+
+async function addCoachChatNotes(discordId, incoming, { at } = {}) {
+  const id = String(discordId || "").trim();
+  if (!id) return [];
+  if (!canEncryptCoachMemory()) {
+    console.warn("COACH_MEMORY_KEY / STRAVA_CONNECT_SECRET missing; storing coach chat notes in plaintext");
+  }
+  const existing = await listCoachChatNotes(id);
+  const now = at instanceof Date ? at : new Date();
+  const toAdd = [];
+  for (const raw of Array.isArray(incoming) ? incoming : []) {
+    const note = sanitizeNote(raw, now.toISOString());
+    if (!note) continue;
+    if (isNearDuplicate(note.text, existing) || isNearDuplicate(note.text, toAdd)) continue;
+    toAdd.push(note);
+    if (toAdd.length >= MAX_EXTRACT_NOTES) break;
+  }
+  if (!toAdd.length) return [];
+
+  const batch = db.batch();
+  batch.set(coachChatNotesParent(id), { discordId: id, updatedAt: now }, { merge: true });
+  const created = [];
+  for (const note of toAdd) {
+    const ref = coachChatNotesCol(id).doc();
+    const stamp = note.at ? new Date(note.at) : now;
+    const when = Number.isNaN(stamp.getTime()) ? now : stamp;
+    batch.set(ref, persistChatNoteDoc({
+      discordId: id,
+      at: when,
+      text: note.text,
+      kind: note.kind,
+    }));
+    created.push({
+      id: ref.id,
+      discordId: id,
+      at: when.toISOString(),
+      text: note.text,
+      kind: note.kind,
+    });
+  }
+  await batch.commit();
+  await pruneCoachChatNotes(id);
+  return created;
+}
+
+async function deleteCoachChatNote(discordId, noteId) {
+  const id = String(discordId || "").trim();
+  const nid = String(noteId || "").trim();
+  if (!id || !nid) return false;
+  await coachChatNotesCol(id).doc(nid).delete();
+  return true;
+}
+
+async function deleteAllCoachChatNotes(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return 0;
+  const col = coachChatNotesCol(id);
+  let deleted = 0;
+  while (true) {
+    const snap = await col.limit(400).get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    snap.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    deleted += snap.size;
+    if (snap.size < 400) break;
+  }
+  return deleted;
+}
 
 /**
  * Get user's linked ZwiftID from Discord ID
@@ -507,4 +622,8 @@ module.exports = {
   rejectCoachProfile,
   formatCoachProfileForPrompt,
   migrateAllCoachProfiles,
+  listCoachChatNotes,
+  addCoachChatNotes,
+  deleteCoachChatNote,
+  deleteAllCoachChatNotes,
 }; 

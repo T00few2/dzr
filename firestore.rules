@@ -36,6 +36,12 @@ service cloud.firestore {
     match /coach_profiles/{id} {
       allow read, write: if false;
     }
+    match /coach_chat_notes/{id} {
+      allow read, write: if false;
+      match /notes/{noteId} {
+        allow read, write: if false;
+      }
+    }
     match /coach_usage/{id} {
       allow read, write: if false;
     }

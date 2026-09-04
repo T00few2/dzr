@@ -29,6 +29,7 @@
     "stravaConnections": "strava_connections",
     "coachUsage": "coach_usage",
     "coachUsageEvents": "coach_usage_events",
-    "coachProfiles": "coach_profiles"
+    "coachProfiles": "coach_profiles",
+    "coachChatNotes": "coach_chat_notes"
   }
 }

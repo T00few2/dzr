@@ -326,18 +326,6 @@ function mergeCoachProfileData(existing, patch) {
   if (Object.prototype.hasOwnProperty.call(patch, "goals")) {
     next.goals = sanitizeGoals([...(base.goals || []), ...(Array.isArray(patch.goals) ? patch.goals : [])]);
   }
-  if (Object.prototype.hasOwnProperty.call(patch, "notes")) {
-    const extra = sanitizeNotes(patch.notes);
-    if (!extra) {
-      next.notes = base.notes;
-    } else if (!base.notes) {
-      next.notes = extra;
-    } else if (base.notes.toLowerCase().includes(extra.toLowerCase())) {
-      next.notes = base.notes;
-    } else {
-      next.notes = `${base.notes}\n${extra}`.slice(0, 1000);
-    }
-  }
   if (Object.prototype.hasOwnProperty.call(patch, "style")) {
     next.style = mergeStyle(base.style, patch.style);
   }
@@ -383,7 +371,6 @@ function formatCoachProfileForPrompt(profile) {
     }
   }
   if (data.goals.length) lines.push(`- Goals: ${data.goals.join("; ")}`);
-  if (data.notes) lines.push(`- Notes: ${data.notes}`);
   const styleText = formatStyle(data.style);
   if (styleText) lines.push(`- Coaching style (obey every reply): ${styleText}`);
 
@@ -407,8 +394,6 @@ function summarizePatch(patch, fallback) {
     parts.push(inj.status === "recovered" ? `${inj.text} recovered` : inj.text);
   }
   for (const goal of sanitizeGoals(patch?.goals)) parts.push(goal);
-  const notes = sanitizeNotes(patch?.notes);
-  if (notes) parts.push(notes);
   if (patch && Object.prototype.hasOwnProperty.call(patch, "style")) {
     const styleText = formatStyle(mergeStyle(emptyStyle(), patch.style));
     if (styleText) parts.push(styleText);
