@@ -49,16 +49,16 @@ const secondaryButtonProps = {
 }
 
 type ClearConfirm =
-  | { kind: 'memory' }
+  | { kind: 'settings' }
   | { kind: 'notes' }
   | { kind: 'all' }
   | { kind: 'note'; id: string }
 
 const CLEAR_CONFIRM_COPY = {
-  memory: {
-    title: 'Clear memory?',
-    body: 'Coach-profilen nulstilles til udgangspunktet. Chat-noter slettes ikke.',
-    confirm: 'Clear memory',
+  settings: {
+    title: 'Clear settings?',
+    body: 'Coach-indstillingerne nulstilles til udgangspunktet. Chat-noter slettes ikke.',
+    confirm: 'Clear settings',
   },
   notes: {
     title: 'Clear notes?',
@@ -230,17 +230,17 @@ export default function CoachMemoryEditor() {
         return
       }
       if (data?.profile) applyProfile(data.profile)
-      toast({ title: 'Coach memory saved', status: 'success' })
+      toast({ title: 'Coach settings saved', status: 'success' })
     } finally {
       setSaving(false)
     }
   }
 
-  async function resetMemoryRequest() {
+  async function resetSettingsRequest() {
     const res = await fetch('/api/coach/profile', { method: 'DELETE' })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      throw new Error(data?.error || 'Could not reset memory')
+      throw new Error(data?.error || 'Could not reset settings')
     }
     applyProfile(data?.profile || emptyForm())
   }
@@ -254,13 +254,13 @@ export default function CoachMemoryEditor() {
     setChatNotes([])
   }
 
-  async function clearMemory() {
+  async function clearSettings() {
     setSaving(true)
     try {
-      await resetMemoryRequest()
-      toast({ title: 'Coach-profilen er nulstillet', status: 'info' })
+      await resetSettingsRequest()
+      toast({ title: 'Coach-indstillingerne er nulstillet', status: 'info' })
     } catch (err: any) {
-      toast({ title: err?.message || 'Could not reset memory', status: 'error' })
+      toast({ title: err?.message || 'Could not reset settings', status: 'error' })
     } finally {
       setSaving(false)
     }
@@ -281,7 +281,7 @@ export default function CoachMemoryEditor() {
   async function clearAll() {
     setSaving(true)
     try {
-      const results = await Promise.allSettled([resetMemoryRequest(), deleteAllNotesRequest()])
+      const results = await Promise.allSettled([resetSettingsRequest(), deleteAllNotesRequest()])
       const failed = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined
       if (failed) {
         toast({
@@ -321,7 +321,7 @@ export default function CoachMemoryEditor() {
   async function confirmClear() {
     const action = clearConfirm
     if (!action) return
-    if (action.kind === 'memory') await clearMemory()
+    if (action.kind === 'settings') await clearSettings()
     else if (action.kind === 'notes') await clearNotes()
     else if (action.kind === 'all') await clearAll()
     else await deleteChatNote(action.id)
@@ -331,7 +331,7 @@ export default function CoachMemoryEditor() {
   if (loading) {
     return (
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
-        <Heading size="sm" mb={2}>DZR Coach memory</Heading>
+        <Heading size="sm" mb={2}>DZR Coach settings</Heading>
         <Spinner size="sm" />
       </Box>
     )
@@ -340,9 +340,9 @@ export default function CoachMemoryEditor() {
   if (eligible === false) {
     return (
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
-        <Heading size="sm" mb={2}>DZR Coach memory</Heading>
+        <Heading size="sm" mb={2}>DZR Coach settings</Heading>
         <Text color="gray.400" fontSize="sm">
-          Coaching-memory er kun for betalende klubmedlemmer. Forny medlemskab under Membership.
+          Coach settings er kun for betalende klubmedlemmer. Forny medlemskab under Membership.
         </Text>
       </Box>
     )
@@ -350,7 +350,7 @@ export default function CoachMemoryEditor() {
 
   return (
     <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
-      <Heading size="sm" mb={2}>DZR Coach memory</Heading>
+      <Heading size="sm" mb={2}>DZR Coach settings</Heading>
       <Text color="gray.400" mb={4} fontSize="sm">
         Her sætter du dine faste rammer til DZR Coach: hvor ofte du kører, andre sportsgrene, skader, mål og hvordan coachen skal svare. Du har fået et udgangspunkt, som du kan rette. Coachen ændrer ikke selv de rammer — det gør du her. Data bruges kun til din private coaching og sendes til OpenAI, når du chatter med coachen. Det gemmes krypteret.
       </Text>
@@ -648,7 +648,7 @@ export default function CoachMemoryEditor() {
         </Text>
       </Checkbox>
       <Text color="gray.400" fontSize="sm" mb={3}>
-        Noterne er ikke faste regler. Du kan se og slette dem her. Husk at trykke Save memory, når du slår det til eller fra.
+        Noterne er ikke faste regler. Du kan se og slette dem her. Husk at trykke Save settings, når du slår det til eller fra.
       </Text>
       {notesLoading ? (
         <Spinner size="sm" mb={6} />
@@ -689,10 +689,10 @@ export default function CoachMemoryEditor() {
 
       <Flex wrap="wrap" gap={2}>
         <Button onClick={save} isLoading={saving} size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }}>
-          Save memory
+          Save settings
         </Button>
-        <Button onClick={() => setClearConfirm({ kind: 'memory' })} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
-          Clear memory
+        <Button onClick={() => setClearConfirm({ kind: 'settings' })} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
+          Clear settings
         </Button>
         <Button onClick={() => setClearConfirm({ kind: 'notes' })} isLoading={saving} isDisabled={chatNotes.length === 0} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
           Clear notes
