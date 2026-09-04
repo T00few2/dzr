@@ -52,6 +52,7 @@ type ClearConfirm =
   | { kind: 'settings' }
   | { kind: 'notes' }
   | { kind: 'all' }
+  | { kind: 'disableNotes' }
   | { kind: 'note'; id: string }
 
 const CLEAR_CONFIRM_COPY = {
@@ -69,6 +70,11 @@ const CLEAR_CONFIRM_COPY = {
     title: 'Clear all?',
     body: 'Coach-profilen nulstilles, og alle chat-noter slettes. Det kan ikke fortrydes.',
     confirm: 'Clear all',
+  },
+  disableNotes: {
+    title: 'Turn off chat notes?',
+    body: 'Alle gemte chat-noter slettes, når du gemmer. Det kan ikke fortrydes.',
+    confirm: 'Save and clear notes',
   },
   note: {
     title: 'Slet note?',
@@ -95,6 +101,7 @@ export default function CoachMemoryEditor() {
   const [saving, setSaving] = useState(false)
   const [eligible, setEligible] = useState<boolean | null>(null)
   const [form, setForm] = useState<CoachProfile>(emptyForm())
+  const [savedNotesOptIn, setSavedNotesOptIn] = useState(false)
   const [chatNotes, setChatNotes] = useState<CoachChatNote[]>([])
   const [notesLoading, setNotesLoading] = useState(true)
   const [extraSport, setExtraSport] = useState('')
@@ -115,6 +122,7 @@ export default function CoachMemoryEditor() {
       style: profile.style || { length: null, language: null, tone: null, notes: '' },
       notesOptIn: profile.notesOptIn === true,
     })
+    setSavedNotesOptIn(profile.notesOptIn === true)
     setRidesMin(profile.ridesPerWeek?.min != null ? String(profile.ridesPerWeek.min) : '')
     setRidesMax(profile.ridesPerWeek?.max != null ? String(profile.ridesPerWeek.max) : '')
   }
@@ -202,9 +210,12 @@ export default function CoachMemoryEditor() {
     }))
   }
 
-  async function save() {
+  async function persistSettings({ clearNotesOnDisable = false } = {}) {
     setSaving(true)
     try {
+      if (clearNotesOnDisable) {
+        await deleteAllNotesRequest()
+      }
       const min = ridesMin.trim() === '' ? null : Number(ridesMin)
       const max = ridesMax.trim() === '' ? null : Number(ridesMax)
       const payload: CoachProfile = {
@@ -229,10 +240,23 @@ export default function CoachMemoryEditor() {
         return
       }
       if (data?.profile) applyProfile(data.profile)
-      toast({ title: 'Coach settings saved', status: 'success' })
+      toast({
+        title: clearNotesOnDisable ? 'Settings saved and chat notes cleared' : 'Coach settings saved',
+        status: 'success',
+      })
+    } catch (err: any) {
+      toast({ title: err?.message || 'Could not save', status: 'error' })
     } finally {
       setSaving(false)
     }
+  }
+
+  async function save() {
+    if (savedNotesOptIn && form.notesOptIn !== true) {
+      setClearConfirm({ kind: 'disableNotes' })
+      return
+    }
+    await persistSettings()
   }
 
   async function resetSettingsRequest() {
@@ -323,6 +347,7 @@ export default function CoachMemoryEditor() {
     if (action.kind === 'settings') await clearSettings()
     else if (action.kind === 'notes') await clearNotes()
     else if (action.kind === 'all') await clearAll()
+    else if (action.kind === 'disableNotes') await persistSettings({ clearNotesOnDisable: true })
     else await deleteChatNote(action.id)
     setClearConfirm(null)
   }
@@ -663,7 +688,7 @@ export default function CoachMemoryEditor() {
       </Flex>
     </Box>
 
-      {form.notesOptIn === true && (
+      {savedNotesOptIn && (
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
           <Heading size="sm" mb={2}>Chat-noter</Heading>
           <Text color="gray.400" fontSize="sm" mb={3}>
