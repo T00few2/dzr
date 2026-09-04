@@ -2,17 +2,6 @@ const crypto = require("crypto");
 
 const PREFIX = "enc:v1:";
 
-const COACH_PLAINTEXT_KEYS = [
-  "ridesPerWeek",
-  "sports",
-  "weekly",
-  "injuries",
-  "goals",
-  "notes",
-  "style",
-  "pendingConfirmation",
-];
-
 function hashKey(material) {
   return crypto.createHash("sha256").update(material, "utf8").digest();
 }
@@ -137,19 +126,6 @@ function needsTokenMigration(data) {
   return Boolean((src.accessToken || src.refreshToken) && canEncryptTokens());
 }
 
-function packPending(pending) {
-  if (!pending || typeof pending !== "object") return null;
-  const snapshot =
-    pending.snapshotBefore && typeof pending.snapshotBefore === "object"
-      ? pending.snapshotBefore
-      : {};
-  return {
-    summary: String(pending.summary || "").slice(0, 280),
-    snapshotBefore: snapshot,
-    askedAt: toIso(pending.askedAt),
-  };
-}
-
 function packCoachMemory(plain) {
   const src = plain && typeof plain === "object" ? plain : {};
   return {
@@ -158,10 +134,8 @@ function packCoachMemory(plain) {
     weekly: Array.isArray(src.weekly) ? src.weekly : [],
     injuries: Array.isArray(src.injuries) ? src.injuries : [],
     goals: Array.isArray(src.goals) ? src.goals : [],
-    notes: typeof src.notes === "string" ? src.notes : String(src.notes || ""),
     style: src.style && typeof src.style === "object" ? src.style : { length: null, language: null, tone: null, notes: "" },
     notesOptIn: src.notesOptIn === true,
-    pendingConfirmation: packPending(src.pendingConfirmation),
   };
 }
 
@@ -180,17 +154,19 @@ function unwrapCoachMemoryDoc(data) {
     updatedAt: src.updatedAt || null,
     updatedBy: src.updatedBy || null,
     howItWorksSentAt: src.howItWorksSentAt || null,
-    notesOptIn: fromPlain.notesOptIn === true || src.notesOptIn === true,
+    notesOptIn: fromPlain.notesOptIn === true,
   };
 }
 
 function packChatNote(plain) {
   const src = plain && typeof plain === "object" ? plain : {};
   const kind = String(src.kind || "").trim().toLowerCase();
-  const allowed = new Set(["feeling", "plan", "preference_transient", "life"]);
+  const allowed = new Set(["feeling", "plan", "preference_transient", "life", "race"]);
+  const eventDate = String(src.eventDate || "").trim().slice(0, 10);
   return {
     text: String(src.text || "").slice(0, 280),
     kind: allowed.has(kind) ? kind : "life",
+    eventDate: /^\d{4}-\d{2}-\d{2}$/.test(eventDate) ? eventDate : null,
   };
 }
 
@@ -209,6 +185,7 @@ function unwrapChatNoteDoc(data) {
     at: toIso(src.at),
     text: fromPlain.text,
     kind: fromPlain.kind,
+    eventDate: fromPlain.eventDate || null,
   };
 }
 
@@ -249,13 +226,6 @@ function persistCoachMemoryDoc(plain) {
   };
 }
 
-function needsCoachMemoryMigration(data) {
-  if (!canEncryptCoachMemory()) return false;
-  const src = data && typeof data === "object" ? data : {};
-  if (!src.memoryEnc) return true;
-  return COACH_PLAINTEXT_KEYS.some((key) => Object.prototype.hasOwnProperty.call(src, key));
-}
-
 module.exports = {
   PREFIX,
   canEncryptTokens,
@@ -268,7 +238,6 @@ module.exports = {
   needsTokenMigration,
   unwrapCoachMemoryDoc,
   persistCoachMemoryDoc,
-  needsCoachMemoryMigration,
   unwrapChatNoteDoc,
   persistChatNoteDoc,
 };

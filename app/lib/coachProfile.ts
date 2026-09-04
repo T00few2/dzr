@@ -20,7 +20,6 @@ export type CoachInjury = {
   text: string
   started: string | null
   status: 'active' | 'recovered'
-  source: 'user' | 'coach'
 }
 
 export type CoachProfile = {
@@ -29,7 +28,6 @@ export type CoachProfile = {
   weekly: CoachWeeklySlot[]
   injuries: CoachInjury[]
   goals: string[]
-  notes: string
   style: CoachStyle
   notesOptIn: boolean
 }
@@ -124,7 +122,6 @@ export function emptyCoachProfile(): CoachProfile {
     weekly: [],
     injuries: [],
     goals: [],
-    notes: '',
     style: emptyStyle(),
     notesOptIn: false,
   }
@@ -137,7 +134,6 @@ export function defaultCoachProfile(): CoachProfile {
     weekly: [],
     injuries: [],
     goals: [],
-    notes: '',
     style: { length: null, language: 'da', tone: null, notes: '' },
     notesOptIn: false,
   }
@@ -196,12 +192,12 @@ function newInjuryId() {
   return `inj_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 }
 
-function sanitizeInjuries(value: unknown, source: 'user' | 'coach'): CoachInjury[] {
+function sanitizeInjuries(value: unknown): CoachInjury[] {
   const out: CoachInjury[] = []
   const seen = new Set<string>()
   for (const raw of Array.isArray(value) ? value : []) {
     if (!raw || typeof raw !== 'object') continue
-    const row = raw as { id?: unknown; text?: unknown; started?: unknown; status?: unknown; source?: unknown }
+    const row = raw as { id?: unknown; text?: unknown; started?: unknown; status?: unknown }
     const text = clip(row.text, 240)
     if (!text) continue
     const id = clip(row.id, 64) || newInjuryId()
@@ -213,7 +209,6 @@ function sanitizeInjuries(value: unknown, source: 'user' | 'coach'): CoachInjury
       text,
       started: clip(row.started, 40) || null,
       status: String(row.status || 'active').toLowerCase() === 'recovered' ? 'recovered' : 'active',
-      source: row.source === 'coach' || row.source === 'user' ? row.source : source,
     })
     if (out.length >= 12) break
   }
@@ -249,15 +244,14 @@ function sanitizeStyle(value: unknown): CoachStyle {
   }
 }
 
-export function publicCoachFields(data: unknown, source: 'user' | 'coach' = 'user'): CoachProfile {
+export function publicCoachFields(data: unknown): CoachProfile {
   const src = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
   return {
     ridesPerWeek: sanitizeRidesPerWeek(src.ridesPerWeek),
     sports: uniqueStrings(src.sports, 12, 40),
     weekly: sanitizeWeekly(src.weekly),
-    injuries: sanitizeInjuries(src.injuries, source),
+    injuries: sanitizeInjuries(src.injuries),
     goals: sanitizeGoals(src.goals),
-    notes: clip(src.notes, 1000),
     style: sanitizeStyle(src.style),
     notesOptIn: src.notesOptIn === true,
   }
@@ -266,12 +260,12 @@ export function publicCoachFields(data: unknown, source: 'user' | 'coach' = 'use
 export function toClientCoachProfile(data: unknown, discordId: string) {
   const raw = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
   const src = unwrapCoachMemoryDoc({ ...raw, discordId })
-  const fields = publicCoachFields(src, src.updatedBy === 'coach' ? 'coach' : 'user')
+  const fields = publicCoachFields(src)
   return {
     ...fields,
     discordId,
     updatedAt: src.updatedAt ?? null,
-    updatedBy: src.updatedBy === 'user' || src.updatedBy === 'coach' ? src.updatedBy : null,
+    updatedBy: 'user' as const,
     howItWorksSentAt: src.howItWorksSentAt ?? null,
   }
 }

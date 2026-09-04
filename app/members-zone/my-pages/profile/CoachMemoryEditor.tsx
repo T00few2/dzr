@@ -11,6 +11,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Collapse,
   Flex,
   FormControl,
   FormLabel,
@@ -84,7 +85,6 @@ function emptyForm(): CoachProfile {
     weekly: [],
     injuries: [],
     goals: [],
-    notes: '',
     style: { length: null, language: null, tone: null, notes: '' },
     notesOptIn: false,
   }
@@ -103,6 +103,7 @@ export default function CoachMemoryEditor() {
   const [ridesMin, setRidesMin] = useState('')
   const [ridesMax, setRidesMax] = useState('')
   const [clearConfirm, setClearConfirm] = useState<ClearConfirm | null>(null)
+  const [notesOpen, setNotesOpen] = useState(false)
   const cancelClearRef = useRef<HTMLButtonElement>(null)
 
   function applyProfile(profile: CoachProfile) {
@@ -191,7 +192,7 @@ export default function CoachMemoryEditor() {
       ...prev,
       injuries: [
         ...prev.injuries,
-        { id: `new_${Date.now()}`, text: '', started: '', status: 'active', source: 'user' },
+        { id: `new_${Date.now()}`, text: '', started: '', status: 'active' },
       ],
     }))
   }
@@ -349,7 +350,8 @@ export default function CoachMemoryEditor() {
   }
 
   return (
-    <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
+    <Box>
+      <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
       <Heading size="sm" mb={2}>DZR Coach settings</Heading>
       <Text color="gray.400" mb={4} fontSize="sm">
         Her sætter du dine faste rammer til DZR Coach: hvor ofte du kører, andre sportsgrene, skader, mål og hvordan coachen skal svare. Du har fået et udgangspunkt, som du kan rette. Coachen ændrer ikke selv de rammer — det gør du her. Data bruges kun til din private coaching og sendes til OpenAI, når du chatter med coachen. Det gemmes krypteret.
@@ -521,7 +523,10 @@ export default function CoachMemoryEditor() {
       </Box>
 
       <Box mb={4}>
-        <FormLabel>Goals</FormLabel>
+        <FormLabel mb={1}>Goals</FormLabel>
+        <Text color="gray.400" fontSize="sm" mb={2}>
+          Faste mål, som ikke skifter hele tiden — fx tabe vægt, holde formen, vinde løb. En konkret løbsdato hører til i chatten (notes), ikke her.
+        </Text>
         <Stack spacing={2} mb={2}>
           {form.goals.map((goal, index) => (
             <HStack key={`${goal}-${index}`}>
@@ -549,7 +554,7 @@ export default function CoachMemoryEditor() {
         </Stack>
         <HStack maxW="480px">
           <Input
-            placeholder="Add a goal"
+            placeholder="e.g. stay in shape, lose weight"
             value={newGoal}
             onChange={(e) => setNewGoal(e.target.value)}
             bg="gray.800"
@@ -635,58 +640,6 @@ export default function CoachMemoryEditor() {
         />
       </FormControl>
 
-      <Heading size="xs" mb={3} color="gray.300">Chat-noter</Heading>
-      <Checkbox
-        isChecked={form.notesOptIn === true}
-        onChange={(e) => setForm((prev) => ({ ...prev, notesOptIn: e.target.checked }))}
-        colorScheme="red"
-        alignItems="flex-start"
-        mb={3}
-      >
-        <Text color="gray.200" fontSize="sm">
-          Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går). Coachen bruger dem kun, når dette er slået til.
-        </Text>
-      </Checkbox>
-      <Text color="gray.400" fontSize="sm" mb={3}>
-        Noterne er ikke faste regler. Du kan se og slette dem her. Husk at trykke Save settings, når du slår det til eller fra.
-      </Text>
-      {notesLoading ? (
-        <Spinner size="sm" mb={6} />
-      ) : chatNotes.length === 0 ? (
-        <Text color="gray.500" fontSize="sm" mb={6}>Ingen chat-noter endnu.</Text>
-      ) : (
-        <Stack spacing={3} mb={4}>
-          {chatNotes.map((note) => (
-            <Flex
-              key={note.id}
-              gap={3}
-              align="flex-start"
-              justify="space-between"
-              bg="gray.800"
-              borderWidth="1px"
-              borderColor="gray.600"
-              borderRadius="md"
-              p={3}
-            >
-              <Box>
-                <Text fontSize="xs" color="gray.500">{formatNoteAt(note.at)}</Text>
-                <Text fontSize="sm" color="gray.100">{note.text}</Text>
-              </Box>
-              <Button
-                size="xs"
-                variant="ghost"
-                color="red.300"
-                _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
-                onClick={() => setClearConfirm({ kind: 'note', id: note.id })}
-                isDisabled={saving}
-              >
-                Slet
-              </Button>
-            </Flex>
-          ))}
-        </Stack>
-      )}
-
       <Flex wrap="wrap" gap={2}>
         <Button onClick={save} isLoading={saving} size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }}>
           Save settings
@@ -694,13 +647,101 @@ export default function CoachMemoryEditor() {
         <Button onClick={() => setClearConfirm({ kind: 'settings' })} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
           Clear settings
         </Button>
-        <Button onClick={() => setClearConfirm({ kind: 'notes' })} isLoading={saving} isDisabled={chatNotes.length === 0} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
-          Clear notes
-        </Button>
-        <Button onClick={() => setClearConfirm({ kind: 'all' })} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
-          Clear all
+        <Button
+          onClick={() => setNotesOpen((open) => !open)}
+          size="sm"
+          {...secondaryButtonProps}
+          borderColor={notesOpen ? 'gray.300' : 'gray.500'}
+        >
+          {notesOpen ? 'Hide notes' : 'Notes'}
         </Button>
       </Flex>
+    </Box>
+
+      <Collapse in={notesOpen} animateOpacity>
+        <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
+          <Heading size="sm" mb={2}>Chat-noter</Heading>
+          <Checkbox
+            isChecked={form.notesOptIn === true}
+            onChange={(e) => setForm((prev) => ({ ...prev, notesOptIn: e.target.checked }))}
+            colorScheme="red"
+            alignItems="flex-start"
+            mb={3}
+          >
+            <Text color="gray.200" fontSize="sm">
+              Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går, eller at jeg kører et løb den 18. oktober). Coachen bruger dem kun, når dette er slået til.
+            </Text>
+          </Checkbox>
+          <Text color="gray.400" fontSize="sm" mb={3}>
+            Noterne er ikke faste regler. Du kan se og slette dem her. Husk at trykke Save settings, når du slår det til eller fra.
+          </Text>
+          {notesLoading ? (
+            <Spinner size="sm" mb={4} />
+          ) : chatNotes.length === 0 ? (
+            <Text color="gray.500" fontSize="sm" mb={4}>Ingen chat-noter endnu.</Text>
+          ) : (
+            <Stack spacing={3} mb={4}>
+              {chatNotes.map((note) => (
+                <Flex
+                  key={note.id}
+                  gap={3}
+                  align="flex-start"
+                  justify="space-between"
+                  bg="gray.800"
+                  borderWidth="1px"
+                  borderColor="gray.600"
+                  borderRadius="md"
+                  p={3}
+                >
+                  <Box>
+                    <Text fontSize="xs" color="gray.500">
+                      {note.eventDate ? `Race ${note.eventDate}` : formatNoteAt(note.at)}
+                    </Text>
+                    <Text fontSize="sm" color="gray.100">{note.text}</Text>
+                  </Box>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    color="red.300"
+                    _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
+                    onClick={() => setClearConfirm({ kind: 'note', id: note.id })}
+                    isDisabled={saving}
+                  >
+                    Slet
+                  </Button>
+                </Flex>
+              ))}
+            </Stack>
+          )}
+          <Button
+            onClick={() => setClearConfirm({ kind: 'notes' })}
+            isLoading={saving}
+            isDisabled={chatNotes.length === 0}
+            size="sm"
+            variant="outline"
+            colorScheme="red"
+            color="red.300"
+            borderColor="red.400"
+            _hover={{ bg: 'whiteAlpha.100' }}
+          >
+            Clear notes
+          </Button>
+        </Box>
+      </Collapse>
+
+      <Button
+        onClick={() => setClearConfirm({ kind: 'all' })}
+        isLoading={saving}
+        size="sm"
+        variant="outline"
+        colorScheme="red"
+        color="red.300"
+        borderColor="red.400"
+        _hover={{ bg: 'whiteAlpha.100' }}
+        mb={6}
+      >
+        Clear all
+      </Button>
 
       <AlertDialog
         isOpen={Boolean(clearConfirm)}

@@ -9,6 +9,7 @@ export type CoachChatNote = {
   at: string | null
   text: string
   kind: CoachChatNoteKind
+  eventDate?: string | null
 }
 
 export function toClientCoachChatNote(
@@ -24,6 +25,7 @@ export function toClientCoachChatNote(
       at: note.at,
       text,
       kind: note.kind,
+      eventDate: note.eventDate || null,
     }
   } catch {
     return null

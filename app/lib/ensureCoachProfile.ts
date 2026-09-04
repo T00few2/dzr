@@ -27,7 +27,6 @@ export async function ensureDefaultCoachProfile(discordId: string) {
     persistCoachMemoryDoc({
       discordId: id,
       ...fields,
-      pendingConfirmation: null,
       updatedAt: now,
       updatedBy: 'user',
       howItWorksSentAt: null,
@@ -50,14 +49,12 @@ export async function sendCoachHowItWorksIfNeeded(discordId: string) {
       console.warn('coach how-it-works DM failed for', id)
       return
     }
-    const fields = publicCoachFields(existing, existing.updatedBy === 'coach' ? 'coach' : 'user')
     await ref.set(
       persistCoachMemoryDoc({
         discordId: id,
-        ...fields,
-        pendingConfirmation: existing.pendingConfirmation || null,
+        ...publicCoachFields(existing),
         updatedAt: existing.updatedAt || new Date(),
-        updatedBy: existing.updatedBy === 'user' || existing.updatedBy === 'coach' ? existing.updatedBy : 'user',
+        updatedBy: 'user',
         howItWorksSentAt: new Date().toISOString(),
       })
     )

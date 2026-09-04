@@ -5,16 +5,11 @@ const {
   emptyProfile,
   defaultProfile,
   publicFields,
-  snapshotProfile,
-  mergeCoachProfileData,
-  formatCoachProfileForPrompt,
-  summarizePatch,
 } = require("./coachProfile");
 const {
   canEncryptCoachMemory,
   unwrapCoachMemoryDoc,
   persistCoachMemoryDoc,
-  needsCoachMemoryMigration,
   unwrapChatNoteDoc,
   persistChatNoteDoc,
 } = require("./tokenCrypto");
@@ -93,6 +88,7 @@ async function addCoachChatNotes(discordId, incoming, { at } = {}) {
     const note = sanitizeNote(raw, now.toISOString());
     if (!note) continue;
     if (isNearDuplicate(note.text, existing) || isNearDuplicate(note.text, toAdd)) continue;
+    if (note.eventDate && (existing.some((item) => item.eventDate === note.eventDate) || toAdd.some((item) => item.eventDate === note.eventDate))) continue;
     toAdd.push(note);
     if (toAdd.length >= MAX_EXTRACT_NOTES) break;
   }
@@ -110,6 +106,7 @@ async function addCoachChatNotes(discordId, incoming, { at } = {}) {
       at: when,
       text: note.text,
       kind: note.kind,
+      eventDate: note.eventDate || null,
     }));
     created.push({
       id: ref.id,
@@ -117,36 +114,12 @@ async function addCoachChatNotes(discordId, incoming, { at } = {}) {
       at: when.toISOString(),
       text: note.text,
       kind: note.kind,
+      eventDate: note.eventDate || null,
     });
   }
   await batch.commit();
   await pruneCoachChatNotes(id);
   return created;
-}
-
-async function deleteCoachChatNote(discordId, noteId) {
-  const id = String(discordId || "").trim();
-  const nid = String(noteId || "").trim();
-  if (!id || !nid) return false;
-  await coachChatNotesCol(id).doc(nid).delete();
-  return true;
-}
-
-async function deleteAllCoachChatNotes(discordId) {
-  const id = String(discordId || "").trim();
-  if (!id) return 0;
-  const col = coachChatNotesCol(id);
-  let deleted = 0;
-  while (true) {
-    const snap = await col.limit(400).get();
-    if (snap.empty) break;
-    const batch = db.batch();
-    snap.docs.forEach((doc) => batch.delete(doc.ref));
-    await batch.commit();
-    deleted += snap.size;
-    if (snap.size < 400) break;
-  }
-  return deleted;
 }
 
 /**
@@ -412,19 +385,11 @@ function coachProfileRef(discordId) {
 
 function toPlainProfile(data) {
   const src = unwrapCoachMemoryDoc(data && typeof data === "object" ? data : {});
-  const pending = src.pendingConfirmation && typeof src.pendingConfirmation === "object"
-    ? {
-        summary: String(src.pendingConfirmation.summary || "").slice(0, 280),
-        snapshotBefore: snapshotProfile(src.pendingConfirmation.snapshotBefore || {}),
-        askedAt: src.pendingConfirmation.askedAt || null,
-      }
-    : null;
   return {
     ...publicFields(src),
     discordId: src.discordId || null,
     updatedAt: src.updatedAt || null,
-    updatedBy: src.updatedBy === "user" || src.updatedBy === "coach" ? src.updatedBy : null,
-    pendingConfirmation: pending,
+    updatedBy: "user",
     howItWorksSentAt: src.howItWorksSentAt || null,
   };
 }
@@ -436,58 +401,21 @@ async function writeCoachProfileDoc(id, plain) {
   await coachProfileRef(id).set(persistCoachMemoryDoc({ discordId: id, ...plain }));
 }
 
-async function maybeMigrateCoachProfile(id, raw) {
-  if (!raw || !needsCoachMemoryMigration(raw)) return false;
-  try {
-    const unwrapped = unwrapCoachMemoryDoc({ discordId: id, ...raw });
-    await coachProfileRef(id).set(
-      persistCoachMemoryDoc({
-        discordId: id,
-        updatedAt: raw.updatedAt || unwrapped.updatedAt || null,
-        updatedBy: raw.updatedBy === "user" || raw.updatedBy === "coach" ? raw.updatedBy : null,
-        ...publicFields(unwrapped),
-        pendingConfirmation: unwrapped.pendingConfirmation || null,
-      })
-    );
-    return true;
-  } catch (err) {
-    console.warn("coach memory encryption migrate failed:", err?.message || err);
-    return false;
-  }
-}
-
-async function migrateAllCoachProfiles() {
-  if (!canEncryptCoachMemory()) {
-    console.warn("coach memory encryption skipped: COACH_MEMORY_KEY / STRAVA_CONNECT_SECRET missing");
-    return { scanned: 0, migrated: 0 };
-  }
-  const snap = await db.collection(COACH_PROFILES_COLLECTION).get();
-  let migrated = 0;
-  for (const doc of snap.docs) {
-    if (await maybeMigrateCoachProfile(doc.id, doc.data() || {})) migrated += 1;
-  }
-  console.log(`coach memory encryption: scanned ${snap.size}, migrated ${migrated}`);
-  return { scanned: snap.size, migrated };
-}
-
 /**
- * Durable coaching constraints for one Discord user.
+ * Coach settings for one Discord user.
  */
 async function ensureDefaultCoachProfile(discordId) {
   const id = String(discordId || "").trim();
-  if (!id) return { ...emptyProfile(), pendingConfirmation: null };
+  if (!id) return { ...emptyProfile() };
   const ref = coachProfileRef(id);
   const snap = await ref.get();
   if (snap.exists) {
-    const raw = snap.data() || {};
-    await maybeMigrateCoachProfile(id, raw);
-    return toPlainProfile({ discordId: id, ...raw });
+    return toPlainProfile({ discordId: id, ...snap.data() });
   }
   const now = new Date();
   const doc = {
     discordId: id,
     ...defaultProfile(),
-    pendingConfirmation: null,
     updatedAt: now,
     updatedBy: "user",
     howItWorksSentAt: null,
@@ -503,86 +431,14 @@ async function markCoachHowItWorksSent(discordId) {
   const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.exists ? snap.data() || {} : {}) });
   await writeCoachProfileDoc(id, {
     ...publicFields(existing),
-    pendingConfirmation: existing.pendingConfirmation || null,
     updatedAt: existing.updatedAt || new Date(),
-    updatedBy: existing.updatedBy === "user" || existing.updatedBy === "coach" ? existing.updatedBy : "user",
+    updatedBy: "user",
     howItWorksSentAt: new Date().toISOString(),
   });
 }
 
 async function getCoachProfile(discordId) {
   return ensureDefaultCoachProfile(discordId);
-}
-
-async function mergeCoachProfile(discordId, patch, { summary } = {}) {
-  const id = String(discordId || "").trim();
-  if (!id) throw new Error("discordId required");
-  const ref = coachProfileRef(id);
-  const snap = await ref.get();
-  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.exists ? snap.data() || {} : {}) });
-  const snapshotBefore = snapshotProfile(existing);
-  const merged = mergeCoachProfileData(existing, patch);
-  const now = new Date();
-  const pendingConfirmation = {
-    summary: summarizePatch(patch, summary),
-    snapshotBefore,
-    askedAt: now,
-  };
-  const doc = {
-    discordId: id,
-    ...merged,
-    pendingConfirmation,
-    updatedAt: now,
-    updatedBy: "coach",
-  };
-  await writeCoachProfileDoc(id, doc);
-  return toPlainProfile(doc);
-}
-
-async function confirmCoachProfile(discordId) {
-  const id = String(discordId || "").trim();
-  if (!id) throw new Error("discordId required");
-  const snap = await coachProfileRef(id).get();
-  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.exists ? snap.data() || {} : {}) });
-  if (!existing.pendingConfirmation) {
-    return { success: false, message: "Nothing pending to confirm." };
-  }
-  const summary = existing.pendingConfirmation.summary || null;
-  await writeCoachProfileDoc(id, {
-    ...publicFields(existing),
-    pendingConfirmation: null,
-    updatedAt: new Date(),
-    updatedBy: "coach",
-  });
-  const next = await getCoachProfile(id);
-  return { success: true, confirmed: true, summary, profile: next };
-}
-
-async function rejectCoachProfile(discordId) {
-  const id = String(discordId || "").trim();
-  if (!id) throw new Error("discordId required");
-  const snap = await coachProfileRef(id).get();
-  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.exists ? snap.data() || {} : {}) });
-  const pending = existing.pendingConfirmation;
-  if (!pending) {
-    return { success: false, message: "Nothing pending to undo." };
-  }
-  const restored = snapshotProfile(pending.snapshotBefore || emptyProfile());
-  const now = new Date();
-  const doc = {
-    discordId: id,
-    ...restored,
-    pendingConfirmation: null,
-    updatedAt: now,
-    updatedBy: "coach",
-  };
-  await writeCoachProfileDoc(id, doc);
-  return {
-    success: true,
-    rejected: true,
-    summary: pending.summary || null,
-    profile: toPlainProfile(doc),
-  };
 }
 
 /**
@@ -652,13 +508,6 @@ module.exports = {
   getCoachProfile,
   ensureDefaultCoachProfile,
   markCoachHowItWorksSent,
-  mergeCoachProfile,
-  confirmCoachProfile,
-  rejectCoachProfile,
-  formatCoachProfileForPrompt,
-  migrateAllCoachProfiles,
   listCoachChatNotes,
   addCoachChatNotes,
-  deleteCoachChatNote,
-  deleteAllCoachChatNotes,
 }; 

@@ -113,27 +113,21 @@ function newInjuryId() {
   return `inj_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function sanitizeInjury(raw, source) {
+function sanitizeInjury(raw) {
   if (!raw || typeof raw !== "object") return null;
   const text = clip(raw.text, 240);
   if (!text) return null;
   const status = String(raw.status || "active").toLowerCase() === "recovered" ? "recovered" : "active";
   const started = clip(raw.started, 40) || null;
   const id = clip(raw.id, 64) || newInjuryId();
-  return {
-    id,
-    text,
-    started,
-    status,
-    source: raw.source === "user" || raw.source === "coach" ? raw.source : source || "coach",
-  };
+  return { id, text, started, status };
 }
 
-function sanitizeInjuries(value, source) {
+function sanitizeInjuries(value) {
   const out = [];
   const seen = new Set();
   for (const raw of Array.isArray(value) ? value : []) {
-    const injury = sanitizeInjury(raw, source);
+    const injury = sanitizeInjury(raw);
     if (!injury) continue;
     const key = injury.id || injury.text.toLowerCase();
     if (seen.has(key)) continue;
@@ -157,11 +151,6 @@ function sanitizeGoals(value) {
     if (out.length >= 8) break;
   }
   return out;
-}
-
-function sanitizeNotes(value) {
-  if (value == null) return "";
-  return clip(value, 1000);
 }
 
 const LENGTH_MAP = {
@@ -214,27 +203,6 @@ function sanitizeStyle(value) {
   };
 }
 
-function mergeStyle(existing, incoming) {
-  const next = sanitizeStyle(existing);
-  if (!incoming || typeof incoming !== "object") return next;
-  if (Object.prototype.hasOwnProperty.call(incoming, "length")) {
-    const key = String(incoming.length || "").trim().toLowerCase();
-    next.length = LENGTH_MAP[key] || null;
-  }
-  if (Object.prototype.hasOwnProperty.call(incoming, "language")) {
-    const key = String(incoming.language || "").trim().toLowerCase();
-    next.language = LANGUAGE_MAP[key] || null;
-  }
-  if (Object.prototype.hasOwnProperty.call(incoming, "tone")) {
-    const key = String(incoming.tone || "").trim().toLowerCase();
-    next.tone = TONE_MAP[key] || null;
-  }
-  if (Object.prototype.hasOwnProperty.call(incoming, "notes")) {
-    next.notes = clip(incoming.notes, 400);
-  }
-  return next;
-}
-
 function formatStyle(style) {
   const parts = [];
   if (style?.length === "short") parts.push("keep replies SHORT (a few sentences or tight bullets; no long essays)");
@@ -255,9 +223,8 @@ function publicFields(data) {
     ridesPerWeek: sanitizeRidesPerWeek(src.ridesPerWeek),
     sports: sanitizeSports(src.sports),
     weekly: sanitizeWeekly(src.weekly),
-    injuries: sanitizeInjuries(src.injuries, src.updatedBy === "user" ? "user" : "coach"),
+    injuries: sanitizeInjuries(src.injuries),
     goals: sanitizeGoals(src.goals),
-    notes: sanitizeNotes(src.notes),
     style: sanitizeStyle(src.style),
     notesOptIn: src.notesOptIn === true,
   };
@@ -270,7 +237,6 @@ function emptyProfile() {
     weekly: [],
     injuries: [],
     goals: [],
-    notes: "",
     style: emptyStyle(),
     notesOptIn: false,
   };
@@ -283,75 +249,9 @@ function defaultProfile() {
     weekly: [],
     injuries: [],
     goals: [],
-    notes: "",
     style: { length: null, language: "da", tone: null, notes: "" },
     notesOptIn: false,
   };
-}
-
-function snapshotProfile(data) {
-  return publicFields(data);
-}
-
-function mergeWeekly(existing, incoming) {
-  const bySport = new Map();
-  for (const row of existing || []) {
-    bySport.set(row.sport, { sport: row.sport, days: [...row.days] });
-  }
-  for (const row of incoming || []) {
-    bySport.set(row.sport, { sport: row.sport, days: [...row.days] });
-  }
-  return Array.from(bySport.values());
-}
-
-function mergeInjuries(existing, incoming) {
-  const out = [...(existing || [])];
-  for (const injury of incoming || []) {
-    const idx = out.findIndex(
-      (item) =>
-        item.id === injury.id ||
-        String(item.text || "").toLowerCase() === String(injury.text || "").toLowerCase()
-    );
-    if (idx >= 0) {
-      out[idx] = { ...out[idx], ...injury, id: out[idx].id };
-    } else {
-      out.push(injury);
-    }
-  }
-  return out.slice(0, 12);
-}
-
-function mergeCoachProfileData(existing, patch) {
-  const base = publicFields(existing);
-  const next = { ...base };
-  if (!patch || typeof patch !== "object") return next;
-
-  if (Object.prototype.hasOwnProperty.call(patch, "ridesPerWeek")) {
-    next.ridesPerWeek = sanitizeRidesPerWeek(patch.ridesPerWeek);
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "sports")) {
-    next.sports = uniqueStrings([...(base.sports || []), ...sanitizeSports(patch.sports)]);
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "weekly")) {
-    next.weekly = mergeWeekly(base.weekly, sanitizeWeekly(patch.weekly));
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "injuries")) {
-    next.injuries = mergeInjuries(base.injuries, sanitizeInjuries(patch.injuries, "coach"));
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "goals")) {
-    next.goals = sanitizeGoals([...(base.goals || []), ...(Array.isArray(patch.goals) ? patch.goals : [])]);
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "style")) {
-    next.style = mergeStyle(base.style, patch.style);
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "notesOptIn")) {
-    next.notesOptIn = patch.notesOptIn === true;
-  }
-  return next;
-}
-
-function replaceCoachProfileData(patch) {
-  return publicFields(patch);
 }
 
 function formatRidesPerWeek(rides) {
@@ -388,57 +288,21 @@ function formatCoachProfileForPrompt(profile) {
       lines.push("- Never prescribe through an active injury. Treat it as a hard constraint, not a diagnosis.");
     }
   }
-  if (data.goals.length) lines.push(`- Goals: ${data.goals.join("; ")}`);
+  if (data.goals.length) {
+    lines.push(`- Standing goals (slow-changing aims, not a calendar date): ${data.goals.join("; ")}`);
+  }
   const styleText = formatStyle(data.style);
   if (styleText) lines.push(`- Coaching style (obey every reply): ${styleText}`);
 
   if (!lines.length) {
-    return "No durable athlete constraints stored yet.";
+    return "No Coach settings stored yet.";
   }
   return lines.join("\n");
-}
-
-function summarizePatch(patch, fallback) {
-  if (fallback && String(fallback).trim()) return clip(fallback, 280);
-  const parts = [];
-  const rides = formatRidesPerWeek(sanitizeRidesPerWeek(patch?.ridesPerWeek));
-  if (rides) parts.push(`${rides} rides`);
-  const sports = sanitizeSports(patch?.sports);
-  if (sports.length) parts.push(sports.join(", "));
-  for (const row of sanitizeWeekly(patch?.weekly)) {
-    parts.push(`${row.sport} ${row.days.map((d) => DAY_LABELS[d] || d).join("/")}`);
-  }
-  for (const inj of sanitizeInjuries(patch?.injuries, "coach")) {
-    parts.push(inj.status === "recovered" ? `${inj.text} recovered` : inj.text);
-  }
-  for (const goal of sanitizeGoals(patch?.goals)) parts.push(goal);
-  if (patch && Object.prototype.hasOwnProperty.call(patch, "style")) {
-    const styleText = formatStyle(mergeStyle(emptyStyle(), patch.style));
-    if (styleText) parts.push(styleText);
-  }
-  return parts.join("; ").slice(0, 280) || "updated training constraints";
-}
-
-function hasPendingConfirmation(profile) {
-  return Boolean(profile?.pendingConfirmation && typeof profile.pendingConfirmation === "object");
 }
 
 module.exports = {
   emptyProfile,
   defaultProfile,
   publicFields,
-  snapshotProfile,
-  mergeCoachProfileData,
-  replaceCoachProfileData,
   formatCoachProfileForPrompt,
-  summarizePatch,
-  hasPendingConfirmation,
-  sanitizeRidesPerWeek,
-  sanitizeSports,
-  sanitizeWeekly,
-  sanitizeInjuries,
-  sanitizeGoals,
-  sanitizeNotes,
-  sanitizeStyle,
-  emptyStyle,
 };

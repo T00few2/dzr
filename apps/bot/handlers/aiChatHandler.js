@@ -7,7 +7,6 @@ const {
   getDZRTeamsAndSeries,
   recordCoachUsage,
   getCoachProfile,
-  formatCoachProfileForPrompt,
   listCoachChatNotes,
   addCoachChatNotes,
 } = require("../services/firebase");
@@ -25,6 +24,8 @@ const {
 const { startQuizFromMessage } = require("../services/quizService");
 const strava = require("../services/stravaService");
 const { handoffCoachingFromMessage, NOT_CLUB_MEMBER_TEXT } = require("../services/coachDm");
+const { formatCoachProfileForPrompt } = require("../services/coachProfile");
+const { MY_PAGES_COACH_URL } = require("../services/coachHowItWorks");
 const {
   shouldSkipExtract,
   buildExtractMessages,
@@ -32,6 +33,8 @@ const {
   retrieveRelevantNotes,
   searchNotes,
   formatNotesForPrompt,
+  formatCoachToday,
+  formatNoteAge,
 } = require("../services/coachChatNotes");
 
 // Initialize OpenAI client
@@ -127,8 +130,6 @@ function safeStringify(value) {
     return JSON.stringify({ success: false, message: "Failed to serialize tool result." });
   }
 }
-
-const MY_PAGES_URL = "https://www.dzrracingseries.com/members-zone/my-pages?tab=2";
 
 /**
  * Compact tool results before adding them to the model context.
@@ -625,7 +626,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "search_past_notes",
-      description: "Search dated episode notes from earlier coach DMs (feelings, one-off plans, how a ride felt). Use when the athlete refers to something you discussed before that is not in the retrieved notes block. Not for Strava workouts and not for standing constraints.",
+      description: "Search dated episode notes from earlier coach DMs (feelings, one-off plans, upcoming races). Use when the athlete refers to something discussed before that is not in the retrieved notes block. Not for Strava workouts and not for standing Coach settings.",
       parameters: {
         type: "object",
         properties: {
@@ -1208,7 +1209,7 @@ async function executeSingleToolCall(toolCall, message) {
             return {
               tool_call_id: toolCall.id,
               success: false,
-              message: `Chat notes are off. The athlete can turn them on under My Pages (Coach): ${MY_PAGES_URL}`,
+              message: `Chat notes are off. The athlete can turn them on under My Pages (Coach): ${MY_PAGES_COACH_URL}`,
             };
           }
           const query = String(args.query || "").trim();
@@ -1225,11 +1226,13 @@ async function executeSingleToolCall(toolCall, message) {
             success: true,
             notes: hits.map((note) => ({
               at: note.at,
+              age: formatNoteAge(note.at),
               kind: note.kind,
+              eventDate: note.eventDate || null,
               text: note.text,
             })),
             message: hits.length
-              ? `Dated episode notes — hints only, not standing rules. Forget/delete is on ${MY_PAGES_URL} (Coach tab).`
+              ? `Dated episode notes — hints only, not standing rules. Forget/delete is on ${MY_PAGES_COACH_URL} (Coach tab).`
               : "No matching episode notes.",
           };
         } catch (err) {
@@ -1409,13 +1412,14 @@ ${catalogLines}
 }
 
 async function buildCoachSystemPrompt(message, userText) {
-  const timestamp = new Date().toISOString();
-  let memoryBlock = "No durable athlete constraints stored yet.";
+  const now = new Date();
+  const today = formatCoachToday(now);
+  let settingsBlock = "No Coach settings stored yet.";
   let notesBlock = "Chat notes are off. If they want dated notes from this chat, tell them to turn that on under My Pages (Coach).";
   let notesOptIn = false;
   try {
     const profile = await getCoachProfile(message.author.id);
-    memoryBlock = formatCoachProfileForPrompt(profile);
+    settingsBlock = formatCoachProfileForPrompt(profile);
     notesOptIn = profile?.notesOptIn === true;
   } catch (err) {
     console.error("getCoachProfile failed:", err?.message || err);
@@ -1424,8 +1428,8 @@ async function buildCoachSystemPrompt(message, userText) {
     notesBlock = "None retrieved for this message.";
     try {
       const notes = await listCoachChatNotes(message.author.id);
-      const hits = retrieveRelevantNotes(notes, userText || "");
-      const formatted = formatNotesForPrompt(hits);
+      const hits = retrieveRelevantNotes(notes, userText || "", { now });
+      const formatted = formatNotesForPrompt(hits, now);
       if (formatted) notesBlock = formatted;
     } catch (err) {
       console.error("listCoachChatNotes failed:", err?.message || err);
@@ -1434,24 +1438,31 @@ async function buildCoachSystemPrompt(message, userText) {
 
   const content = `You are DZR Coach, a cycling coach for Danish Zwift Racers. You chat in a private Discord DM with one athlete.
 
+## Today
+${today.line}
+Use this calendar date for everything: how old a chat note is, whether a feeling is still relevant, how far an upcoming race is, and what "this week" means. Do not guess the date.
+
 ## Data
 You may only use tools to read THIS athlete's Strava data (the Discord user talking to you). Never request or invent another rider's activities.
 Typical flow: get_recent_activities first, then get_activity_details for a specific session, plus profile/stats/zones as needed. get_zwiftpower_context is optional extra (category/phenotype).
 
-## Athlete constraints (durable memory)
-${memoryBlock}
+## Athlete constraints (Coach settings)
+${settingsBlock}
 
-These constraints come from the athlete's Coach settings. You cannot change them. If they ask to change rides per week, sports, injuries, goals, or reply style, tell them to edit Mine sider → Coach: ${MY_PAGES_URL}
+These constraints come from the athlete's Coach settings. You cannot change them — there is no tool to write settings. If they ask to change rides per week, sports, injuries, standing goals, or reply style, tell them to edit Mine sider → Coach: ${MY_PAGES_COACH_URL}
 Obey ride frequency and weekly slots over last week's Strava volume. Never prescribe through an active injury.
+Standing goals are slow-changing (lose weight, stay in shape, win races). They are not a date on the calendar. Never say you saved a goal to their profile.
+Upcoming races live in chat notes, not in settings. Count days from today and let that shape load, recovery, and taper. Do not invent race dates. If they name a specific race or date and notes are off, tell them they can turn chat notes on under Coach.
 
 ## Recent conversation notes (episodic, dated — not standing rules)
 ${notesBlock}
 
 ${notesOptIn
-    ? `Treat these as hints for today's reply. A yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
-If they ask to forget a chat note, tell them to delete it on ${MY_PAGES_URL} (Coach tab).
+    ? `Treat these as hints for today's reply. Compare each note's date to today: a yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
+Upcoming race notes stay relevant until the event date, even if the note was written weeks ago.
+If they ask to forget a chat note, tell them to delete it on ${MY_PAGES_COACH_URL} (Coach tab).
 Use search_past_notes when they refer to something discussed earlier that is not in this block.`
-    : `Do not invent chat notes. If they ask you to remember how they felt, tell them they can turn chat notes on under Coach: ${MY_PAGES_URL}`}
+    : `Do not invent chat notes. If they ask you to remember how they felt, tell them they can turn chat notes on under Coach: ${MY_PAGES_COACH_URL}`}
 
 ## Coaching style
 - Reply in the user's language (Danish or English) unless Athlete constraints specify a language.
@@ -1465,7 +1476,7 @@ Use search_past_notes when they refer to something discussed earlier that is not
 
 ## Current context
 - Athlete Discord: ${message.author.username} (ID: ${message.author.id})
-- Time: ${timestamp}`;
+- ${today.line}`;
 
   return { content, notesOptIn };
 }
@@ -1579,12 +1590,12 @@ function scheduleCoachNoteExtract(args) {
 
 async function extractCoachChatNotes({ discordId, username, userMessage, assistantText }) {
   if (!openai || shouldSkipExtract(userMessage) || !String(assistantText || "").trim()) return;
-  let durableMemory = "";
+  let coachSettings = "";
   let recentNotes = [];
   try {
     const profile = await getCoachProfile(discordId);
     if (profile?.notesOptIn !== true) return;
-    durableMemory = formatCoachProfileForPrompt(profile);
+    coachSettings = formatCoachProfileForPrompt(profile);
   } catch (err) {
     console.error("extract getCoachProfile failed:", err?.message || err);
     return;
@@ -1598,7 +1609,7 @@ async function extractCoachChatNotes({ discordId, username, userMessage, assista
   const messages = buildExtractMessages({
     userMessage,
     assistantText,
-    durableMemory,
+    coachSettings,
     recentNotes,
     timestamp: now.toISOString(),
   });

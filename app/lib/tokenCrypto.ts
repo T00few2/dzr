@@ -2,17 +2,6 @@ import crypto from 'node:crypto'
 
 const PREFIX = 'enc:v1:'
 
-const COACH_PLAINTEXT_KEYS = [
-  'ridesPerWeek',
-  'sports',
-  'weekly',
-  'injuries',
-  'goals',
-  'notes',
-  'style',
-  'pendingConfirmation',
-] as const
-
 function hashKey(material: string): Buffer {
   return crypto.createHash('sha256').update(material, 'utf8').digest()
 }
@@ -136,12 +125,6 @@ export function encryptedTokenFields(accessToken: string, refreshToken: string) 
   }
 }
 
-export type CoachMemoryPending = {
-  summary?: string
-  snapshotBefore?: Record<string, unknown>
-  askedAt?: unknown
-} | null
-
 export type CoachMemoryPlain = {
   discordId?: string | null
   updatedAt?: unknown
@@ -151,25 +134,9 @@ export type CoachMemoryPlain = {
   weekly?: unknown
   injuries?: unknown
   goals?: unknown
-  notes?: unknown
   style?: unknown
   notesOptIn?: unknown
   howItWorksSentAt?: unknown
-  pendingConfirmation?: CoachMemoryPending
-}
-
-function packPending(pending: unknown): CoachMemoryPending {
-  if (!pending || typeof pending !== 'object') return null
-  const src = pending as Record<string, unknown>
-  const snapshot =
-    src.snapshotBefore && typeof src.snapshotBefore === 'object'
-      ? (src.snapshotBefore as Record<string, unknown>)
-      : {}
-  return {
-    summary: String(src.summary || '').slice(0, 280),
-    snapshotBefore: snapshot,
-    askedAt: toIso(src.askedAt),
-  }
 }
 
 function packCoachMemory(plain: CoachMemoryPlain) {
@@ -179,10 +146,8 @@ function packCoachMemory(plain: CoachMemoryPlain) {
     weekly: Array.isArray(plain.weekly) ? plain.weekly : [],
     injuries: Array.isArray(plain.injuries) ? plain.injuries : [],
     goals: Array.isArray(plain.goals) ? plain.goals : [],
-    notes: typeof plain.notes === 'string' ? plain.notes : String(plain.notes || ''),
     style: plain.style && typeof plain.style === 'object' ? plain.style : { length: null, language: null, tone: null, notes: '' },
     notesOptIn: plain.notesOptIn === true,
-    pendingConfirmation: packPending(plain.pendingConfirmation),
   }
 }
 
@@ -201,11 +166,11 @@ export function unwrapCoachMemoryDoc(data: Record<string, unknown> | null | unde
     updatedAt: src.updatedAt ?? null,
     updatedBy: src.updatedBy ?? null,
     howItWorksSentAt: src.howItWorksSentAt ?? null,
-    notesOptIn: fromPlain.notesOptIn === true || src.notesOptIn === true,
+    notesOptIn: fromPlain.notesOptIn === true,
   }
 }
 
-export type CoachChatNoteKind = 'feeling' | 'plan' | 'preference_transient' | 'life'
+export type CoachChatNoteKind = 'feeling' | 'plan' | 'preference_transient' | 'life' | 'race'
 
 export type CoachChatNotePlain = {
   id?: string | null
@@ -213,6 +178,7 @@ export type CoachChatNotePlain = {
   at?: unknown
   text?: unknown
   kind?: unknown
+  eventDate?: unknown
   noteEnc?: unknown
 }
 
@@ -221,13 +187,16 @@ const CHAT_NOTE_KINDS = new Set<CoachChatNoteKind>([
   'plan',
   'preference_transient',
   'life',
+  'race',
 ])
 
 function packChatNote(plain: CoachChatNotePlain) {
   const kind = String(plain.kind || '').trim().toLowerCase()
+  const eventDate = String(plain.eventDate || '').trim().slice(0, 10)
   return {
     text: String(plain.text || '').slice(0, 280),
     kind: (CHAT_NOTE_KINDS.has(kind as CoachChatNoteKind) ? kind : 'life') as CoachChatNoteKind,
+    eventDate: /^\d{4}-\d{2}-\d{2}$/.test(eventDate) ? eventDate : null,
   }
 }
 
@@ -237,6 +206,7 @@ export function unwrapChatNoteDoc(data: Record<string, unknown> | null | undefin
   at: string | null
   text: string
   kind: CoachChatNoteKind
+  eventDate: string | null
 } {
   const src = data && typeof data === 'object' ? data : {}
   let packed: ReturnType<typeof packChatNote> | null = null
@@ -252,6 +222,7 @@ export function unwrapChatNoteDoc(data: Record<string, unknown> | null | undefin
     at: toIso(src.at),
     text: fromPlain.text,
     kind: fromPlain.kind,
+    eventDate: fromPlain.eventDate || null,
   }
 }
 
@@ -290,13 +261,6 @@ export function persistCoachMemoryDoc(plain: CoachMemoryPlain): Record<string, u
     memoryEnc: encryptWithKey(key, JSON.stringify(packed)),
     memoryEncVersion: 1,
   }
-}
-
-export function needsCoachMemoryMigration(data: Record<string, unknown> | null | undefined): boolean {
-  if (!canEncryptCoachMemory()) return false
-  const src = data && typeof data === 'object' ? data : {}
-  if (!src.memoryEnc) return true
-  return COACH_PLAINTEXT_KEYS.some((key) => Object.prototype.hasOwnProperty.call(src, key))
 }
 
 export const SECRET_DOC_KEYS = [
