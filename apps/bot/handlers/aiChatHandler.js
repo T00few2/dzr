@@ -1,5 +1,5 @@
 const OpenAI = require("openai");
-const { ChannelType } = require("discord.js");
+const { ChannelType, MessageFlags } = require("discord.js");
 const config = require("../config/config");
 const {
   getAllBotKnowledge,
@@ -25,7 +25,7 @@ const { startQuizFromMessage } = require("../services/quizService");
 const strava = require("../services/stravaService");
 const { handoffCoachingFromMessage, NOT_CLUB_MEMBER_TEXT } = require("../services/coachDm");
 const { formatCoachProfileForPrompt } = require("../services/coachProfile");
-const { MY_PAGES_COACH_URL } = require("../services/coachHowItWorks");
+const { MY_PAGES_COACH_URL, noEmbedUrl } = require("../services/coachHowItWorks");
 const {
   shouldSkipExtract,
   buildExtractMessages,
@@ -653,8 +653,14 @@ const coachToolDefinitions = [
  * rejection in the messageCreate handler.
  */
 async function safeReply(message, content) {
-  const payload = typeof content === "string" ? content.trim() : content;
-  if (payload == null || payload === "") {
+  const payload = typeof content === "string"
+    ? { content: content.trim(), flags: MessageFlags.SuppressEmbeds }
+    : content;
+  if (typeof content === "string" && !content.trim()) {
+    console.warn("⚠️ safeReply skipped empty content");
+    return null;
+  }
+  if (payload == null) {
     console.warn("⚠️ safeReply skipped empty content");
     return null;
   }
@@ -692,7 +698,7 @@ async function safeReplyChunks(message, content) {
       await safeReply(message, chunk);
       first = false;
     } else {
-      await message.channel.send(chunk);
+      await message.channel.send({ content: chunk, flags: MessageFlags.SuppressEmbeds });
     }
   }
 }
@@ -1541,7 +1547,7 @@ function fallbackCoachFromTools(toolResults) {
   }
   const failed = (toolResults || []).find((r) => r && r.success === false && r.message);
   if (failed?.needs_reconnect && failed.connectUrl) {
-    return `🔗 Strava-forbindelsen skal fornys:\n${failed.connectUrl}`;
+    return `🔗 Strava-forbindelsen skal fornys:\n${noEmbedUrl(failed.connectUrl)}`;
   }
   if (failed?.message) return String(failed.message).slice(0, 1500);
   return "Jeg hentede dine data, men kunne ikke skrive svaret færdigt. Prøv at spørge igen om lidt.";
@@ -1761,7 +1767,7 @@ async function handleAIChatMessage(message, client) {
         await safeReply(
           message,
           "🔗 Forbind Strava først (linket gælder 15 min):\n" +
-            (url || "Connect-link kunne ikke oprettes. Tjek STRAVA_CONNECT_SECRET.")
+            (url ? noEmbedUrl(url) : "Connect-link kunne ikke oprettes. Tjek STRAVA_CONNECT_SECRET.")
         );
         return;
       }

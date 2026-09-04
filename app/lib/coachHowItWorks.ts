@@ -2,6 +2,13 @@ import { SITE_ORIGIN } from '@/app/lib/sharedConstants'
 
 export const MY_PAGES_COACH_URL = `${SITE_ORIGIN}/members-zone/my-pages?tab=2`
 
+export function noEmbedUrl(url: string) {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  if (raw.startsWith('<') && raw.endsWith('>')) return raw
+  return `<${raw}>`
+}
+
 export function coachHowItWorksText({ includeStartHint = true }: { includeStartHint?: boolean } = {}) {
   const lines = [
     '🚴 **DZR Coach**',
@@ -13,7 +20,7 @@ export function coachHowItWorksText({ includeStartHint = true }: { includeStartH
     '',
     '**Din profil**',
     'Du har fået et udgangspunkt på profilen (cykling og typisk 3–4 ture om ugen). Du retter selv rammerne under Mine sider → Coach:',
-    MY_PAGES_COACH_URL,
+    noEmbedUrl(MY_PAGES_COACH_URL),
     '',
     'Det er der, du sætter hvor ofte du kører, andre sportsgrene, faste træningsdage, skader, faste mål (fx tabe vægt eller holde formen) og hvordan jeg skal svare. Jeg ændrer ikke selv de rammer — det gør du på Coach-fanen.',
     '',

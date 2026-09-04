@@ -419,7 +419,7 @@ export async function sendDm(userId: string, content: string) {
   const msg = await fetch(`https://discord.com/api/v10/channels/${channel.id}/messages`, {
     method: 'POST',
     headers: botHeaders(),
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, flags: 4 }),
   })
   return msg.ok
 }

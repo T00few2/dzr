@@ -1,15 +1,19 @@
-const { ChannelType } = require("discord.js");
+const { ChannelType, MessageFlags } = require("discord.js");
 const strava = require("./stravaService");
 const { ensureDefaultCoachProfile, markCoachHowItWorksSent } = require("./firebase");
-const { MY_PAGES_COACH_URL, coachHowItWorksText } = require("./coachHowItWorks");
+const { MY_PAGES_COACH_URL, coachHowItWorksText, noEmbedUrl } = require("./coachHowItWorks");
 
 const NOT_CLUB_MEMBER_TEXT =
   "❌ DZR Coach er kun for **betalende klubmedlemmer** (indeværende år).\n\n" +
   "Verified Member / community er ikke nok — du skal have aktivt klubmedlemskab.\n" +
-  "Bliv klubmedlem: https://www.dzrracingseries.com/join";
+  "Bliv klubmedlem: " + noEmbedUrl("https://www.dzrracingseries.com/join");
 
 const DM_CLOSED_TEXT =
   "❌ Jeg kunne ikke sende dig en DM. Tillad beskeder fra servermedlemmer (Discord → Privatliv / Privacy) og prøv `/coach` igen.";
+
+function sendNoEmbeds(channel, content) {
+  return channel.send({ content, flags: MessageFlags.SuppressEmbeds });
+}
 
 async function sendCoachingIntroDm(user, client, guild = null) {
   const eligible = await strava.hasClubMemberRole(user.id, client, guild);
@@ -35,7 +39,7 @@ async function sendCoachingIntroDm(user, client, guild = null) {
   const alreadyExplained = Boolean(profile?.howItWorksSentAt);
   try {
     if (!alreadyExplained) {
-      await dm.send(coachHowItWorksText({ includeStartHint: false }));
+      await sendNoEmbeds(dm, coachHowItWorksText({ includeStartHint: false }));
       try {
         await markCoachHowItWorksSent(user.id);
       } catch (err) {
@@ -45,26 +49,28 @@ async function sendCoachingIntroDm(user, client, guild = null) {
 
     if (!connected) {
       const url = strava.getConnectUrl(user.id);
-      await dm.send(
+      await sendNoEmbeds(
+        dm,
         "For at give dig træningsråd skal jeg have adgang til dine Strava-aktiviteter.\n\n" +
           "1. Klik på linket (gyldigt 15 minutter)\n" +
           "2. Læs samtykket og forbind Strava\n" +
           "3. Kom tilbage hertil og spørg fx: *Hvordan var min uge?*\n\n" +
-          (url || "⚠️ Connect-link kunne ikke oprettes (STRAVA_CONNECT_SECRET mangler).")
+          (url ? noEmbedUrl(url) : "⚠️ Connect-link kunne ikke oprettes (STRAVA_CONNECT_SECRET mangler).")
       );
       return { ok: true, connected: false, dmChannelId: dm.id };
     }
 
     if (alreadyExplained) {
-      await dm.send(
+      await sendNoEmbeds(
+        dm,
         "🚴 **DZR Coach** — jeg er klar.\n\n" +
           "Spørg om din træning, restitution, volume eller et specifikt pas. Jeg henter dine Strava-data bag kulissen.\n\n" +
           "Dine rammer retter du på Mine sider → Coach. Chat-noter slår du til samme sted, hvis du vil.\n" +
-          MY_PAGES_COACH_URL +
+          noEmbedUrl(MY_PAGES_COACH_URL) +
           "\n\nFx: *Hvordan var min uge?* · *Var i går for hård?* · *Skal jeg hvile i morgen?*"
       );
     } else {
-      await dm.send("Jeg er klar. Spørg fx: *Hvordan var min uge?* · *Var i går for hård?* · *Skal jeg hvile i morgen?*");
+      await sendNoEmbeds(dm, "Jeg er klar. Spørg fx: *Hvordan var min uge?* · *Var i går for hård?* · *Skal jeg hvile i morgen?*");
     }
     return { ok: true, connected: true, dmChannelId: dm.id };
   } catch {
