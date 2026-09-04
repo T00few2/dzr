@@ -94,6 +94,7 @@ const ZRLRiderEditDelete: React.FC<ZRLRiderEditDeleteProps> = ({ rider, onClose 
               value={raceSeries}
               onChange={(e) => setRaceSeries(e.target.value)}
               bg="white"
+              color="black"
             >
               <option value="WTRL ZRL">WTRL ZRL</option>
               <option value="WTRL TTT">WTRL TTT</option>

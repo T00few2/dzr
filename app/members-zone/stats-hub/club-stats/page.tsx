@@ -333,7 +333,7 @@ export default function StatsPage() {
         </Flex>
         <Flex gap={2} align='center'>
           <Text color='white' fontWeight='bold'>Select team</Text>
-          <Select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} width='sm' bg='white'>
+          <Select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} width='sm' bg='white' color='black'>
             <option value=''>All riders</option>
             {captainRoles.map((r) => (
               <option key={r.roleId} value={r.roleId}>{r.roleName}</option>
@@ -488,13 +488,13 @@ export default function StatsPage() {
         <Stack spacing={2}>
           <Text color='white' fontWeight='bold'>Time Series Graph</Text>
           <Flex gap={3} align='center' wrap='wrap'>
-            <Select value={range} onChange={e => setRange(e.target.value)} width='xs' bg='white'>
+            <Select value={range} onChange={e => setRange(e.target.value)} width='xs' bg='white' color='black'>
               <option value='7'>Last 7 days</option>
               <option value='30'>Last 30 days</option>
               <option value='90'>Last 90 days</option>
             </Select>
             <Button onClick={loadCompare} isDisabled={selected.length === 0}>Load time series</Button>
-            <Select value={metric} onChange={(e) => setMetric(e.target.value as 'velo' | 'zrs')} width='xs' bg='white'>
+            <Select value={metric} onChange={(e) => setMetric(e.target.value as 'velo' | 'zrs')} width='xs' bg='white' color='black'>
               <option value='velo'>vELO</option>
               <option value='zrs'>ZRS</option>
             </Select>

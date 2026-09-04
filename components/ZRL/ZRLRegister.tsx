@@ -202,6 +202,7 @@ const ZRLRegister = () => {
                 value={raceSeries}
                 onChange={(e) => setRaceSeries(e.target.value)}
                 bg="white"
+                color="black"
               >
                 <option value="WTRL ZRL">WTRL ZRL</option>
                 <option value="WTRL TTT">WTRL TTT</option>
@@ -219,6 +220,7 @@ const ZRLRegister = () => {
                   value={division}
                   onChange={(e) => setDivision(e.target.value)}
                   bg="white"
+                  color="black"
                 >
                   {availableDivisions.map((div) => (
                     <option key={div} value={div}>

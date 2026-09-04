@@ -12,12 +12,16 @@ const theme = extendTheme({
     // Add more font styles if needed
   },
   styles: {
-    global: () => ({
+    global: {
       body: {
-        background:'black',
-      }
-    })
-  }
+        background: 'black',
+      },
+      'select option, option': {
+        color: '#171923',
+        backgroundColor: '#fff',
+      },
+    },
+  },
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {

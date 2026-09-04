@@ -45,7 +45,7 @@ export default function MembersAdminPage() {
   return (
     <AdminShell title="Members">
       <HStack mb={4}>
-        <Select w="200px" value={type} onChange={(e) => { setType(e.target.value); load(e.target.value) }} bg="gray.900">
+        <Select w="200px" value={type} onChange={(e) => { setType(e.target.value); load(e.target.value) }} bg="gray.900" color="white">
           <option value="all">All</option>
           <option value="linked">Linked</option>
           <option value="unlinked">Unlinked</option>

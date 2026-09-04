@@ -48,6 +48,19 @@ const secondaryButtonProps = {
   _hover: { bg: 'gray.700', borderColor: 'gray.400', color: 'white' },
 }
 
+const darkSelectProps = {
+  bg: 'gray.800',
+  borderColor: 'gray.600',
+  color: 'white',
+  size: 'sm' as const,
+  sx: {
+    option: {
+      color: 'black',
+      background: 'white',
+    },
+  },
+}
+
 type ClearConfirm =
   | { kind: 'settings' }
   | { kind: 'notes' }
@@ -453,9 +466,7 @@ export default function CoachMemoryEditor() {
                   value={row.sport}
                   onChange={(e) => updateWeekly(index, { ...row, sport: e.target.value })}
                   maxW="180px"
-                  bg="gray.800"
-                  borderColor="gray.600"
-                  size="sm"
+                  {...darkSelectProps}
                 >
                   {SPORT_OPTIONS.map((sport) => (
                     <option key={sport} value={sport}>{sport}</option>
@@ -524,9 +535,7 @@ export default function CoachMemoryEditor() {
               <Select
                 value={inj.status}
                 onChange={(e) => updateInjury(index, { ...inj, status: e.target.value === 'recovered' ? 'recovered' : 'active' })}
-                bg="gray.800"
-                borderColor="gray.600"
-                size="sm"
+                {...darkSelectProps}
               >
                 <option value="active">Active</option>
                 <option value="recovered">Recovered</option>
