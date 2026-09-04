@@ -1,34 +1,17 @@
 'use client'
 
 import React, { useContext, useMemo, useEffect, useState } from 'react'
-import { Box, Heading, Text, Flex, Badge, SimpleGrid, Button, Spinner, useToast, Link as ChakraLink } from '@chakra-ui/react'
+import { Box, Heading, Text, Flex, Badge, SimpleGrid } from '@chakra-ui/react'
 import { useSession } from 'next-auth/react'
 import { AuthContext } from '@/components/auth/AuthContext'
 import Link from 'next/link'
-import CoachMemoryEditor from './CoachMemoryEditor'
 
 export default function ProfilePage() {
   const { data: session, status } = useSession()
   const { currentUser } = useContext(AuthContext)
-  const toast = useToast()
   const [zwiftId, setZwiftId] = useState<string | null>(null)
   const [roleNames, setRoleNames] = useState<string[] | null>(null)
   const [memberSummary, setMemberSummary] = useState<{ currentStatus?: string; coveredThroughYear?: number | null; fullName?: string | null } | null>(null)
-  const [strava, setStrava] = useState<{ connected: boolean; eligible?: boolean; athleteName?: string | null; connectedAt?: string | null } | null>(null)
-  const [stravaBusy, setStravaBusy] = useState(false)
-  const [stravaNotice, setStravaNotice] = useState<string | null>(null)
-
-  async function loadStravaStatus() {
-    const res = await fetch('/api/strava/status', { cache: 'no-store' })
-    if (!res.ok) return
-    const data = await res.json()
-    setStrava({
-      connected: !!data?.connected,
-      eligible: data?.eligible !== false,
-      athleteName: data?.athleteName ?? null,
-      connectedAt: data?.connectedAt ?? null,
-    })
-  }
 
   useEffect(() => {
     let ignore = false
@@ -76,17 +59,6 @@ export default function ProfilePage() {
     return () => { ignore = true }
   }, [session])
 
-  useEffect(() => {
-    let ignore = false
-    async function fetchStrava() {
-      try {
-        await loadStravaStatus()
-      } catch {}
-    }
-    if (session) fetchStrava()
-    return () => { ignore = true }
-  }, [session])
-
   const profile = useMemo(() => {
     const user = (session?.user || {}) as any
     return {
@@ -129,31 +101,6 @@ export default function ProfilePage() {
     const month = monthNames[d.getUTCMonth()]
     return `${day} ${month} ${y}`
   })()
-
-  async function disconnectStrava() {
-    setStravaBusy(true)
-    setStravaNotice(null)
-    try {
-      const res = await fetch('/api/strava/disconnect', { method: 'POST' })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast({ title: data?.error || 'Disconnect failed', status: 'error' })
-        return
-      }
-      await loadStravaStatus()
-      if (data?.revokedOnStrava) {
-        toast({ title: 'Strava disconnected', status: 'success' })
-        setStravaNotice(null)
-      } else {
-        toast({ title: 'Disconnected in DZR', status: 'warning' })
-        setStravaNotice(
-          'DZR no longer has your tokens, but Strava may still list the app. Remove it under Strava → Settings → My Apps if it is still there.'
-        )
-      }
-    } finally {
-      setStravaBusy(false)
-    }
-  }
 
   return (
     <Box px={{ base: 4, md: 8 }} py={{ base: 100, md: 100 }} color={'white'}>
@@ -226,60 +173,6 @@ export default function ProfilePage() {
           </Box>
         </SimpleGrid>
       </Box>
-
-      {/* Strava coaching */}
-      <Box borderWidth={'1px'} borderColor={'gray.700'} borderRadius={'md'} p={4} mb={6}>
-        <Heading size="sm" mb={2}>Strava / DZR Coach</Heading>
-        <Text color="gray.400" mb={4} fontSize="sm">
-          Forbind Strava for at få personlig træningscoaching i en privat Discord-DM. Kun betalende klubmedlemmer (indeværende år).
-        </Text>
-        {!strava ? (
-          <Spinner size="sm" />
-        ) : strava.connected ? (
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-            <Box>
-              <Text fontWeight="bold" mb={1}>Status</Text>
-              <Text>Connected{strava.athleteName ? ` as ${strava.athleteName}` : ''}</Text>
-            </Box>
-            <Box>
-              <Text fontWeight="bold" mb={1}>Connected</Text>
-              <Text>{strava.connectedAt ? new Date(strava.connectedAt).toLocaleString() : '—'}</Text>
-            </Box>
-            <Box>
-              <Button
-                onClick={disconnectStrava}
-                isLoading={stravaBusy}
-                size="sm"
-                variant="outline"
-                colorScheme="red"
-                color="red.300"
-                borderColor="red.400"
-                _hover={{ bg: 'whiteAlpha.100' }}
-              >
-                Disconnect Strava
-              </Button>
-            </Box>
-          </SimpleGrid>
-        ) : strava.eligible === false ? (
-          <Text>Coaching er kun for betalende klubmedlemmer. Forny medlemskab under Membership, eller gå til /join.</Text>
-        ) : (
-          <>
-            <Button as="a" href="/strava/connect?force=1" size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }}>
-              Connect Strava
-            </Button>
-            {stravaNotice && (
-              <Text mt={3} fontSize="sm" color="orange.200">
-                {stravaNotice}{' '}
-                <ChakraLink href="https://www.strava.com/settings/apps" isExternal textDecoration="underline">
-                  Open Strava apps
-                </ChakraLink>
-              </Text>
-            )}
-          </>
-        )}
-      </Box>
-
-      <CoachMemoryEditor />
 
       {/* Discord Info */}
       <Box borderWidth={'1px'} borderColor={'gray.700'} borderRadius={'md'} p={4}>

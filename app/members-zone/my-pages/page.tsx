@@ -4,7 +4,6 @@ import React, { useState, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Box,
   Container,
   Heading,
   Tabs,
@@ -18,15 +17,28 @@ import dynamic from 'next/dynamic';
 
 const Profile = dynamic(() => import('./profile/page'), { ssr: false });
 const Membership = dynamic(() => import('./membership/page'), { ssr: false });
+const Coach = dynamic(() => import('./coach/page'), { ssr: false });
+
+const TAB_STYLE = {
+  color: 'gray.300',
+  _selected: { color: 'white', bg: 'gray.800', borderColor: 'gray.600', borderBottomColor: 'gray.800' },
+} as const;
+
+function parseTabIndex(raw: string | null, isClub: boolean) {
+  if (raw === 'coach' || raw === '2') return isClub ? 2 : 0;
+  if (raw === 'membership' || raw === '1') return 1;
+  const n = raw ? parseInt(raw, 10) : 0;
+  if (n === 2) return isClub ? 2 : 0;
+  if (n === 1) return 1;
+  return 0;
+}
 
 function MyPagesPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  
-  const tabFromUrl = searchParams?.get('tab');
-  const initialTab = tabFromUrl ? parseInt(tabFromUrl) : 0;
-  const [tabIndex, setTabIndex] = useState(initialTab);
+  const [isClub, setIsClub] = useState<boolean | null>(null);
+  const [tabIndex, setTabIndex] = useState(0);
 
   React.useEffect(() => {
     if (status === 'unauthenticated') {
@@ -35,6 +47,30 @@ function MyPagesPageContent() {
     }
   }, [status, router]);
 
+  React.useEffect(() => {
+    let ignore = false;
+    async function loadClub() {
+      try {
+        const res = await fetch('/api/membership/summary', { cache: 'no-store' });
+        if (!res.ok) {
+          if (!ignore) setIsClub(false);
+          return;
+        }
+        const data = await res.json();
+        if (!ignore) setIsClub(data?.currentStatus === 'club');
+      } catch {
+        if (!ignore) setIsClub(false);
+      }
+    }
+    if (session) loadClub();
+    return () => { ignore = true };
+  }, [session]);
+
+  React.useEffect(() => {
+    if (isClub === null) return;
+    setTabIndex(parseTabIndex(searchParams?.get('tab') ?? null, isClub));
+  }, [isClub, searchParams]);
+
   const handleTabChange = (index: number) => {
     setTabIndex(index);
     const url = new URL(window.location.href);
@@ -42,7 +78,7 @@ function MyPagesPageContent() {
     window.history.pushState({}, '', url);
   };
 
-  if (status === 'loading') {
+  if (status === 'loading' || (session && isClub === null)) {
     return <LoadingSpinnerMemb />;
   }
 
@@ -58,12 +94,17 @@ function MyPagesPageContent() {
       
       <Tabs index={tabIndex} onChange={handleTabChange} colorScheme="red" variant="enclosed">
         <TabList borderColor="gray.600">
-          <Tab color="gray.300" _selected={{ color: 'white', bg: 'gray.800', borderColor: 'gray.600', borderBottomColor: 'gray.800' }}>
+          <Tab {...TAB_STYLE}>
             Profile
           </Tab>
-          <Tab color="gray.300" _selected={{ color: 'white', bg: 'gray.800', borderColor: 'gray.600', borderBottomColor: 'gray.800' }}>
+          <Tab {...TAB_STYLE}>
             Membership
           </Tab>
+          {isClub && (
+            <Tab {...TAB_STYLE}>
+              Coach
+            </Tab>
+          )}
         </TabList>
 
         <TabPanels>
@@ -73,6 +114,11 @@ function MyPagesPageContent() {
           <TabPanel px={0}>
             <Membership />
           </TabPanel>
+          {isClub && (
+            <TabPanel px={0}>
+              <Coach />
+            </TabPanel>
+          )}
         </TabPanels>
       </Tabs>
     </Container>

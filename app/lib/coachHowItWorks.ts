@@ -1,4 +1,4 @@
-export const MY_PAGES_PROFILE_URL = 'https://www.dzrracingseries.com/members-zone/my-pages'
+export const MY_PAGES_PROFILE_URL = 'https://www.dzrracingseries.com/members-zone/my-pages?tab=2'
 
 export function coachHowItWorksText({ includeStartHint = true }: { includeStartHint?: boolean } = {}) {
   const lines = [
@@ -10,7 +10,7 @@ export function coachHowItWorksText({ includeStartHint = true }: { includeStartH
     'Jeg bruger dine Strava-aktiviteter, når du spørger om træning, restitution eller et bestemt pas.',
     '',
     '**Din profil**',
-    'Du har fået et udgangspunkt på profilen (cykling og typisk 3–4 ture om ugen). Du retter selv rammerne under Mine sider → Profile:',
+    'Du har fået et udgangspunkt på profilen (cykling og typisk 3–4 ture om ugen). Du retter selv rammerne under Mine sider → Coach:',
     MY_PAGES_PROFILE_URL,
     '',
     'Det er der, du sætter hvor ofte du kører, andre sportsgrene, faste træningsdage, skader, mål og hvordan jeg skal svare. Jeg ændrer ikke selv de rammer — det gør du på profilen.',

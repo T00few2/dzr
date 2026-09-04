@@ -128,7 +128,7 @@ function safeStringify(value) {
   }
 }
 
-const MY_PAGES_URL = "https://www.dzrracingseries.com/members-zone/my-pages";
+const MY_PAGES_URL = "https://www.dzrracingseries.com/members-zone/my-pages?tab=2";
 
 /**
  * Compact tool results before adding them to the model context.
@@ -1208,7 +1208,7 @@ async function executeSingleToolCall(toolCall, message) {
             return {
               tool_call_id: toolCall.id,
               success: false,
-              message: `Chat notes are off. The athlete can turn them on under My Pages (Profile): ${MY_PAGES_URL}`,
+              message: `Chat notes are off. The athlete can turn them on under My Pages (Coach): ${MY_PAGES_URL}`,
             };
           }
           const query = String(args.query || "").trim();
@@ -1229,7 +1229,7 @@ async function executeSingleToolCall(toolCall, message) {
               text: note.text,
             })),
             message: hits.length
-              ? `Dated episode notes — hints only, not standing rules. Forget/delete is on ${MY_PAGES_URL} (Profile tab).`
+              ? `Dated episode notes — hints only, not standing rules. Forget/delete is on ${MY_PAGES_URL} (Coach tab).`
               : "No matching episode notes.",
           };
         } catch (err) {
@@ -1411,7 +1411,7 @@ ${catalogLines}
 async function buildCoachSystemPrompt(message, userText) {
   const timestamp = new Date().toISOString();
   let memoryBlock = "No durable athlete constraints stored yet.";
-  let notesBlock = "Chat notes are off. If they want dated notes from this chat, tell them to turn that on under My Pages (Profile).";
+  let notesBlock = "Chat notes are off. If they want dated notes from this chat, tell them to turn that on under My Pages (Coach).";
   let notesOptIn = false;
   try {
     const profile = await getCoachProfile(message.author.id);
@@ -1441,7 +1441,7 @@ Typical flow: get_recent_activities first, then get_activity_details for a speci
 ## Athlete constraints (durable memory)
 ${memoryBlock}
 
-These constraints come from the athlete's Profile page. You cannot change them. If they ask to change rides per week, sports, injuries, goals, or reply style, tell them to edit Mine sider → Profile: ${MY_PAGES_URL}
+These constraints come from the athlete's Coach settings. You cannot change them. If they ask to change rides per week, sports, injuries, goals, or reply style, tell them to edit Mine sider → Coach: ${MY_PAGES_URL}
 Obey ride frequency and weekly slots over last week's Strava volume. Never prescribe through an active injury.
 
 ## Recent conversation notes (episodic, dated — not standing rules)
@@ -1449,9 +1449,9 @@ ${notesBlock}
 
 ${notesOptIn
     ? `Treat these as hints for today's reply. A yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
-If they ask to forget a chat note, tell them to delete it on ${MY_PAGES_URL} (Profile tab).
+If they ask to forget a chat note, tell them to delete it on ${MY_PAGES_URL} (Coach tab).
 Use search_past_notes when they refer to something discussed earlier that is not in this block.`
-    : `Do not invent chat notes. If they ask you to remember how they felt, tell them they can turn chat notes on under Profile: ${MY_PAGES_URL}`}
+    : `Do not invent chat notes. If they ask you to remember how they felt, tell them they can turn chat notes on under Coach: ${MY_PAGES_URL}`}
 
 ## Coaching style
 - Reply in the user's language (Danish or English) unless Athlete constraints specify a language.

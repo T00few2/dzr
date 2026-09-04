@@ -2,7 +2,7 @@ const { ChannelType } = require("discord.js");
 const strava = require("./stravaService");
 const { ensureDefaultCoachProfile, markCoachHowItWorksSent } = require("./firebase");
 
-const MY_PAGES_URL = "https://www.dzrracingseries.com/members-zone/my-pages";
+const MY_PAGES_URL = "https://www.dzrracingseries.com/members-zone/my-pages?tab=2";
 
 const NOT_CLUB_MEMBER_TEXT =
   "❌ DZR Coach er kun for **betalende klubmedlemmer** (indeværende år).\n\n" +
@@ -22,7 +22,7 @@ function coachHowItWorksText({ includeStartHint = false } = {}) {
     "Jeg bruger dine Strava-aktiviteter, når du spørger om træning, restitution eller et bestemt pas.",
     "",
     "**Din profil**",
-    "Du har fået et udgangspunkt på profilen (cykling og typisk 3–4 ture om ugen). Du retter selv rammerne under Mine sider → Profile:",
+    "Du har fået et udgangspunkt på profilen (cykling og typisk 3–4 ture om ugen). Du retter selv rammerne under Mine sider → Coach:",
     MY_PAGES_URL,
     "",
     "Det er der, du sætter hvor ofte du kører, andre sportsgrene, faste træningsdage, skader, mål og hvordan jeg skal svare. Jeg ændrer ikke selv de rammer — det gør du på profilen.",
@@ -84,7 +84,7 @@ async function sendCoachingIntroDm(user, client, guild = null) {
       await dm.send(
         "🚴 **DZR Coach** — jeg er klar.\n\n" +
           "Spørg om din træning, restitution, volume eller et specifikt pas. Jeg henter dine Strava-data bag kulissen.\n\n" +
-          "Dine rammer retter du på Mine sider → Profile. Chat-noter slår du til samme sted, hvis du vil.\n" +
+          "Dine rammer retter du på Mine sider → Coach. Chat-noter slår du til samme sted, hvis du vil.\n" +
           MY_PAGES_URL +
           "\n\nFx: *Hvordan var min uge?* · *Var i går for hård?* · *Skal jeg hvile i morgen?*"
       );

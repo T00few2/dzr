@@ -12,8 +12,8 @@ export default function StravaConnectedPage() {
       </Text>
       <Text fontSize="sm" color="gray.500">
         Du kan afbryde forbindelsen under{' '}
-        <Link href="/members-zone/my-pages/profile" style={{ textDecoration: 'underline' }}>
-          Profile
+        <Link href="/members-zone/my-pages?tab=2" style={{ textDecoration: 'underline' }}>
+          Coach
         </Link>
         .
       </Text>

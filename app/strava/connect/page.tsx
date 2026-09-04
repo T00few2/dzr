@@ -44,7 +44,7 @@ function ConnectForm() {
           <ListItem>DZR læser din Strava-profil, zoner og aktiviteter (read-only).</ListItem>
           <ListItem>Aktivitetssammendrag og dine beskeder sendes til OpenAI for at generere coaching-svar. Hvis du har udfyldt coach-profilen, sendes de rammer med. Hvis du har slået chat-noter til, kan korte daterede notater fra samtalen også sendes med.</ListItem>
           <ListItem>Strava-tokens gemmes krypteret og bruges kun til coaching i Discord. Vi gemmer ikke hele din træningshistorik.</ListItem>
-          <ListItem>Dine faste træningsrammer (fx 3–4 ture/uge, skader, skrivestil) retter du selv under Mine sider → Profile. Chat-noter er slået fra, indtil du slår dem til samme sted.</ListItem>
+          <ListItem>Dine faste træningsrammer (fx 3–4 ture/uge, skader, skrivestil) retter du selv under Mine sider → Coach. Chat-noter er slået fra, indtil du slår dem til samme sted.</ListItem>
           <ListItem>Du kan afbryde Strava-forbindelsen når som helst her på siden eller under Strava → Settings → My Apps.</ListItem>
         </UnorderedList>
       </Box>
