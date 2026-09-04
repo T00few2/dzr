@@ -94,8 +94,7 @@ export async function GET(req: Request) {
           'Spørg mig om din træning her i DM — fx:\n' +
           '• Hvordan var min uge?\n' +
           '• Var i går for hård?\n' +
-          '• Skal jeg hvile i morgen?\n\n' +
-          'Jeg bruger kun *dine* Strava-data, og chatten her forbliver privat.'
+          '• Skal jeg hvile i morgen?'
       )
     } catch (dmErr) {
       console.warn('strava callback: could not DM user', discordId, dmErr)
