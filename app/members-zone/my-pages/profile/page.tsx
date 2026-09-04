@@ -231,7 +231,7 @@ export default function ProfilePage() {
       <Box borderWidth={'1px'} borderColor={'gray.700'} borderRadius={'md'} p={4} mb={6}>
         <Heading size="sm" mb={2}>Strava / DZR Coach</Heading>
         <Text color="gray.400" mb={4} fontSize="sm">
-          Forbind Strava for at få personlig træningscoaching i en privat Discord-DM. Kun betalende klubmedlemmer (indeværende år) — ikke Verified Member alene.
+          Forbind Strava for at få personlig træningscoaching i en privat Discord-DM. Kun betalende klubmedlemmer (indeværende år).
         </Text>
         {!strava ? (
           <Spinner size="sm" />

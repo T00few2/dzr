@@ -1,7 +1,13 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
   Box,
   Button,
   Checkbox,
@@ -42,6 +48,35 @@ const secondaryButtonProps = {
   _hover: { bg: 'gray.700', borderColor: 'gray.400', color: 'white' },
 }
 
+type ClearConfirm =
+  | { kind: 'memory' }
+  | { kind: 'notes' }
+  | { kind: 'all' }
+  | { kind: 'note'; id: string }
+
+const CLEAR_CONFIRM_COPY = {
+  memory: {
+    title: 'Clear memory?',
+    body: 'Coach-profilen nulstilles til udgangspunktet. Chat-noter slettes ikke.',
+    confirm: 'Clear memory',
+  },
+  notes: {
+    title: 'Clear notes?',
+    body: 'Alle chat-noter slettes. Coach-profilen beholdes.',
+    confirm: 'Clear notes',
+  },
+  all: {
+    title: 'Clear all?',
+    body: 'Coach-profilen nulstilles, og alle chat-noter slettes. Det kan ikke fortrydes.',
+    confirm: 'Clear all',
+  },
+  note: {
+    title: 'Slet note?',
+    body: 'Denne chat-note slettes. Det kan ikke fortrydes.',
+    confirm: 'Slet',
+  },
+} as const
+
 function emptyForm(): CoachProfile {
   return {
     ridesPerWeek: null,
@@ -67,6 +102,8 @@ export default function CoachMemoryEditor() {
   const [newGoal, setNewGoal] = useState('')
   const [ridesMin, setRidesMin] = useState('')
   const [ridesMax, setRidesMax] = useState('')
+  const [clearConfirm, setClearConfirm] = useState<ClearConfirm | null>(null)
+  const cancelClearRef = useRef<HTMLButtonElement>(null)
 
   function applyProfile(profile: CoachProfile) {
     setForm({
@@ -199,18 +236,61 @@ export default function CoachMemoryEditor() {
     }
   }
 
-  async function clearAll() {
-    if (!window.confirm('Nulstil coach-profilen til udgangspunktet?')) return
+  async function resetMemoryRequest() {
+    const res = await fetch('/api/coach/profile', { method: 'DELETE' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(data?.error || 'Could not reset memory')
+    }
+    applyProfile(data?.profile || emptyForm())
+  }
+
+  async function deleteAllNotesRequest() {
+    const res = await fetch('/api/coach/notes?all=1', { method: 'DELETE' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(data?.error || 'Could not delete notes')
+    }
+    setChatNotes([])
+  }
+
+  async function clearMemory() {
     setSaving(true)
     try {
-      const res = await fetch('/api/coach/profile', { method: 'DELETE' })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast({ title: data?.error || 'Could not delete', status: 'error' })
+      await resetMemoryRequest()
+      toast({ title: 'Coach-profilen er nulstillet', status: 'info' })
+    } catch (err: any) {
+      toast({ title: err?.message || 'Could not reset memory', status: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function clearNotes() {
+    setSaving(true)
+    try {
+      await deleteAllNotesRequest()
+      toast({ title: 'Chat-noter slettet', status: 'info' })
+    } catch (err: any) {
+      toast({ title: err?.message || 'Could not delete notes', status: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function clearAll() {
+    setSaving(true)
+    try {
+      const results = await Promise.allSettled([resetMemoryRequest(), deleteAllNotesRequest()])
+      const failed = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined
+      if (failed) {
+        toast({
+          title: failed.reason?.message || 'Could not clear everything',
+          status: 'error',
+        })
         return
       }
-      applyProfile(data?.profile || emptyForm())
-      toast({ title: 'Coach-profilen er nulstillet', status: 'info' })
+      toast({ title: 'Profil og chat-noter er nulstillet', status: 'info' })
     } finally {
       setSaving(false)
     }
@@ -238,21 +318,14 @@ export default function CoachMemoryEditor() {
     }
   }
 
-  async function deleteAllChatNotes() {
-    if (!window.confirm('Slet alle chat-noter fra DZR Coach?')) return
-    setSaving(true)
-    try {
-      const res = await fetch('/api/coach/notes?all=1', { method: 'DELETE' })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast({ title: data?.error || 'Could not delete notes', status: 'error' })
-        return
-      }
-      setChatNotes([])
-      toast({ title: 'Chat-noter slettet', status: 'info' })
-    } finally {
-      setSaving(false)
-    }
+  async function confirmClear() {
+    const action = clearConfirm
+    if (!action) return
+    if (action.kind === 'memory') await clearMemory()
+    else if (action.kind === 'notes') await clearNotes()
+    else if (action.kind === 'all') await clearAll()
+    else await deleteChatNote(action.id)
+    setClearConfirm(null)
   }
 
   if (loading) {
@@ -604,37 +677,71 @@ export default function CoachMemoryEditor() {
                 variant="ghost"
                 color="red.300"
                 _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
-                onClick={() => deleteChatNote(note.id)}
+                onClick={() => setClearConfirm({ kind: 'note', id: note.id })}
                 isDisabled={saving}
               >
                 Slet
               </Button>
             </Flex>
           ))}
-          <Button
-            alignSelf="flex-start"
-            size="sm"
-            variant="outline"
-            colorScheme="red"
-            color="red.300"
-            borderColor="red.400"
-            _hover={{ bg: 'whiteAlpha.100' }}
-            onClick={deleteAllChatNotes}
-            isLoading={saving}
-          >
-            Slet alle chat-noter
-          </Button>
         </Stack>
       )}
 
-      <HStack>
+      <Flex wrap="wrap" gap={2}>
         <Button onClick={save} isLoading={saving} size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }}>
           Save memory
         </Button>
-        <Button onClick={clearAll} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
+        <Button onClick={() => setClearConfirm({ kind: 'memory' })} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
+          Clear memory
+        </Button>
+        <Button onClick={() => setClearConfirm({ kind: 'notes' })} isLoading={saving} isDisabled={chatNotes.length === 0} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
+          Clear notes
+        </Button>
+        <Button onClick={() => setClearConfirm({ kind: 'all' })} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
           Clear all
         </Button>
-      </HStack>
+      </Flex>
+
+      <AlertDialog
+        isOpen={Boolean(clearConfirm)}
+        leastDestructiveRef={cancelClearRef}
+        onClose={() => {
+          if (!saving) setClearConfirm(null)
+        }}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent bg="gray.800" color="gray.100" borderWidth="1px" borderColor="gray.600">
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              {clearConfirm ? CLEAR_CONFIRM_COPY[clearConfirm.kind].title : ''}
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              {clearConfirm ? CLEAR_CONFIRM_COPY[clearConfirm.kind].body : ''}
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button
+                ref={cancelClearRef}
+                onClick={() => setClearConfirm(null)}
+                isDisabled={saving}
+                {...secondaryButtonProps}
+                size="sm"
+              >
+                Cancel
+              </Button>
+              <Button
+                ml={3}
+                size="sm"
+                bg="#ad1a2d"
+                color="white"
+                _hover={{ bg: '#8c1524' }}
+                onClick={confirmClear}
+                isLoading={saving}
+              >
+                {clearConfirm ? CLEAR_CONFIRM_COPY[clearConfirm.kind].confirm : ''}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Box>
   )
 }
