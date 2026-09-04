@@ -31,6 +31,7 @@ export type CoachProfile = {
   goals: string[]
   notes: string
   style: CoachStyle
+  notesOptIn: boolean
 }
 
 const DAY_ALIASES: Record<string, string> = {
@@ -125,6 +126,20 @@ export function emptyCoachProfile(): CoachProfile {
     goals: [],
     notes: '',
     style: emptyStyle(),
+    notesOptIn: false,
+  }
+}
+
+export function defaultCoachProfile(): CoachProfile {
+  return {
+    ridesPerWeek: { min: 3, max: 4 },
+    sports: ['cycling'],
+    weekly: [],
+    injuries: [],
+    goals: [],
+    notes: '',
+    style: { length: null, language: 'da', tone: null, notes: '' },
+    notesOptIn: false,
   }
 }
 
@@ -244,6 +259,7 @@ export function publicCoachFields(data: unknown, source: 'user' | 'coach' = 'use
     goals: sanitizeGoals(src.goals),
     notes: clip(src.notes, 1000),
     style: sanitizeStyle(src.style),
+    notesOptIn: src.notesOptIn === true,
   }
 }
 
@@ -256,5 +272,6 @@ export function toClientCoachProfile(data: unknown, discordId: string) {
     discordId,
     updatedAt: src.updatedAt ?? null,
     updatedBy: src.updatedBy === 'user' || src.updatedBy === 'coach' ? src.updatedBy : null,
+    howItWorksSentAt: src.howItWorksSentAt ?? null,
   }
 }

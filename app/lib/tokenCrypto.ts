@@ -153,6 +153,8 @@ export type CoachMemoryPlain = {
   goals?: unknown
   notes?: unknown
   style?: unknown
+  notesOptIn?: unknown
+  howItWorksSentAt?: unknown
   pendingConfirmation?: CoachMemoryPending
 }
 
@@ -179,6 +181,7 @@ function packCoachMemory(plain: CoachMemoryPlain) {
     goals: Array.isArray(plain.goals) ? plain.goals : [],
     notes: typeof plain.notes === 'string' ? plain.notes : String(plain.notes || ''),
     style: plain.style && typeof plain.style === 'object' ? plain.style : { length: null, language: null, tone: null, notes: '' },
+    notesOptIn: plain.notesOptIn === true,
     pendingConfirmation: packPending(plain.pendingConfirmation),
   }
 }
@@ -197,6 +200,8 @@ export function unwrapCoachMemoryDoc(data: Record<string, unknown> | null | unde
     discordId: (src.discordId as string) || null,
     updatedAt: src.updatedAt ?? null,
     updatedBy: src.updatedBy ?? null,
+    howItWorksSentAt: src.howItWorksSentAt ?? fromPlain.howItWorksSentAt ?? null,
+    notesOptIn: fromPlain.notesOptIn === true || src.notesOptIn === true,
   }
 }
 
@@ -273,6 +278,8 @@ export function persistCoachMemoryDoc(plain: CoachMemoryPlain): Record<string, u
     discordId: plain.discordId || null,
     updatedAt: plain.updatedAt || null,
     updatedBy: plain.updatedBy || null,
+    notesOptIn: packed.notesOptIn === true,
+    howItWorksSentAt: plain.howItWorksSentAt || null,
   }
   const key = getCoachKey()
   if (!key) {

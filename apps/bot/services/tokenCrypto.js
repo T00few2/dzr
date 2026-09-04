@@ -160,6 +160,7 @@ function packCoachMemory(plain) {
     goals: Array.isArray(src.goals) ? src.goals : [],
     notes: typeof src.notes === "string" ? src.notes : String(src.notes || ""),
     style: src.style && typeof src.style === "object" ? src.style : { length: null, language: null, tone: null, notes: "" },
+    notesOptIn: src.notesOptIn === true,
     pendingConfirmation: packPending(src.pendingConfirmation),
   };
 }
@@ -178,6 +179,8 @@ function unwrapCoachMemoryDoc(data) {
     discordId: src.discordId || null,
     updatedAt: src.updatedAt || null,
     updatedBy: src.updatedBy || null,
+    howItWorksSentAt: src.howItWorksSentAt || fromPlain.howItWorksSentAt || null,
+    notesOptIn: fromPlain.notesOptIn === true || src.notesOptIn === true,
   };
 }
 
@@ -232,6 +235,8 @@ function persistCoachMemoryDoc(plain) {
     discordId: plain?.discordId || null,
     updatedAt: plain?.updatedAt || null,
     updatedBy: plain?.updatedBy || null,
+    notesOptIn: packed.notesOptIn === true,
+    howItWorksSentAt: plain?.howItWorksSentAt || null,
   };
   const key = getCoachKey();
   if (!key) {

@@ -1,5 +1,8 @@
 const { ChannelType } = require("discord.js");
 const strava = require("./stravaService");
+const { ensureDefaultCoachProfile, markCoachHowItWorksSent } = require("./firebase");
+
+const MY_PAGES_URL = "https://www.dzrracingseries.com/members-zone/my-pages";
 
 const NOT_CLUB_MEMBER_TEXT =
   "❌ DZR Coach er kun for **betalende klubmedlemmer** (indeværende år).\n\n" +
@@ -8,6 +11,30 @@ const NOT_CLUB_MEMBER_TEXT =
 
 const DM_CLOSED_TEXT =
   "❌ Jeg kunne ikke sende dig en DM. Tillad beskeder fra servermedlemmer (Discord → Privatliv / Privacy) og prøv `/coach` igen.";
+
+function coachHowItWorksText({ includeStartHint = false } = {}) {
+  const lines = [
+    "🚴 **DZR Coach**",
+    "",
+    "Du kan få træningsråd i en privat Discord-besked. Sådan virker det:",
+    "",
+    "**Din træning**",
+    "Jeg bruger dine Strava-aktiviteter, når du spørger om træning, restitution eller et bestemt pas.",
+    "",
+    "**Din profil**",
+    "Du har fået et udgangspunkt på profilen (cykling og typisk 3–4 ture om ugen). Du retter selv rammerne under Mine sider → Profile:",
+    MY_PAGES_URL,
+    "",
+    "Det er der, du sætter hvor ofte du kører, andre sportsgrene, faste træningsdage, skader, mål og hvordan jeg skal svare. Jeg ændrer ikke selv de rammer — det gør du på profilen.",
+    "",
+    "**Chat-noter**",
+    "Korte, daterede notater fra samtalen (fx at du var syg i går) er slået fra. Vil du have det, slår du det til på samme profilside. Du kan altid se og slette noterne der.",
+  ];
+  if (includeStartHint) {
+    lines.push("", "Skriv **/coach** på Discord-serveren, når du vil i gang.");
+  }
+  return lines.join("\n");
+}
 
 async function sendCoachingIntroDm(user, client, guild = null) {
   const eligible = await strava.hasClubMemberRole(user.id, client, guild);
@@ -22,13 +49,29 @@ async function sendCoachingIntroDm(user, client, guild = null) {
     return { ok: false, reason: "dm_closed" };
   }
 
-  const connected = await strava.isStravaConnected(user.id);
+  let profile = null;
   try {
+    profile = await ensureDefaultCoachProfile(user.id);
+  } catch (err) {
+    console.warn("ensureDefaultCoachProfile failed:", err?.message || err);
+  }
+
+  const connected = await strava.isStravaConnected(user.id);
+  const alreadyExplained = Boolean(profile?.howItWorksSentAt);
+  try {
+    if (!alreadyExplained) {
+      await dm.send(coachHowItWorksText({ includeStartHint: false }));
+      try {
+        await markCoachHowItWorksSent(user.id);
+      } catch (err) {
+        console.warn("markCoachHowItWorksSent failed:", err?.message || err);
+      }
+    }
+
     if (!connected) {
       const url = strava.getConnectUrl(user.id);
       await dm.send(
-        "🚴 **DZR Coach**\n\n" +
-          "For at give dig træningsråd skal jeg have adgang til dine Strava-aktiviteter.\n\n" +
+        "For at give dig træningsråd skal jeg have adgang til dine Strava-aktiviteter.\n\n" +
           "1. Klik på linket (gyldigt 15 minutter)\n" +
           "2. Læs samtykket og forbind Strava\n" +
           "3. Kom tilbage hertil og spørg fx: *Hvordan var min uge?*\n\n" +
@@ -37,11 +80,17 @@ async function sendCoachingIntroDm(user, client, guild = null) {
       return { ok: true, connected: false, dmChannelId: dm.id };
     }
 
-    await dm.send(
-      "🚴 **DZR Coach** — jeg er klar.\n\n" +
-        "Spørg om din træning, restitution, volume eller et specifikt pas. Jeg henter dine Strava-data bag kulissen.\n\n" +
-        "Fx: *Hvordan var min uge?* · *Var i går for hård?* · *Skal jeg hvile i morgen?*"
-    );
+    if (alreadyExplained) {
+      await dm.send(
+        "🚴 **DZR Coach** — jeg er klar.\n\n" +
+          "Spørg om din træning, restitution, volume eller et specifikt pas. Jeg henter dine Strava-data bag kulissen.\n\n" +
+          "Dine rammer retter du på Mine sider → Profile. Chat-noter slår du til samme sted, hvis du vil.\n" +
+          MY_PAGES_URL +
+          "\n\nFx: *Hvordan var min uge?* · *Var i går for hård?* · *Skal jeg hvile i morgen?*"
+      );
+    } else {
+      await dm.send("Jeg er klar. Spørg fx: *Hvordan var min uge?* · *Var i går for hård?* · *Skal jeg hvile i morgen?*");
+    }
     return { ok: true, connected: true, dmChannelId: dm.id };
   } catch {
     return { ok: false, reason: "dm_closed" };

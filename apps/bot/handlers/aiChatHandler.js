@@ -7,9 +7,6 @@ const {
   getDZRTeamsAndSeries,
   recordCoachUsage,
   getCoachProfile,
-  mergeCoachProfile,
-  confirmCoachProfile,
-  rejectCoachProfile,
   formatCoachProfileForPrompt,
   listCoachChatNotes,
   addCoachChatNotes,
@@ -132,23 +129,6 @@ function safeStringify(value) {
 }
 
 const MY_PAGES_URL = "https://www.dzrracingseries.com/members-zone/my-pages";
-
-function formatMemoryConfirmMessages(summary) {
-  const parts = String(summary || "")
-    .split(";")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const bullets = (parts.length ? parts : ["dine træningsrammer"])
-    .map((p) => `• ${p}`)
-    .join("\n");
-  const confirmMessageDa =
-    `Jeg har gemt følgende til fremtidige samtaler:\n${bullets}\n\n` +
-    `Skriv **nej** hvis du ikke vil have det gemt. Du kan altid se og slette det under Mine sider:\n${MY_PAGES_URL}`;
-  const confirmMessageEn =
-    `I've saved the following for future conversations:\n${bullets}\n\n` +
-    `Reply **no** if you don't want this stored. You can always view and delete it on My Pages:\n${MY_PAGES_URL}`;
-  return { confirmMessageDa, confirmMessageEn };
-}
 
 /**
  * Compact tool results before adding them to the model context.
@@ -638,101 +618,6 @@ const coachToolDefinitions = [
     function: {
       name: "get_zwiftpower_context",
       description: "Optional ZwiftPower snapshot for the asking athlete (category, phenotype, FTP) if they have a linked Zwift ID.",
-      parameters: { type: "object", properties: {} }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "update_athlete_memory",
-      description: "Save durable facts the athlete just stated: ride frequency, sports, weekly slots, lasting injuries, goals, AND coaching-style preferences (short messages, language, tone). Do not save illness, fatigue, mood, skipped sessions, or how a ride felt — those are ephemeral. Do not save a busy Strava week as a rule. Do not save language just because the current message is in Danish or English. After saving, use the provided confirmMessage in your reply.",
-      parameters: {
-        type: "object",
-        properties: {
-          ridesPerWeek: {
-            type: "object",
-            description: "Typical ride count per week, e.g. {min:3,max:4}",
-            properties: {
-              min: { type: "number" },
-              max: { type: "number" }
-            }
-          },
-          sports: {
-            type: "array",
-            items: { type: "string" },
-            description: "Sports they do, e.g. cycling, running, strength"
-          },
-          weekly: {
-            type: "array",
-            description: "Fixed weekly slots",
-            items: {
-              type: "object",
-              properties: {
-                sport: { type: "string" },
-                days: { type: "array", items: { type: "string" } }
-              }
-            }
-          },
-          injuries: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                text: { type: "string" },
-                started: { type: "string" },
-                status: { type: "string", enum: ["active", "recovered"] }
-              }
-            }
-          },
-          goals: {
-            type: "array",
-            items: { type: "string" }
-          },
-          style: {
-            type: "object",
-            description: "How they want the coach to write. Save when they ask for short messages, Danish/English, a tone, or similar.",
-            properties: {
-              length: {
-                type: "string",
-                enum: ["short", "normal", "detailed"],
-                description: "short = few sentences / tight bullets"
-              },
-              language: {
-                type: "string",
-                enum: ["da", "en"],
-                description: "da = always Danish, en = always English"
-              },
-              tone: {
-                type: "string",
-                enum: ["direct", "encouraging", "casual"]
-              },
-              notes: {
-                type: "string",
-                description: "Other style requests, e.g. bullets only, no emojis"
-              }
-            }
-          },
-          summary: {
-            type: "string",
-            description: "Short phrase listing only the facts just saved, for the confirmation question"
-          }
-        }
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "confirm_athlete_memory",
-      description: "Call when the athlete confirms the last saved memory (yes / ja / det stemmer).",
-      parameters: { type: "object", properties: {} }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "reject_athlete_memory",
-      description: "Call when the athlete rejects the last saved memory (no / nej / forkert). Undoes only that last auto-save.",
       parameters: { type: "object", properties: {} }
     }
   },
@@ -1312,83 +1197,20 @@ async function executeSingleToolCall(toolCall, message) {
         return { tool_call_id: toolCall.id, ...(coachResult || { success: false, message: "No data" }) };
       }
 
-      case "update_athlete_memory":
-      case "confirm_athlete_memory":
-      case "reject_athlete_memory": {
-        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
-        if (!eligible) {
-          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
-        }
-        const discordId = message.author.id;
-        try {
-          if (name === "update_athlete_memory") {
-            const patch = {};
-            if (args.ridesPerWeek !== undefined) patch.ridesPerWeek = args.ridesPerWeek;
-            if (args.sports !== undefined) patch.sports = args.sports;
-            if (args.weekly !== undefined) patch.weekly = args.weekly;
-            if (args.injuries !== undefined) patch.injuries = args.injuries;
-            if (args.goals !== undefined) patch.goals = args.goals;
-            if (args.style !== undefined) patch.style = args.style;
-            if (!Object.keys(patch).length) {
-              return { tool_call_id: toolCall.id, success: false, message: "No memory fields provided." };
-            }
-            const profile = await mergeCoachProfile(discordId, patch, { summary: args.summary });
-            const { pendingConfirmation, ...stored } = profile;
-            const summary = pendingConfirmation?.summary || args.summary || null;
-            const { confirmMessageDa, confirmMessageEn } = formatMemoryConfirmMessages(summary);
-            return {
-              tool_call_id: toolCall.id,
-              success: true,
-              saved: true,
-              summary,
-              confirmMessageDa,
-              confirmMessageEn,
-              profile: {
-                ridesPerWeek: stored.ridesPerWeek,
-                sports: stored.sports,
-                weekly: stored.weekly,
-                injuries: stored.injuries,
-                goals: stored.goals,
-                style: stored.style,
-              },
-              instruction:
-                "Paste confirmMessageDa (or confirmMessageEn if they wrote English) as the memory notice. You may add a short coaching reply after it. Do not shorten it to 'Gemte:'. Even if they prefer short messages, keep this full notice.",
-            };
-          }
-          if (name === "confirm_athlete_memory") {
-            const result = await confirmCoachProfile(discordId);
-            return {
-              tool_call_id: toolCall.id,
-              success: result.success,
-              confirmed: result.confirmed || false,
-              message: result.message || null,
-              summary: result.summary || null,
-            };
-          }
-          const result = await rejectCoachProfile(discordId);
-          return {
-            tool_call_id: toolCall.id,
-            success: result.success,
-            rejected: result.rejected || false,
-            message: result.message || null,
-            summary: result.summary || null,
-            editUrl: MY_PAGES_URL,
-            instruction: result.success
-              ? `Say you undid the last save. For older memory they can edit under My Pages: ${MY_PAGES_URL}`
-              : undefined,
-          };
-        } catch (err) {
-          console.error("coach memory tool failed:", err?.message || err);
-          return { tool_call_id: toolCall.id, success: false, message: "Could not update coach memory." };
-        }
-      }
-
       case "search_past_notes": {
         const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
         if (!eligible) {
           return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
         }
         try {
+          const profile = await getCoachProfile(message.author.id);
+          if (profile?.notesOptIn !== true) {
+            return {
+              tool_call_id: toolCall.id,
+              success: false,
+              message: `Chat notes are off. The athlete can turn them on under My Pages (Profile): ${MY_PAGES_URL}`,
+            };
+          }
           const query = String(args.query || "").trim();
           if (!query) {
             return { tool_call_id: toolCall.id, success: false, message: "query is required." };
@@ -1589,55 +1411,47 @@ ${catalogLines}
 async function buildCoachSystemPrompt(message, userText) {
   const timestamp = new Date().toISOString();
   let memoryBlock = "No durable athlete constraints stored yet.";
-  let pendingLine = "";
-  let notesBlock = "None retrieved for this message.";
+  let notesBlock = "Chat notes are off. If they want dated notes from this chat, tell them to turn that on under My Pages (Profile).";
+  let notesOptIn = false;
   try {
     const profile = await getCoachProfile(message.author.id);
     memoryBlock = formatCoachProfileForPrompt(profile);
-    if (profile?.pendingConfirmation?.summary) {
-      pendingLine = `\nLast save awaiting ja/nej: ${profile.pendingConfirmation.summary}`;
-    }
+    notesOptIn = profile?.notesOptIn === true;
   } catch (err) {
     console.error("getCoachProfile failed:", err?.message || err);
   }
-  try {
-    const notes = await listCoachChatNotes(message.author.id);
-    const hits = retrieveRelevantNotes(notes, userText || "");
-    const formatted = formatNotesForPrompt(hits);
-    if (formatted) notesBlock = formatted;
-  } catch (err) {
-    console.error("listCoachChatNotes failed:", err?.message || err);
+  if (notesOptIn) {
+    notesBlock = "None retrieved for this message.";
+    try {
+      const notes = await listCoachChatNotes(message.author.id);
+      const hits = retrieveRelevantNotes(notes, userText || "");
+      const formatted = formatNotesForPrompt(hits);
+      if (formatted) notesBlock = formatted;
+    } catch (err) {
+      console.error("listCoachChatNotes failed:", err?.message || err);
+    }
   }
 
-  return `You are DZR Coach, a cycling coach for Danish Zwift Racers. You chat in a private Discord DM with one athlete.
+  const content = `You are DZR Coach, a cycling coach for Danish Zwift Racers. You chat in a private Discord DM with one athlete.
 
 ## Data
 You may only use tools to read THIS athlete's Strava data (the Discord user talking to you). Never request or invent another rider's activities.
 Typical flow: get_recent_activities first, then get_activity_details for a specific session, plus profile/stats/zones as needed. get_zwiftpower_context is optional extra (category/phenotype).
 
 ## Athlete constraints (durable memory)
-${memoryBlock}${pendingLine}
+${memoryBlock}
 
+These constraints come from the athlete's Profile page. You cannot change them. If they ask to change rides per week, sports, injuries, goals, or reply style, tell them to edit Mine sider → Profile: ${MY_PAGES_URL}
 Obey ride frequency and weekly slots over last week's Strava volume. Never prescribe through an active injury.
-If they ask to change or delete older memory, tell them to edit it on ${MY_PAGES_URL} (Profile tab). You may only undo the last auto-save with reject_athlete_memory when they say nej/forkert.
 
 ## Recent conversation notes (episodic, dated — not standing rules)
 ${notesBlock}
 
-Treat these as hints for today's reply. A yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up. Do not copy these into update_athlete_memory.
+${notesOptIn
+    ? `Treat these as hints for today's reply. A yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
 If they ask to forget a chat note, tell them to delete it on ${MY_PAGES_URL} (Profile tab).
-Use search_past_notes when they refer to something discussed earlier that is not in this block.
-
-## Memory tools
-- When the athlete states a durable fact (rides per week, other sports, fixed strength days, lasting injury, goal) OR a coaching-style preference (short messages, always Danish, direct tone, bullets only, etc.), call update_athlete_memory with only those fields.
-- Transient state (illness, fatigue, mood, skip today, how a ride felt, one-off plans) is NOT durable memory. Do not call update_athlete_memory for those.
-- Do not save a free-text notes field. Only the structured fields on the tool.
-- Do not infer rules from a busy Strava week. Do not invent memory.
-- Do not save language (da/en) just because this message is in Danish or English. Only save language if they explicitly want replies always in that language.
-- After update_athlete_memory succeeds, include the tool's confirmMessageDa (or confirmMessageEn) verbatim as the memory notice. Do not replace it with a one-liner like "Gemte: ...". This notice is allowed even when they prefer short coaching replies. Ask only when something new was just stored.
-- If they reply ja / det stemmer to a pending save, call confirm_athlete_memory.
-- If they reply nej / forkert, call reject_athlete_memory (undoes only that last save).
-- If they ignore the question, keep the save and do not ask again.
+Use search_past_notes when they refer to something discussed earlier that is not in this block.`
+    : `Do not invent chat notes. If they ask you to remember how they felt, tell them they can turn chat notes on under Profile: ${MY_PAGES_URL}`}
 
 ## Coaching style
 - Reply in the user's language (Danish or English) unless Athlete constraints specify a language.
@@ -1652,6 +1466,8 @@ Use search_past_notes when they refer to something discussed earlier that is not
 ## Current context
 - Athlete Discord: ${message.author.username} (ID: ${message.author.id})
 - Time: ${timestamp}`;
+
+  return { content, notesOptIn };
 }
 
 /**
@@ -1767,9 +1583,11 @@ async function extractCoachChatNotes({ discordId, username, userMessage, assista
   let recentNotes = [];
   try {
     const profile = await getCoachProfile(discordId);
+    if (profile?.notesOptIn !== true) return;
     durableMemory = formatCoachProfileForPrompt(profile);
   } catch (err) {
     console.error("extract getCoachProfile failed:", err?.message || err);
+    return;
   }
   try {
     recentNotes = await listCoachChatNotes(discordId);
@@ -1939,10 +1757,16 @@ async function handleAIChatMessage(message, client) {
     }
 
     const knowledgeCatalog = isCoachSession ? [] : await getKnowledgeCatalog();
-    const systemPrompt = isCoachSession
+    const coachPrompt = isCoachSession
       ? await buildCoachSystemPrompt(message, cleanedMessage)
+      : null;
+    const systemPrompt = isCoachSession
+      ? coachPrompt.content
       : buildSystemPrompt(message, knowledgeCatalog);
-    const activeTools = isCoachSession ? coachToolDefinitions : toolDefinitions;
+    const notesOptIn = Boolean(coachPrompt?.notesOptIn);
+    const activeTools = isCoachSession
+      ? (notesOptIn ? coachToolDefinitions : coachToolDefinitions.filter((t) => t.function?.name !== "search_past_notes"))
+      : toolDefinitions;
     const maxTokens = isCoachSession ? COACH_MAX_TOKENS : AI_CONFIG.maxTokens;
     const maxIters = isCoachSession ? COACH_MAX_TOOL_ITERATIONS : MAX_TOOL_ITERATIONS;
     const replyFn = isCoachSession ? safeReplyChunks : safeReply;
@@ -2220,7 +2044,7 @@ async function handleAIChatMessage(message, client) {
     // Reset timeout
     resetConversationTimeout(conversationKey);
 
-    if (isCoachSession) {
+    if (isCoachSession && notesOptIn) {
       scheduleCoachNoteExtract({
         discordId: message.author.id,
         username: message.author.username,

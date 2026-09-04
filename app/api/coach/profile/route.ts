@@ -4,16 +4,13 @@ import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { hasClubMemberRole } from '@/app/lib/stravaAuth'
 import {
   COACH_PROFILES_COLLECTION,
+  defaultCoachProfile,
   emptyCoachProfile,
   publicCoachFields,
   toClientCoachProfile,
 } from '@/app/lib/coachProfile'
-import {
-  canEncryptCoachMemory,
-  needsCoachMemoryMigration,
-  persistCoachMemoryDoc,
-  unwrapCoachMemoryDoc,
-} from '@/app/lib/tokenCrypto'
+import { persistCoachMemoryDoc, unwrapCoachMemoryDoc, canEncryptCoachMemory } from '@/app/lib/tokenCrypto'
+import { ensureDefaultCoachProfile } from '@/app/lib/ensureCoachProfile'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -41,29 +38,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ eligible: false, profile: emptyCoachProfile() })
     }
 
-    const ref = adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId)
-    const snap = await ref.get()
-    const raw = snap.exists ? { ...(snap.data() || {}), discordId } : null
-    if (raw && needsCoachMemoryMigration(raw)) {
-      try {
-        const unwrapped = unwrapCoachMemoryDoc(raw)
-        await ref.set(
-          persistCoachMemoryDoc({
-            discordId,
-            updatedAt: unwrapped.updatedAt ?? null,
-            updatedBy: unwrapped.updatedBy ?? null,
-            ...publicCoachFields(unwrapped, unwrapped.updatedBy === 'coach' ? 'coach' : 'user'),
-            pendingConfirmation: unwrapped.pendingConfirmation ?? null,
-          })
-        )
-      } catch (err: any) {
-        console.warn('coach memory encryption migrate failed:', err?.message || err)
-      }
-    }
-    const profile = raw
-      ? toClientCoachProfile(raw, discordId)
-      : { ...emptyCoachProfile(), discordId, updatedAt: null, updatedBy: null }
-
+    const profile = await ensureDefaultCoachProfile(discordId)
     return NextResponse.json({ eligible: true, profile })
   } catch (err: any) {
     console.error('coach profile GET failed:', err)
@@ -96,6 +71,7 @@ export async function PUT(req: Request) {
         pendingConfirmation: null,
         updatedAt: now,
         updatedBy: 'user',
+        howItWorksSentAt: existing.howItWorksSentAt || null,
       })
     )
 
@@ -145,10 +121,21 @@ export async function DELETE(req: Request) {
     } else if (clearNotes) {
       current.notes = ''
     } else {
-      await ref.delete()
+      const reset = defaultCoachProfile()
+      warnIfPlaintext()
+      await ref.set(
+        persistCoachMemoryDoc({
+          discordId,
+          ...reset,
+          pendingConfirmation: null,
+          updatedAt: now,
+          updatedBy: 'user',
+          howItWorksSentAt: existing.howItWorksSentAt || null,
+        })
+      )
       return NextResponse.json({
         ok: true,
-        profile: { ...emptyCoachProfile(), discordId, updatedAt: null, updatedBy: null },
+        profile: toClientCoachProfile({ ...reset, discordId, updatedAt: now, updatedBy: 'user' }, discordId),
       })
     }
 
@@ -160,6 +147,7 @@ export async function DELETE(req: Request) {
         pendingConfirmation: null,
         updatedAt: now,
         updatedBy: 'user',
+        howItWorksSentAt: existing.howItWorksSentAt || null,
       })
     )
 

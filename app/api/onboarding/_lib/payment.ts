@@ -101,6 +101,10 @@ export async function processOnboardingPayment(reference: string, expectedSessio
       updatedAt: paidAt,
     }, { merge: true })
 
+    const { ensureDefaultCoachProfile, sendCoachHowItWorksIfNeeded } = await import('@/app/lib/ensureCoachProfile')
+    await ensureDefaultCoachProfile(userId)
+    await sendCoachHowItWorksIfNeeded(userId)
+
     const roleSync = await syncClubMemberRole({
       userId,
       coveredThroughYear,

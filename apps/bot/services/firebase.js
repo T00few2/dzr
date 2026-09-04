@@ -3,6 +3,7 @@ const config = require("../config/config");
 const shared = require("../constants.json");
 const {
   emptyProfile,
+  defaultProfile,
   publicFields,
   snapshotProfile,
   mergeCoachProfileData,
@@ -424,6 +425,7 @@ function toPlainProfile(data) {
     updatedAt: src.updatedAt || null,
     updatedBy: src.updatedBy === "user" || src.updatedBy === "coach" ? src.updatedBy : null,
     pendingConfirmation: pending,
+    howItWorksSentAt: src.howItWorksSentAt || null,
   };
 }
 
@@ -471,14 +473,45 @@ async function migrateAllCoachProfiles() {
 /**
  * Durable coaching constraints for one Discord user.
  */
-async function getCoachProfile(discordId) {
+async function ensureDefaultCoachProfile(discordId) {
   const id = String(discordId || "").trim();
   if (!id) return { ...emptyProfile(), pendingConfirmation: null };
+  const ref = coachProfileRef(id);
+  const snap = await ref.get();
+  if (snap.exists) {
+    const raw = snap.data() || {};
+    await maybeMigrateCoachProfile(id, raw);
+    return toPlainProfile({ discordId: id, ...raw });
+  }
+  const now = new Date();
+  const doc = {
+    discordId: id,
+    ...defaultProfile(),
+    pendingConfirmation: null,
+    updatedAt: now,
+    updatedBy: "user",
+    howItWorksSentAt: null,
+  };
+  await writeCoachProfileDoc(id, doc);
+  return toPlainProfile(doc);
+}
+
+async function markCoachHowItWorksSent(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return;
   const snap = await coachProfileRef(id).get();
-  if (!snap.exists) return { ...emptyProfile(), discordId: id, pendingConfirmation: null };
-  const raw = snap.data() || {};
-  await maybeMigrateCoachProfile(id, raw);
-  return toPlainProfile({ discordId: id, ...raw });
+  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.exists ? snap.data() || {} : {}) });
+  await writeCoachProfileDoc(id, {
+    ...publicFields(existing),
+    pendingConfirmation: existing.pendingConfirmation || null,
+    updatedAt: existing.updatedAt || new Date(),
+    updatedBy: existing.updatedBy === "user" || existing.updatedBy === "coach" ? existing.updatedBy : "user",
+    howItWorksSentAt: new Date().toISOString(),
+  });
+}
+
+async function getCoachProfile(discordId) {
+  return ensureDefaultCoachProfile(discordId);
 }
 
 async function mergeCoachProfile(discordId, patch, { summary } = {}) {
@@ -617,6 +650,8 @@ module.exports = {
   isPaidClubMember,
   recordCoachUsage,
   getCoachProfile,
+  ensureDefaultCoachProfile,
+  markCoachHowItWorksSent,
   mergeCoachProfile,
   confirmCoachProfile,
   rejectCoachProfile,

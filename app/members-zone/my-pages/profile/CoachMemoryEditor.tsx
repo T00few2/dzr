@@ -51,6 +51,7 @@ function emptyForm(): CoachProfile {
     goals: [],
     notes: '',
     style: { length: null, language: null, tone: null, notes: '' },
+    notesOptIn: false,
   }
 }
 
@@ -76,6 +77,7 @@ export default function CoachMemoryEditor() {
       injuries: profile.injuries || [],
       goals: profile.goals || [],
       style: profile.style || { length: null, language: null, tone: null, notes: '' },
+      notesOptIn: profile.notesOptIn === true,
     })
     setRidesMin(profile.ridesPerWeek?.min != null ? String(profile.ridesPerWeek.min) : '')
     setRidesMax(profile.ridesPerWeek?.max != null ? String(profile.ridesPerWeek.max) : '')
@@ -178,6 +180,7 @@ export default function CoachMemoryEditor() {
         injuries: form.injuries.filter((inj) => inj.text.trim()),
         weekly: form.weekly.filter((row) => row.sport.trim() && row.days.length),
         goals: form.goals.map((g) => g.trim()).filter(Boolean),
+        notesOptIn: form.notesOptIn === true,
       }
       const res = await fetch('/api/coach/profile', {
         method: 'PUT',
@@ -197,7 +200,7 @@ export default function CoachMemoryEditor() {
   }
 
   async function clearAll() {
-    if (!window.confirm('Slet al DZR Coach memory?')) return
+    if (!window.confirm('Nulstil coach-profilen til udgangspunktet?')) return
     setSaving(true)
     try {
       const res = await fetch('/api/coach/profile', { method: 'DELETE' })
@@ -207,7 +210,7 @@ export default function CoachMemoryEditor() {
         return
       }
       applyProfile(data?.profile || emptyForm())
-      toast({ title: 'Coach memory cleared', status: 'info' })
+      toast({ title: 'Coach-profilen er nulstillet', status: 'info' })
     } finally {
       setSaving(false)
     }
@@ -276,7 +279,7 @@ export default function CoachMemoryEditor() {
     <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
       <Heading size="sm" mb={2}>DZR Coach memory</Heading>
       <Text color="gray.400" mb={4} fontSize="sm">
-        Coach gemmer træningsrammer og skrivestil fra dine Discord-DMs og spørger ja/nej. Skader gemmes med dine egne ord, ikke som diagnose. Kortvarige ting (fx “jeg er syg i dag”) gemmes som daterede chat-noter, ikke som faste regler. Data bruges kun til din private coaching og sendes til OpenAI når du chatter med coachen. Det gemmes krypteret og kan rettes eller slettes her.
+        Her sætter du dine faste rammer til DZR Coach: hvor ofte du kører, andre sportsgrene, skader, mål og hvordan coachen skal svare. Du har fået et udgangspunkt, som du kan rette. Coachen ændrer ikke selv de rammer — det gør du her. Data bruges kun til din private coaching og sendes til OpenAI, når du chatter med coachen. Det gemmes krypteret.
       </Text>
 
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
@@ -560,8 +563,19 @@ export default function CoachMemoryEditor() {
       </FormControl>
 
       <Heading size="xs" mb={3} color="gray.300">Chat-noter</Heading>
+      <Checkbox
+        isChecked={form.notesOptIn === true}
+        onChange={(e) => setForm((prev) => ({ ...prev, notesOptIn: e.target.checked }))}
+        colorScheme="red"
+        alignItems="flex-start"
+        mb={3}
+      >
+        <Text color="gray.200" fontSize="sm">
+          Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går). Coachen bruger dem kun, når dette er slået til.
+        </Text>
+      </Checkbox>
       <Text color="gray.400" fontSize="sm" mb={3}>
-        Daterede uddrag fra dine coach-DMs (fx hvordan en tur føltes, eller at du var syg i går). Ikke faste regler. Du kan slette dem her.
+        Noterne er ikke faste regler. Du kan se og slette dem her. Husk at trykke Save memory, når du slår det til eller fra.
       </Text>
       {notesLoading ? (
         <Spinner size="sm" mb={6} />

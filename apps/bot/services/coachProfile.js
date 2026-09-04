@@ -259,6 +259,7 @@ function publicFields(data) {
     goals: sanitizeGoals(src.goals),
     notes: sanitizeNotes(src.notes),
     style: sanitizeStyle(src.style),
+    notesOptIn: src.notesOptIn === true,
   };
 }
 
@@ -271,6 +272,20 @@ function emptyProfile() {
     goals: [],
     notes: "",
     style: emptyStyle(),
+    notesOptIn: false,
+  };
+}
+
+function defaultProfile() {
+  return {
+    ridesPerWeek: { min: 3, max: 4 },
+    sports: ["cycling"],
+    weekly: [],
+    injuries: [],
+    goals: [],
+    notes: "",
+    style: { length: null, language: "da", tone: null, notes: "" },
+    notesOptIn: false,
   };
 }
 
@@ -328,6 +343,9 @@ function mergeCoachProfileData(existing, patch) {
   }
   if (Object.prototype.hasOwnProperty.call(patch, "style")) {
     next.style = mergeStyle(base.style, patch.style);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "notesOptIn")) {
+    next.notesOptIn = patch.notesOptIn === true;
   }
   return next;
 }
@@ -407,6 +425,7 @@ function hasPendingConfirmation(profile) {
 
 module.exports = {
   emptyProfile,
+  defaultProfile,
   publicFields,
   snapshotProfile,
   mergeCoachProfileData,
