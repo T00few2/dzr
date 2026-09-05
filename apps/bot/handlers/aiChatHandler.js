@@ -27,6 +27,7 @@ const { unconnectedCoachText, NOT_CLUB_MEMBER_TEXT, USE_COACH_BOT_TEXT } = requi
 const { formatCoachProfileForPrompt } = require("../services/coachProfile");
 const { MY_PAGES_COACH_URL, noEmbedUrl } = require("../services/coachHowItWorks");
 const {
+  NOTE_KINDS,
   shouldSkipExtract,
   buildExtractMessages,
   parseExtractedNotes,
@@ -52,7 +53,7 @@ try {
 // Store conversations per user
 const userConversations = new Map();
 const conversationTimers = new Map();
-const conversationModes = new Map(); // conversationKey -> 'coach' | 'club'
+const COACH_NOTE_TOOLS = new Set(["search_past_notes", "save_chat_notes"]);
 
 // Configuration
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
@@ -182,7 +183,12 @@ function compactToolResult(result) {
   if (typeof result.confirmMessageEn === "string") base.confirmMessageEn = result.confirmMessageEn.slice(0, 1500);
   if (typeof result.instruction === "string") base.instruction = result.instruction.slice(0, 800);
   if (typeof result.editUrl === "string") base.editUrl = result.editUrl.slice(0, 300);
-  if (result.saved) base.saved = true;
+  if (Array.isArray(result.saved)) {
+    base.saved = result.saved.slice(0, 8);
+  } else if (result.saved) {
+    base.saved = true;
+  }
+  if (Array.isArray(result.skipped)) base.skipped = result.skipped.slice(0, 8);
   if (result.confirmed) base.confirmed = true;
   if (result.rejected) base.rejected = true;
   if (Array.isArray(result.notes)) {
@@ -635,6 +641,42 @@ const coachToolDefinitions = [
           }
         },
         required: ["query"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "save_chat_notes",
+      description: "Silently persist dated episode notes from this chat (feelings, one-off plans, upcoming races, life schedule). Use when the athlete names a race/date or states something worth keeping. Not for standing Coach settings (rides/week, lasting injuries, goals, style). Do not mention this save to the athlete unless they asked if you remembered it. Saving notes must not skip Strava tools.",
+      parameters: {
+        type: "object",
+        properties: {
+          notes: {
+            type: "array",
+            description: "Episode notes to save. Quality over quantity. Prefer none over noise. Max 8.",
+            items: {
+              type: "object",
+              properties: {
+                text: {
+                  type: "string",
+                  description: "One or two sentences in the athlete's language. For races, the event name only."
+                },
+                kind: {
+                  type: "string",
+                  enum: NOTE_KINDS,
+                  description: "feeling | plan | preference_transient | life | race"
+                },
+                eventDate: {
+                  type: "string",
+                  description: "YYYY-MM-DD. Required for kind race. Resolve relative dates from Today."
+                }
+              },
+              required: ["text", "kind"]
+            }
+          }
+        },
+        required: ["notes"]
       }
     }
   }
@@ -1241,6 +1283,72 @@ async function executeSingleToolCall(toolCall, message) {
           return { tool_call_id: toolCall.id, success: false, message: "Could not search past notes." };
         }
       }
+
+      case "save_chat_notes": {
+        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+        if (!eligible) {
+          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+        }
+        try {
+          const profile = await getCoachProfile(message.author.id);
+          if (profile?.notesOptIn !== true) {
+            return {
+              tool_call_id: toolCall.id,
+              success: false,
+              saved: [],
+              skipped: [],
+              message: `Chat notes are off. The athlete can turn them on under My Pages (Coach): ${MY_PAGES_COACH_URL}`,
+            };
+          }
+          const incoming = Array.isArray(args.notes)
+            ? args.notes
+            : args.notes && typeof args.notes === "object"
+              ? [args.notes]
+              : [];
+          if (!incoming.length) {
+            return {
+              tool_call_id: toolCall.id,
+              success: false,
+              saved: [],
+              skipped: [],
+              message: "notes array is required.",
+            };
+          }
+          const prepared = [];
+          const skipped = [];
+          for (const raw of incoming) {
+            const kind = String(raw?.kind || "").trim().toLowerCase();
+            if (kind === "race" && !String(raw?.eventDate || "").trim()) {
+              skipped.push({
+                text: String(raw?.text || "").trim().slice(0, 80) || undefined,
+                kind: "race",
+                reason: "race_needs_eventDate",
+              });
+              continue;
+            }
+            prepared.push(raw);
+          }
+          const result = await addCoachChatNotes(message.author.id, prepared);
+          const saved = Array.isArray(result?.saved) ? result.saved : [];
+          const allSkipped = skipped.concat(Array.isArray(result?.skipped) ? result.skipped : []);
+          return {
+            tool_call_id: toolCall.id,
+            success: true,
+            saved: saved.map((note) => ({
+              text: note.text,
+              kind: note.kind,
+              eventDate: note.eventDate || null,
+            })),
+            skipped: allSkipped,
+            message: saved.length
+              ? "Episode notes stored. Do not tell the athlete you saved a note unless they asked. This is not Coach settings."
+              : "No new episode notes stored (invalid, duplicate, or empty).",
+          };
+        } catch (err) {
+          console.error("save_chat_notes failed:", err?.message || err);
+          return { tool_call_id: toolCall.id, success: false, saved: [], skipped: [], message: "Could not save chat notes." };
+        }
+      }
       
       default:
         await safeReply(message, `❌ Unknown command: ${name}`);
@@ -1298,11 +1406,6 @@ function clearConversation(userId) {
       conversationTimers.delete(k);
     }
   }
-  for (const k of Array.from(conversationModes.keys())) {
-    if (typeof k === "string" && k.endsWith(`:${key}`)) {
-      conversationModes.delete(k);
-    }
-  }
 
   console.log(`🧹 Cleared conversation(s) for user ${key}`);
 }
@@ -1315,7 +1418,6 @@ function clearConversationForKey(conversationKey) {
     clearTimeout(timer);
     conversationTimers.delete(key);
   }
-  conversationModes.delete(key);
   console.log(`🧹 Cleared conversation for key ${key}`);
 }
 
@@ -1446,38 +1548,43 @@ Use this calendar date for everything: how old a chat note is, whether a feeling
 ## Data
 You may only use tools to read THIS athlete's Strava data (the Discord user talking to you). Never request or invent another rider's activities.
 Typical flow: get_recent_activities first, then get_activity_details for a specific session, plus profile/stats/zones as needed. get_zwiftpower_context is optional extra (category/phenotype).
+Saving a chat note must not skip Strava when they asked about training.
 
-## Athlete constraints (Coach settings)
+## Coach settings (standing)
 ${settingsBlock}
 
-These constraints come from the athlete's Coach settings. You cannot change them — there is no tool to write settings. If they ask to change rides per week, sports, injuries, standing goals, or reply style, tell them to edit Mine sider → Coach: ${MY_PAGES_COACH_URL}
-Obey ride frequency and weekly slots over last week's Strava volume. Never prescribe through an active injury.
-Standing goals are slow-changing (lose weight, stay in shape, win races). They are not a date on the calendar. Never say you saved a goal to their profile.
-Upcoming races live in chat notes, not in settings. Count days from today and let that shape load, recovery, and taper. Do not invent race dates. If they name a specific race or date and notes are off, tell them they can turn chat notes on under Coach.
+These are standing constraints from the athlete's Coach settings. Read-only — there is no tool to write settings.
+If they ask to change rides per week, sports, lasting injuries, standing goals, or reply style, tell them to edit Mine sider → Coach: ${MY_PAGES_COACH_URL}
+Never say you saved a setting, goal, injury, or style to their profile.
 
-## Recent conversation notes (episodic, dated — not standing rules)
+## Chat notes
 ${notesBlock}
 
 ${notesOptIn
-    ? `Treat these as hints for today's reply. Compare each note's date to today: a yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
-Upcoming race notes stay relevant until the event date, even if the note was written weeks ago.
+    ? `Chat notes are dated hints, not standing rules. Compare each note's date to today: a yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
+Upcoming race notes stay relevant until the event date.
 If they ask to forget a chat note, tell them to delete it on ${MY_PAGES_COACH_URL} (Coach tab).
-Use search_past_notes when they refer to something discussed earlier that is not in this block.`
-    : `Do not invent chat notes. If they ask you to remember how they felt, tell them they can turn chat notes on under Coach: ${MY_PAGES_COACH_URL}`}
+Use search_past_notes when they refer to something discussed earlier that is not in this block.
+When they name a race/date or state a feeling, one-off plan, or life schedule worth keeping, call save_chat_notes. Save silently. Do not ask them to confirm. Do not say you saved a note unless they asked whether you remembered it.`
+    : `Chat notes are off. Do not invent notes. If they ask you to remember a feeling, race date, or one-off plan, tell them they can turn chat notes on under Coach: ${MY_PAGES_COACH_URL}`}
+
+## What goes where
+- Standing (settings, web only): rides/week, sports, weekly slots, lasting injuries, slow-changing goals, reply style.
+- Episodes (chat notes): race dates, how they felt, a one-off plan, a life schedule that may change.
+- Examples: "I race Sunday" → chat note. "I want to lose weight" → settings. "My knee is injured" (lasting) → settings. "My knee is sore today" → chat note.
 
 ## Coaching style
-- Reply in the user's language (Danish or English) unless Athlete constraints specify a language.
+- Obey the language in Coach settings when present; otherwise match the chat (Danish or English).
 - Be a practical endurance coach: load, recovery, easy days, intensity distribution, race prep.
 - Cite specific recent sessions (date, duration, power/HR) from tool results. Never invent numbers that were not returned by a tool.
 - If tools fail, say so and ask them to reconnect Strava if needs_reconnect/connectUrl is present.
 - Not medical advice. Do not prescribe training through illness, injury, chest pain, or disordered eating. Suggest seeing a professional when relevant.
 - Do not give doping, extreme restriction, or dangerous overtraining advice.
-- Keep replies concise (Discord) unless they asked for detailed replies. Use short bullets when listing sessions. If style.length is short, stay very brief.
+- Keep replies concise (Discord) unless they asked for detailed replies. Use short bullets when listing sessions.
 - Never mention or invent Strava access tokens, refresh tokens, or Firestore documents.
 
 ## Current context
-- Athlete Discord: ${message.author.username} (ID: ${message.author.id})
-- ${today.line}`;
+- Athlete: ${message.author.username}`;
 
   return { content, notesOptIn };
 }
@@ -1706,6 +1813,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
   
   try {
     let coachUsageTally = null;
+    let notesSavedThisTurn = false;
 
     // Show typing indicator
     await message.channel.sendTyping();
@@ -1782,7 +1890,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
       : buildSystemPrompt(message, knowledgeCatalog);
     const notesOptIn = Boolean(coachPrompt?.notesOptIn);
     const activeTools = isCoachSession
-      ? (notesOptIn ? coachToolDefinitions : coachToolDefinitions.filter((t) => t.function?.name !== "search_past_notes"))
+      ? (notesOptIn ? coachToolDefinitions : coachToolDefinitions.filter((t) => !COACH_NOTE_TOOLS.has(t.function?.name)))
       : toolDefinitions;
     const maxTokens = isCoachSession ? COACH_MAX_TOKENS : AI_CONFIG.maxTokens;
     const maxIters = isCoachSession ? COACH_MAX_TOOL_ITERATIONS : MAX_TOOL_ITERATIONS;
@@ -1858,6 +1966,9 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
       while (currentToolCalls && currentToolCalls.length > 0 && iteration < maxIters) {
         // Execute all tool calls (parallel if multiple)
         toolResults = await executeToolCalls(currentToolCalls, message);
+        if (toolResults.some((r) => Array.isArray(r.saved) && r.saved.length > 0)) {
+          notesSavedThisTurn = true;
+        }
 
         // Add tool results to conversation (compact to reduce context bloat)
         for (const result of toolResults) {
@@ -2061,7 +2172,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     // Reset timeout
     resetConversationTimeout(conversationKey);
 
-    if (isCoachSession && notesOptIn) {
+    if (isCoachSession && notesOptIn && !notesSavedThisTurn) {
       scheduleCoachNoteExtract({
         discordId: message.author.id,
         username: message.author.username,

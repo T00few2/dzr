@@ -15,7 +15,7 @@ const {
 } = require("./tokenCrypto");
 const {
   MAX_NOTES_PER_ATHLETE,
-  MAX_EXTRACT_NOTES,
+  MAX_NOTES_PER_WRITE,
   sanitizeNote,
   isNearDuplicate,
 } = require("./coachChatNotes");
@@ -75,9 +75,20 @@ async function pruneCoachChatNotes(discordId) {
   await batch.commit();
 }
 
+function noteSkip(raw, reason, extra = {}) {
+  const text = String(raw?.text || extra.text || "").trim().slice(0, 80);
+  return {
+    text: text || undefined,
+    kind: extra.kind || raw?.kind || undefined,
+    eventDate: extra.eventDate || raw?.eventDate || undefined,
+    reason,
+  };
+}
+
 async function addCoachChatNotes(discordId, incoming, { at } = {}) {
   const id = String(discordId || "").trim();
-  if (!id) return [];
+  const skipped = [];
+  if (!id) return { saved: [], skipped };
   if (!canEncryptCoachMemory()) {
     console.warn("COACH_MEMORY_KEY / STRAVA_CONNECT_SECRET missing; storing coach chat notes in plaintext");
   }
@@ -86,13 +97,25 @@ async function addCoachChatNotes(discordId, incoming, { at } = {}) {
   const toAdd = [];
   for (const raw of Array.isArray(incoming) ? incoming : []) {
     const note = sanitizeNote(raw, now.toISOString());
-    if (!note) continue;
-    if (isNearDuplicate(note.text, existing) || isNearDuplicate(note.text, toAdd)) continue;
-    if (note.eventDate && (existing.some((item) => item.eventDate === note.eventDate) || toAdd.some((item) => item.eventDate === note.eventDate))) continue;
+    if (!note) {
+      skipped.push(noteSkip(raw, "invalid"));
+      continue;
+    }
+    if (isNearDuplicate(note.text, existing) || isNearDuplicate(note.text, toAdd)) {
+      skipped.push(noteSkip(raw, "duplicate", note));
+      continue;
+    }
+    if (note.eventDate && (existing.some((item) => item.eventDate === note.eventDate) || toAdd.some((item) => item.eventDate === note.eventDate))) {
+      skipped.push(noteSkip(raw, "duplicate_event_date", note));
+      continue;
+    }
+    if (toAdd.length >= MAX_NOTES_PER_WRITE) {
+      skipped.push(noteSkip(raw, "cap", note));
+      continue;
+    }
     toAdd.push(note);
-    if (toAdd.length >= MAX_EXTRACT_NOTES) break;
   }
-  if (!toAdd.length) return [];
+  if (!toAdd.length) return { saved: [], skipped };
 
   const batch = db.batch();
   batch.set(coachChatNotesParent(id), { discordId: id, updatedAt: now }, { merge: true });
@@ -119,7 +142,7 @@ async function addCoachChatNotes(discordId, incoming, { at } = {}) {
   }
   await batch.commit();
   await pruneCoachChatNotes(id);
-  return created;
+  return { saved: created, skipped };
 }
 
 /**

@@ -390,7 +390,7 @@ export default function CoachMemoryEditor() {
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
       <Heading size="sm" mb={2}>DZR Coach settings</Heading>
       <Text color="gray.400" mb={4} fontSize="sm">
-        Her sætter du dine faste rammer til DZR Coach: hvor ofte du kører, andre sportsgrene, skader, mål og hvordan coachen skal svare. Du har fået et udgangspunkt, som du kan rette. Coachen ændrer ikke selv de rammer — det gør du her. Data bruges kun til din private coaching og sendes til OpenAI, når du chatter med coachen. Det gemmes krypteret.
+        Her sætter du dine faste rammer til DZR Coach: hvor ofte du kører, andre sportsgrene, skader, mål og hvordan coachen skal svare. Du har fået et udgangspunkt, som du kan rette. Coachen ændrer ikke selv de rammer — det gør du her. Når chat-noter er slået til, gemmes nyttige notater automatisk fra Discord, uden bekræftelse. Data bruges kun til din private coaching og sendes til OpenAI, når du chatter med coachen. Det gemmes krypteret.
       </Text>
 
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
@@ -662,7 +662,7 @@ export default function CoachMemoryEditor() {
         </FormControl>
       </SimpleGrid>
       <FormControl mb={4}>
-        <FormLabel>Other style notes</FormLabel>
+        <FormLabel>Other style preferences</FormLabel>
         <Input
           placeholder="e.g. bullets only, no emojis"
           value={form.style.notes}
@@ -680,7 +680,7 @@ export default function CoachMemoryEditor() {
         mb={2}
       >
         <Text color="gray.200" fontSize="sm">
-          Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går, eller at jeg kører et løb den 18. oktober). Coachen bruger dem kun, når dette er slået til.
+          Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går, eller at jeg kører et løb den 18. oktober). Når det er slået til, gemmes nyttige notater automatisk — uden bekræftelse. Coachen ændrer ikke dine settings.
         </Text>
       </Checkbox>
       <Text color="gray.400" fontSize="sm" mb={4}>
@@ -701,7 +701,7 @@ export default function CoachMemoryEditor() {
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
           <Heading size="sm" mb={2}>Chat-noter</Heading>
           <Text color="gray.400" fontSize="sm" mb={3}>
-            Noterne er ikke faste regler. Du kan se og slette dem her.
+            Noterne er ikke faste regler. De gemmes automatisk fra Discord, når chat-noter er slået til. Du kan se og slette dem her.
           </Text>
           {notesLoading ? (
             <Spinner size="sm" mb={4} />

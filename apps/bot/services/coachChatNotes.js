@@ -1,7 +1,7 @@
 const NOTE_KINDS = ["feeling", "plan", "preference_transient", "life", "race"];
 const MAX_NOTE_TEXT = 280;
 const MAX_NOTES_PER_ATHLETE = 200;
-const MAX_EXTRACT_NOTES = 2;
+const MAX_NOTES_PER_WRITE = 8;
 const RETRIEVE_LIMIT = 5;
 const SEARCH_LIMIT = 8;
 const MIN_USER_MESSAGE_LEN = 10;
@@ -249,6 +249,14 @@ function formatNoteDate(at) {
   return iso.length >= 10 ? iso.slice(0, 10) : iso || "unknown date";
 }
 
+const NOTE_KIND_LABELS = {
+  feeling: "Feeling",
+  plan: "Plan",
+  preference_transient: "Preference",
+  life: "Life",
+  race: "Race",
+};
+
 function formatNotesForPrompt(notes, now = new Date()) {
   const list = Array.isArray(notes) ? notes.filter((n) => n && n.text) : [];
   if (!list.length) return "";
@@ -260,9 +268,10 @@ function formatNotesForPrompt(notes, now = new Date()) {
         const when = until ? `${eventDate} (${until})` : eventDate;
         return `- Race ${when}: ${note.text}`;
       }
+      const kindLabel = NOTE_KIND_LABELS[note.kind] || "Note";
       const age = formatNoteAge(note.at, now);
       const when = age ? `${formatNoteDate(note.at)} (${age})` : formatNoteDate(note.at);
-      return `- ${when}: ${note.text}`;
+      return `- ${kindLabel}, ${when}: ${note.text}`;
     })
     .join("\n");
 }
@@ -289,7 +298,7 @@ function buildExtractMessages({ userMessage, assistantText, coachSettings, recen
   const system = `You extract dated coaching episode notes from one Discord exchange.
 Return JSON only: {"notes":[{"text":"one or two sentences","kind":"feeling|plan|preference_transient|life|race","eventDate":"YYYY-MM-DD or omit"}]}
 Rules:
-- 0–2 notes. Prefer none over noise, except upcoming races.
+- As many notes as are genuinely useful, max 8. Prefer none over noise, except upcoming races.
 - Capture transient state: illness, fatigue, mood, skipped session, how a ride felt, one-off plans, life schedule that may change tomorrow.
 - If the athlete names a race, event, or target date (a calendar date, "next Sunday", "om 2 uger", Zwift race, ZRL, klubmesterskab, etc.), add a kind "race" note. Resolve the date from Today into eventDate as YYYY-MM-DD. Text is the event name only. Do not invent dates. Skip if that eventDate is already in recent notes.
 - Do not store standing goals (lose weight, stay in shape, win races, "get fitter") as notes. The coach cannot write Coach settings; skip those.
@@ -346,7 +355,7 @@ function parseExtractedNotes(rawText, fallbackAt) {
     if (isNearDuplicate(note.text, out)) continue;
     if (note.eventDate && out.some((item) => item.eventDate === note.eventDate)) continue;
     out.push(note);
-    if (out.length >= MAX_EXTRACT_NOTES) break;
+    if (out.length >= MAX_NOTES_PER_WRITE) break;
   }
   return out;
 }
@@ -355,7 +364,7 @@ module.exports = {
   NOTE_KINDS,
   MAX_NOTE_TEXT,
   MAX_NOTES_PER_ATHLETE,
-  MAX_EXTRACT_NOTES,
+  MAX_NOTES_PER_WRITE,
   RETRIEVE_LIMIT,
   SEARCH_LIMIT,
   sanitizeNote,

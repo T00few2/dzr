@@ -213,7 +213,7 @@ function formatStyle(style) {
   if (style?.tone === "direct") parts.push("direct and to the point");
   if (style?.tone === "encouraging") parts.push("encouraging tone");
   if (style?.tone === "casual") parts.push("casual tone");
-  if (style?.notes) parts.push(style.notes);
+  if (style?.notes) parts.push(`Style extra: ${style.notes}`);
   return parts.join("; ");
 }
 
