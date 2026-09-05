@@ -30,6 +30,17 @@ import type { CoachInjury, CoachProfile, CoachWeeklySlot } from '@/app/lib/coach
 import type { CoachChatNote } from '@/app/lib/coachChatNotes'
 
 const SPORT_OPTIONS = ['cycling', 'running', 'swimming', 'strength']
+const SPORT_LABELS: Record<string, string> = {
+  cycling: 'Cykling',
+  running: 'Løb',
+  swimming: 'Svømning',
+  strength: 'Styrke',
+}
+
+function sportLabel(sport: string) {
+  return SPORT_LABELS[sport] || sport
+}
+
 const DAYS: Array<{ id: string; label: string }> = [
   { id: 'mon', label: 'Man' },
   { id: 'tue', label: 'Tir' },
@@ -70,24 +81,24 @@ type ClearConfirm =
 
 const CLEAR_CONFIRM_COPY = {
   settings: {
-    title: 'Clear settings?',
+    title: 'Nulstil indstillinger?',
     body: 'Coach-indstillingerne nulstilles til udgangspunktet. Chat-noter slettes ikke.',
-    confirm: 'Clear settings',
+    confirm: 'Nulstil indstillinger',
   },
   notes: {
-    title: 'Clear notes?',
+    title: 'Slet noter?',
     body: 'Alle chat-noter slettes. Coach-profilen beholdes.',
-    confirm: 'Clear notes',
+    confirm: 'Slet noter',
   },
   all: {
-    title: 'Clear all?',
+    title: 'Nulstil alt?',
     body: 'Coach-profilen nulstilles, og alle chat-noter slettes. Det kan ikke fortrydes.',
-    confirm: 'Clear all',
+    confirm: 'Nulstil alt',
   },
   disableNotes: {
-    title: 'Turn off chat notes?',
+    title: 'Slå chat-noter fra?',
     body: 'Alle gemte chat-noter slettes, når du gemmer. Det kan ikke fortrydes.',
-    confirm: 'Save and clear notes',
+    confirm: 'Gem og slet noter',
   },
   note: {
     title: 'Slet note?',
@@ -253,16 +264,16 @@ export default function CoachMemoryEditor() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast({ title: data?.error || 'Could not save', status: 'error' })
+        toast({ title: data?.error || 'Kunne ikke gemme', status: 'error' })
         return
       }
       if (data?.profile) applyProfile(data.profile)
       toast({
-        title: clearNotesOnDisable ? 'Settings saved and chat notes cleared' : 'Coach settings saved',
+        title: clearNotesOnDisable ? 'Indstillinger gemt, og chat-noter slettet' : 'Coach-indstillinger gemt',
         status: 'success',
       })
     } catch (err: any) {
-      toast({ title: err?.message || 'Could not save', status: 'error' })
+      toast({ title: err?.message || 'Kunne ikke gemme', status: 'error' })
     } finally {
       setSaving(false)
     }
@@ -280,7 +291,7 @@ export default function CoachMemoryEditor() {
     const res = await fetch('/api/coach/profile', { method: 'DELETE' })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      throw new Error(data?.error || 'Could not reset settings')
+      throw new Error(data?.error || 'Kunne ikke nulstille indstillinger')
     }
     applyProfile(data?.profile || emptyForm())
   }
@@ -289,7 +300,7 @@ export default function CoachMemoryEditor() {
     const res = await fetch('/api/coach/notes?all=1', { method: 'DELETE' })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      throw new Error(data?.error || 'Could not delete notes')
+      throw new Error(data?.error || 'Kunne ikke slette noter')
     }
     setChatNotes([])
   }
@@ -300,7 +311,7 @@ export default function CoachMemoryEditor() {
       await resetSettingsRequest()
       toast({ title: 'Coach-indstillingerne er nulstillet', status: 'info' })
     } catch (err: any) {
-      toast({ title: err?.message || 'Could not reset settings', status: 'error' })
+      toast({ title: err?.message || 'Kunne ikke nulstille indstillinger', status: 'error' })
     } finally {
       setSaving(false)
     }
@@ -312,7 +323,7 @@ export default function CoachMemoryEditor() {
       await deleteAllNotesRequest()
       toast({ title: 'Chat-noter slettet', status: 'info' })
     } catch (err: any) {
-      toast({ title: err?.message || 'Could not delete notes', status: 'error' })
+      toast({ title: err?.message || 'Kunne ikke slette noter', status: 'error' })
     } finally {
       setSaving(false)
     }
@@ -325,7 +336,7 @@ export default function CoachMemoryEditor() {
       const failed = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined
       if (failed) {
         toast({
-          title: failed.reason?.message || 'Could not clear everything',
+          title: failed.reason?.message || 'Kunne ikke nulstille alt',
           status: 'error',
         })
         return
@@ -349,7 +360,7 @@ export default function CoachMemoryEditor() {
       const res = await fetch(`/api/coach/notes?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast({ title: data?.error || 'Could not delete note', status: 'error' })
+        toast({ title: data?.error || 'Kunne ikke slette noten', status: 'error' })
         return
       }
       setChatNotes(Array.isArray(data?.notes) ? data.notes : [])
@@ -372,7 +383,7 @@ export default function CoachMemoryEditor() {
   if (loading) {
     return (
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
-        <Heading size="sm" mb={2}>DZR Coach settings</Heading>
+        <Heading size="sm" mb={2}>DZR Coach-indstillinger</Heading>
         <Spinner size="sm" />
       </Box>
     )
@@ -381,9 +392,9 @@ export default function CoachMemoryEditor() {
   if (eligible === false) {
     return (
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
-        <Heading size="sm" mb={2}>DZR Coach settings</Heading>
+        <Heading size="sm" mb={2}>DZR Coach-indstillinger</Heading>
         <Text color="gray.400" fontSize="sm">
-          Coach settings er kun for betalende klubmedlemmer. Forny medlemskab under Membership.
+          Coach-indstillinger er kun for betalende klubmedlemmer. Forny medlemskab under Medlemskab.
         </Text>
       </Box>
     )
@@ -392,14 +403,14 @@ export default function CoachMemoryEditor() {
   return (
     <Box>
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
-      <Heading size="sm" mb={2}>DZR Coach settings</Heading>
+      <Heading size="sm" mb={2}>DZR Coach-indstillinger</Heading>
       <Text color="gray.400" mb={4} fontSize="sm">
         Her sætter du dine faste rammer til DZR Coach: hvor ofte du kører, andre sportsgrene, skader og hvordan coachen skal svare. Du har fået et udgangspunkt, som du kan rette. Coachen ændrer ikke selv de rammer — det gør du her. Mål (fx tabe vægt) og løbsdatoer gemmes som chat-noter, når det er slået til. Data bruges kun til din private coaching og sendes til OpenAI, når du chatter med coachen. Det gemmes krypteret.
       </Text>
 
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
         <FormControl>
-          <FormLabel>Rides per week (min)</FormLabel>
+          <FormLabel>Ture om ugen (min)</FormLabel>
           <Input
             type="number"
             min={0}
@@ -411,7 +422,7 @@ export default function CoachMemoryEditor() {
           />
         </FormControl>
         <FormControl>
-          <FormLabel>Rides per week (max)</FormLabel>
+          <FormLabel>Ture om ugen (maks)</FormLabel>
           <Input
             type="number"
             min={0}
@@ -425,7 +436,7 @@ export default function CoachMemoryEditor() {
       </SimpleGrid>
 
       <FormControl mb={4}>
-        <FormLabel>Sports</FormLabel>
+        <FormLabel>Sportsgrene</FormLabel>
         <HStack spacing={4} wrap="wrap">
           {SPORT_OPTIONS.map((sport) => (
             <Checkbox
@@ -433,34 +444,33 @@ export default function CoachMemoryEditor() {
               isChecked={form.sports.includes(sport)}
               onChange={() => toggleSport(sport)}
               colorScheme="red"
-              textTransform="capitalize"
             >
-              {sport}
+              {sportLabel(sport)}
             </Checkbox>
           ))}
         </HStack>
         <HStack mt={2} maxW="360px">
           <Input
-            placeholder="Other sport"
+            placeholder="Anden sportsgren"
             value={extraSport}
             onChange={(e) => setExtraSport(e.target.value)}
             bg="gray.800"
             borderColor="gray.600"
             size="sm"
           />
-          <Button size="sm" onClick={addExtraSport} {...secondaryButtonProps}>Add</Button>
+          <Button size="sm" onClick={addExtraSport} {...secondaryButtonProps}>Tilføj</Button>
         </HStack>
         {form.sports.filter((s) => !SPORT_OPTIONS.includes(s)).length > 0 && (
           <Text mt={2} fontSize="sm" color="gray.400">
-            Extra: {form.sports.filter((s) => !SPORT_OPTIONS.includes(s)).join(', ')}
+            Ekstra: {form.sports.filter((s) => !SPORT_OPTIONS.includes(s)).join(', ')}
           </Text>
         )}
       </FormControl>
 
       <Box mb={4}>
         <Flex justify="space-between" align="center" mb={2}>
-          <FormLabel mb={0}>Fixed weekly slots</FormLabel>
-          <Button size="xs" onClick={addWeekly} {...secondaryButtonProps}>Add slot</Button>
+          <FormLabel mb={0}>Faste træningsdage</FormLabel>
+          <Button size="xs" onClick={addWeekly} {...secondaryButtonProps}>Tilføj dag</Button>
         </Flex>
         <Stack spacing={3}>
           {form.weekly.map((row, index) => (
@@ -473,7 +483,7 @@ export default function CoachMemoryEditor() {
                   {...darkSelectProps}
                 >
                   {SPORT_OPTIONS.map((sport) => (
-                    <option key={sport} value={sport}>{sport}</option>
+                    <option key={sport} value={sport}>{sportLabel(sport)}</option>
                   ))}
                   {row.sport && !SPORT_OPTIONS.includes(row.sport) && (
                     <option value={row.sport}>{row.sport}</option>
@@ -504,7 +514,7 @@ export default function CoachMemoryEditor() {
                   _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
                   onClick={() => setForm((prev) => ({ ...prev, weekly: prev.weekly.filter((_, i) => i !== index) }))}
                 >
-                  Delete
+                  Slet
                 </Button>
               </HStack>
             </Box>
@@ -514,14 +524,14 @@ export default function CoachMemoryEditor() {
 
       <Box mb={4}>
         <Flex justify="space-between" align="center" mb={2}>
-          <FormLabel mb={0}>Injuries / limits</FormLabel>
-          <Button size="xs" onClick={addInjury} {...secondaryButtonProps}>Add</Button>
+          <FormLabel mb={0}>Skader / begrænsninger</FormLabel>
+          <Button size="xs" onClick={addInjury} {...secondaryButtonProps}>Tilføj</Button>
         </Flex>
         <Stack spacing={3}>
           {form.injuries.map((inj, index) => (
             <SimpleGrid key={inj.id || index} columns={{ base: 1, md: 4 }} spacing={2} alignItems="end">
               <Input
-                placeholder="e.g. knee"
+                placeholder="fx knæ"
                 value={inj.text}
                 onChange={(e) => updateInjury(index, { ...inj, text: e.target.value })}
                 bg="gray.800"
@@ -529,7 +539,7 @@ export default function CoachMemoryEditor() {
                 size="sm"
               />
               <Input
-                placeholder="Started (optional)"
+                placeholder="Startet (valgfrit)"
                 value={inj.started || ''}
                 onChange={(e) => updateInjury(index, { ...inj, started: e.target.value })}
                 bg="gray.800"
@@ -541,8 +551,8 @@ export default function CoachMemoryEditor() {
                 onChange={(e) => updateInjury(index, { ...inj, status: e.target.value === 'recovered' ? 'recovered' : 'active' })}
                 {...darkSelectProps}
               >
-                <option value="active">Active</option>
-                <option value="recovered">Recovered</option>
+                <option value="active">Aktiv</option>
+                <option value="recovered">Helbredt</option>
               </Select>
               <Button
                 size="sm"
@@ -551,17 +561,17 @@ export default function CoachMemoryEditor() {
                 _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
                 onClick={() => setForm((prev) => ({ ...prev, injuries: prev.injuries.filter((_, i) => i !== index) }))}
               >
-                Delete
+                Slet
               </Button>
             </SimpleGrid>
           ))}
         </Stack>
       </Box>
 
-      <Heading size="xs" mb={3} color="gray.300">Coaching style</Heading>
+      <Heading size="xs" mb={3} color="gray.300">Coach-stil</Heading>
       <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4} mb={4}>
         <FormControl>
-          <FormLabel>Message length</FormLabel>
+          <FormLabel>Beskedlængde</FormLabel>
           <RadioGroup
             value={form.style.length || 'default'}
             onChange={(value) => setForm((prev) => ({
@@ -570,15 +580,15 @@ export default function CoachMemoryEditor() {
             }))}
           >
             <Stack>
-              <Radio value="default" colorScheme="red">Default</Radio>
-              <Radio value="short" colorScheme="red">Short messages</Radio>
+              <Radio value="default" colorScheme="red">Standard</Radio>
+              <Radio value="short" colorScheme="red">Korte beskeder</Radio>
               <Radio value="normal" colorScheme="red">Normal</Radio>
-              <Radio value="detailed" colorScheme="red">Detailed</Radio>
+              <Radio value="detailed" colorScheme="red">Udførlig</Radio>
             </Stack>
           </RadioGroup>
         </FormControl>
         <FormControl>
-          <FormLabel>Language</FormLabel>
+          <FormLabel>Sprog</FormLabel>
           <RadioGroup
             value={form.style.language || 'default'}
             onChange={(value) => setForm((prev) => ({
@@ -587,9 +597,9 @@ export default function CoachMemoryEditor() {
             }))}
           >
             <Stack>
-              <Radio value="default" colorScheme="red">Match chat</Radio>
-              <Radio value="da" colorScheme="red">Danish</Radio>
-              <Radio value="en" colorScheme="red">English</Radio>
+              <Radio value="default" colorScheme="red">Følg chatten</Radio>
+              <Radio value="da" colorScheme="red">Dansk</Radio>
+              <Radio value="en" colorScheme="red">Engelsk</Radio>
             </Stack>
           </RadioGroup>
         </FormControl>
@@ -603,18 +613,18 @@ export default function CoachMemoryEditor() {
             }))}
           >
             <Stack>
-              <Radio value="default" colorScheme="red">Default</Radio>
-              <Radio value="direct" colorScheme="red">Direct</Radio>
-              <Radio value="encouraging" colorScheme="red">Encouraging</Radio>
-              <Radio value="casual" colorScheme="red">Casual</Radio>
+              <Radio value="default" colorScheme="red">Standard</Radio>
+              <Radio value="direct" colorScheme="red">Direkte</Radio>
+              <Radio value="encouraging" colorScheme="red">Opmuntrende</Radio>
+              <Radio value="casual" colorScheme="red">Afslappet</Radio>
             </Stack>
           </RadioGroup>
         </FormControl>
       </SimpleGrid>
       <FormControl mb={4}>
-        <FormLabel>Other style preferences</FormLabel>
+        <FormLabel>Andre stilønsker</FormLabel>
         <Input
-          placeholder="e.g. bullets only, no emojis"
+          placeholder="fx kun punktopstilling, ingen emojis"
           value={form.style.notes}
           onChange={(e) => setForm((prev) => ({ ...prev, style: { ...prev.style, notes: e.target.value } }))}
           bg="gray.800"
@@ -630,17 +640,17 @@ export default function CoachMemoryEditor() {
         mb={2}
       >
         <Text color="gray.200" fontSize="sm">
-          Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går, eller at jeg kører et løb den 18. oktober). Når det er slået til, gemmes nyttige notater automatisk — uden bekræftelse. Coachen ændrer ikke dine settings.
+          Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går, eller at jeg kører et løb den 18. oktober). Når det er slået til, gemmes nyttige notater automatisk — uden bekræftelse. Coachen ændrer ikke dine indstillinger.
         </Text>
       </Checkbox>
       <Text color="gray.400" fontSize="sm" mb={4}>
-        Husk at trykke Save settings, når du slår det til eller fra.
+        Husk at trykke Gem indstillinger, når du slår det til eller fra.
       </Text>
 
       <FormControl mb={4}>
-        <FormLabel>Proactive check-in</FormLabel>
+        <FormLabel>Check-in fra coachen</FormLabel>
         <Text color="gray.400" fontSize="sm" mb={2}>
-          DZR Coach kan skrive først om morgenen (kl. 8 i Danmark), hvis du ikke har chattet i et stykke tid. Beskeden bruger dine seneste Strava-pas og sendes til OpenAI. Du kan slå det fra når som helst.
+          DZR Coach kan skrive først om morgenen (kl. 8), hvis du ikke har chattet i et stykke tid. Beskeden bruger dine seneste Strava-pas og sendes til OpenAI. Du kan slå det fra når som helst.
         </Text>
         <RadioGroup
           value={form.followUpEveryDays == null ? 'off' : String(form.followUpEveryDays)}
@@ -652,20 +662,20 @@ export default function CoachMemoryEditor() {
           }))}
         >
           <Stack>
-            <Radio value="off" colorScheme="red">Off</Radio>
-            <Radio value="3" colorScheme="red">Every 3 days</Radio>
-            <Radio value="7" colorScheme="red">Every 7 days</Radio>
-            <Radio value="14" colorScheme="red">Every 14 days</Radio>
+            <Radio value="off" colorScheme="red">Fra</Radio>
+            <Radio value="3" colorScheme="red">Hver 3. dag</Radio>
+            <Radio value="7" colorScheme="red">Hver 7. dag</Radio>
+            <Radio value="14" colorScheme="red">Hver 14. dag</Radio>
           </Stack>
         </RadioGroup>
       </FormControl>
 
       <Flex wrap="wrap" gap={2}>
         <Button onClick={save} isLoading={saving} size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }}>
-          Save settings
+          Gem indstillinger
         </Button>
         <Button onClick={() => setClearConfirm({ kind: 'settings' })} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
-          Clear settings
+          Nulstil indstillinger
         </Button>
       </Flex>
     </Box>
@@ -696,7 +706,7 @@ export default function CoachMemoryEditor() {
                 >
                   <Box>
                     <Text fontSize="xs" color="gray.500">
-                      {note.eventDate ? `Race ${note.eventDate}` : formatNoteAt(note.at)}
+                      {note.eventDate ? `Løb ${note.eventDate}` : formatNoteAt(note.at)}
                     </Text>
                     <Text fontSize="sm" color="gray.100">{note.text}</Text>
                   </Box>
@@ -725,7 +735,7 @@ export default function CoachMemoryEditor() {
             borderColor="red.400"
             _hover={{ bg: 'whiteAlpha.100' }}
           >
-            Clear notes
+            Slet noter
           </Button>
         </Box>
       )}
@@ -741,7 +751,7 @@ export default function CoachMemoryEditor() {
         _hover={{ bg: 'whiteAlpha.100' }}
         mb={6}
       >
-        Clear all
+        Nulstil alt
       </Button>
 
       <AlertDialog
@@ -767,7 +777,7 @@ export default function CoachMemoryEditor() {
                 {...secondaryButtonProps}
                 size="sm"
               >
-                Cancel
+                Annuller
               </Button>
               <Button
                 ml={3}

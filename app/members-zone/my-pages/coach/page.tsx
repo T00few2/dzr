@@ -110,8 +110,8 @@ export default function CoachPage() {
     return (
       <Box px={{ base: 4, md: 8 }} py={{ base: 8, md: 8 }} color="white">
         <Heading size="md" mb={4}>Coach</Heading>
-        <Text mb={4}>You are not logged in.</Text>
-        <Link href="/login" style={{ textDecoration: 'underline' }}>Go to login</Link>
+        <Text mb={4}>Du er ikke logget ind.</Text>
+        <Link href="/login" style={{ textDecoration: 'underline' }}>Gå til login</Link>
       </Box>
     )
   }
@@ -126,17 +126,17 @@ export default function CoachPage() {
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
         <Heading size="sm" mb={2}>Strava</Heading>
         <Text color="gray.400" mb={4} fontSize="sm">
-          Forbind Strava for at få personlig træningscoaching i en privat DM fra DZR Coach. Skriv
-          /coach på Discord-serveren for at åbne chatten. Afbryd sletter
-          tokens, profil og noter. Vi sender en bekræftelse i en DM fra DZR Coach.{' '}
-          <StravaPrivacyLink color="gray.400">Privatliv</StravaPrivacyLink>
+          Connect Strava for personal training coaching in a private DM from DZR Coach. Type
+          /coach on the Discord server to open the chat. Disconnecting deletes
+          tokens, profile, and notes. We send a confirmation in a DM from DZR Coach.{' '}
+          <StravaPrivacyLink color="gray.400">Privacy</StravaPrivacyLink>
           {' · '}
           <ChakraLink href={`mailto:${DZR_SUPPORT_EMAIL}`} textDecoration="underline">
             Support
           </ChakraLink>
           {' · '}
           <ChakraLink href={STRAVA_APPS_URL} isExternal textDecoration="underline">
-            Strava-apps
+            Strava apps
           </ChakraLink>
         </Text>
         {!strava ? (
@@ -167,7 +167,7 @@ export default function CoachPage() {
             </Box>
           </SimpleGrid>
         ) : strava.eligible === false ? (
-          <Text>Coaching er kun for betalende klubmedlemmer. Forny medlemskab under Membership, eller gå til /join.</Text>
+          <Text>Coaching is only for paying club members. Renew membership under Membership, or go to /join.</Text>
         ) : (
           <>
             <ConnectWithStravaButton href="/strava/connect?force=1" />
@@ -198,8 +198,8 @@ export default function CoachPage() {
               Disconnect Strava?
             </AlertDialogHeader>
             <AlertDialogBody>
-              Strava-forbindelsen afbrydes. Coach-profilen nulstilles, og alle chat-noter slettes.
-              Du får en bekræftelse i Discord-DM. Det kan ikke fortrydes.
+              This disconnects Strava. The Coach profile is reset, and all chat notes are deleted.
+              You will get a confirmation in a Discord DM. This cannot be undone.
             </AlertDialogBody>
             <AlertDialogFooter>
               <Button
