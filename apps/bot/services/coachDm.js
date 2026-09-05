@@ -126,6 +126,7 @@ async function handleCoach(interaction) {
 module.exports = {
   handleCoach,
   sendCoachingIntroDm,
+  sendNoEmbeds,
   unconnectedCoachText,
   NOT_CLUB_MEMBER_TEXT,
   DM_CLOSED_TEXT,

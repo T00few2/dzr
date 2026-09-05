@@ -70,12 +70,21 @@ export async function PUT(req: Request) {
         updatedAt: now,
         updatedBy: 'user',
         howItWorksSentAt: existing.howItWorksSentAt || null,
+        lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
+        lastFollowUpAt: existing.lastFollowUpAt || null,
       })
     )
 
     return NextResponse.json({
       ok: true,
-      profile: toClientCoachProfile({ ...fields, discordId, updatedAt: now, updatedBy: 'user' }, discordId),
+      profile: toClientCoachProfile({
+        ...fields,
+        discordId,
+        updatedAt: now,
+        updatedBy: 'user',
+        lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
+        lastFollowUpAt: existing.lastFollowUpAt || null,
+      }, discordId),
     })
   } catch (err: any) {
     console.error('coach profile PUT failed:', err)
@@ -119,6 +128,8 @@ export async function DELETE(req: Request) {
           updatedAt: now,
           updatedBy: 'user',
           howItWorksSentAt: existing.howItWorksSentAt || null,
+          lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
+          lastFollowUpAt: existing.lastFollowUpAt || null,
         })
       )
       return NextResponse.json({
@@ -135,6 +146,8 @@ export async function DELETE(req: Request) {
         updatedAt: now,
         updatedBy: 'user',
         howItWorksSentAt: existing.howItWorksSentAt || null,
+        lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
+        lastFollowUpAt: existing.lastFollowUpAt || null,
       })
     )
 

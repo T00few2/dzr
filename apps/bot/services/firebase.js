@@ -414,6 +414,8 @@ function toPlainProfile(data) {
     updatedAt: src.updatedAt || null,
     updatedBy: "user",
     howItWorksSentAt: src.howItWorksSentAt || null,
+    lastAthleteMessageAt: src.lastAthleteMessageAt || null,
+    lastFollowUpAt: src.lastFollowUpAt || null,
   };
 }
 
@@ -442,6 +444,8 @@ async function ensureDefaultCoachProfile(discordId) {
     updatedAt: now,
     updatedBy: "user",
     howItWorksSentAt: null,
+    lastAthleteMessageAt: null,
+    lastFollowUpAt: null,
   };
   await writeCoachProfileDoc(id, doc);
   return toPlainProfile(doc);
@@ -457,7 +461,46 @@ async function markCoachHowItWorksSent(discordId) {
     updatedAt: existing.updatedAt || new Date(),
     updatedBy: "user",
     howItWorksSentAt: new Date().toISOString(),
+    lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
+    lastFollowUpAt: existing.lastFollowUpAt || null,
   });
+}
+
+async function markCoachAthleteMessage(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return;
+  const snap = await coachProfileRef(id).get();
+  if (!snap.exists) return;
+  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.data() || {}) });
+  await writeCoachProfileDoc(id, {
+    ...publicFields(existing),
+    updatedAt: existing.updatedAt || new Date(),
+    updatedBy: existing.updatedBy || "user",
+    howItWorksSentAt: existing.howItWorksSentAt || null,
+    lastAthleteMessageAt: new Date().toISOString(),
+    lastFollowUpAt: existing.lastFollowUpAt || null,
+  });
+}
+
+async function markCoachFollowUpSent(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return;
+  const snap = await coachProfileRef(id).get();
+  if (!snap.exists) return;
+  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.data() || {}) });
+  await writeCoachProfileDoc(id, {
+    ...publicFields(existing),
+    updatedAt: existing.updatedAt || new Date(),
+    updatedBy: existing.updatedBy || "user",
+    howItWorksSentAt: existing.howItWorksSentAt || null,
+    lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
+    lastFollowUpAt: new Date().toISOString(),
+  });
+}
+
+async function listCoachProfiles() {
+  const snap = await db.collection(COACH_PROFILES_COLLECTION).get();
+  return snap.docs.map((doc) => toPlainProfile({ discordId: doc.id, ...(doc.data() || {}) }));
 }
 
 async function getCoachProfile(discordId) {
@@ -531,6 +574,9 @@ module.exports = {
   getCoachProfile,
   ensureDefaultCoachProfile,
   markCoachHowItWorksSent,
+  markCoachAthleteMessage,
+  markCoachFollowUpSent,
+  listCoachProfiles,
   listCoachChatNotes,
   addCoachChatNotes,
 }; 

@@ -22,7 +22,7 @@ function coachHowItWorksText({ includeStartHint = false } = {}) {
     "Du har fået et udgangspunkt på profilen (cykling og typisk 3–4 ture om ugen). Du retter selv rammerne under Mine sider → Coach:",
     noEmbedUrl(MY_PAGES_COACH_URL),
     "",
-    "Det er der, du sætter hvor ofte du kører, andre sportsgrene, faste træningsdage, skader og hvordan jeg skal svare.",
+    "Det er der, du sætter hvor ofte du kører, andre sportsgrene, faste træningsdage, skader og hvordan jeg skal svare. Under samme side kan du slå et valgfrit check-in til, så jeg skriver først om morgenen, hvis vi ikke har snakket i et par dage.",
     "",
     "**Chat-noter**",
     "Chatten er privat, og samtalen gemmes ikke. Når chat-noter er slået til, gemmer jeg stille korte notater (fx et mål som at tabe vægt, at du var syg, eller at du kører et løb en bestemt dag) — uden at spørge dig. Faste rammer (ture om ugen, skader, svartone) retter du selv under Mine sider. Du kan altid se og slette noterne der.",

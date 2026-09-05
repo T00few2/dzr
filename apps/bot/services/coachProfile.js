@@ -188,6 +188,13 @@ function sanitizeStyle(value) {
   };
 }
 
+const FOLLOW_UP_DAYS = new Set([3, 7, 14]);
+
+function sanitizeFollowUpEveryDays(value) {
+  const n = Number(value);
+  return FOLLOW_UP_DAYS.has(n) ? n : null;
+}
+
 function formatStyle(style) {
   const parts = [];
   if (style?.length === "short") parts.push("keep replies SHORT (a few sentences or tight bullets; no long essays)");
@@ -212,6 +219,7 @@ function publicFields(data) {
     goals: [],
     style: sanitizeStyle(src.style),
     notesOptIn: src.notesOptIn === true,
+    followUpEveryDays: sanitizeFollowUpEveryDays(src.followUpEveryDays),
   };
 }
 
@@ -224,6 +232,7 @@ function emptyProfile() {
     goals: [],
     style: emptyStyle(),
     notesOptIn: false,
+    followUpEveryDays: null,
   };
 }
 
@@ -236,6 +245,7 @@ function defaultProfile() {
     goals: [],
     style: { length: null, language: "da", tone: null, notes: "" },
     notesOptIn: false,
+    followUpEveryDays: null,
   };
 }
 
@@ -287,4 +297,5 @@ module.exports = {
   defaultProfile,
   publicFields,
   formatCoachProfileForPrompt,
+  sanitizeFollowUpEveryDays,
 };

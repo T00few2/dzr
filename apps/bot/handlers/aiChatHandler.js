@@ -9,6 +9,7 @@ const {
   getCoachProfile,
   listCoachChatNotes,
   addCoachChatNotes,
+  markCoachAthleteMessage,
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
 const { 
@@ -1825,6 +1826,12 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     const cleanedMessage = message.content
       .replace(botMentionPattern, '') // Remove only bot mention
       .trim();
+
+    if (coachOnly && cleanedMessage) {
+      markCoachAthleteMessage(message.author.id).catch((err) =>
+        console.warn("markCoachAthleteMessage failed:", err?.message || err)
+      );
+    }
 
     if (!cleanedMessage) {
       await safeReply(

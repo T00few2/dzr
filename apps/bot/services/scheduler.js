@@ -5,6 +5,7 @@ const config = require("../config/config");
 const { getBotState, setBotState } = require("./firebase");
 const { syncZpRolesForGuild } = require("./zpRoleSync");
 const { maybePostScheduledQuiz } = require("./quizService");
+const { maybeSendCoachFollowUps } = require("./coachFollowUp");
 
 /**
  * Check for and send scheduled messages (both time-based and probability-based)
@@ -35,6 +36,8 @@ async function checkScheduledMessages(client) {
 
     // Occasional Zwift route quiz (daily probability roll)
     await maybePostScheduledQuiz(client);
+
+    await maybeSendCoachFollowUps();
     
   } catch (error) {
     console.error("❌ Error checking scheduled messages:", error);

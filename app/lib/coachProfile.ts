@@ -22,6 +22,8 @@ export type CoachInjury = {
   status: 'active' | 'recovered'
 }
 
+export type CoachFollowUpDays = 3 | 7 | 14
+
 export type CoachProfile = {
   ridesPerWeek: { min?: number; max?: number } | null
   sports: string[]
@@ -30,6 +32,7 @@ export type CoachProfile = {
   goals: string[]
   style: CoachStyle
   notesOptIn: boolean
+  followUpEveryDays: CoachFollowUpDays | null
 }
 
 const DAY_ALIASES: Record<string, string> = {
@@ -124,6 +127,7 @@ export function emptyCoachProfile(): CoachProfile {
     goals: [],
     style: emptyStyle(),
     notesOptIn: false,
+    followUpEveryDays: null,
   }
 }
 
@@ -136,6 +140,7 @@ export function defaultCoachProfile(): CoachProfile {
     goals: [],
     style: { length: null, language: 'da', tone: null, notes: '' },
     notesOptIn: false,
+    followUpEveryDays: null,
   }
 }
 
@@ -215,6 +220,13 @@ function sanitizeInjuries(value: unknown): CoachInjury[] {
   return out
 }
 
+const FOLLOW_UP_DAYS = new Set<CoachFollowUpDays>([3, 7, 14])
+
+export function sanitizeFollowUpEveryDays(value: unknown): CoachFollowUpDays | null {
+  const n = Number(value)
+  return FOLLOW_UP_DAYS.has(n as CoachFollowUpDays) ? (n as CoachFollowUpDays) : null
+}
+
 function sanitizeStyle(value: unknown): CoachStyle {
   if (!value || typeof value !== 'object') return emptyStyle()
   const raw = value as { length?: unknown; language?: unknown; tone?: unknown; notes?: unknown }
@@ -239,6 +251,7 @@ export function publicCoachFields(data: unknown): CoachProfile {
     goals: [],
     style: sanitizeStyle(src.style),
     notesOptIn: src.notesOptIn === true,
+    followUpEveryDays: sanitizeFollowUpEveryDays(src.followUpEveryDays),
   }
 }
 

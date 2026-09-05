@@ -136,6 +136,7 @@ function packCoachMemory(plain) {
     goals: Array.isArray(src.goals) ? src.goals : [],
     style: src.style && typeof src.style === "object" ? src.style : { length: null, language: null, tone: null, notes: "" },
     notesOptIn: src.notesOptIn === true,
+    followUpEveryDays: src.followUpEveryDays ?? null,
   };
 }
 
@@ -154,6 +155,8 @@ function unwrapCoachMemoryDoc(data) {
     updatedAt: src.updatedAt || null,
     updatedBy: src.updatedBy || null,
     howItWorksSentAt: src.howItWorksSentAt || null,
+    lastAthleteMessageAt: src.lastAthleteMessageAt || null,
+    lastFollowUpAt: src.lastFollowUpAt || null,
     notesOptIn: fromPlain.notesOptIn === true,
   };
 }
@@ -214,6 +217,8 @@ function persistCoachMemoryDoc(plain) {
     updatedBy: plain?.updatedBy || null,
     notesOptIn: packed.notesOptIn === true,
     howItWorksSentAt: plain?.howItWorksSentAt || null,
+    lastAthleteMessageAt: plain?.lastAthleteMessageAt || null,
+    lastFollowUpAt: plain?.lastFollowUpAt || null,
   };
   const key = getCoachKey();
   if (!key) {

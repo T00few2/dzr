@@ -105,6 +105,7 @@ function emptyForm(): CoachProfile {
     goals: [],
     style: { length: null, language: null, tone: null, notes: '' },
     notesOptIn: false,
+    followUpEveryDays: null,
   }
 }
 
@@ -133,6 +134,9 @@ export default function CoachMemoryEditor() {
       goals: [],
       style: profile.style || { length: null, language: null, tone: null, notes: '' },
       notesOptIn: profile.notesOptIn === true,
+      followUpEveryDays: profile.followUpEveryDays === 3 || profile.followUpEveryDays === 7 || profile.followUpEveryDays === 14
+        ? profile.followUpEveryDays
+        : null,
     })
     setSavedNotesOptIn(profile.notesOptIn === true)
     setRidesMin(profile.ridesPerWeek?.min != null ? String(profile.ridesPerWeek.min) : '')
@@ -240,6 +244,7 @@ export default function CoachMemoryEditor() {
         weekly: form.weekly.filter((row) => row.sport.trim() && row.days.length),
         goals: [],
         notesOptIn: form.notesOptIn === true,
+        followUpEveryDays: form.followUpEveryDays,
       }
       const res = await fetch('/api/coach/profile', {
         method: 'PUT',
@@ -631,6 +636,29 @@ export default function CoachMemoryEditor() {
       <Text color="gray.400" fontSize="sm" mb={4}>
         Husk at trykke Save settings, når du slår det til eller fra.
       </Text>
+
+      <FormControl mb={4}>
+        <FormLabel>Proactive check-in</FormLabel>
+        <Text color="gray.400" fontSize="sm" mb={2}>
+          DZR Coach kan skrive først om morgenen (kl. 8 i Danmark), hvis du ikke har chattet i et stykke tid. Beskeden bruger dine seneste Strava-pas og sendes til OpenAI. Du kan slå det fra når som helst.
+        </Text>
+        <RadioGroup
+          value={form.followUpEveryDays == null ? 'off' : String(form.followUpEveryDays)}
+          onChange={(value) => setForm((prev) => ({
+            ...prev,
+            followUpEveryDays: value === '3' || value === '7' || value === '14'
+              ? Number(value) as CoachProfile['followUpEveryDays']
+              : null,
+          }))}
+        >
+          <Stack>
+            <Radio value="off" colorScheme="red">Off</Radio>
+            <Radio value="3" colorScheme="red">Every 3 days</Radio>
+            <Radio value="7" colorScheme="red">Every 7 days</Radio>
+            <Radio value="14" colorScheme="red">Every 14 days</Radio>
+          </Stack>
+        </RadioGroup>
+      </FormControl>
 
       <Flex wrap="wrap" gap={2}>
         <Button onClick={save} isLoading={saving} size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }}>

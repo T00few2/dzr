@@ -136,7 +136,10 @@ export type CoachMemoryPlain = {
   goals?: unknown
   style?: unknown
   notesOptIn?: unknown
+  followUpEveryDays?: unknown
   howItWorksSentAt?: unknown
+  lastAthleteMessageAt?: unknown
+  lastFollowUpAt?: unknown
 }
 
 function packCoachMemory(plain: CoachMemoryPlain) {
@@ -148,6 +151,7 @@ function packCoachMemory(plain: CoachMemoryPlain) {
     goals: Array.isArray(plain.goals) ? plain.goals : [],
     style: plain.style && typeof plain.style === 'object' ? plain.style : { length: null, language: null, tone: null, notes: '' },
     notesOptIn: plain.notesOptIn === true,
+    followUpEveryDays: plain.followUpEveryDays ?? null,
   }
 }
 
@@ -166,6 +170,8 @@ export function unwrapCoachMemoryDoc(data: Record<string, unknown> | null | unde
     updatedAt: src.updatedAt ?? null,
     updatedBy: src.updatedBy ?? null,
     howItWorksSentAt: src.howItWorksSentAt ?? null,
+    lastAthleteMessageAt: src.lastAthleteMessageAt ?? null,
+    lastFollowUpAt: src.lastFollowUpAt ?? null,
     notesOptIn: fromPlain.notesOptIn === true,
   }
 }
@@ -252,6 +258,8 @@ export function persistCoachMemoryDoc(plain: CoachMemoryPlain): Record<string, u
     updatedBy: plain.updatedBy || null,
     notesOptIn: packed.notesOptIn === true,
     howItWorksSentAt: plain.howItWorksSentAt || null,
+    lastAthleteMessageAt: plain.lastAthleteMessageAt || null,
+    lastFollowUpAt: plain.lastFollowUpAt || null,
   }
   const key = getCoachKey()
   if (!key) {
