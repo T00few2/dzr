@@ -15,7 +15,8 @@ import {
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ConnectWithStravaButton from '@/components/ConnectWithStravaButton'
-import { DZR_SUPPORT_EMAIL, STRAVA_APPS_URL, STRAVA_PRIVACY_PATH } from '@/app/lib/stravaCoachLinks'
+import { StravaPrivacyLink } from '@/components/StravaPrivacyModal'
+import { DZR_SUPPORT_EMAIL, STRAVA_APPS_URL } from '@/app/lib/stravaCoachLinks'
 
 function ConnectForm() {
   const searchParams = useSearchParams()
@@ -77,9 +78,7 @@ function ConnectForm() {
       <ConnectWithStravaButton href={href} disabled={!agreed} />
 
       <Text fontSize="sm" color="gray.500">
-        <Link href={STRAVA_PRIVACY_PATH} style={{ textDecoration: 'underline' }}>
-          Privatliv
-        </Link>
+        <StravaPrivacyLink>Privatliv</StravaPrivacyLink>
         {' · '}
         <ChakraLink href={`mailto:${DZR_SUPPORT_EMAIL}`} textDecoration="underline">
           {DZR_SUPPORT_EMAIL}

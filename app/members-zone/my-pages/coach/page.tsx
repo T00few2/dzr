@@ -21,7 +21,8 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import CoachMemoryEditor from '../profile/CoachMemoryEditor'
 import ConnectWithStravaButton from '@/components/ConnectWithStravaButton'
-import { DZR_SUPPORT_EMAIL, STRAVA_APPS_URL, STRAVA_PRIVACY_PATH } from '@/app/lib/stravaCoachLinks'
+import { StravaPrivacyLink } from '@/components/StravaPrivacyModal'
+import { DZR_SUPPORT_EMAIL, STRAVA_APPS_URL } from '@/app/lib/stravaCoachLinks'
 
 const secondaryButtonProps = {
   variant: 'outline' as const,
@@ -128,9 +129,7 @@ export default function CoachPage() {
           Forbind Strava for at få personlig træningscoaching i en privat DM fra DZR Coach. Skriv
           /coach på Discord-serveren for at åbne chatten. Afbryd sletter
           tokens, profil og noter. Vi sender en bekræftelse i en DM fra DZR Coach.{' '}
-          <ChakraLink as={Link} href={STRAVA_PRIVACY_PATH} textDecoration="underline">
-            Privatliv
-          </ChakraLink>
+          <StravaPrivacyLink color="gray.400">Privatliv</StravaPrivacyLink>
           {' · '}
           <ChakraLink href={`mailto:${DZR_SUPPORT_EMAIL}`} textDecoration="underline">
             Support

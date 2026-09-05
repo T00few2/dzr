@@ -4,6 +4,7 @@ import { Suspense } from 'react'
 import { Container, Heading, Text } from '@chakra-ui/react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { StravaPrivacyLink } from '@/components/StravaPrivacyModal'
 
 const REASONS: Record<string, string> = {
   not_club_member:
@@ -34,9 +35,7 @@ function ErrorBody() {
           Tilbage til connect
         </Link>
         {' · '}
-        <Link href="/strava/privacy" style={{ textDecoration: 'underline' }}>
-          Privatliv
-        </Link>
+        <StravaPrivacyLink>Privatliv</StravaPrivacyLink>
         {' · '}
         <Link href="/join" style={{ textDecoration: 'underline' }}>
           Bliv klubmedlem
