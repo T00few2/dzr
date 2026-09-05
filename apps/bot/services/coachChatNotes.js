@@ -1,4 +1,4 @@
-const NOTE_KINDS = ["feeling", "plan", "preference_transient", "life", "race"];
+const NOTE_KINDS = ["feeling", "plan", "preference_transient", "life", "race", "goal"];
 const MAX_NOTE_TEXT = 280;
 const MAX_NOTES_PER_ATHLETE = 200;
 const MAX_NOTES_PER_WRITE = 8;
@@ -212,18 +212,36 @@ function scoreNote(note, query, now) {
   return keyword * 2 + recency;
 }
 
+function standingGoalNotes(notes) {
+  const seen = new Set();
+  const out = [];
+  for (const note of Array.isArray(notes) ? notes : []) {
+    if (note?.kind !== "goal" || !note.text) continue;
+    const key = normalizeNoteText(note.text);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(note);
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
 function retrieveRelevantNotes(notes, query, { limit = RETRIEVE_LIMIT, now = new Date(), minScore = MIN_RETRIEVE_SCORE } = {}) {
   const upcoming = upcomingRaceNotes(notes, now);
-  const upcomingKeys = new Set(upcoming.map((note) => note.id || `${note.eventDate}:${note.text}`));
+  const goals = standingGoalNotes(notes);
+  const pinnedKeys = new Set([
+    ...upcoming.map((note) => note.id || `${note.eventDate}:${note.text}`),
+    ...goals.map((note) => note.id || `goal:${note.text}`),
+  ]);
   const scored = (Array.isArray(notes) ? notes : [])
     .map((note) => ({ note, score: scoreNote(note, query, now) }))
     .filter((row) => {
       const key = row.note.id || `${row.note.eventDate || ""}:${row.note.text}`;
-      return row.score >= minScore && !upcomingKeys.has(key);
+      return row.score >= minScore && !pinnedKeys.has(key);
     });
   scored.sort((a, b) => b.score - a.score || String(b.note.at || "").localeCompare(String(a.note.at || "")));
   const rest = scored.slice(0, limit).map((row) => row.note);
-  return [...upcoming, ...rest];
+  return [...upcoming, ...goals, ...rest];
 }
 
 function searchNotes(notes, query, { sinceDays, limit = SEARCH_LIMIT, now = new Date() } = {}) {
@@ -255,6 +273,7 @@ const NOTE_KIND_LABELS = {
   preference_transient: "Preference",
   life: "Life",
   race: "Race",
+  goal: "Goal",
 };
 
 function formatNotesForPrompt(notes, now = new Date()) {
@@ -262,6 +281,9 @@ function formatNotesForPrompt(notes, now = new Date()) {
   if (!list.length) return "";
   return list
     .map((note) => {
+      if (note.kind === "goal") {
+        return `- Goal: ${note.text}`;
+      }
       const eventDate = eventDateFromNote(note);
       if (eventDate) {
         const until = formatDaysUntil(eventDate, now);
@@ -296,14 +318,14 @@ function buildExtractMessages({ userMessage, assistantText, coachSettings, recen
     .join("\n");
 
   const system = `You extract dated coaching episode notes from one Discord exchange.
-Return JSON only: {"notes":[{"text":"one or two sentences","kind":"feeling|plan|preference_transient|life|race","eventDate":"YYYY-MM-DD or omit"}]}
+Return JSON only: {"notes":[{"text":"one or two sentences","kind":"feeling|plan|preference_transient|life|race|goal","eventDate":"YYYY-MM-DD or omit"}]}
 Rules:
-- As many notes as are genuinely useful, max 8. Prefer none over noise, except upcoming races.
+- As many notes as are genuinely useful, max 8. Prefer none over noise, except upcoming races and standing goals.
 - Capture transient state: illness, fatigue, mood, skipped session, how a ride felt, one-off plans, life schedule that may change tomorrow.
+- If the athlete names a standing aim (lose weight, stay in shape, get fitter, win races as an aim — not a calendar date), add a kind "goal" note. Skip if that aim is already in recent notes.
 - If the athlete names a race, event, or target date (a calendar date, "next Sunday", "om 2 uger", Zwift race, ZRL, klubmesterskab, etc.), add a kind "race" note. Resolve the date from Today into eventDate as YYYY-MM-DD. Text is the event name only. Do not invent dates. Skip if that eventDate is already in recent notes.
-- Do not store standing goals (lose weight, stay in shape, win races, "get fitter") as notes. The coach cannot write Coach settings; skip those.
 - kind feeling = illness/fatigue/mood/soreness that is not a lasting injury they want obeyed every session.
-- Do NOT copy standing constraints already in Coach settings (rides/week, weekly slots, lasting injuries, standing goals, reply style).
+- Do NOT copy standing constraints already in Coach settings (rides/week, weekly slots, lasting injuries, reply style). Goals are chat notes, not settings.
 - Do NOT invent facts. Do NOT store Strava numbers unless the athlete stated them in this exchange.
 - Do not note that they asked a question or that the coach listed workouts.
 - Deduplicate against recent notes; skip if already captured.

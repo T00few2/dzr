@@ -95,7 +95,6 @@ export async function DELETE(req: Request) {
 
     const url = new URL(req.url)
     const injuryId = String(url.searchParams.get('injuryId') || '').trim()
-    const goalIndexRaw = url.searchParams.get('goalIndex')
     const weeklyIndexRaw = url.searchParams.get('weeklyIndex')
     const ref = adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId)
     const snap = await ref.get()
@@ -105,11 +104,6 @@ export async function DELETE(req: Request) {
 
     if (injuryId) {
       current.injuries = current.injuries.filter((inj) => inj.id !== injuryId)
-    } else if (goalIndexRaw != null && goalIndexRaw !== '') {
-      const idx = Number(goalIndexRaw)
-      if (Number.isInteger(idx) && idx >= 0 && idx < current.goals.length) {
-        current.goals.splice(idx, 1)
-      }
     } else if (weeklyIndexRaw != null && weeklyIndexRaw !== '') {
       const idx = Number(weeklyIndexRaw)
       if (Number.isInteger(idx) && idx >= 0 && idx < current.weekly.length) {

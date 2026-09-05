@@ -627,7 +627,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "search_past_notes",
-      description: "Search dated episode notes from earlier coach DMs (feelings, one-off plans, upcoming races). Use when the athlete refers to something discussed before that is not in the retrieved notes block. Not for Strava workouts and not for standing Coach settings.",
+      description: "Search dated episode notes from earlier coach DMs (goals, feelings, one-off plans, upcoming races). Use when the athlete refers to something discussed before that is not in the retrieved notes block. Not for Strava workouts and not for standing Coach settings.",
       parameters: {
         type: "object",
         properties: {
@@ -648,7 +648,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "save_chat_notes",
-      description: "Silently persist dated episode notes from this chat (feelings, one-off plans, upcoming races, life schedule). Use when the athlete names a race/date or states something worth keeping. Not for standing Coach settings (rides/week, lasting injuries, goals, style). Do not mention this save to the athlete unless they asked if you remembered it. Saving notes must not skip Strava tools.",
+      description: "Silently persist dated episode notes from this chat (goals, feelings, one-off plans, upcoming races, life schedule). Use when the athlete names a standing aim, a race/date, or states something worth keeping. Not for standing Coach settings (rides/week, lasting injuries, reply style). Do not mention this save to the athlete unless they asked if you remembered it. Saving notes must not skip Strava tools.",
       parameters: {
         type: "object",
         properties: {
@@ -665,7 +665,7 @@ const coachToolDefinitions = [
                 kind: {
                   type: "string",
                   enum: NOTE_KINDS,
-                  description: "feeling | plan | preference_transient | life | race"
+                  description: "feeling | plan | preference_transient | life | race | goal"
                 },
                 eventDate: {
                   type: "string",
@@ -1554,24 +1554,26 @@ Saving a chat note must not skip Strava when they asked about training.
 ${settingsBlock}
 
 These are standing constraints from the athlete's Coach settings. Read-only — there is no tool to write settings.
-If they ask to change rides per week, sports, lasting injuries, standing goals, or reply style, tell them to edit Mine sider → Coach: ${MY_PAGES_COACH_URL}
-Never say you saved a setting, goal, injury, or style to their profile.
+If they ask what their settings are (rides/week, sports, weekly slots, injuries, reply style), summarize the Coach settings block above. You already have it. Do not say you cannot see settings. Do not invent a tool.
+If they ask to change rides per week, sports, lasting injuries, or reply style, tell them to edit Mine sider → Coach: ${MY_PAGES_COACH_URL}
+Never say you saved a setting, injury, or style to their profile.
 
 ## Chat notes
 ${notesBlock}
 
 ${notesOptIn
-    ? `Chat notes are dated hints, not standing rules. Compare each note's date to today: a yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
+    ? `Chat notes are dated hints, not standing rules — except Goal notes, which stay relevant until they change them. Compare each other note's date to today: a yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
 Upcoming race notes stay relevant until the event date.
 If they ask to forget a chat note, tell them to delete it on ${MY_PAGES_COACH_URL} (Coach tab).
 Use search_past_notes when they refer to something discussed earlier that is not in this block.
-When they name a race/date or state a feeling, one-off plan, or life schedule worth keeping, call save_chat_notes. Save silently. Do not ask them to confirm. Do not say you saved a note unless they asked whether you remembered it.`
-    : `Chat notes are off. Do not invent notes. If they ask you to remember a feeling, race date, or one-off plan, tell them they can turn chat notes on under Coach: ${MY_PAGES_COACH_URL}`}
+When they name a standing aim, a race/date, or a feeling/plan/life schedule worth keeping, call save_chat_notes. Save silently. Do not ask them to confirm. Do not say you saved a note unless they asked whether you remembered it.`
+    : `Chat notes are off. Do not invent notes. If they ask you to remember a goal, feeling, race date, or one-off plan, tell them they can turn chat notes on under Coach: ${MY_PAGES_COACH_URL}`}
 
 ## What goes where
-- Standing (settings, web only): rides/week, sports, weekly slots, lasting injuries, slow-changing goals, reply style.
-- Episodes (chat notes): race dates, how they felt, a one-off plan, a life schedule that may change.
-- Examples: "I race Sunday" → chat note. "I want to lose weight" → settings. "My knee is injured" (lasting) → settings. "My knee is sore today" → chat note.
+- Standing (settings, web only): rides/week, sports, weekly slots, lasting injuries, reply style.
+- Chat notes: goals ("lose weight", "stay in shape"), race dates, feelings, one-off plans.
+- Examples: "I race Sunday" → chat note. "I want to lose weight" / "husk mit mål" → chat note (kind goal). "My knee is injured" (lasting) → settings. "My knee is sore today" → chat note.
+- Never send them to a Goals form. Goals are not Coach settings.
 
 ## Coaching style
 - Obey the language in Coach settings when present; otherwise match the chat (Danish or English).

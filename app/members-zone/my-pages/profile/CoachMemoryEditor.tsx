@@ -118,7 +118,6 @@ export default function CoachMemoryEditor() {
   const [chatNotes, setChatNotes] = useState<CoachChatNote[]>([])
   const [notesLoading, setNotesLoading] = useState(true)
   const [extraSport, setExtraSport] = useState('')
-  const [newGoal, setNewGoal] = useState('')
   const [ridesMin, setRidesMin] = useState('')
   const [ridesMax, setRidesMax] = useState('')
   const [clearConfirm, setClearConfirm] = useState<ClearConfirm | null>(null)
@@ -131,7 +130,7 @@ export default function CoachMemoryEditor() {
       sports: profile.sports || [],
       weekly: profile.weekly || [],
       injuries: profile.injuries || [],
-      goals: profile.goals || [],
+      goals: [],
       style: profile.style || { length: null, language: null, tone: null, notes: '' },
       notesOptIn: profile.notesOptIn === true,
     })
@@ -239,7 +238,7 @@ export default function CoachMemoryEditor() {
         },
         injuries: form.injuries.filter((inj) => inj.text.trim()),
         weekly: form.weekly.filter((row) => row.sport.trim() && row.days.length),
-        goals: form.goals.map((g) => g.trim()).filter(Boolean),
+        goals: [],
         notesOptIn: form.notesOptIn === true,
       }
       const res = await fetch('/api/coach/profile', {
@@ -390,7 +389,7 @@ export default function CoachMemoryEditor() {
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
       <Heading size="sm" mb={2}>DZR Coach settings</Heading>
       <Text color="gray.400" mb={4} fontSize="sm">
-        Her sætter du dine faste rammer til DZR Coach: hvor ofte du kører, andre sportsgrene, skader, mål og hvordan coachen skal svare. Du har fået et udgangspunkt, som du kan rette. Coachen ændrer ikke selv de rammer — det gør du her. Når chat-noter er slået til, gemmes nyttige notater automatisk fra Discord, uden bekræftelse. Data bruges kun til din private coaching og sendes til OpenAI, når du chatter med coachen. Det gemmes krypteret.
+        Her sætter du dine faste rammer til DZR Coach: hvor ofte du kører, andre sportsgrene, skader og hvordan coachen skal svare. Du har fået et udgangspunkt, som du kan rette. Coachen ændrer ikke selv de rammer — det gør du her. Mål (fx tabe vægt) og løbsdatoer gemmes som chat-noter, når det er slået til. Data bruges kun til din private coaching og sendes til OpenAI, når du chatter med coachen. Det gemmes krypteret.
       </Text>
 
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
@@ -552,60 +551,6 @@ export default function CoachMemoryEditor() {
             </SimpleGrid>
           ))}
         </Stack>
-      </Box>
-
-      <Box mb={4}>
-        <FormLabel mb={1}>Goals</FormLabel>
-        <Text color="gray.400" fontSize="sm" mb={2}>
-          Faste mål, som ikke skifter hele tiden — fx tabe vægt, holde formen, vinde løb. En konkret løbsdato hører til i chatten (notes), ikke her.
-        </Text>
-        <Stack spacing={2} mb={2}>
-          {form.goals.map((goal, index) => (
-            <HStack key={`${goal}-${index}`}>
-              <Input
-                value={goal}
-                onChange={(e) => setForm((prev) => ({
-                  ...prev,
-                  goals: prev.goals.map((g, i) => (i === index ? e.target.value : g)),
-                }))}
-                bg="gray.800"
-                borderColor="gray.600"
-                size="sm"
-              />
-              <Button
-                size="sm"
-                variant="ghost"
-                color="red.300"
-                _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
-                onClick={() => setForm((prev) => ({ ...prev, goals: prev.goals.filter((_, i) => i !== index) }))}
-              >
-                Delete
-              </Button>
-            </HStack>
-          ))}
-        </Stack>
-        <HStack maxW="480px">
-          <Input
-            placeholder="e.g. stay in shape, lose weight"
-            value={newGoal}
-            onChange={(e) => setNewGoal(e.target.value)}
-            bg="gray.800"
-            borderColor="gray.600"
-            size="sm"
-          />
-          <Button
-            size="sm"
-            {...secondaryButtonProps}
-            onClick={() => {
-              const value = newGoal.trim()
-              if (!value) return
-              setForm((prev) => ({ ...prev, goals: [...prev.goals, value] }))
-              setNewGoal('')
-            }}
-          >
-            Add
-          </Button>
-        </HStack>
       </Box>
 
       <Heading size="xs" mb={3} color="gray.300">Coaching style</Heading>

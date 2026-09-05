@@ -170,7 +170,7 @@ export function unwrapCoachMemoryDoc(data: Record<string, unknown> | null | unde
   }
 }
 
-export type CoachChatNoteKind = 'feeling' | 'plan' | 'preference_transient' | 'life' | 'race'
+export type CoachChatNoteKind = 'feeling' | 'plan' | 'preference_transient' | 'life' | 'race' | 'goal'
 
 export type CoachChatNotePlain = {
   id?: string | null
@@ -188,6 +188,7 @@ const CHAT_NOTE_KINDS = new Set<CoachChatNoteKind>([
   'preference_transient',
   'life',
   'race',
+  'goal',
 ])
 
 function packChatNote(plain: CoachChatNotePlain) {

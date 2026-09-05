@@ -138,21 +138,6 @@ function sanitizeInjuries(value) {
   return out;
 }
 
-function sanitizeGoals(value) {
-  const out = [];
-  const seen = new Set();
-  for (const raw of Array.isArray(value) ? value : []) {
-    const goal = clip(raw, 200);
-    if (!goal) continue;
-    const key = goal.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(goal);
-    if (out.length >= 8) break;
-  }
-  return out;
-}
-
 const LENGTH_MAP = {
   short: "short",
   kort: "short",
@@ -224,7 +209,7 @@ function publicFields(data) {
     sports: sanitizeSports(src.sports),
     weekly: sanitizeWeekly(src.weekly),
     injuries: sanitizeInjuries(src.injuries),
-    goals: sanitizeGoals(src.goals),
+    goals: [],
     style: sanitizeStyle(src.style),
     notesOptIn: src.notesOptIn === true,
   };
@@ -287,9 +272,6 @@ function formatCoachProfileForPrompt(profile) {
     if (data.injuries.some((inj) => inj.status === "active")) {
       lines.push("- Never prescribe through an active injury. Treat it as a hard constraint, not a diagnosis.");
     }
-  }
-  if (data.goals.length) {
-    lines.push(`- Standing goals (slow-changing aims, not a calendar date): ${data.goals.join("; ")}`);
   }
   const styleText = formatStyle(data.style);
   if (styleText) lines.push(`- Coaching style (obey every reply): ${styleText}`);

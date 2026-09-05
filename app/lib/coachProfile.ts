@@ -215,21 +215,6 @@ function sanitizeInjuries(value: unknown): CoachInjury[] {
   return out
 }
 
-function sanitizeGoals(value: unknown): string[] {
-  const out: string[] = []
-  const seen = new Set<string>()
-  for (const raw of Array.isArray(value) ? value : []) {
-    const goal = clip(raw, 200)
-    if (!goal) continue
-    const key = goal.toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(goal)
-    if (out.length >= 8) break
-  }
-  return out
-}
-
 function sanitizeStyle(value: unknown): CoachStyle {
   if (!value || typeof value !== 'object') return emptyStyle()
   const raw = value as { length?: unknown; language?: unknown; tone?: unknown; notes?: unknown }
@@ -251,7 +236,7 @@ export function publicCoachFields(data: unknown): CoachProfile {
     sports: uniqueStrings(src.sports, 12, 40),
     weekly: sanitizeWeekly(src.weekly),
     injuries: sanitizeInjuries(src.injuries),
-    goals: sanitizeGoals(src.goals),
+    goals: [],
     style: sanitizeStyle(src.style),
     notesOptIn: src.notesOptIn === true,
   }
