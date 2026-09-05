@@ -1,5 +1,5 @@
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import { sendDm } from '@/app/api/admin/_lib/discord'
+import { sendCoachDm } from '@/app/api/admin/_lib/discord'
 import { clearCoachProfileAndNotes } from '@/app/lib/clearCoachData'
 import { STRAVA_DELETION_DM } from '@/app/lib/stravaCoachLinks'
 import { revokeStravaGrant, STRAVA_CONNECTIONS_COLLECTION } from '@/app/lib/stravaAuth'
@@ -38,7 +38,7 @@ export async function wipeCoachStravaForDiscordId(
   let notified = false
   if (notifyUser) {
     try {
-      notified = await sendDm(id, STRAVA_DELETION_DM)
+      notified = await sendCoachDm(id, STRAVA_DELETION_DM)
     } catch (err) {
       console.warn('wipeCoachStrava: deletion DM failed', err)
     }

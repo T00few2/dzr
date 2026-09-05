@@ -78,14 +78,20 @@ export function slugifyChannelName(name: string) {
   return slug || 'channel'
 }
 
-export function botHeaders(withJson = true) {
-  const token = process.env.DISCORD_BOT_TOKEN
+export function botHeaders(withJson = true, tokenOverride?: string) {
+  const token = String(tokenOverride || process.env.DISCORD_BOT_TOKEN || '').trim()
   if (!token) throw new Error('DISCORD_BOT_TOKEN is not set')
   const headers: Record<string, string> = {
     Authorization: `Bot ${token}`,
   }
   if (withJson) headers['Content-Type'] = 'application/json'
   return headers
+}
+
+function coachOrClubToken() {
+  const coach = String(process.env.COACH_BOT_TOKEN || '').trim()
+  if (coach) return coach
+  return String(process.env.DISCORD_BOT_TOKEN || '').trim()
 }
 
 export async function discordGet(path: string) {
@@ -408,18 +414,29 @@ export async function sendChannelMessage(channelId: string, payload: any) {
   })
 }
 
-export async function sendDm(userId: string, content: string) {
+export async function sendDm(userId: string, content: string, opts?: { token?: string }) {
+  const token = opts?.token
+  const headers = token ? botHeaders(true, token) : botHeaders()
   const ch = await fetch('https://discord.com/api/v10/users/@me/channels', {
     method: 'POST',
-    headers: botHeaders(),
+    headers,
     body: JSON.stringify({ recipient_id: userId }),
   })
   if (!ch.ok) return false
   const channel = await ch.json()
   const msg = await fetch(`https://discord.com/api/v10/channels/${channel.id}/messages`, {
     method: 'POST',
-    headers: botHeaders(),
+    headers,
     body: JSON.stringify({ content, flags: 4 }),
   })
   return msg.ok
+}
+
+/** Coach lifecycle DMs (connect / disconnect) must land in the DZR Coach thread. */
+export async function sendCoachDm(userId: string, content: string) {
+  const token = coachOrClubToken()
+  if (!process.env.COACH_BOT_TOKEN) {
+    console.warn('sendCoachDm: COACH_BOT_TOKEN is not set; using club bot token')
+  }
+  return sendDm(userId, content, { token })
 }

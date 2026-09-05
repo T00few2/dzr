@@ -16,6 +16,7 @@ const {
 } = require("./handlers/statsHandler");
 const { handleZwiftIdMessage, handleZwiftIdConfirmation } = require("./handlers/zwiftIdMessageHandler");
 const { handleAIChatMessage } = require("./handlers/aiChatHandler");
+const { startCoachBot } = require("./services/coachBot");
 
 // Setup keep-alive server
 setupKeepAliveServer();
@@ -171,5 +172,6 @@ process.on('SIGTERM', () => {
   }, 2000);
 });
 
-// Start the bot
-client.login(config.discord.token); 
+// Start the club bot. DZR Coach is a second client (DMs only; no slash commands).
+client.login(config.discord.token);
+startCoachBot(); 

@@ -21,7 +21,6 @@ const {
   handleRepostSignupBoard,
 } = require("./commandHandlers");
 const { handleCoach } = require("../services/coachDm");
-const { markCoachingMode } = require("./aiChatHandler");
 const {
   handleSetupRoles,
   handleAddSelfRole,
@@ -560,12 +559,7 @@ async function handleInteractions(interaction) {
       "process_verification": handleProcessVerification,
       "disable_verification": handleDisableVerification,
       "quiz": startQuizFromInteraction,
-      "coach": async (interaction) => {
-        const result = await handleCoach(interaction);
-        if (result?.ok && result.dmChannelId) {
-          markCoachingMode(interaction.user.id, result.dmChannelId);
-        }
-      },
+      "coach": handleCoach,
     };
 
     const handler = commandHandlers[commandName];

@@ -1,7 +1,8 @@
-const { ChannelType, MessageFlags } = require("discord.js");
+const { MessageFlags } = require("discord.js");
 const strava = require("./stravaService");
 const { ensureDefaultCoachProfile, markCoachHowItWorksSent } = require("./firebase");
 const { MY_PAGES_COACH_URL, coachHowItWorksText, noEmbedUrl } = require("./coachHowItWorks");
+const { getCoachClient, isCoachBotConfigured } = require("./coachBot");
 
 const NOT_CLUB_MEMBER_TEXT =
   "❌ DZR Coach er kun for **betalende klubmedlemmer** (indeværende år).\n\n" +
@@ -9,7 +10,14 @@ const NOT_CLUB_MEMBER_TEXT =
   "Bliv klubmedlem: " + noEmbedUrl("https://www.dzrracingseries.com/join");
 
 const DM_CLOSED_TEXT =
-  "❌ Jeg kunne ikke sende dig en DM. Tillad beskeder fra servermedlemmer (Discord → Privatliv / Privacy) og prøv `/coach` igen.";
+  "❌ Jeg kunne ikke sende dig en DM fra **DZR Coach**. Tillad beskeder fra servermedlemmer (Discord → Privatliv / Privacy) og prøv `/coach` igen.";
+
+const COACH_NOT_CONFIGURED_TEXT =
+  "⚠️ DZR Coach er ikke sat op endnu. Prøv igen lidt senere, eller skriv til support hvis det bliver ved.";
+
+const USE_COACH_BOT_TEXT =
+  "🚴 Coaching sker hos **DZR Coach**. Skriv `/coach` på serveren — så åbner jeg en privat chat med DZR Coach.\n\n" +
+  "Skriv videre her, hvis det handler om klubben (stats, hold, quiz).";
 
 function sendNoEmbeds(channel, content) {
   return channel.send({ content, flags: MessageFlags.SuppressEmbeds });
@@ -22,7 +30,7 @@ function stravaConnectText(discordId) {
     "For at give dig træningsråd skal jeg have adgang til dine Strava-aktiviteter.\n\n" +
     "1. Klik på linket (gyldigt 15 minutter)\n" +
     "2. Læs samtykket og forbind Strava\n" +
-    "3. Kom tilbage hertil og spørg fx: *Hvordan var min uge?*\n\n" +
+    "3. Kom tilbage til **DZR Coach** i DM og spørg fx: *Hvordan var min uge?*\n\n" +
     (url ? noEmbedUrl(url) : "⚠️ Connect-link kunne ikke oprettes (STRAVA_CONNECT_SECRET mangler).")
   );
 }
@@ -39,15 +47,25 @@ async function markHowItWorksSentSafe(discordId) {
   }
 }
 
-async function sendCoachingIntroDm(user, client, guild = null) {
-  const eligible = await strava.hasClubMemberRole(user.id, client, guild);
+async function sendCoachingIntroDm(user) {
+  if (!isCoachBotConfigured()) {
+    return { ok: false, reason: "coach_not_configured" };
+  }
+
+  const eligible = await strava.hasClubMemberRole(user.id);
   if (!eligible) {
     return { ok: false, reason: "not_club_member" };
   }
 
+  const coachClient = await getCoachClient();
+  if (!coachClient) {
+    return { ok: false, reason: "coach_not_configured" };
+  }
+
   let dm;
   try {
-    dm = await user.createDM();
+    const coachUser = await coachClient.users.fetch(user.id);
+    dm = await coachUser.createDM();
   } catch {
     return { ok: false, reason: "dm_closed" };
   }
@@ -92,63 +110,25 @@ async function sendCoachingIntroDm(user, client, guild = null) {
 }
 
 function replyForIntroResult(result) {
+  if (!result?.ok && result?.reason === "coach_not_configured") return COACH_NOT_CONFIGURED_TEXT;
   if (!result?.ok && result?.reason === "not_club_member") return NOT_CLUB_MEMBER_TEXT;
   if (!result?.ok) return DM_CLOSED_TEXT;
-  if (result.connected) return "✅ Tjek din DM — coach-chatten er klar der.";
-  return "✅ Tjek din DM — forbind Strava via linket, så kan vi chatte om din træning.";
+  if (result.connected) return "✅ Tjek din DM med **DZR Coach** — coach-chatten er klar der.";
+  return "✅ Tjek din DM med **DZR Coach** — forbind Strava via linket, så kan vi chatte om din træning.";
 }
 
 async function handleCoach(interaction) {
-  const result = await sendCoachingIntroDm(
-    interaction.user,
-    interaction.client,
-    interaction.guild
-  );
-
-  if (interaction.channel?.type === ChannelType.DM && result.ok) {
-    await interaction.editReply(
-      result.connected
-        ? "✅ Coach-session startet her i DM. Spørg løs om din træning."
-        : "✅ Forbind Strava via linket ovenfor, så kan vi chatte om din træning."
-    );
-    return result;
-  }
-
+  const result = await sendCoachingIntroDm(interaction.user);
   await interaction.editReply(replyForIntroResult(result));
-  return result;
-}
-
-async function handoffCoachingFromMessage(message, client) {
-  const result = await sendCoachingIntroDm(message.author, client, message.guild);
-
-  if (message.channel?.type !== ChannelType.DM) {
-    try {
-      if (!result.ok && result.reason === "not_club_member") {
-        await message.reply(NOT_CLUB_MEMBER_TEXT);
-      } else if (!result.ok) {
-        await message.reply(DM_CLOSED_TEXT);
-      } else {
-        await message.reply("📬 Jeg sender coaching i en **privat DM** — tjek din indbakke.");
-      }
-    } catch (err) {
-      console.warn("handoffCoachingFromMessage channel reply failed:", err?.message || err);
-    }
-  } else if (!result.ok) {
-    try {
-      await message.reply(result.reason === "not_club_member" ? NOT_CLUB_MEMBER_TEXT : DM_CLOSED_TEXT);
-    } catch {
-      /* ignore */
-    }
-  }
-
   return result;
 }
 
 module.exports = {
   handleCoach,
   sendCoachingIntroDm,
-  handoffCoachingFromMessage,
   unconnectedCoachText,
   NOT_CLUB_MEMBER_TEXT,
   DM_CLOSED_TEXT,
+  COACH_NOT_CONFIGURED_TEXT,
+  USE_COACH_BOT_TEXT,
 };

@@ -43,6 +43,8 @@ node bot.js
 
 Render currently tracks `T00few2/bot`. After this repo is pushed, change Source to `T00few2/dzr`, Root Directory `apps/bot`, keep Build `npm install` and Start `node bot.js`.
 
+Optional second bot **DZR Coach** (silent in channels; coaching DMs only). Create a Discord application named DZR Coach, enable Message Content, invite it to the guild with scope `bot` only, then set `COACH_BOT_TOKEN` and `COACH_BOT_CLIENT_ID` on Render and Vercel. `/coach` stays on the club bot and opens a DM from DZR Coach. Without those env vars the club bot starts and skips Coach.
+
 ## Shared constants
 
 `packages/shared/constants.json` is the source of truth for Discord role IDs and Firestore collection names. Copies live in `apps/bot/constants.json` and `apps/api/constants.json` because Render and Cloud Run build those folders as the project root.

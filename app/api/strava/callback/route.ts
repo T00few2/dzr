@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { admin, adminDb } from '@/app/utils/firebaseAdminConfig'
-import { sendDm } from '@/app/api/admin/_lib/discord'
+import { sendCoachDm } from '@/app/api/admin/_lib/discord'
 import {
   getStravaClientId,
   getStravaClientSecret,
@@ -88,10 +88,10 @@ export async function GET(req: Request) {
     await adminDb.collection(STRAVA_CONNECTIONS_COLLECTION).doc(discordId).set(doc)
 
     try {
-      await sendDm(
+      await sendCoachDm(
         discordId,
         '✅ **Strava er forbundet.**\n\n' +
-          'Spørg mig om din træning her i DM — fx:\n' +
+          'Spørg **DZR Coach** om din træning her i DM — fx:\n' +
           '• Hvordan var min uge?\n' +
           '• Var i går for hård?\n' +
           '• Skal jeg hvile i morgen?'

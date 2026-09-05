@@ -12,7 +12,8 @@ export default function StravaCoachPrivacyPage() {
       </Heading>
       <VStack align="stretch" spacing={5} color="gray.300" fontSize="sm">
         <Text>
-          Denne erklæring gælder DZR Coach på Danish Zwift Racers&apos; website og i Discord.
+          Denne erklæring gælder DZR Coach på Danish Zwift Racers&apos; website og i Discord
+          (den separate DZR Coach-bot, ikke klub-boten).
           Den supplerer Stravas egen privatlivspolitik. Ved konflikt gælder{' '}
           <ChakraLink href="https://www.strava.com/legal/privacy" isExternal textDecoration="underline">
             Stravas privatlivspolitik
@@ -47,7 +48,7 @@ export default function StravaCoachPrivacyPage() {
             Coach-rammer, du selv sætter (ture/uge, skader, mål, sprog). Chat-noter kun hvis du slår
             dem til. Noter gemmes krypteret.
           </ListItem>
-          <ListItem>Din Discord-id, så vi kan sende private coaching-svar.</ListItem>
+          <ListItem>Din Discord-id, så DZR Coach kan sende private coaching-svar.</ListItem>
         </UnorderedList>
 
         <Heading size="sm" color="white">
@@ -55,7 +56,7 @@ export default function StravaCoachPrivacyPage() {
         </Heading>
         <Text>
           Du forbinder via Strava OAuth på vores site. Vores server kalder Stravas API direkte, når
-          du stiller et spørgsmål i Discord. Vi bruger ikke en tredjeparts Strava-proxy.
+          du stiller et spørgsmål til DZR Coach i Discord. Vi bruger ikke en tredjeparts Strava-proxy.
         </Text>
 
         <Heading size="sm" color="white">
@@ -97,7 +98,7 @@ export default function StravaCoachPrivacyPage() {
           <ChakraLink href={STRAVA_APPS_URL} isExternal textDecoration="underline">
             Strava → Settings → My Apps
           </ChakraLink>
-          . Så sletter vi tokens, coach-profil og noter og sender en bekræftelse i Discord-DM. Du
+          . Så sletter vi tokens, coach-profil og noter og sender en bekræftelse i en DM fra DZR Coach. Du
           kan også skrive til {DZR_SUPPORT_EMAIL}.
         </Text>
 

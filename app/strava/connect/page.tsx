@@ -34,7 +34,8 @@ function ConnectForm() {
   return (
     <VStack align="stretch" spacing={5}>
       <Text color="gray.300">
-        DZR Coach bruger dine Strava-data til at give dig personlige træningsråd i en privat Discord-DM.
+        DZR Coach bruger dine Strava-data til at give dig personlige træningsråd i en privat DM fra
+        DZR Coach. Skriv /coach på Discord-serveren for at åbne chatten.
         Kun betalende klubmedlemmer kan forbinde.
       </Text>
 
@@ -57,7 +58,7 @@ function ConnectForm() {
           </ListItem>
           <ListItem>
             Når du afbryder, sletter vi dine Strava-tokens, coach-profil og chat-noter og sender en
-            bekræftelse i Discord-DM.
+            bekræftelse i en DM fra DZR Coach.
           </ListItem>
         </UnorderedList>
       </Box>

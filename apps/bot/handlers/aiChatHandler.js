@@ -23,7 +23,7 @@ const {
 } = require("./commandHandlers");
 const { startQuizFromMessage } = require("../services/quizService");
 const strava = require("../services/stravaService");
-const { handoffCoachingFromMessage, unconnectedCoachText, NOT_CLUB_MEMBER_TEXT } = require("../services/coachDm");
+const { unconnectedCoachText, NOT_CLUB_MEMBER_TEXT, USE_COACH_BOT_TEXT } = require("../services/coachDm");
 const { formatCoachProfileForPrompt } = require("../services/coachProfile");
 const { MY_PAGES_COACH_URL, noEmbedUrl } = require("../services/coachHowItWorks");
 const {
@@ -212,11 +212,6 @@ function getConversationKey(message) {
   const channelId = message?.channelId || message?.channel?.id || "unknown_channel";
   const guildId = message?.guild?.id || message?.guildId || "dm";
   return `${guildId}:${channelId}:${userId}`;
-}
-
-function markCoachingMode(userId, dmChannelId) {
-  if (!userId || !dmChannelId) return;
-  conversationModes.set(`dm:${dmChannelId}:${userId}`, "coach");
 }
 
 function isCoachingIntent(text) {
@@ -1674,9 +1669,20 @@ async function callOpenAIWithRetry(params) {
 }
 
 /**
- * Main handler for AI chat messages
+ * Club-bot AI chat. Never coaches — DZR Coach owns that DM.
  */
 async function handleAIChatMessage(message, client) {
+  return handleChatMessage(message, client, { coachOnly: false });
+}
+
+/**
+ * DZR Coach DMs only. Silent in guild channels. Always coaching.
+ */
+async function handleCoachChatMessage(message, client) {
+  return handleChatMessage(message, client, { coachOnly: true });
+}
+
+async function handleChatMessage(message, client, { coachOnly = false } = {}) {
   // Check if OpenAI is configured
   if (!openai) {
     return; // Silently ignore if not configured
@@ -1687,7 +1693,10 @@ async function handleAIChatMessage(message, client) {
 
   const isDM = message.channel.type === ChannelType.DM;
 
-  // In guild channels: only respond when the bot is mentioned.
+  // DZR Coach never talks in guild channels.
+  if (coachOnly && !isDM) return;
+
+  // In guild channels: only respond when the club bot is mentioned.
   // In DMs: treat every message as directed to the bot.
   if (!isDM) {
     const mentioned = message.mentions.users.has(client.user.id);
@@ -1708,22 +1717,24 @@ async function handleAIChatMessage(message, client) {
       .trim();
 
     if (!cleanedMessage) {
-      await safeReply(message, "👋 Hej! I can help you with rider stats, team comparisons, and more. Just ask me something like:\n• Show me stats for @Chris\n• Compare @John, @Mike, and @Sarah\n• What's my Zwift ID?\n• Find riders named Anders");
+      await safeReply(
+        message,
+        coachOnly
+          ? "🚴 Hej — jeg er **DZR Coach**. Spørg om din træning, fx *Hvordan var min uge?*"
+          : "👋 Hej! I can help you with rider stats, team comparisons, and more. Just ask me something like:\n• Show me stats for @Chris\n• Compare @John, @Mike, and @Sarah\n• What's my Zwift ID?\n• Find riders named Anders"
+      );
       return;
     }
 
-    // Coaching in guild channels always moves to a private DM.
-    if (!isDM && isCoachingIntent(cleanedMessage)) {
-      const result = await handoffCoachingFromMessage(message, client);
-      if (result?.ok && result.dmChannelId) {
-        markCoachingMode(message.author.id, result.dmChannelId);
-      }
+    // Club bot never coaches. Point people at /coach (opens a DZR Coach DM).
+    if (!coachOnly && isCoachingIntent(cleanedMessage)) {
+      await safeReply(message, USE_COACH_BOT_TEXT);
       return;
     }
 
-    // Shortcut: "mine stats" → use caller's linked ZwiftID directly
+    // Shortcut: "mine stats" → use caller's linked ZwiftID directly (club bot only)
     const normalized = cleanedMessage.toLowerCase().replace(/[!?\.]+$/g, '').trim();
-    if (normalized === "mine stats" || normalized === "my stats") {
+    if (!coachOnly && (normalized === "mine stats" || normalized === "my stats")) {
       const zwiftId = await getUserZwiftId(message.author.id);
       if (!zwiftId) {
         await safeReply(message,
@@ -1747,20 +1758,14 @@ async function handleAIChatMessage(message, client) {
     }
 
     const conversationKey = getConversationKey(message);
-    const wasCoach = conversationModes.get(conversationKey) === "coach";
-    const isCoachSession = isDM && (isCoachingIntent(cleanedMessage) || wasCoach);
+    const isCoachSession = coachOnly;
 
     if (isCoachSession) {
-      const eligible = await strava.hasClubMemberRole(message.author.id, client, message.guild);
+      const eligible = await strava.hasClubMemberRole(message.author.id);
       if (!eligible) {
-        conversationModes.delete(conversationKey);
         await safeReply(message, NOT_CLUB_MEMBER_TEXT);
         return;
       }
-      if (!wasCoach) {
-        userConversations.delete(conversationKey);
-      }
-      conversationModes.set(conversationKey, "coach");
       const connected = await strava.isStravaConnected(message.author.id);
       if (!connected) {
         await safeReply(message, unconnectedCoachText(message.author.id));
@@ -2092,7 +2097,7 @@ async function handleAIChatMessage(message, client) {
 
 module.exports = {
   handleAIChatMessage,
+  handleCoachChatMessage,
   clearConversation, // Export for testing/admin commands
-  markCoachingMode,
   AI_CONFIG // Export for external configuration if needed
 };

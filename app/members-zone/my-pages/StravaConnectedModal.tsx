@@ -27,7 +27,7 @@ export default function StravaConnectedModal({
         <ModalCloseButton _hover={{ bg: 'whiteAlpha.200' }} />
         <ModalBody>
           <Text color="gray.300" mb={4}>
-            Gå tilbage til Discord. Botten har sendt dig en DM — spørg om din træning der. Coaching sker aldrig i offentlige kanaler.
+            Gå tilbage til Discord. DZR Coach har sendt dig en DM — spørg om din træning der. Coaching sker aldrig i offentlige kanaler. Skriv /coach på serveren, hvis du ikke kan se beskeden.
           </Text>
           <Text color="gray.300" mb={4}>
             Dine rammer (hvor ofte du kører, skader, mål og skrivestil) sætter du under Coach her på siden. Chat-noter kan du også slå til samme sted, hvis du vil have korte notater fra samtalen.

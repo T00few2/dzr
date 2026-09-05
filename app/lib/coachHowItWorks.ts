@@ -13,7 +13,7 @@ export function coachHowItWorksText({ includeStartHint = true }: { includeStartH
   const lines = [
     '🚴 **DZR Coach**',
     '',
-    'Du kan få træningsråd i en privat Discord-besked. Sådan virker det:',
+    'Du kan få træningsråd i en privat besked fra **DZR Coach** (ikke klub-boten). Sådan virker det:',
     '',
     '**Din træning**',
     'Jeg bruger dine Strava-aktiviteter, når du spørger om træning, restitution eller et bestemt pas.',
@@ -28,7 +28,7 @@ export function coachHowItWorksText({ includeStartHint = true }: { includeStartH
     'Chatten er privat, og samtalen gemmes ikke. Vil du have, at jeg husker tidligere samtaler (fx at du var syg, eller at du kører et løb en bestemt dag), slår du chat-noter til via linket ovenfor. Du kan altid se og slette noterne der.',
   ]
   if (includeStartHint) {
-    lines.push('', 'Skriv **/coach** på Discord-serveren, når du vil i gang.')
+    lines.push('', 'Skriv **/coach** på Discord-serveren, når du vil i gang. **DZR Coach** skriver til dig i en privat besked.')
   }
   return lines.join('\n')
 }

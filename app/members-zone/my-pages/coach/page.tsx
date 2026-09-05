@@ -125,8 +125,9 @@ export default function CoachPage() {
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
         <Heading size="sm" mb={2}>Strava</Heading>
         <Text color="gray.400" mb={4} fontSize="sm">
-          Forbind Strava for at få personlig træningscoaching i en privat Discord-DM. Afbryd sletter
-          tokens, profil og noter. Vi sender en bekræftelse i Discord-DM.{' '}
+          Forbind Strava for at få personlig træningscoaching i en privat DM fra DZR Coach. Skriv
+          /coach på Discord-serveren for at åbne chatten. Afbryd sletter
+          tokens, profil og noter. Vi sender en bekræftelse i en DM fra DZR Coach.{' '}
           <ChakraLink as={Link} href={STRAVA_PRIVACY_PATH} textDecoration="underline">
             Privatliv
           </ChakraLink>

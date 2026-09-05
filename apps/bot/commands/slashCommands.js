@@ -58,7 +58,7 @@ const commands = [
   // coach (club members only; continues in DM)
   new SlashCommandBuilder()
     .setName("coach")
-    .setDescription("Start a private Strava coaching chat in a DM (club members only)"),
+    .setDescription("Open a private DZR Coach DM (club members only)"),
   // team_stats
   new SlashCommandBuilder()
     .setName("team_stats")
