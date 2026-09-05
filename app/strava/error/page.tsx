@@ -34,6 +34,10 @@ function ErrorBody() {
           Tilbage til connect
         </Link>
         {' · '}
+        <Link href="/strava/privacy" style={{ textDecoration: 'underline' }}>
+          Privatliv
+        </Link>
+        {' · '}
         <Link href="/join" style={{ textDecoration: 'underline' }}>
           Bliv klubmedlem
         </Link>

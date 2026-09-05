@@ -6,6 +6,7 @@ import {
   Checkbox,
   Container,
   Heading,
+  Link as ChakraLink,
   ListItem,
   Text,
   UnorderedList,
@@ -14,6 +15,7 @@ import {
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ConnectWithStravaButton from '@/components/ConnectWithStravaButton'
+import { DZR_SUPPORT_EMAIL, STRAVA_APPS_URL, STRAVA_PRIVACY_PATH } from '@/app/lib/stravaCoachLinks'
 
 function ConnectForm() {
   const searchParams = useSearchParams()
@@ -45,7 +47,18 @@ function ConnectForm() {
           <ListItem>Aktivitetssammendrag og dine beskeder sendes til OpenAI for at generere coaching-svar. Hvis du har udfyldt coach-profilen, sendes de rammer med. Hvis du har slået chat-noter til, kan korte daterede notater fra samtalen også sendes med.</ListItem>
           <ListItem>Strava-tokens gemmes krypteret og bruges kun til coaching i Discord. Vi gemmer ikke hele din træningshistorik.</ListItem>
           <ListItem>Dine faste træningsrammer (fx 3–4 ture/uge, skader, skrivestil) retter du selv under Mine sider → Coach. Chat-noter er slået fra, indtil du slår dem til samme sted.</ListItem>
-          <ListItem>Du kan afbryde Strava-forbindelsen når som helst her på siden eller under Strava → Settings → My Apps.</ListItem>
+          <ListItem>
+            Du kan trække samtykket tilbage når som helst: afbryd under Mine sider → Coach, eller
+            fjern appen under{' '}
+            <ChakraLink href={STRAVA_APPS_URL} isExternal textDecoration="underline">
+              Strava → Settings → My Apps
+            </ChakraLink>
+            .
+          </ListItem>
+          <ListItem>
+            Når du afbryder, sletter vi dine Strava-tokens, coach-profil og chat-noter og sender en
+            bekræftelse i Discord-DM.
+          </ListItem>
         </UnorderedList>
       </Box>
 
@@ -63,7 +76,14 @@ function ConnectForm() {
       <ConnectWithStravaButton href={href} disabled={!agreed} />
 
       <Text fontSize="sm" color="gray.500">
-        Mangler du klubmedlemskab?{' '}
+        <Link href={STRAVA_PRIVACY_PATH} style={{ textDecoration: 'underline' }}>
+          Privatliv
+        </Link>
+        {' · '}
+        <ChakraLink href={`mailto:${DZR_SUPPORT_EMAIL}`} textDecoration="underline">
+          {DZR_SUPPORT_EMAIL}
+        </ChakraLink>
+        {' · '}
         <Link href="/join" style={{ textDecoration: 'underline' }}>
           Bliv medlem
         </Link>

@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
-import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import { revokeStravaGrant, STRAVA_CONNECTIONS_COLLECTION } from '@/app/lib/stravaAuth'
-import { readStravaTokens } from '@/app/lib/tokenCrypto'
-import { clearCoachProfileAndNotes } from '@/app/lib/clearCoachData'
+import { wipeCoachStravaForDiscordId } from '@/app/lib/wipeCoachStrava'
+import { STRAVA_APPS_URL } from '@/app/lib/stravaCoachLinks'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,31 +14,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Not logged in' }, { status: 401 })
     }
 
-    await clearCoachProfileAndNotes(discordId)
-
-    const ref = adminDb.collection(STRAVA_CONNECTIONS_COLLECTION).doc(discordId)
-    const snap = await ref.get()
-    let revokedOnStrava = false
-
-    if (snap.exists) {
-      const data = snap.data() || {}
-      try {
-        const tokens = readStravaTokens(data)
-        revokedOnStrava = await revokeStravaGrant({
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          expiresAt: Number(data.expiresAt) || 0,
-        })
-      } catch (err) {
-        console.warn('strava disconnect: could not decrypt/revoke (continuing with local delete)', err)
-      }
-      await ref.delete()
-    }
+    const result = await wipeCoachStravaForDiscordId(discordId, {
+      revokeOnStrava: true,
+      notifyUser: true,
+    })
 
     return NextResponse.json({
       connected: false,
-      revokedOnStrava,
-      stravaAppsUrl: 'https://www.strava.com/settings/apps',
+      revokedOnStrava: result.revokedOnStrava,
+      deletionNotified: result.notified,
+      stravaAppsUrl: STRAVA_APPS_URL,
     })
   } catch (err: any) {
     console.error('strava disconnect error:', err)

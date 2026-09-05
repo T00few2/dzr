@@ -21,6 +21,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import CoachMemoryEditor from '../profile/CoachMemoryEditor'
 import ConnectWithStravaButton from '@/components/ConnectWithStravaButton'
+import { DZR_SUPPORT_EMAIL, STRAVA_APPS_URL, STRAVA_PRIVACY_PATH } from '@/app/lib/stravaCoachLinks'
 
 const secondaryButtonProps = {
   variant: 'outline' as const,
@@ -76,7 +77,13 @@ export default function CoachPage() {
       }
       await loadStravaStatus()
       if (data?.revokedOnStrava) {
-        toast({ title: 'Strava disconnected', status: 'success' })
+        toast({
+          title: 'Strava disconnected',
+          description: data?.deletionNotified
+            ? 'We sent a deletion confirmation to your Discord DM.'
+            : 'Tokens, profile, and notes were deleted.',
+          status: 'success',
+        })
         setStravaNotice(null)
       } else {
         toast({ title: 'Disconnected in DZR', status: 'warning' })
@@ -118,7 +125,19 @@ export default function CoachPage() {
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
         <Heading size="sm" mb={2}>Strava</Heading>
         <Text color="gray.400" mb={4} fontSize="sm">
-          Forbind Strava for at få personlig træningscoaching i en privat Discord-DM.
+          Forbind Strava for at få personlig træningscoaching i en privat Discord-DM. Afbryd sletter
+          tokens, profil og noter. Vi sender en bekræftelse i Discord-DM.{' '}
+          <ChakraLink as={Link} href={STRAVA_PRIVACY_PATH} textDecoration="underline">
+            Privatliv
+          </ChakraLink>
+          {' · '}
+          <ChakraLink href={`mailto:${DZR_SUPPORT_EMAIL}`} textDecoration="underline">
+            Support
+          </ChakraLink>
+          {' · '}
+          <ChakraLink href={STRAVA_APPS_URL} isExternal textDecoration="underline">
+            Strava-apps
+          </ChakraLink>
         </Text>
         {!strava ? (
           <Spinner size="sm" />
@@ -179,7 +198,8 @@ export default function CoachPage() {
               Disconnect Strava?
             </AlertDialogHeader>
             <AlertDialogBody>
-              Strava-forbindelsen afbrydes. Coach-profilen nulstilles, og alle chat-noter slettes. Det kan ikke fortrydes.
+              Strava-forbindelsen afbrydes. Coach-profilen nulstilles, og alle chat-noter slettes.
+              Du får en bekræftelse i Discord-DM. Det kan ikke fortrydes.
             </AlertDialogBody>
             <AlertDialogFooter>
               <Button
