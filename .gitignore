@@ -30,6 +30,9 @@ yarn-error.log*
 .env
 .env.example
 
+# P1 Firestore / env backups (member data + secrets)
+/backups/
+
 # nested apps (bot + Flask API)
 apps/bot/node_modules/
 apps/bot/.env
@@ -50,11 +53,6 @@ apps/api/service-account-key.json
 *.tsbuildinfo
 next-env.d.ts
 
-.vercel
-
-.vercel
-.env*.local
+# one-off local exports
 active_members_2026_emails.csv
 scripts/export-active-member-emails-2026.js
-
-.vercel

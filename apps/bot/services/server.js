@@ -6,7 +6,7 @@ function setupKeepAliveServer() {
   // Fake Web Server (to keep Render awake)
   const app = express();
   app.get("/", (req, res) => res.send("Bot is running!"));
-  app.listen(config.server.port, () => 
+  app.listen(config.server.port, "0.0.0.0", () =>
     console.log(`Fake web server running on port ${config.server.port}`)
   );
 
