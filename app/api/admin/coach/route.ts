@@ -154,6 +154,20 @@ export async function GET(req: Request) {
       .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')))
   }
 
+  // 👍/👎 on coach replies. Automated evals catch regressions; this catches advice that is
+  // technically correct and still unhelpful, which no assertion can see.
+  let feedback = { up: 0, down: 0 }
+  try {
+    const feedbackSnap = await adminDb.collection('coach_feedback').orderBy('at', 'desc').limit(500).get()
+    feedbackSnap.forEach((doc) => {
+      const rating = Number((doc.data() || {}).rating)
+      if (rating > 0) feedback.up += 1
+      else if (rating < 0) feedback.down += 1
+    })
+  } catch (err) {
+    console.warn('admin/coach: could not read feedback', err)
+  }
+
   const totals = people.reduce(
     (acc, p) => {
       acc.connected += p.connected ? 1 : 0
@@ -176,6 +190,7 @@ export async function GET(req: Request) {
     // Key-drift signal. Should always be 0. A non-zero count means some coach_profiles documents
     // cannot be decrypted with the key this runtime holds — Vercel and Render have drifted apart,
     // or COACH_MEMORY_KEY was rotated. keyIdStatus below distinguishes those two.
+    feedback,
     undecryptableProfiles: undecryptable.length,
     // Diagnostic for the above: a mismatch says the key changed, an unknown says the document
     // simply predates fingerprinting. Without this the two look identical from a failed decrypt.

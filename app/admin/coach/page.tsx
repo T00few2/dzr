@@ -68,7 +68,7 @@ function fmtTime(iso: string | null) {
 }
 
 export default function CoachAdminPage() {
-  const [data, setData] = useState<{ totals: any; people: Person[]; events: EventRow[]; undecryptableProfiles?: number } | null>(null)
+  const [data, setData] = useState<{ totals: any; people: Person[]; events: EventRow[]; undecryptableProfiles?: number; feedback?: { up: number; down: number } } | null>(null)
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -139,6 +139,10 @@ export default function CoachAdminPage() {
         <Stat><StatLabel>OpenAI calls</StatLabel><StatNumber>{fmt(totals.openaiCalls)}</StatNumber></Stat>
         <Stat><StatLabel>Prompt tokens</StatLabel><StatNumber>{fmt(totals.promptTokens)}</StatNumber></Stat>
         <Stat><StatLabel>Total tokens</StatLabel><StatNumber>{fmt(totals.totalTokens)}</StatNumber></Stat>
+        <Stat>
+          <StatLabel>Feedback 👍/👎</StatLabel>
+          <StatNumber>{fmt(data?.feedback?.up ?? 0)}/{fmt(data?.feedback?.down ?? 0)}</StatNumber>
+        </Stat>
       </SimpleGrid>
 
       <Box mb={4} display="flex" gap={3}>

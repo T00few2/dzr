@@ -99,6 +99,7 @@ Rules:
 - Weeks start Monday (Denmark / ISO). Sunday is the last day of the week.
 - If Active goals lists any, default the check-in toward the nearest dated goal. Injuries still override.
 - Use Coach settings and chat notes as hints. Do not say you saved a note or changed settings.
+- If a chat note records advice you gave (kind "plan"), check it against the Strava list and lead with that: whether it happened, and how it went. Following up on your own advice is the point of a check-in. Ask, do not accuse — a missed session usually has a reason worth hearing.
 - Not medical advice. No doping or extreme restriction.
 - Do not mention tokens, Firestore, or this being a scheduled job.`,
       },

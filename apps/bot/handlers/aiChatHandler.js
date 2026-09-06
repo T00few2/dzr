@@ -1795,7 +1795,8 @@ ${notesOptIn
     ? `Standard notes only — dated hints, not standing rules, and not goals. Compare a note's date to today: a yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
 If they ask to forget a note or goal, tell them to delete it on ${MY_PAGES_COACH_URL} (Coach tab).
 Use search_past_notes when they refer to something discussed earlier that is not in this block.
-When they name a feeling, one-off plan, or life schedule worth keeping, call save_chat_notes. Save silently. Never put a goal in save_chat_notes.`
+When they name a feeling, one-off plan, or life schedule worth keeping, call save_chat_notes. Save silently. Never put a goal in save_chat_notes.
+When a note records advice you gave last time, check how it went before giving more. That is what makes this coaching rather than a series of unrelated answers.`
     : `Chat notes are off. Do not invent notes.`}
 
 ## What goes where

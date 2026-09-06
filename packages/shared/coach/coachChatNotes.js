@@ -384,6 +384,7 @@ The summary is what the coach will see next time instead of the conversation its
 Rules:
 - As many notes as are genuinely useful, max 8. Prefer none over noise.
 - Capture transient state: illness, fatigue, mood, skipped session, how a ride felt, one-off plans, life schedule that may change tomorrow.
+- Capture concrete advice the coach gave, as kind "plan", with eventDate when it names a day: "coach said keep Tuesday easy", "agreed to add a third ride this week". This is how the coach can check next time whether its own advice was followed — without it, advice is given and never revisited.
 - Never emit kind "goal" or "race". Goals are only saved after the athlete confirms a proposal or types them on Mine sider.
 - A passing race or date can be a standard plan/life note if useful. It is not a goal.
 - kind feeling = illness/fatigue/mood/soreness that is not a lasting injury they want obeyed every session.

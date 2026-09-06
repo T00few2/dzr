@@ -31,14 +31,18 @@ function startCoachBot() {
 
   const { handleCoachChatMessage } = require("../handlers/aiChatHandler");
   const { handleCoachGoalButton } = require("./coachGoalConfirm");
+  const { recordCoachFeedback } = require("./coachFeedback");
 
   coachClient = new Client({
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.DirectMessages,
+      GatewayIntentBits.DirectMessageReactions,
       GatewayIntentBits.MessageContent,
     ],
-    partials: [Partials.Channel],
+    // Message and Reaction partials so 👍/👎 on an older reply still registers; Channel so DMs
+    // arrive at all.
+    partials: [Partials.Channel, Partials.Message, Partials.Reaction],
   });
 
   coachClient.on("messageCreate", async (message) => {
@@ -46,6 +50,17 @@ function startCoachBot() {
       await handleCoachChatMessage(message, coachClient);
     } catch (err) {
       console.error("DZR Coach message handler failed:", err);
+    }
+  });
+
+  // Partials are required: a reaction on a message from before this process started arrives
+  // uncached, and would otherwise be silently dropped.
+  coachClient.on("messageReactionAdd", async (reaction, user) => {
+    try {
+      if (reaction.partial) await reaction.fetch();
+      await recordCoachFeedback(reaction, user);
+    } catch (err) {
+      console.warn("DZR Coach reaction handler failed:", err?.message || err);
     }
   });
 

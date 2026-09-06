@@ -24,6 +24,9 @@ function coachHowItWorksText({ includeStartHint = false } = {}) {
     "",
     "Det er der, du sætter hvor ofte du kører, andre sportsgrene, faste træningsdage, skader og hvordan jeg skal svare. Under samme side kan du slå et valgfrit check-in til, så jeg skriver først om morgenen, hvis vi ikke har snakket i et par dage.",
     "",
+    "**Feedback**",
+    "Reagér med 👍 eller 👎 på mine svar, hvis du vil. Det er anonymt over for de andre og hjælper med at gøre coachingen bedre.",
+    "",
     "**Chat-noter**",
     "Chatten er privat. Selve samtalen gemmes ikke — men når en samtale slutter, gemmer jeg et kort resumé af den, så jeg kan huske tråden næste gang. Når chat-noter er slået til, gemmer jeg stille korte notater (fx at du var syg, eller en engangsplan) — uden at spørge dig. Datobundne mål (et løb, tabe vægt inden en dato) sætter du under Mine sider, eller jeg foreslår dem i chatten og gemmer først, når du trykker Ja. Så styrer jeg træningen efter dem. Faste rammer (ture om ugen, skader, svartone) retter du selv under Mine sider. Du kan altid se og slette noterne der.",
   ];
