@@ -13,6 +13,7 @@ const {
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
 const { trimConversation } = require("../services/conversationTrim");
+const { loadTrend, formatWeeklyLoadForPrompt } = require("../services/weeklyLoad");
 const { 
   handleRiderStats, 
   handleTeamStats, 
@@ -1660,6 +1661,16 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
   let notesBlock = "Chat notes are off.";
   let goalsBlock = "Chat notes are off. There are no saved goals.";
   let notesOptIn = false;
+  let loadBlock = "No weekly history yet.";
+  try {
+    const stored = await strava.getWeeklyLoad(message.author.id);
+    if (stored?.weekly?.length) {
+      loadBlock = formatWeeklyLoadForPrompt(stored.weekly, loadTrend(stored.weekly));
+    }
+  } catch (err) {
+    console.error("getWeeklyLoad failed:", err?.message || err);
+  }
+
   let profile = preloadedProfile ?? null;
   try {
     if (!profile) profile = await getCoachProfile(message.author.id);
@@ -1722,6 +1733,14 @@ Typical flow: get_recent_activities first, then get_activity_details for a speci
 For "how was that session" or "were my intervals any good", call get_activity_metrics on that one activity. It returns the mean-maximal power curve, normalized power, IF, TSS, aerobic decoupling and detected intervals. One activity at a time — it costs a Strava request shared across the whole club.
 get_recent_activities returns averages only. Do not judge interval quality from an average; either fetch metrics or say you only have the summary. If metrics come back null because the ride has no power meter, say so and talk about duration, heart rate and feel instead.
 Saving a chat note must not skip Strava when they asked about training.
+
+## Training load (last weeks)
+${loadBlock}
+
+Use this for trend, which recent activities cannot show: whether they are building or flat, how
+this week compares to the last month, and how long since a genuine rest week. Prefer it over
+counting sessions when judging whether to add or back off. It is rebuilt nightly, so the current
+week is partial — do not read a low number mid-week as a drop in training.
 
 ## Coach settings (standing)
 ${settingsBlock}

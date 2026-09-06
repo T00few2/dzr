@@ -4,6 +4,7 @@ const config = require("../config/config");
 const shared = require("../constants.json");
 const { db, getUserZwiftId, getLatestClubStats, isPaidClubMember } = require("./firebase");
 const metrics = require("./streamMetrics");
+const weeklyLoad = require("./weeklyLoad");
   const {
     canEncryptTokens,
     encryptedTokenFields,
@@ -384,6 +385,69 @@ async function getZwiftPowerContext(discordId) {
 }
 
 const STREAM_CACHE_COLLECTION = "coach_activity_metrics";
+const WEEKLY_LOAD_COLLECTION = "coach_weekly_load";
+
+/**
+ * Activities over a longer window than getRecentActivities allows, for the weekly rollup.
+ *
+ * Paginated, and deliberately bounded: this is the expensive call in the whole coach. The first
+ * run for an athlete fetches ~6 months of history, and the per-app Strava rate limit is shared
+ * across the entire club, so callers must throttle between athletes and must not run this on a
+ * chat turn.
+ */
+async function fetchActivityHistory(discordId, { days = 182, maxPages = 6 } = {}) {
+  const after = Math.floor((Date.now() - days * 86400000) / 1000);
+  return wrapCall(discordId, async () => {
+    const all = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const { data } = await stravaGet(
+        discordId,
+        `/athlete/activities?after=${after}&per_page=200&page=${page}`
+      );
+      const list = Array.isArray(data) ? data : [];
+      all.push(...list.map(compactActivity).filter(Boolean));
+      if (list.length < 200) break; // last page
+    }
+    return { success: true, days, activities: all };
+  });
+}
+
+/** Read the stored weekly rollup. Cheap — one document, no Strava call. */
+async function getWeeklyLoad(discordId) {
+  try {
+    const snap = await db.collection(WEEKLY_LOAD_COLLECTION).doc(String(discordId)).get();
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    return { weekly: Array.isArray(data.weekly) ? data.weekly : [], updatedAt: data.updatedAt || null };
+  } catch (err) {
+    console.warn("getWeeklyLoad failed:", err?.message || err);
+    return null;
+  }
+}
+
+/** Recompute and store one athlete's weekly rollup. Called by the nightly job, never on a turn. */
+async function refreshWeeklyLoad(discordId, { days = 182 } = {}) {
+  const history = await fetchActivityHistory(discordId, { days });
+  if (!history?.success) return history;
+
+  let ftp = null;
+  try {
+    const profile = await getAthleteProfile(discordId);
+    ftp = Number(profile?.athlete?.ftp) || null;
+  } catch {
+    ftp = null;
+  }
+
+  const weekly = weeklyLoad.rollupWeeks(history.activities, { ftp, weeks: 26 });
+  await db.collection(WEEKLY_LOAD_COLLECTION).doc(String(discordId)).set({
+    discordId: String(discordId),
+    weekly,
+    ftpUsed: ftp,
+    updatedAt: new Date(),
+  });
+  return { success: true, weeks: weekly.length };
+}
+
 
 /**
  * Derived power metrics for one activity.
@@ -493,4 +557,7 @@ module.exports = {
   getActivityDetails,
   getZwiftPowerContext,
   getActivityMetrics,
+  fetchActivityHistory,
+  getWeeklyLoad,
+  refreshWeeklyLoad,
 };
