@@ -27,7 +27,8 @@ import {
   useToast,
 } from '@chakra-ui/react'
 import type { CoachInjury, CoachProfile, CoachWeeklySlot } from '@/app/lib/coachProfile'
-import { MAX_ACTIVE_GOALS, activeGoalNotes, type CoachChatNote } from '@/app/lib/coachChatNotes'
+import type { CoachChatNote } from '@/app/lib/coachChatNotes'
+import { MAX_ACTIVE_GOALS, activeGoalNotes } from '@/app/lib/coachGoals'
 
 const SPORT_OPTIONS = ['cycling', 'running', 'swimming', 'strength']
 const SPORT_LABELS: Record<string, string> = {
