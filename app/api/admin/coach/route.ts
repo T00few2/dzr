@@ -16,17 +16,15 @@ export async function GET(req: Request) {
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
 
-  const [connectionsSnap, usageSnap, usersSnap, profilesSnap] = await Promise.all([
+  // The three coach collections are inherently small (one document per athlete who has opened
+  // Coach). `users` is not - it holds every member - and it was previously scanned in full on
+  // every dashboard load just to map ids to names. Fetch only the ids actually referenced,
+  // after the small scans have told us which those are.
+  const [connectionsSnap, usageSnap, profilesSnap] = await Promise.all([
     adminDb.collection(COLLECTIONS.stravaConnections).get(),
     adminDb.collection(COLLECTIONS.coachUsage).get(),
-    adminDb.collection(COLLECTIONS.users).get(),
     adminDb.collection(COLLECTIONS.coachProfiles).get(),
   ])
-
-  const usersById = new Map<string, any>()
-  usersSnap.forEach((doc) => {
-    usersById.set(doc.id, doc.data() || {})
-  })
 
   const connectionsById = new Map<string, any>()
   connectionsSnap.forEach((doc) => {
@@ -65,6 +63,21 @@ export async function GET(req: Request) {
     ...notesOptInById.keys(),
     ...followUpEveryDaysById.keys(),
   ])
+
+  const usersById = new Map<string, any>()
+  const idList = Array.from(ids)
+  if (idList.length > 0) {
+    // getAll() takes document refs directly, so this is one round trip for the ids we need
+    // rather than a full-collection scan. Chunked to stay well inside Firestore's limits.
+    const CHUNK = 300
+    for (let i = 0; i < idList.length; i += CHUNK) {
+      const refs = idList.slice(i, i + CHUNK).map((id) => adminDb.collection(COLLECTIONS.users).doc(id))
+      const docs = await adminDb.getAll(...refs)
+      docs.forEach((doc) => {
+        if (doc.exists) usersById.set(doc.id, doc.data() || {})
+      })
+    }
+  }
 
   const people = Array.from(ids).map((discordId) => {
     const conn = connectionsById.get(discordId) || null

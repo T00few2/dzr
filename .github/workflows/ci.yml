@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  site:
+    name: Site (typecheck + lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+
+  bot:
+    name: Bot (tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/bot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/bot/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/bot/package-lock.json
+      - run: npm ci
+      # Only pure modules are covered. Anything importing services/firebase.js initialises the
+      # Firebase Admin SDK at module load and cannot run without credentials.
+      - name: Unit tests
+        run: npm test
+
+  shared-constants:
+    name: Shared constants are in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # packages/shared/constants.json is the source of truth, but Render and Cloud Run build
+      # apps/* as their own project root, so copies live in each app tree. render.yaml's
+      # buildFilter only triggers on apps/bot/**, so an edit to packages/shared alone does not
+      # even rebuild the bot — the drift would be silent without this check.
+      - name: Compare copies against the source of truth
+        run: |
+          for target in apps/bot/constants.json apps/api/constants.json; do
+            if ! diff -q packages/shared/constants.json "$target" >/dev/null; then
+              echo "::error file=$target::$target has drifted from packages/shared/constants.json"
+              diff packages/shared/constants.json "$target" || true
+              exit 1
+            fi
+          done
+          echo "constants.json copies are in sync"
