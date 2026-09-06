@@ -16,8 +16,10 @@ const {
 const {
   MAX_NOTES_PER_ATHLETE,
   MAX_NOTES_PER_WRITE,
+  MAX_ACTIVE_GOALS,
   sanitizeNote,
   isNearDuplicate,
+  activeGoalNotes,
 } = require("./coachChatNotes");
 
 // Initialize Firebase
@@ -85,7 +87,7 @@ function noteSkip(raw, reason, extra = {}) {
   };
 }
 
-async function addCoachChatNotes(discordId, incoming, { at } = {}) {
+async function addCoachChatNotes(discordId, incoming, { at, allowGoals = false, replaceNoteId } = {}) {
   const id = String(discordId || "").trim();
   const skipped = [];
   if (!id) return { saved: [], skipped };
@@ -94,6 +96,8 @@ async function addCoachChatNotes(discordId, incoming, { at } = {}) {
   }
   const existing = await listCoachChatNotes(id);
   const now = at instanceof Date ? at : new Date();
+  const replaceId = String(replaceNoteId || "").trim();
+  const activeGoals = activeGoalNotes(existing, now).filter((note) => note.id !== replaceId);
   const toAdd = [];
   for (const raw of Array.isArray(incoming) ? incoming : []) {
     const note = sanitizeNote(raw, now.toISOString());
@@ -101,12 +105,19 @@ async function addCoachChatNotes(discordId, incoming, { at } = {}) {
       skipped.push(noteSkip(raw, "invalid"));
       continue;
     }
-    if (isNearDuplicate(note.text, existing) || isNearDuplicate(note.text, toAdd)) {
-      skipped.push(noteSkip(raw, "duplicate", note));
+    if (note.kind === "goal" && !allowGoals) {
+      skipped.push(noteSkip(raw, "goal_needs_confirm", note));
       continue;
     }
-    if (note.eventDate && (existing.some((item) => item.eventDate === note.eventDate) || toAdd.some((item) => item.eventDate === note.eventDate))) {
-      skipped.push(noteSkip(raw, "duplicate_event_date", note));
+    if (note.kind === "goal") {
+      const pendingGoals = toAdd.filter((item) => item.kind === "goal").length;
+      if (activeGoals.length + pendingGoals >= MAX_ACTIVE_GOALS) {
+        skipped.push(noteSkip(raw, "goal_cap", note));
+        continue;
+      }
+    }
+    if (isNearDuplicate(note.text, existing.filter((item) => item.id !== replaceId)) || isNearDuplicate(note.text, toAdd)) {
+      skipped.push(noteSkip(raw, "duplicate", note));
       continue;
     }
     if (toAdd.length >= MAX_NOTES_PER_WRITE) {
@@ -115,10 +126,13 @@ async function addCoachChatNotes(discordId, incoming, { at } = {}) {
     }
     toAdd.push(note);
   }
-  if (!toAdd.length) return { saved: [], skipped };
+  if (!toAdd.length && !replaceId) return { saved: [], skipped };
 
   const batch = db.batch();
   batch.set(coachChatNotesParent(id), { discordId: id, updatedAt: now }, { merge: true });
+  if (replaceId && allowGoals) {
+    batch.delete(coachChatNotesCol(id).doc(replaceId));
+  }
   const created = [];
   for (const note of toAdd) {
     const ref = coachChatNotesCol(id).doc();

@@ -27,14 +27,16 @@ const strava = require("../services/stravaService");
 const { unconnectedCoachText, NOT_CLUB_MEMBER_TEXT, USE_COACH_BOT_TEXT } = require("../services/coachDm");
 const { formatCoachProfileForPrompt } = require("../services/coachProfile");
 const { MY_PAGES_COACH_URL, noEmbedUrl } = require("../services/coachHowItWorks");
+const { proposeCoachGoal } = require("../services/coachGoalConfirm");
 const {
-  NOTE_KINDS,
+  EPISODE_NOTE_KINDS,
   shouldSkipExtract,
   buildExtractMessages,
   parseExtractedNotes,
   retrieveRelevantNotes,
   searchNotes,
   formatNotesForPrompt,
+  formatActiveGoalsForPrompt,
   formatCoachToday,
   formatNoteAge,
 } = require("../services/coachChatNotes");
@@ -54,7 +56,7 @@ try {
 // Store conversations per user
 const userConversations = new Map();
 const conversationTimers = new Map();
-const COACH_NOTE_TOOLS = new Set(["search_past_notes", "save_chat_notes"]);
+const COACH_NOTE_TOOLS = new Set(["search_past_notes", "save_chat_notes", "propose_coach_goal"]);
 
 // Configuration
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
@@ -628,7 +630,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "search_past_notes",
-      description: "Search dated episode notes from earlier coach DMs (goals, feelings, one-off plans, upcoming races). Use when the athlete refers to something discussed before that is not in the retrieved notes block. Not for Strava workouts and not for standing Coach settings.",
+      description: "Search dated episode notes from earlier coach DMs (feelings, one-off plans). Use when the athlete refers to something discussed before that is not in the retrieved notes block. Not for Strava workouts, not for goals, and not for standing Coach settings.",
       parameters: {
         type: "object",
         properties: {
@@ -649,28 +651,28 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "save_chat_notes",
-      description: "Silently persist dated episode notes from this chat (goals, feelings, one-off plans, upcoming races, life schedule). Use when the athlete names a standing aim, a race/date, or states something worth keeping. Not for standing Coach settings (rides/week, lasting injuries, reply style). Do not mention this save to the athlete unless they asked if you remembered it. Saving notes must not skip Strava tools.",
+      description: "Silently persist dated episode notes from this chat (feelings, one-off plans, life schedule). Not for goals. Not for standing Coach settings. Do not mention this save unless they asked if you remembered it. Saving notes must not skip Strava tools.",
       parameters: {
         type: "object",
         properties: {
           notes: {
             type: "array",
-            description: "Episode notes to save. Quality over quantity. Prefer none over noise. Max 8.",
+            description: "Episode notes to save. Quality over quantity. Prefer none over noise. Max 8. Never include kind goal.",
             items: {
               type: "object",
               properties: {
                 text: {
                   type: "string",
-                  description: "One or two sentences in the athlete's language. For races, the event name only."
+                  description: "One or two sentences in the athlete's language."
                 },
                 kind: {
                   type: "string",
-                  enum: NOTE_KINDS,
-                  description: "feeling | plan | preference_transient | life | race | goal"
+                  enum: EPISODE_NOTE_KINDS,
+                  description: "feeling | plan | preference_transient | life"
                 },
                 eventDate: {
                   type: "string",
-                  description: "YYYY-MM-DD. Required for kind race. Resolve relative dates from Today."
+                  description: "YYYY-MM-DD if they named a date. Optional. Does not make this a goal."
                 }
               },
               required: ["text", "kind"]
@@ -678,6 +680,31 @@ const coachToolDefinitions = [
           }
         },
         required: ["notes"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "propose_coach_goal",
+      description: "Propose a dated goal and send Ja/Nej buttons. The only way to save a goal from chat. Use when they explicitly call something their goal or ask you to remember a dated aim. Do not use for a casual upcoming ride. Do not say it is saved until they press Ja.",
+      parameters: {
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+            description: "Short goal in the athlete's language, e.g. tabe 3 kg or ZRL-finalen."
+          },
+          eventDate: {
+            type: "string",
+            description: "Future date YYYY-MM-DD. Resolve relative dates from Today. Weeks start Monday."
+          },
+          replaceNoteId: {
+            type: "string",
+            description: "If they already have 3 active goals, the id of the goal to replace."
+          }
+        },
+        required: ["text", "eventDate"]
       }
     }
   }
@@ -1319,11 +1346,11 @@ async function executeSingleToolCall(toolCall, message) {
           const skipped = [];
           for (const raw of incoming) {
             const kind = String(raw?.kind || "").trim().toLowerCase();
-            if (kind === "race" && !String(raw?.eventDate || "").trim()) {
+            if (kind === "goal" || kind === "race") {
               skipped.push({
                 text: String(raw?.text || "").trim().slice(0, 80) || undefined,
-                kind: "race",
-                reason: "race_needs_eventDate",
+                kind,
+                reason: "goal_needs_confirm",
               });
               continue;
             }
@@ -1348,6 +1375,38 @@ async function executeSingleToolCall(toolCall, message) {
         } catch (err) {
           console.error("save_chat_notes failed:", err?.message || err);
           return { tool_call_id: toolCall.id, success: false, saved: [], skipped: [], message: "Could not save chat notes." };
+        }
+      }
+
+      case "propose_coach_goal": {
+        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+        if (!eligible) {
+          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+        }
+        try {
+          const profile = await getCoachProfile(message.author.id);
+          if (profile?.notesOptIn !== true) {
+            return {
+              tool_call_id: toolCall.id,
+              success: false,
+              message: `Chat notes are off. Still help toward this aim in this chat. Tell them you will not remember it next time unless they turn chat notes on: ${MY_PAGES_COACH_URL}`,
+            };
+          }
+          const language = profile?.style?.language === "en" ? "en" : "da";
+          return {
+            tool_call_id: toolCall.id,
+            ...(await proposeCoachGoal({
+              discordId: message.author.id,
+              channel: message.channel,
+              text: args.text,
+              eventDate: args.eventDate,
+              replaceNoteId: args.replaceNoteId,
+              language,
+            })),
+          };
+        } catch (err) {
+          console.error("propose_coach_goal failed:", err?.message || err);
+          return { tool_call_id: toolCall.id, success: false, message: "Could not propose a goal." };
         }
       }
       
@@ -1519,7 +1578,8 @@ async function buildCoachSystemPrompt(message, userText) {
   const now = new Date();
   const today = formatCoachToday(now);
   let settingsBlock = "No Coach settings stored yet.";
-  let notesBlock = "Chat notes are off. If they want dated notes from this chat, tell them to turn that on under My Pages (Coach).";
+  let notesBlock = "Chat notes are off.";
+  let goalsBlock = "Chat notes are off. There are no saved goals.";
   let notesOptIn = false;
   try {
     const profile = await getCoachProfile(message.author.id);
@@ -1530,10 +1590,13 @@ async function buildCoachSystemPrompt(message, userText) {
   }
   if (notesOptIn) {
     notesBlock = "None retrieved for this message.";
+    goalsBlock = "No saved goals.";
     try {
       const notes = await listCoachChatNotes(message.author.id);
+      goalsBlock = formatActiveGoalsForPrompt(notes, now);
       const hits = retrieveRelevantNotes(notes, userText || "", { now });
-      const formatted = formatNotesForPrompt(hits, now);
+      const standard = hits.filter((note) => note.kind !== "goal");
+      const formatted = formatNotesForPrompt(standard, now);
       if (formatted) notesBlock = formatted;
     } catch (err) {
       console.error("listCoachChatNotes failed:", err?.message || err);
@@ -1544,7 +1607,7 @@ async function buildCoachSystemPrompt(message, userText) {
 
 ## Today
 ${today.line}
-Use this calendar date for everything: how old a chat note is, whether a feeling is still relevant, how far an upcoming race is, and what "this week" means. Do not guess the date.
+Use this calendar date for everything: how old a chat note is, whether a feeling is still relevant, how far a goal is, and what "this week" means. Do not guess the date.
 Weeks start on Monday (Denmark / ISO). "This week" is the Monday–Sunday range above. Sunday is the last day of the week, not the first. "Last week" is the previous Monday–Sunday.
 
 ## Data
@@ -1560,22 +1623,31 @@ If they ask what their settings are (rides/week, sports, weekly slots, injuries,
 If they ask to change rides per week, sports, lasting injuries, or reply style, tell them to edit Mine sider → Coach: ${MY_PAGES_COACH_URL}
 Never say you saved a setting, injury, or style to their profile.
 
+## Active goals
+${goalsBlock}
+
+${notesOptIn
+    ? `These are the only saved goals. If this block lists any, default coaching (plan, load, check-ins) toward those dates. Cite the nearest date. Injuries still override.
+If they ask what their goals are, summarize this block. Do not say you cannot see goals. If it says no saved goals, say so.
+To add or change a goal, call propose_coach_goal and wait for Ja. Never say a goal is saved until they press Ja. Only propose when they call it their mål / goal or ask you to remember a dated aim — not for a casual upcoming ride.
+If they already have 3 goals, ask which to replace and pass replaceNoteId.`
+    : `Chat notes are off, so you cannot save or remember goals. If they name an aim, still help toward it in THIS conversation. Say clearly that you will not remember it next time unless they turn chat notes on under Mine sider → Coach: ${MY_PAGES_COACH_URL}. Do not refuse to help. Do not invent a saved goal.`}
+
 ## Chat notes
 ${notesBlock}
 
 ${notesOptIn
-    ? `Chat notes are dated hints, not standing rules — except Goal notes, which stay relevant until they change them. Compare each other note's date to today: a yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
-Upcoming race notes stay relevant until the event date.
-If they ask to forget a chat note, tell them to delete it on ${MY_PAGES_COACH_URL} (Coach tab).
+    ? `Standard notes only — dated hints, not standing rules, and not goals. Compare a note's date to today: a yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
+If they ask to forget a note or goal, tell them to delete it on ${MY_PAGES_COACH_URL} (Coach tab).
 Use search_past_notes when they refer to something discussed earlier that is not in this block.
-When they name a standing aim, a race/date, or a feeling/plan/life schedule worth keeping, call save_chat_notes. Save silently. Do not ask them to confirm. Do not say you saved a note unless they asked whether you remembered it.`
-    : `Chat notes are off. Do not invent notes. If they ask you to remember a goal, feeling, race date, or one-off plan, tell them they can turn chat notes on under Coach: ${MY_PAGES_COACH_URL}`}
+When they name a feeling, one-off plan, or life schedule worth keeping, call save_chat_notes. Save silently. Never put a goal in save_chat_notes.`
+    : `Chat notes are off. Do not invent notes.`}
 
 ## What goes where
-- Standing (settings, web only): rides/week, sports, weekly slots, lasting injuries, reply style.
-- Chat notes: goals ("lose weight", "stay in shape"), race dates, feelings, one-off plans.
-- Examples: "I race Sunday" → chat note. "I want to lose weight" / "husk mit mål" → chat note (kind goal). "My knee is injured" (lasting) → settings. "My knee is sore today" → chat note.
-- Never send them to a Goals form. Goals are not Coach settings.
+- Settings (web only): rides/week, sports, weekly slots, lasting injuries, reply style.
+- Standard notes (silent, notes on): feelings, one-off plans, life schedule. A casual "jeg kører ZRL søndag" is a standard note if worth keeping — not a goal.
+- Goals (Ja or Mine sider only): dated aims they explicitly want remembered ("tabe 3 kg inden 1. dec", "ZRL 18. okt er mit mål").
+- There is no other goal type. Never send them to a Goals form.
 
 ## Coaching style
 - Obey the language in Coach settings when present; otherwise match the chat (Danish or English).

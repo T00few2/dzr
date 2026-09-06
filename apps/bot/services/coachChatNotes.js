@@ -1,7 +1,9 @@
 const NOTE_KINDS = ["feeling", "plan", "preference_transient", "life", "race", "goal"];
+const EPISODE_NOTE_KINDS = ["feeling", "plan", "preference_transient", "life"];
 const MAX_NOTE_TEXT = 280;
 const MAX_NOTES_PER_ATHLETE = 200;
 const MAX_NOTES_PER_WRITE = 8;
+const MAX_ACTIVE_GOALS = 3;
 const RETRIEVE_LIMIT = 5;
 const SEARCH_LIMIT = 8;
 const MIN_USER_MESSAGE_LEN = 10;
@@ -152,19 +154,17 @@ function formatDaysUntil(eventDate, now = new Date()) {
   return months === 1 ? "in 1 month" : `in ${months} months`;
 }
 
-function upcomingRaceNotes(notes, now = new Date()) {
+function activeGoalNotes(notes, now = new Date()) {
   const today = calendarDateInTz(now);
-  const seen = new Set();
   const out = [];
   for (const note of Array.isArray(notes) ? notes : []) {
+    if (note?.kind !== "goal" || !note.text) continue;
     const eventDate = eventDateFromNote(note);
     if (!eventDate || eventDate < today) continue;
-    if (seen.has(eventDate)) continue;
-    seen.add(eventDate);
     out.push({ ...note, eventDate });
   }
   out.sort((a, b) => String(a.eventDate).localeCompare(String(b.eventDate)));
-  return out.slice(0, 3);
+  return out.slice(0, MAX_ACTIVE_GOALS);
 }
 
 function sanitizeKind(value) {
@@ -178,8 +178,16 @@ function sanitizeNote(raw, fallbackAt, now = new Date()) {
   if (!text) return null;
   let kind = sanitizeKind(raw.kind);
   const eventDate = sanitizeEventDate(raw.eventDate, now);
-  if (eventDate && kind !== "race") kind = "race";
-  if (kind === "race" && !eventDate) kind = "plan";
+  if (kind === "goal") {
+    if (!eventDate) return null;
+    return {
+      text,
+      kind: "goal",
+      at: raw.at || fallbackAt || null,
+      eventDate,
+    };
+  }
+  if (kind === "race") kind = "plan";
   return {
     text,
     kind,
@@ -251,36 +259,19 @@ function scoreNote(note, query, now) {
   return keyword * 2 + recency;
 }
 
-function standingGoalNotes(notes) {
-  const seen = new Set();
-  const out = [];
-  for (const note of Array.isArray(notes) ? notes : []) {
-    if (note?.kind !== "goal" || !note.text) continue;
-    const key = normalizeNoteText(note.text);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(note);
-    if (out.length >= 8) break;
-  }
-  return out;
-}
-
 function retrieveRelevantNotes(notes, query, { limit = RETRIEVE_LIMIT, now = new Date(), minScore = MIN_RETRIEVE_SCORE } = {}) {
-  const upcoming = upcomingRaceNotes(notes, now);
-  const goals = standingGoalNotes(notes);
-  const pinnedKeys = new Set([
-    ...upcoming.map((note) => note.id || `${note.eventDate}:${note.text}`),
-    ...goals.map((note) => note.id || `goal:${note.text}`),
-  ]);
+  const goals = activeGoalNotes(notes, now);
+  const pinnedKeys = new Set(goals.map((note) => note.id || `goal:${note.eventDate}:${note.text}`));
   const scored = (Array.isArray(notes) ? notes : [])
     .map((note) => ({ note, score: scoreNote(note, query, now) }))
     .filter((row) => {
+      if (row.note?.kind === "goal") return false;
       const key = row.note.id || `${row.note.eventDate || ""}:${row.note.text}`;
       return row.score >= minScore && !pinnedKeys.has(key);
     });
   scored.sort((a, b) => b.score - a.score || String(b.note.at || "").localeCompare(String(a.note.at || "")));
   const rest = scored.slice(0, limit).map((row) => row.note);
-  return [...upcoming, ...goals, ...rest];
+  return [...goals, ...rest];
 }
 
 function searchNotes(notes, query, { sinceDays, limit = SEARCH_LIMIT, now = new Date() } = {}) {
@@ -311,24 +302,29 @@ const NOTE_KIND_LABELS = {
   plan: "Plan",
   preference_transient: "Preference",
   life: "Life",
-  race: "Race",
+  race: "Note",
   goal: "Goal",
 };
+
+function formatGoalLine(note, now = new Date()) {
+  const eventDate = note.eventDate || eventDateFromNote(note);
+  const until = eventDate ? formatDaysUntil(eventDate, now) : "";
+  const when = eventDate ? (until ? `${eventDate} (${until})` : eventDate) : "";
+  return when ? `- Goal ${when}: ${note.text}` : `- Goal: ${note.text}`;
+}
+
+function formatActiveGoalsForPrompt(notes, now = new Date()) {
+  const goals = activeGoalNotes(notes, now);
+  if (!goals.length) return "No saved goals.";
+  return goals.map((note) => formatGoalLine(note, now)).join("\n");
+}
 
 function formatNotesForPrompt(notes, now = new Date()) {
   const list = Array.isArray(notes) ? notes.filter((n) => n && n.text) : [];
   if (!list.length) return "";
   return list
     .map((note) => {
-      if (note.kind === "goal") {
-        return `- Goal: ${note.text}`;
-      }
-      const eventDate = eventDateFromNote(note);
-      if (eventDate) {
-        const until = formatDaysUntil(eventDate, now);
-        const when = until ? `${eventDate} (${until})` : eventDate;
-        return `- Race ${when}: ${note.text}`;
-      }
+      if (note.kind === "goal") return formatGoalLine(note, now);
       const kindLabel = NOTE_KIND_LABELS[note.kind] || "Note";
       const age = formatNoteAge(note.at, now);
       const when = age ? `${formatNoteDate(note.at)} (${age})` : formatNoteDate(note.at);
@@ -357,14 +353,14 @@ function buildExtractMessages({ userMessage, assistantText, coachSettings, recen
     .join("\n");
 
   const system = `You extract dated coaching episode notes from one Discord exchange.
-Return JSON only: {"notes":[{"text":"one or two sentences","kind":"feeling|plan|preference_transient|life|race|goal","eventDate":"YYYY-MM-DD or omit"}]}
+Return JSON only: {"notes":[{"text":"one or two sentences","kind":"feeling|plan|preference_transient|life","eventDate":"YYYY-MM-DD or omit"}]}
 Rules:
-- As many notes as are genuinely useful, max 8. Prefer none over noise, except upcoming races and standing goals.
+- As many notes as are genuinely useful, max 8. Prefer none over noise.
 - Capture transient state: illness, fatigue, mood, skipped session, how a ride felt, one-off plans, life schedule that may change tomorrow.
-- If the athlete names a standing aim (lose weight, stay in shape, get fitter, win races as an aim — not a calendar date), add a kind "goal" note. Skip if that aim is already in recent notes.
-- If the athlete names a race, event, or target date (a calendar date, "next Sunday", "om 2 uger", Zwift race, ZRL, klubmesterskab, etc.), add a kind "race" note. Resolve the date from Today into eventDate as YYYY-MM-DD. Weeks start Monday. Text is the event name only. Do not invent dates. Skip if that eventDate is already in recent notes.
+- Never emit kind "goal" or "race". Goals are only saved after the athlete confirms a proposal or types them on Mine sider.
+- A passing race or date can be a standard plan/life note if useful. It is not a goal.
 - kind feeling = illness/fatigue/mood/soreness that is not a lasting injury they want obeyed every session.
-- Do NOT copy standing constraints already in Coach settings (rides/week, weekly slots, lasting injuries, reply style). Goals are chat notes, not settings.
+- Do NOT copy standing constraints already in Coach settings (rides/week, weekly slots, lasting injuries, reply style).
 - Do NOT invent facts. Do NOT store Strava numbers unless the athlete stated them in this exchange.
 - Do not note that they asked a question or that the coach listed workouts.
 - Deduplicate against recent notes; skip if already captured.
@@ -411,10 +407,11 @@ function parseExtractedNotes(rawText, fallbackAt) {
   const rows = Array.isArray(parsed?.notes) ? parsed.notes : [];
   const out = [];
   for (const raw of rows) {
-    const note = sanitizeNote(raw, fallbackAt);
-    if (!note) continue;
+    const rawKind = String(raw?.kind || "").trim().toLowerCase();
+    if (rawKind === "goal" || rawKind === "race") continue;
+    const note = sanitizeNote({ ...raw, kind: rawKind || "life" }, fallbackAt);
+    if (!note || note.kind === "goal") continue;
     if (isNearDuplicate(note.text, out)) continue;
-    if (note.eventDate && out.some((item) => item.eventDate === note.eventDate)) continue;
     out.push(note);
     if (out.length >= MAX_NOTES_PER_WRITE) break;
   }
@@ -423,15 +420,18 @@ function parseExtractedNotes(rawText, fallbackAt) {
 
 module.exports = {
   NOTE_KINDS,
+  EPISODE_NOTE_KINDS,
   MAX_NOTE_TEXT,
   MAX_NOTES_PER_ATHLETE,
   MAX_NOTES_PER_WRITE,
-  RETRIEVE_LIMIT,
-  SEARCH_LIMIT,
+  MAX_ACTIVE_GOALS,
   sanitizeNote,
+  sanitizeEventDate,
   isNearDuplicate,
   retrieveRelevantNotes,
   searchNotes,
+  activeGoalNotes,
+  formatActiveGoalsForPrompt,
   formatNotesForPrompt,
   formatNoteDate,
   formatCoachToday,

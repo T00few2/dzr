@@ -15,6 +15,7 @@ const { formatCoachProfileForPrompt } = require("./coachProfile");
 const {
   retrieveRelevantNotes,
   formatNotesForPrompt,
+  formatActiveGoalsForPrompt,
   formatCoachToday,
 } = require("./coachChatNotes");
 
@@ -115,7 +116,7 @@ function extractTokenUsage(response) {
   return { promptTokens, completionTokens, totalTokens };
 }
 
-async function generateFollowUpText({ profile, activities, notesBlock, username }) {
+async function generateFollowUpText({ profile, activities, notesBlock, goalsBlock, username }) {
   const language = profile?.style?.language === "en" ? "en" : "da";
   const fallback = language === "en" ? FALLBACK_EN : FALLBACK_DA;
   if (!openai) return fallback;
@@ -135,6 +136,7 @@ Rules:
 - Discord-short: a few sentences, one question.
 - Cite a real recent session (date, duration, power/HR) only if it appears in the Strava list. Never invent numbers.
 - Weeks start Monday (Denmark / ISO). Sunday is the last day of the week.
+- If Active goals lists any, default the check-in toward the nearest dated goal. Injuries still override.
 - Use Coach settings and chat notes as hints. Do not say you saved a note or changed settings.
 - Not medical advice. No doping or extreme restriction.
 - Do not mention tokens, Firestore, or this being a scheduled job.`,
@@ -147,6 +149,9 @@ Athlete: ${username || "athlete"}
 
 ## Coach settings
 ${settings}
+
+## Active goals
+${goalsBlock || "No saved goals."}
 
 ## Chat notes
 ${notesBlock || "(none)"}
@@ -200,11 +205,13 @@ async function sendOneFollowUp(profile) {
   }
 
   let notesBlock = "";
+  let goalsBlock = "No saved goals.";
   if (profile.notesOptIn === true) {
     try {
       const notes = await listCoachChatNotes(discordId);
+      goalsBlock = formatActiveGoalsForPrompt(notes);
       const hits = retrieveRelevantNotes(notes, "training week follow up", { now: new Date() });
-      notesBlock = formatNotesForPrompt(hits) || "";
+      notesBlock = formatNotesForPrompt(hits.filter((note) => note.kind !== "goal")) || "";
     } catch (err) {
       console.warn("coach follow-up notes failed:", err?.message || err);
     }
@@ -219,7 +226,7 @@ async function sendOneFollowUp(profile) {
     username = null;
   }
 
-  const text = await generateFollowUpText({ profile, activities, notesBlock, username });
+  const text = await generateFollowUpText({ profile, activities, notesBlock, goalsBlock, username });
   try {
     await sendFollowUpDm(discordId, text);
   } catch (err) {

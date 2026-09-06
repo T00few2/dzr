@@ -5,9 +5,13 @@ import { hasClubMemberRole } from '@/app/lib/stravaAuth'
 import {
   COACH_CHAT_NOTES_COLLECTION,
   COACH_CHAT_NOTES_SUBCOLLECTION,
+  MAX_ACTIVE_GOALS,
+  activeGoalNotes,
+  sanitizeGoalEventDate,
   toClientCoachChatNote,
 } from '@/app/lib/coachChatNotes'
-import { canEncryptCoachMemory } from '@/app/lib/tokenCrypto'
+import { COACH_PROFILES_COLLECTION } from '@/app/lib/coachProfile'
+import { canEncryptCoachMemory, persistChatNoteDoc, unwrapCoachMemoryDoc } from '@/app/lib/tokenCrypto'
 import { deleteAllCoachChatNotes } from '@/app/lib/clearCoachData'
 
 export const dynamic = 'force-dynamic'
@@ -48,6 +52,62 @@ export async function GET(req: Request) {
   } catch (err: any) {
     console.error('coach notes GET failed:', err)
     return NextResponse.json({ error: err?.message || 'Lookup failed' }, { status: 500 })
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const { discordId, eligible } = await sessionMember(req)
+    if (!discordId) {
+      return NextResponse.json({ error: 'Not logged in' }, { status: 401 })
+    }
+    if (!eligible) {
+      return NextResponse.json({ error: 'Club membership required' }, { status: 403 })
+    }
+
+    const profileSnap = await adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId).get()
+    const profile = unwrapCoachMemoryDoc({ ...(profileSnap.data() || {}), discordId })
+    if (profile.notesOptIn !== true) {
+      return NextResponse.json({ error: 'Chat-noter skal være slået til' }, { status: 403 })
+    }
+
+    const body = await req.json().catch(() => ({}))
+    const text = String(body?.text || '').trim().slice(0, 280)
+    const eventDate = sanitizeGoalEventDate(body?.eventDate)
+    if (!text) {
+      return NextResponse.json({ error: 'Skriv et mål' }, { status: 400 })
+    }
+    if (!eventDate) {
+      return NextResponse.json({ error: 'Vælg en dato i fremtiden' }, { status: 400 })
+    }
+
+    const existing = await listNotes(discordId)
+    if (activeGoalNotes(existing).length >= MAX_ACTIVE_GOALS) {
+      return NextResponse.json({ error: `Højst ${MAX_ACTIVE_GOALS} aktive mål` }, { status: 400 })
+    }
+
+    if (!canEncryptCoachMemory()) {
+      console.warn('COACH_MEMORY_KEY / STRAVA_CONNECT_SECRET missing; storing coach chat notes in plaintext')
+    }
+
+    const now = new Date()
+    const ref = notesCol(discordId).doc()
+    await adminDb.collection(COACH_CHAT_NOTES_COLLECTION).doc(discordId).set({
+      discordId,
+      updatedAt: now,
+    }, { merge: true })
+    await ref.set(persistChatNoteDoc({
+      discordId,
+      at: now,
+      text,
+      kind: 'goal',
+      eventDate,
+    }))
+
+    return NextResponse.json({ ok: true, notes: await listNotes(discordId) })
+  } catch (err: any) {
+    console.error('coach notes POST failed:', err)
+    return NextResponse.json({ error: err?.message || 'Save failed' }, { status: 500 })
   }
 }
 

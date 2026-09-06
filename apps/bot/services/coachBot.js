@@ -30,6 +30,7 @@ function startCoachBot() {
   }
 
   const { handleCoachChatMessage } = require("../handlers/aiChatHandler");
+  const { handleCoachGoalButton } = require("./coachGoalConfirm");
 
   coachClient = new Client({
     intents: [
@@ -45,6 +46,14 @@ function startCoachBot() {
       await handleCoachChatMessage(message, coachClient);
     } catch (err) {
       console.error("DZR Coach message handler failed:", err);
+    }
+  });
+
+  coachClient.on("interactionCreate", async (interaction) => {
+    try {
+      await handleCoachGoalButton(interaction);
+    } catch (err) {
+      console.error("DZR Coach goal button failed:", err);
     }
   });
 

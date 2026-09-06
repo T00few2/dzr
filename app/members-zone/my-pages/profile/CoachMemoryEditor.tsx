@@ -27,7 +27,7 @@ import {
   useToast,
 } from '@chakra-ui/react'
 import type { CoachInjury, CoachProfile, CoachWeeklySlot } from '@/app/lib/coachProfile'
-import type { CoachChatNote } from '@/app/lib/coachChatNotes'
+import { MAX_ACTIVE_GOALS, activeGoalNotes, type CoachChatNote } from '@/app/lib/coachChatNotes'
 
 const SPORT_OPTIONS = ['cycling', 'running', 'swimming', 'strength']
 const SPORT_LABELS: Record<string, string> = {
@@ -130,6 +130,8 @@ export default function CoachMemoryEditor() {
   const [chatNotes, setChatNotes] = useState<CoachChatNote[]>([])
   const [notesLoading, setNotesLoading] = useState(true)
   const [extraSport, setExtraSport] = useState('')
+  const [goalText, setGoalText] = useState('')
+  const [goalDate, setGoalDate] = useState('')
   const [ridesMin, setRidesMin] = useState('')
   const [ridesMax, setRidesMax] = useState('')
   const [clearConfirm, setClearConfirm] = useState<ClearConfirm | null>(null)
@@ -354,6 +356,30 @@ export default function CoachMemoryEditor() {
     return date.toLocaleString('da-DK', { dateStyle: 'medium', timeStyle: 'short' })
   }
 
+  async function addGoal() {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/coach/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: goalText, kind: 'goal', eventDate: goalDate }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast({ title: data?.error || 'Kunne ikke gemme målet', status: 'error' })
+        return
+      }
+      setChatNotes(Array.isArray(data?.notes) ? data.notes : [])
+      setGoalText('')
+      setGoalDate('')
+      toast({ title: 'Mål gemt', status: 'success' })
+    } catch (err: any) {
+      toast({ title: err?.message || 'Kunne ikke gemme målet', status: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function deleteChatNote(id: string) {
     setSaving(true)
     try {
@@ -405,7 +431,7 @@ export default function CoachMemoryEditor() {
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
       <Heading size="sm" mb={2}>DZR Coach-indstillinger</Heading>
       <Text color="gray.400" mb={4} fontSize="sm">
-        Her sætter du dine faste rammer til DZR Coach: hvor ofte du kører, andre sportsgrene, skader og hvordan coachen skal svare. Du har fået et udgangspunkt, som du kan rette. Coachen ændrer ikke selv de rammer — det gør du her. Mål (fx tabe vægt) og løbsdatoer gemmes som chat-noter, når det er slået til. Data bruges kun til din private coaching og sendes til OpenAI, når du chatter med coachen. Det gemmes krypteret.
+        Her sætter du dine faste rammer til DZR Coach: hvor ofte du kører, andre sportsgrene, skader og hvordan coachen skal svare. Du har fået et udgangspunkt, som du kan rette. Coachen ændrer ikke selv de rammer — det gør du her. Når chat-noter er slået til, kan du sætte datobundne mål, som coachen styrer træningen efter. Data bruges kun til din private coaching og sendes til OpenAI, når du chatter med coachen. Det gemmes krypteret.
       </Text>
 
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
@@ -640,7 +666,7 @@ export default function CoachMemoryEditor() {
         mb={2}
       >
         <Text color="gray.200" fontSize="sm">
-          Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går, eller at jeg kører et løb den 18. oktober). Når det er slået til, gemmes nyttige notater automatisk — uden bekræftelse. Coachen ændrer ikke dine indstillinger.
+          Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går). Når det er slået til, gemmes nyttige notater automatisk — uden bekræftelse. Datobundne mål sætter du herunder, eller bekræfter i Discord. Coachen ændrer ikke dine indstillinger.
         </Text>
       </Checkbox>
       <Text color="gray.400" fontSize="sm" mb={4}>
@@ -682,17 +708,15 @@ export default function CoachMemoryEditor() {
 
       {savedNotesOptIn && (
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
-          <Heading size="sm" mb={2}>Chat-noter</Heading>
+          <Heading size="sm" mb={2}>Mål</Heading>
           <Text color="gray.400" fontSize="sm" mb={3}>
-            Noterne er ikke faste regler. De gemmes automatisk fra Discord, når chat-noter er slået til. Du kan se og slette dem her.
+            Et mål er datobundet (fx et løb eller at tabe vægt inden en dato). Coachen styrer træningen efter dine aktive mål. Højst {MAX_ACTIVE_GOALS} ad gangen. DZR Coach kan også foreslå et mål i chatten — det gemmes først, når du trykker Ja.
           </Text>
           {notesLoading ? (
             <Spinner size="sm" mb={4} />
-          ) : chatNotes.length === 0 ? (
-            <Text color="gray.500" fontSize="sm" mb={4}>Ingen chat-noter endnu.</Text>
           ) : (
             <Stack spacing={3} mb={4}>
-              {chatNotes.map((note) => (
+              {activeGoalNotes(chatNotes).map((note) => (
                 <Flex
                   key={note.id}
                   gap={3}
@@ -705,9 +729,87 @@ export default function CoachMemoryEditor() {
                   p={3}
                 >
                   <Box>
-                    <Text fontSize="xs" color="gray.500">
-                      {note.eventDate ? `Løb ${note.eventDate}` : formatNoteAt(note.at)}
-                    </Text>
+                    <Text fontSize="xs" color="gray.500">Mål {note.eventDate}</Text>
+                    <Text fontSize="sm" color="gray.100">{note.text}</Text>
+                  </Box>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    color="red.300"
+                    _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
+                    onClick={() => setClearConfirm({ kind: 'note', id: note.id })}
+                    isDisabled={saving}
+                  >
+                    Slet
+                  </Button>
+                </Flex>
+              ))}
+              {activeGoalNotes(chatNotes).length === 0 && (
+                <Text color="gray.500" fontSize="sm">Ingen aktive mål.</Text>
+              )}
+            </Stack>
+          )}
+          {activeGoalNotes(chatNotes).length >= MAX_ACTIVE_GOALS ? (
+            <Text color="gray.400" fontSize="sm" mb={4}>
+              Du har {MAX_ACTIVE_GOALS} aktive mål. Slet et, før du tilføjer et nyt.
+            </Text>
+          ) : (
+            <Stack spacing={2} mb={4} maxW="520px">
+              <Input
+                placeholder="Fx tabe 3 kg, eller ZRL-finalen"
+                value={goalText}
+                onChange={(e) => setGoalText(e.target.value)}
+                bg="gray.800"
+                borderColor="gray.600"
+                size="sm"
+              />
+              <HStack>
+                <Input
+                  type="date"
+                  value={goalDate}
+                  onChange={(e) => setGoalDate(e.target.value)}
+                  bg="gray.800"
+                  borderColor="gray.600"
+                  size="sm"
+                  maxW="200px"
+                />
+                <Button
+                  size="sm"
+                  onClick={addGoal}
+                  isLoading={saving}
+                  isDisabled={!goalText.trim() || !goalDate}
+                  {...secondaryButtonProps}
+                >
+                  Gem mål
+                </Button>
+              </HStack>
+            </Stack>
+          )}
+
+          <Heading size="sm" mb={2}>Chat-noter</Heading>
+          <Text color="gray.400" fontSize="sm" mb={3}>
+            Noterne er ikke faste regler. De gemmes automatisk fra Discord, når chat-noter er slået til. Du kan se og slette dem her.
+          </Text>
+          {notesLoading ? (
+            <Spinner size="sm" mb={4} />
+          ) : chatNotes.filter((note) => note.kind !== 'goal').length === 0 ? (
+            <Text color="gray.500" fontSize="sm" mb={4}>Ingen chat-noter endnu.</Text>
+          ) : (
+            <Stack spacing={3} mb={4}>
+              {chatNotes.filter((note) => note.kind !== 'goal').map((note) => (
+                <Flex
+                  key={note.id}
+                  gap={3}
+                  align="flex-start"
+                  justify="space-between"
+                  bg="gray.800"
+                  borderWidth="1px"
+                  borderColor="gray.600"
+                  borderRadius="md"
+                  p={3}
+                >
+                  <Box>
+                    <Text fontSize="xs" color="gray.500">{formatNoteAt(note.at)}</Text>
                     <Text fontSize="sm" color="gray.100">{note.text}</Text>
                   </Box>
                   <Button
@@ -723,6 +825,43 @@ export default function CoachMemoryEditor() {
                 </Flex>
               ))}
             </Stack>
+          )}
+          {chatNotes.some((note) => note.kind === 'goal' && !activeGoalNotes(chatNotes).some((g) => g.id === note.id)) && (
+            <Box mb={4}>
+              <Text color="gray.400" fontSize="sm" mb={2}>Udløbne mål</Text>
+              <Stack spacing={3}>
+                {chatNotes
+                  .filter((note) => note.kind === 'goal' && !activeGoalNotes(chatNotes).some((g) => g.id === note.id))
+                  .map((note) => (
+                    <Flex
+                      key={note.id}
+                      gap={3}
+                      align="flex-start"
+                      justify="space-between"
+                      bg="gray.800"
+                      borderWidth="1px"
+                      borderColor="gray.600"
+                      borderRadius="md"
+                      p={3}
+                    >
+                      <Box>
+                        <Text fontSize="xs" color="gray.500">Udløbet {note.eventDate || formatNoteAt(note.at)}</Text>
+                        <Text fontSize="sm" color="gray.100">{note.text}</Text>
+                      </Box>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        color="red.300"
+                        _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
+                        onClick={() => setClearConfirm({ kind: 'note', id: note.id })}
+                        isDisabled={saving}
+                      >
+                        Slet
+                      </Button>
+                    </Flex>
+                  ))}
+              </Stack>
+            </Box>
           )}
           <Button
             onClick={() => setClearConfirm({ kind: 'notes' })}
