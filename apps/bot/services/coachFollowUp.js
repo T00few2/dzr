@@ -19,8 +19,13 @@ const {
   formatCoachToday,
 } = require("./coachChatNotes");
 
-const FOLLOW_UP_TZ = "Europe/Copenhagen";
-const FOLLOW_UP_HOUR = 8;
+const {
+  FOLLOW_UP_TZ,
+  FOLLOW_UP_HOUR,
+  shouldRunFollowUpSweep,
+  isFollowUpDue,
+} = require("./coachFollowUpSchedule");
+
 const FOLLOW_UP_STATE_KEY = "coach_follow_up";
 const MAX_FOLLOW_UPS_PER_RUN = 25;
 const MODEL = "gpt-5-mini";
@@ -34,50 +39,6 @@ try {
   }
 } catch {
   openai = null;
-}
-
-function calendarDateInTz(now = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: FOLLOW_UP_TZ,
-  }).format(now);
-}
-
-function localClock(now = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: FOLLOW_UP_TZ,
-  }).formatToParts(now);
-  const hour = Number(parts.find((p) => p.type === "hour")?.value);
-  const minute = Number(parts.find((p) => p.type === "minute")?.value);
-  return { hour, minute };
-}
-
-function parseStamp(value) {
-  if (!value) return NaN;
-  if (value instanceof Date) return value.getTime();
-  if (typeof value?.toDate === "function") return value.toDate().getTime();
-  const ms = Date.parse(value);
-  return Number.isFinite(ms) ? ms : NaN;
-}
-
-function lastContactMs(profile) {
-  const stamps = [profile?.lastAthleteMessageAt, profile?.lastFollowUpAt, profile?.updatedAt]
-    .map(parseStamp)
-    .filter(Number.isFinite);
-  return stamps.length ? Math.max(...stamps) : 0;
-}
-
-function isFollowUpDue(profile, now = new Date()) {
-  const days = Number(profile?.followUpEveryDays);
-  if (![3, 7, 14].includes(days)) return false;
-  const last = lastContactMs(profile);
-  if (!last) return true;
-  return now.getTime() - last >= days * 86400000;
 }
 
 function formatActivitiesForPrompt(activities) {
@@ -138,6 +99,7 @@ Rules:
 - Weeks start Monday (Denmark / ISO). Sunday is the last day of the week.
 - If Active goals lists any, default the check-in toward the nearest dated goal. Injuries still override.
 - Use Coach settings and chat notes as hints. Do not say you saved a note or changed settings.
+- If a chat note records advice you gave (kind "plan"), check it against the Strava list and lead with that: whether it happened, and how it went. Following up on your own advice is the point of a check-in. Ask, do not accuse — a missed session usually has a reason worth hearing.
 - Not medical advice. No doping or extreme restriction.
 - Do not mention tokens, Firestore, or this being a scheduled job.`,
       },
@@ -236,12 +198,10 @@ async function sendOneFollowUp(profile) {
 }
 
 async function maybeSendCoachFollowUps(now = new Date()) {
-  const clock = localClock(now);
-  if (clock.hour !== FOLLOW_UP_HOUR || clock.minute !== 0) return { skipped: "not_time" };
-
-  const todayKey = calendarDateInTz(now);
   const existing = await getBotState(FOLLOW_UP_STATE_KEY);
-  if (existing?.lastRunDate === todayKey) return { skipped: "already_ran" };
+  const decision = shouldRunFollowUpSweep({ now, lastRunDate: existing?.lastRunDate || null });
+  if (!decision.run) return { skipped: decision.reason };
+  const todayKey = decision.todayKey;
 
   const due = [];
   try {

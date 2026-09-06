@@ -17,6 +17,7 @@ const {
 const { handleZwiftIdMessage, handleZwiftIdConfirmation } = require("./handlers/zwiftIdMessageHandler");
 const { handleAIChatMessage } = require("./handlers/aiChatHandler");
 const { startCoachBot } = require("./services/coachBot");
+const { checkCoachKeyCanary } = require("./services/firebase");
 
 // Setup keep-alive server
 setupKeepAliveServer();
@@ -173,5 +174,38 @@ process.on('SIGTERM', () => {
 });
 
 // Start the club bot. DZR Coach is a second client (DMs only; no slash commands).
+/**
+ * Verify the coach encryption key before the coach bot can write anything.
+ *
+ * Failing closed on a *missing* key only proves a key exists. The failure that actually corrupts
+ * data is Vercel and Render both holding a key and holding different ones, so each writes coach
+ * memory the other cannot read. Decrypting a stored canary catches that.
+ *
+ * A wrong key is fatal: starting would write new memory under it and deepen the split. Firestore
+ * simply being unreachable is not - crashing on that would produce a restart loop over a blip.
+ */
+async function verifyCoachKeyOrExit() {
+  const result = await checkCoachKeyCanary();
+  if (result.status === "mismatch") {
+    console.error(
+      "FATAL: COACH_MEMORY_KEY does not match the key existing coach memory was encrypted with.\n" +
+      "Starting would write new memory under a second key and make current memory unreadable.\n" +
+      "Check that Vercel and Render hold the same COACH_MEMORY_KEY, then restart."
+    );
+    process.exit(1);
+  }
+  if (result.status === "created") {
+    console.log("Coach key canary created.");
+  } else if (result.status === "unavailable") {
+    console.warn("Coach key canary could not be checked (Firestore unavailable):", result.message);
+  }
+}
+
 client.login(config.discord.token);
-startCoachBot(); 
+
+verifyCoachKeyOrExit()
+  .then(startCoachBot)
+  .catch((err) => {
+    console.error("Coach key check failed unexpectedly:", err);
+    process.exit(1);
+  }); 

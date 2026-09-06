@@ -9,6 +9,7 @@ import {
   activeGoalNotes,
   sanitizeGoalEventDate,
   toClientCoachChatNote,
+  MAX_NOTES_PER_ATHLETE,
 } from '@/app/lib/coachChatNotes'
 import { COACH_PROFILES_COLLECTION } from '@/app/lib/coachProfile'
 import { canEncryptCoachMemory, persistChatNoteDoc, unwrapCoachMemoryDoc } from '@/app/lib/tokenCrypto'
@@ -84,6 +85,15 @@ export async function POST(req: Request) {
     const existing = await listNotes(discordId)
     if (activeGoalNotes(existing).length >= MAX_ACTIVE_GOALS) {
       return NextResponse.json({ error: `Højst ${MAX_ACTIVE_GOALS} aktive mål` }, { status: 400 })
+    }
+    // The bot prunes to MAX_NOTES_PER_ATHLETE; this path had no cap at all, so notes could grow
+    // past the 200 that listNotes() reads back — at which point older goals silently drop out of
+    // the coach prompt while still existing in Firestore.
+    if (existing.length >= MAX_NOTES_PER_ATHLETE) {
+      return NextResponse.json(
+        { error: `Du har nået grænsen på ${MAX_NOTES_PER_ATHLETE} noter. Slet nogle først.` },
+        { status: 400 }
+      )
     }
 
     if (!canEncryptCoachMemory()) {

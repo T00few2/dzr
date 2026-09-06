@@ -68,7 +68,7 @@ function fmtTime(iso: string | null) {
 }
 
 export default function CoachAdminPage() {
-  const [data, setData] = useState<{ totals: any; people: Person[]; events: EventRow[] } | null>(null)
+  const [data, setData] = useState<{ totals: any; people: Person[]; events: EventRow[]; undecryptableProfiles?: number; feedback?: { up: number; down: number } } | null>(null)
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -118,6 +118,18 @@ export default function CoachAdminPage() {
       <Text color="gray.300" mb={6}>
         Strava sign-ups and OpenAI token usage for coaching DMs. Usage starts after the bot is redeployed with tracking.
       </Text>
+      {Number(data?.undecryptableProfiles || 0) > 0 && (
+        <Box bg="red.900" borderWidth="1px" borderColor="red.500" borderRadius="md" p={4} mb={6}>
+          <Text fontWeight="bold" color="red.100">
+            {data?.undecryptableProfiles} coach profile(s) could not be decrypted
+          </Text>
+          <Text color="red.200" fontSize="sm" mt={1}>
+            This runtime&apos;s COACH_MEMORY_KEY does not match the key those documents were written
+            with. Check that Vercel and Render hold the same value before anyone saves coach
+            settings — writing under a second key makes existing memory unreadable.
+          </Text>
+        </Box>
+      )}
       <SimpleGrid columns={{ base: 2, md: 4, lg: 8 }} spacing={4} mb={8}>
         <Stat><StatLabel>Strava connected</StatLabel><StatNumber>{fmt(totals.connected)}</StatNumber></Stat>
         <Stat><StatLabel>Notes on</StatLabel><StatNumber>{fmt(totals.notesOn)}</StatNumber></Stat>
@@ -127,6 +139,10 @@ export default function CoachAdminPage() {
         <Stat><StatLabel>OpenAI calls</StatLabel><StatNumber>{fmt(totals.openaiCalls)}</StatNumber></Stat>
         <Stat><StatLabel>Prompt tokens</StatLabel><StatNumber>{fmt(totals.promptTokens)}</StatNumber></Stat>
         <Stat><StatLabel>Total tokens</StatLabel><StatNumber>{fmt(totals.totalTokens)}</StatNumber></Stat>
+        <Stat>
+          <StatLabel>Feedback 👍/👎</StatLabel>
+          <StatNumber>{fmt(data?.feedback?.up ?? 0)}/{fmt(data?.feedback?.down ?? 0)}</StatNumber>
+        </Stat>
       </SimpleGrid>
 
       <Box mb={4} display="flex" gap={3}>

@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  site:
+    name: Site (typecheck + lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint site
+        run: npm run lint
+      # apps/** is excluded from next lint (it is a React config, wrong for a CommonJS bot), so
+      # the bot had no static checking at all. no-undef alone already caught a real bug: a
+      # variable declared inside a try and read from its catch, which made every errored coach
+      # turn throw from its own error handler.
+      - name: Lint bot
+        run: npm run lint:bot
+
+  bot:
+    name: Bot (tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/bot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/bot/.nvmrc
+      # Deliberately no `npm ci`. The bot's dependency tree includes chartjs-node-canvas ->
+      # canvas, a native module that needs cairo/pixman headers to compile; installing it here
+      # fails on the runner and costs minutes even when it works. None of it is needed: every
+      # tested module depends on nothing outside Node's standard library, and evals/run.js only
+      # requires `openai` inside the non-dry-run branch.
+      #
+      # Only pure modules are covered. Anything importing services/firebase.js initialises the
+      # Firebase Admin SDK at module load and cannot run without credentials.
+      - name: Unit tests
+        run: npm test
+      # Structure-only pass over the coach prompt: no API calls, no cost. The full golden set
+      # (npm run eval) needs an OpenAI key and is deliberately not in CI — model output is not
+      # perfectly deterministic, and a flaky required check is one people learn to ignore.
+      - name: Coach prompt structure
+        run: npm run eval:dry
+
+  shared-sync:
+    name: Shared copies are in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      # packages/shared is the source of truth, but Render and Cloud Run build apps/* as their
+      # own project root and cannot resolve require("../../packages/..."), so copies live in the
+      # app trees. render.yaml's buildFilter only triggers on apps/bot/**, so editing a shared
+      # source alone does not even rebuild the bot — the drift would be silent without this.
+      - name: Check shared copies
+        run: node scripts/sync-shared.js --check

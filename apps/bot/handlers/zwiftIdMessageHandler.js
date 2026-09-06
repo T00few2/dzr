@@ -15,9 +15,9 @@ function detectZwiftIdPattern(content) {
   // Pattern: zwift (optional space) id (optional colon/space) <number>
   // Case insensitive, flexible whitespace
   const patterns = [
-    /zwift\s*id\s*[:\-]?\s*(\d{5,})/i,  // "zwiftid: 123456", "zwift id 123456"
-    /zwift\s*[:\-]?\s*(\d{5,})/i,        // "zwift: 123456", "zwift 123456"
-    /zid\s*[:\-]?\s*(\d{5,})/i,          // "zid: 123456", "zid 123456"
+    /zwift\s*id\s*[:-]?\s*(\d{5,})/i,  // "zwiftid: 123456", "zwift id 123456"
+    /zwift\s*[:-]?\s*(\d{5,})/i,        // "zwift: 123456", "zwift 123456"
+    /zid\s*[:-]?\s*(\d{5,})/i,          // "zid: 123456", "zid 123456"
   ];
 
   for (const pattern of patterns) {

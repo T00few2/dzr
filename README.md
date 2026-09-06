@@ -46,6 +46,7 @@ Required site env names (set in the Vercel project; never commit values):
 - Firebase client: `NEXT_PUBLIC_FIREBASE_*`
 - Firebase admin: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
 - Strava: `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_CONNECT_SECRET`, `STRAVA_REDIRECT_URI`
+- Strava webhook (optional): `STRAVA_WEBHOOK_VERIFY_TOKEN` — only if you register a push subscription; the callback fails closed without it
 - Jobs API: `CONTENT_API_BASE_URL`, `CONTENT_API_KEY`
 - Payments: `VIPPS_*` (only if membership checkout is enabled)
 
@@ -89,6 +90,8 @@ Render service **`bot`** (Oregon) deploys this folder from this repo:
 Optional second bot **DZR Coach** (silent in channels; coaching DMs only). Create a Discord application named DZR Coach, enable Message Content, invite it to the guild with scope `bot` only, then set `COACH_BOT_TOKEN` and `COACH_BOT_CLIENT_ID` on Render and Vercel. `/coach` stays on the club bot and opens a DM from DZR Coach. Without those env vars the club bot starts and skips Coach.
 
 Required bot env names: `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`, `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`. Also set `CONTENT_API_*`, `OPENAI_API_KEY`, and `STRAVA_*` for the features that use them.
+
+Optional: `COACH_DAILY_TOKEN_BUDGET` caps each athlete's coaching tokens per day (default 300000, `0` disables).
 
 ## Shared constants
 

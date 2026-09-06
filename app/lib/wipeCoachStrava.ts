@@ -46,21 +46,3 @@ export async function wipeCoachStravaForDiscordId(
 
   return { revokedOnStrava: revokedOnStravaResult, notified }
 }
-
-export async function findDiscordIdByStravaAthleteId(athleteId: number): Promise<string | null> {
-  if (!Number.isFinite(athleteId) || athleteId <= 0) return null
-  const snap = await adminDb
-    .collection(STRAVA_CONNECTIONS_COLLECTION)
-    .where('athleteId', '==', athleteId)
-    .limit(2)
-    .get()
-  if (snap.empty) {
-    const asString = await adminDb
-      .collection(STRAVA_CONNECTIONS_COLLECTION)
-      .where('athleteId', '==', String(athleteId))
-      .limit(1)
-      .get()
-    return asString.empty ? null : asString.docs[0].id
-  }
-  return snap.docs[0].id
-}

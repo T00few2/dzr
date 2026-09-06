@@ -58,22 +58,30 @@ export async function PUT(req: Request) {
 
     const body = await req.json().catch(() => ({}))
     const ref = adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId)
-    const snap = await ref.get()
-    const existing = unwrapCoachMemoryDoc({ ...(snap.exists ? snap.data() || {} : {}), discordId })
     const fields = publicCoachFields(body)
     const now = new Date()
     warnIfPlaintext()
-    await adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId).set(
-      persistCoachMemoryDoc({
-        discordId,
-        ...fields,
-        updatedAt: now,
-        updatedBy: 'user',
-        howItWorksSentAt: existing.howItWorksSentAt || null,
-        lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
-        lastFollowUpAt: existing.lastFollowUpAt || null,
-      })
-    )
+
+    // Read and write inside a transaction. The bot stamps lastAthleteMessageAt / lastFollowUpAt
+    // on the same document, so an unguarded read-then-set here could carry a stale stamp back
+    // and undo the bot's write (and vice versa). The transaction retries on contention.
+    const existing = await adminDb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref)
+      const current = unwrapCoachMemoryDoc({ ...(snap.exists ? snap.data() || {} : {}), discordId })
+      tx.set(
+        ref,
+        persistCoachMemoryDoc({
+          discordId,
+          ...fields,
+          updatedAt: now,
+          updatedBy: 'user',
+          howItWorksSentAt: current.howItWorksSentAt || null,
+          lastAthleteMessageAt: current.lastAthleteMessageAt || null,
+          lastFollowUpAt: current.lastFollowUpAt || null,
+        })
+      )
+      return current
+    })
 
     return NextResponse.json({
       ok: true,
@@ -106,25 +114,36 @@ export async function DELETE(req: Request) {
     const injuryId = String(url.searchParams.get('injuryId') || '').trim()
     const weeklyIndexRaw = url.searchParams.get('weeklyIndex')
     const ref = adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId)
-    const snap = await ref.get()
-    const existing = unwrapCoachMemoryDoc({ ...(snap.exists ? snap.data() || {} : {}), discordId })
-    const current = publicCoachFields(existing)
     const now = new Date()
+    const isFullReset = !injuryId && (weeklyIndexRaw == null || weeklyIndexRaw === '')
+    warnIfPlaintext()
 
-    if (injuryId) {
-      current.injuries = current.injuries.filter((inj) => inj.id !== injuryId)
-    } else if (weeklyIndexRaw != null && weeklyIndexRaw !== '') {
-      const idx = Number(weeklyIndexRaw)
-      if (Number.isInteger(idx) && idx >= 0 && idx < current.weekly.length) {
-        current.weekly.splice(idx, 1)
+    // Same transaction as PUT: the bot stamps lastAthleteMessageAt / lastFollowUpAt on this
+    // document, so an unguarded read-then-set can silently undo the bot's write.
+    const written = await adminDb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref)
+      const existing = unwrapCoachMemoryDoc({ ...(snap.exists ? snap.data() || {} : {}), discordId })
+
+      let next: ReturnType<typeof publicCoachFields>
+      if (isFullReset) {
+        next = defaultCoachProfile()
+      } else {
+        next = publicCoachFields(existing)
+        if (injuryId) {
+          next.injuries = next.injuries.filter((inj) => inj.id !== injuryId)
+        } else {
+          const idx = Number(weeklyIndexRaw)
+          if (Number.isInteger(idx) && idx >= 0 && idx < next.weekly.length) {
+            next.weekly.splice(idx, 1)
+          }
+        }
       }
-    } else {
-      const reset = defaultCoachProfile()
-      warnIfPlaintext()
-      await ref.set(
+
+      tx.set(
+        ref,
         persistCoachMemoryDoc({
           discordId,
-          ...reset,
+          ...next,
           updatedAt: now,
           updatedBy: 'user',
           howItWorksSentAt: existing.howItWorksSentAt || null,
@@ -132,28 +151,12 @@ export async function DELETE(req: Request) {
           lastFollowUpAt: existing.lastFollowUpAt || null,
         })
       )
-      return NextResponse.json({
-        ok: true,
-        profile: toClientCoachProfile({ ...reset, discordId, updatedAt: now, updatedBy: 'user' }, discordId),
-      })
-    }
-
-    warnIfPlaintext()
-    await ref.set(
-      persistCoachMemoryDoc({
-        discordId,
-        ...current,
-        updatedAt: now,
-        updatedBy: 'user',
-        howItWorksSentAt: existing.howItWorksSentAt || null,
-        lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
-        lastFollowUpAt: existing.lastFollowUpAt || null,
-      })
-    )
+      return next
+    })
 
     return NextResponse.json({
       ok: true,
-      profile: toClientCoachProfile({ ...current, discordId, updatedAt: now, updatedBy: 'user' }, discordId),
+      profile: toClientCoachProfile({ ...written, discordId, updatedAt: now, updatedBy: 'user' }, discordId),
     })
   } catch (err: any) {
     console.error('coach profile DELETE failed:', err)

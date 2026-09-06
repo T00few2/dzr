@@ -243,9 +243,6 @@ export default function CoachMemoryEditor() {
   async function persistSettings({ clearNotesOnDisable = false } = {}) {
     setSaving(true)
     try {
-      if (clearNotesOnDisable) {
-        await deleteAllNotesRequest()
-      }
       const min = ridesMin.trim() === '' ? null : Number(ridesMin)
       const max = ridesMax.trim() === '' ? null : Number(ridesMax)
       const payload: CoachProfile = {
@@ -270,9 +267,26 @@ export default function CoachMemoryEditor() {
         toast({ title: data?.error || 'Kunne ikke gemme', status: 'error' })
         return
       }
+      // Delete the notes only after the profile save has succeeded. Deleting first meant a
+      // failed PUT left the notes gone with notesOptIn still on — unrecoverable for the athlete.
+      let notesCleared = false
+      if (clearNotesOnDisable) {
+        try {
+          await deleteAllNotesRequest()
+          notesCleared = true
+        } catch (noteErr: any) {
+          if (data?.profile) applyProfile(data.profile)
+          toast({
+            title: 'Indstillinger gemt, men chat-noterne blev ikke slettet',
+            description: noteErr?.message || 'Prøv at slette dem igen under Chat-noter.',
+            status: 'warning',
+          })
+          return
+        }
+      }
       if (data?.profile) applyProfile(data.profile)
       toast({
-        title: clearNotesOnDisable ? 'Indstillinger gemt, og chat-noter slettet' : 'Coach-indstillinger gemt',
+        title: notesCleared ? 'Indstillinger gemt, og chat-noter slettet' : 'Coach-indstillinger gemt',
         status: 'success',
       })
     } catch (err: any) {

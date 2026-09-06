@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const config = require("../config/config");
 const shared = require("../constants.json");
+const { isPaidClubMember: sharedIsPaidClubMember } = require("./membership");
 const {
   emptyProfile,
   defaultProfile,
@@ -9,6 +10,8 @@ const {
 const {
   canEncryptCoachMemory,
   unwrapCoachMemoryDoc,
+  makeCoachCanary,
+  verifyCoachCanary,
   persistCoachMemoryDoc,
   unwrapChatNoteDoc,
   persistChatNoteDoc,
@@ -361,42 +364,15 @@ async function getAllBotKnowledge() {
 }
 
 /**
- * Paid DZR club membership for the current year (Vipps).
- * Verified Member Discord role is not enough.
+ * Paid DZR club membership for the current year.
+ * Logic lives in the shared module so the bot and the website cannot disagree about who is a
+ * member — this is the gate on the whole coach feature.
  */
 async function isPaidClubMember(discordId) {
-  const id = String(discordId || "").trim();
-  if (!id) return false;
-  const year = new Date().getUTCFullYear();
-  try {
-    const membershipSnap = await db.collection("memberships").doc(id).get();
-    const membership = membershipSnap.exists ? membershipSnap.data() || {} : {};
-    if (
-      String(membership.currentStatus || "") === "club" &&
-      typeof membership.coveredThroughYear === "number" &&
-      membership.coveredThroughYear >= year
-    ) {
-      return true;
-    }
-
-    const paymentsSnap = await db
-      .collection("payments")
-      .where("userId", "==", id)
-      .where("status", "==", "succeeded")
-      .get();
-
-    let maxCovered = null;
-    paymentsSnap.forEach((doc) => {
-      const covered = doc.data()?.coveredThroughYear;
-      if (typeof covered === "number" && (maxCovered == null || covered > maxCovered)) {
-        maxCovered = covered;
-      }
-    });
-    return maxCovered != null && maxCovered >= year;
-  } catch (err) {
-    console.error("isPaidClubMember failed", err?.message || err);
-    return false;
-  }
+  return sharedIsPaidClubMember(db, {
+    memberships: shared.firestore?.memberships || "memberships",
+    payments: shared.firestore?.payments || "payments",
+  }, discordId);
 }
 
 /**
@@ -415,6 +391,17 @@ async function getSignupBoardConfigs() {
 const COACH_USAGE_COLLECTION = shared.firestore?.coachUsage || "coach_usage";
 const COACH_USAGE_EVENTS_COLLECTION = shared.firestore?.coachUsageEvents || "coach_usage_events";
 const COACH_PROFILES_COLLECTION = shared.firestore?.coachProfiles || "coach_profiles";
+
+const COACH_USAGE_DAILY_COLLECTION = "coach_usage_daily";
+const PENDING_GOALS_COLLECTION = "coach_pending_goals";
+
+function usageDayKey(discordId, now = new Date()) {
+  const day = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Europe/Copenhagen",
+  }).format(now);
+  return `${discordId}_${day}`;
+}
+
 
 function coachProfileRef(discordId) {
   return db.collection(COACH_PROFILES_COLLECTION).doc(String(discordId));
@@ -465,51 +452,48 @@ async function ensureDefaultCoachProfile(discordId) {
   return toPlainProfile(doc);
 }
 
+const FIRESTORE_NOT_FOUND = 5; // gRPC NOT_FOUND
+
+/**
+ * Stamp one bot-owned timestamp on a coach profile.
+ *
+ * These fields are stored OUTSIDE the encrypted blob (see persistCoachMemoryDoc), so they can be
+ * written as a single-field merge. That matters: the previous implementation read the whole
+ * profile, re-encrypted it and wrote it back with .set(), so a stamp landing while the athlete
+ * was saving settings on Mine sider silently discarded their save — and the reverse ordering
+ * dropped the stamp and broke follow-up scheduling.
+ *
+ * update() also fails with NOT_FOUND when the document is absent, which preserves the old
+ * "do nothing for users who have never opened Coach" behaviour without needing a read first.
+ */
+async function stampCoachProfile(discordId, field) {
+  const id = String(discordId || "").trim();
+  if (!id) return false;
+  try {
+    await coachProfileRef(id).update({ [field]: new Date().toISOString() });
+    return true;
+  } catch (err) {
+    if (err?.code === FIRESTORE_NOT_FOUND) return false;
+    throw err;
+  }
+}
+
 async function markCoachHowItWorksSent(discordId) {
   const id = String(discordId || "").trim();
   if (!id) return;
-  const snap = await coachProfileRef(id).get();
-  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.exists ? snap.data() || {} : {}) });
-  await writeCoachProfileDoc(id, {
-    ...publicFields(existing),
-    updatedAt: existing.updatedAt || new Date(),
-    updatedBy: "user",
-    howItWorksSentAt: new Date().toISOString(),
-    lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
-    lastFollowUpAt: existing.lastFollowUpAt || null,
-  });
+  // Unlike the other two, this one must create the profile if it is missing.
+  if (!(await stampCoachProfile(id, "howItWorksSentAt"))) {
+    await ensureDefaultCoachProfile(id);
+    await stampCoachProfile(id, "howItWorksSentAt");
+  }
 }
 
 async function markCoachAthleteMessage(discordId) {
-  const id = String(discordId || "").trim();
-  if (!id) return;
-  const snap = await coachProfileRef(id).get();
-  if (!snap.exists) return;
-  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.data() || {}) });
-  await writeCoachProfileDoc(id, {
-    ...publicFields(existing),
-    updatedAt: existing.updatedAt || new Date(),
-    updatedBy: existing.updatedBy || "user",
-    howItWorksSentAt: existing.howItWorksSentAt || null,
-    lastAthleteMessageAt: new Date().toISOString(),
-    lastFollowUpAt: existing.lastFollowUpAt || null,
-  });
+  await stampCoachProfile(discordId, "lastAthleteMessageAt");
 }
 
 async function markCoachFollowUpSent(discordId) {
-  const id = String(discordId || "").trim();
-  if (!id) return;
-  const snap = await coachProfileRef(id).get();
-  if (!snap.exists) return;
-  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.data() || {}) });
-  await writeCoachProfileDoc(id, {
-    ...publicFields(existing),
-    updatedAt: existing.updatedAt || new Date(),
-    updatedBy: existing.updatedBy || "user",
-    howItWorksSentAt: existing.howItWorksSentAt || null,
-    lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
-    lastFollowUpAt: new Date().toISOString(),
-  });
+  await stampCoachProfile(discordId, "lastFollowUpAt");
 }
 
 async function listCoachProfiles() {
@@ -553,6 +537,16 @@ async function recordCoachUsage({ discordId, username, model, promptTokens, comp
         updatedAt: now,
       }, { merge: true });
     });
+    // Per-day counter that backs the daily budget. Separate from the cumulative doc above,
+    // which only ever increments and cannot answer "how much today".
+    await db.collection(COACH_USAGE_DAILY_COLLECTION).doc(usageDayKey(id, now)).set({
+      discordId: id,
+      day: usageDayKey(id, now).split("_")[1],
+      totalTokens: admin.firestore.FieldValue.increment(total),
+      openaiCalls: admin.firestore.FieldValue.increment(calls),
+      updatedAt: now,
+    }, { merge: true });
+
     await db.collection(COACH_USAGE_EVENTS_COLLECTION).add({
       discordId: id,
       username: username || null,
@@ -568,8 +562,106 @@ async function recordCoachUsage({ discordId, username, model, promptTokens, comp
   }
 }
 
+const COACH_KEY_CANARY_STATE = "coach_key_canary";
+
+/**
+ * Prove the coach encryption key still matches the one that encrypted existing coach memory.
+ *
+ * Failing closed on a missing key (tokenCrypto.requireKey) only proves a key exists. It cannot
+ * catch the case that actually corrupts data: Vercel and Render both configured, with different
+ * values, so each writes memory the other cannot read. This decrypts a stored canary to catch it.
+ *
+ * Returns a result rather than throwing, so the caller can distinguish:
+ *   - "mismatch"  -> the key is wrong; the bot must not start and write under it
+ *   - "unavailable" -> Firestore could not be read; log and carry on, do not crash-loop
+ */
+async function checkCoachKeyCanary() {
+  let snap;
+  try {
+    snap = await getBotState(COACH_KEY_CANARY_STATE);
+  } catch (err) {
+    return { status: "unavailable", message: err?.message || String(err) };
+  }
+
+  const stored = snap?.value;
+  if (!stored) {
+    try {
+      await setBotState(COACH_KEY_CANARY_STATE, {
+        value: makeCoachCanary(),
+        createdAt: new Date().toISOString(),
+      });
+      return { status: "created" };
+    } catch (err) {
+      return { status: "unavailable", message: err?.message || String(err) };
+    }
+  }
+
+  return verifyCoachCanary(stored) ? { status: "ok" } : { status: "mismatch" };
+}
+
+/**
+ * Tokens this athlete has used today.
+ *
+ * coach_usage is cumulative — it only ever increments and carries no per-day breakdown — so it
+ * cannot back a daily cap. This is a separate per-day counter.
+ */
+async function getCoachDailyTokens(discordId, now = new Date()) {
+  const id = String(discordId || "").trim();
+  if (!id) return 0;
+  try {
+    const snap = await db.collection(COACH_USAGE_DAILY_COLLECTION).doc(usageDayKey(id, now)).get();
+    return snap.exists ? Number(snap.data()?.totalTokens || 0) : 0;
+  } catch (err) {
+    // Fail open: a Firestore blip must not lock an athlete out of coaching.
+    console.warn("getCoachDailyTokens failed:", err?.message || err);
+    return 0;
+  }
+}
+
+/** Save a proposed goal so a deploy cannot silently expire a pending Ja/Nej. */
+async function savePendingGoal(discordId, payload, ttlMs) {
+  const id = String(discordId || "").trim();
+  if (!id) return;
+  await db.collection(PENDING_GOALS_COLLECTION).doc(id).set({
+    discordId: id,
+    ...payload,
+    expiresAt: new Date(Date.now() + ttlMs).toISOString(),
+  });
+}
+
+/** Read a pending goal, treating an expired one as absent. */
+async function getPendingGoal(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return null;
+  try {
+    const snap = await db.collection(PENDING_GOALS_COLLECTION).doc(id).get();
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    if (data.expiresAt && Date.parse(data.expiresAt) < Date.now()) return null;
+    return data;
+  } catch (err) {
+    console.warn("getPendingGoal failed:", err?.message || err);
+    return null;
+  }
+}
+
+async function clearPendingGoal(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return;
+  try {
+    await db.collection(PENDING_GOALS_COLLECTION).doc(id).delete();
+  } catch (err) {
+    console.warn("clearPendingGoal failed:", err?.message || err);
+  }
+}
+
 module.exports = {
   db,
+  checkCoachKeyCanary,
+  getCoachDailyTokens,
+  savePendingGoal,
+  getPendingGoal,
+  clearPendingGoal,
   getUserZwiftId,
   linkUserZwiftId,
   getTodaysClubStats,

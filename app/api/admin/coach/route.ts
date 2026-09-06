@@ -3,7 +3,7 @@ import { requireAdmin } from '@/app/api/admin/_lib/auth'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { COLLECTIONS } from '@/app/lib/sharedConstants'
 import { toIso } from '@/app/lib/stravaAuth'
-import { hasStravaRefreshToken, unwrapCoachMemoryDoc } from '@/app/lib/tokenCrypto'
+import { hasStravaRefreshToken, unwrapCoachMemoryDoc, coachKeyId, compareKeyId } from '@/app/lib/tokenCrypto'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,17 +16,15 @@ export async function GET(req: Request) {
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
 
-  const [connectionsSnap, usageSnap, usersSnap, profilesSnap] = await Promise.all([
+  // The three coach collections are inherently small (one document per athlete who has opened
+  // Coach). `users` is not - it holds every member - and it was previously scanned in full on
+  // every dashboard load just to map ids to names. Fetch only the ids actually referenced,
+  // after the small scans have told us which those are.
+  const [connectionsSnap, usageSnap, profilesSnap] = await Promise.all([
     adminDb.collection(COLLECTIONS.stravaConnections).get(),
     adminDb.collection(COLLECTIONS.coachUsage).get(),
-    adminDb.collection(COLLECTIONS.users).get(),
     adminDb.collection(COLLECTIONS.coachProfiles).get(),
   ])
-
-  const usersById = new Map<string, any>()
-  usersSnap.forEach((doc) => {
-    usersById.set(doc.id, doc.data() || {})
-  })
 
   const connectionsById = new Map<string, any>()
   connectionsSnap.forEach((doc) => {
@@ -40,11 +38,28 @@ export async function GET(req: Request) {
 
   const notesOptInById = new Map<string, boolean>()
   const followUpEveryDaysById = new Map<string, 3 | 7 | 14 | null>()
+  // Decrypt failures must not take the dashboard down: unwrapCoachMemoryDoc throws on a missing
+  // or mismatched key, and one bad document previously 500'd the whole page. Counting them here
+  // doubles as key-drift detection — if Vercel and Render ever encrypt under different keys,
+  // this number goes up and an admin sees it.
+  const undecryptable: string[] = []
+  // Stored key fingerprints. 'unknown' means the document predates keyId, which is expected for
+  // anything written before it existed and is not a problem.
+  const currentKeyId = coachKeyId()
+  const keyIdStatus = { match: 0, mismatch: 0, unknown: 0, no_key: 0 }
   profilesSnap.forEach((doc) => {
-    const profile = unwrapCoachMemoryDoc({ ...(doc.data() || {}), discordId: doc.id })
-    const days = Number(profile.followUpEveryDays)
-    notesOptInById.set(doc.id, profile.notesOptIn === true)
-    followUpEveryDaysById.set(doc.id, days === 3 || days === 7 || days === 14 ? days : null)
+    keyIdStatus[compareKeyId((doc.data() || {}).memoryKeyId, currentKeyId)] += 1
+    try {
+      const profile = unwrapCoachMemoryDoc({ ...(doc.data() || {}), discordId: doc.id })
+      const days = Number(profile.followUpEveryDays)
+      notesOptInById.set(doc.id, profile.notesOptIn === true)
+      followUpEveryDaysById.set(doc.id, days === 3 || days === 7 || days === 14 ? days : null)
+    } catch (err) {
+      console.error('admin/coach: could not decrypt coach profile', doc.id, err)
+      undecryptable.push(doc.id)
+      notesOptInById.set(doc.id, false)
+      followUpEveryDaysById.set(doc.id, null)
+    }
   })
 
   const ids = new Set<string>([
@@ -53,6 +68,21 @@ export async function GET(req: Request) {
     ...notesOptInById.keys(),
     ...followUpEveryDaysById.keys(),
   ])
+
+  const usersById = new Map<string, any>()
+  const idList = Array.from(ids)
+  if (idList.length > 0) {
+    // getAll() takes document refs directly, so this is one round trip for the ids we need
+    // rather than a full-collection scan. Chunked to stay well inside Firestore's limits.
+    const CHUNK = 300
+    for (let i = 0; i < idList.length; i += CHUNK) {
+      const refs = idList.slice(i, i + CHUNK).map((id) => adminDb.collection(COLLECTIONS.users).doc(id))
+      const docs = await adminDb.getAll(...refs)
+      docs.forEach((doc) => {
+        if (doc.exists) usersById.set(doc.id, doc.data() || {})
+      })
+    }
+  }
 
   const people = Array.from(ids).map((discordId) => {
     const conn = connectionsById.get(discordId) || null
@@ -124,6 +154,20 @@ export async function GET(req: Request) {
       .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')))
   }
 
+  // 👍/👎 on coach replies. Automated evals catch regressions; this catches advice that is
+  // technically correct and still unhelpful, which no assertion can see.
+  let feedback = { up: 0, down: 0 }
+  try {
+    const feedbackSnap = await adminDb.collection('coach_feedback').orderBy('at', 'desc').limit(500).get()
+    feedbackSnap.forEach((doc) => {
+      const rating = Number((doc.data() || {}).rating)
+      if (rating > 0) feedback.up += 1
+      else if (rating < 0) feedback.down += 1
+    })
+  } catch (err) {
+    console.warn('admin/coach: could not read feedback', err)
+  }
+
   const totals = people.reduce(
     (acc, p) => {
       acc.connected += p.connected ? 1 : 0
@@ -143,5 +187,13 @@ export async function GET(req: Request) {
     totals: { ...totals, people: people.length },
     people,
     events,
+    // Key-drift signal. Should always be 0. A non-zero count means some coach_profiles documents
+    // cannot be decrypted with the key this runtime holds — Vercel and Render have drifted apart,
+    // or COACH_MEMORY_KEY was rotated. keyIdStatus below distinguishes those two.
+    feedback,
+    undecryptableProfiles: undecryptable.length,
+    // Diagnostic for the above: a mismatch says the key changed, an unknown says the document
+    // simply predates fingerprinting. Without this the two look identical from a failed decrypt.
+    keyIdStatus,
   })
 }

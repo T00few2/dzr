@@ -1,5 +1,5 @@
 const OpenAI = require("openai");
-const { ChannelType, MessageFlags } = require("discord.js");
+const { ChannelType, MessageFlags, AttachmentBuilder } = require("discord.js");
 const config = require("../config/config");
 const {
   getAllBotKnowledge,
@@ -10,8 +10,11 @@ const {
   listCoachChatNotes,
   addCoachChatNotes,
   markCoachAthleteMessage,
+  getCoachDailyTokens,
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
+const { trimConversation } = require("../services/conversationTrim");
+const { loadTrend, formatWeeklyLoadForPrompt } = require("../services/weeklyLoad");
 const { 
   handleRiderStats, 
   handleTeamStats, 
@@ -28,11 +31,15 @@ const { unconnectedCoachText, NOT_CLUB_MEMBER_TEXT, USE_COACH_BOT_TEXT } = requi
 const { formatCoachProfileForPrompt } = require("../services/coachProfile");
 const { MY_PAGES_COACH_URL, noEmbedUrl } = require("../services/coachHowItWorks");
 const { proposeCoachGoal } = require("../services/coachGoalConfirm");
+const { buildZwo, describeWorkout } = require("../services/zwoBuilder");
+const { buildCoachPromptText } = require("../services/coachPrompt");
 const {
   EPISODE_NOTE_KINDS,
   shouldSkipExtract,
   buildExtractMessages,
   parseExtractedNotes,
+  parseExtractedSummary,
+  formatSessionSummariesForPrompt,
   retrieveRelevantNotes,
   searchNotes,
   formatNotesForPrompt,
@@ -60,10 +67,12 @@ const COACH_NOTE_TOOLS = new Set(["search_past_notes", "save_chat_notes", "propo
 
 // Configuration
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-const MAX_CONVERSATION_LENGTH = 20; // Last 20 messages (10 exchanges)
 const MAX_TOOL_ITERATIONS = 2;
 const COACH_MAX_TOOL_ITERATIONS = 4;
 const COACH_MAX_TOKENS = 16000;
+// Per-athlete daily ceiling. Usage was recorded but never enforced, so a runaway loop or a very
+// chatty day had no backstop. Generous by design: this is a safety net, not a rationing device.
+const COACH_DAILY_TOKEN_BUDGET = Number.parseInt(process.env.COACH_DAILY_TOKEN_BUDGET || "300000", 10);
 const COACH_REASONING_EFFORT = "low";
 
 // AI Model Configuration - can be changed to test different models
@@ -174,12 +183,14 @@ function compactToolResult(result) {
   if (result.zones) base.zones = result.zones;
   if (Array.isArray(result.activities)) base.activities = result.activities.slice(0, 40);
   if (result.activity) base.activity = result.activity;
+  if (result.metrics) base.metrics = result.metrics;
   if (typeof result.days === "number") base.days = result.days;
   if (result.needs_reconnect) base.needs_reconnect = true;
   if (result.not_club_member) base.not_club_member = true;
   if (typeof result.connectUrl === "string") base.connectUrl = result.connectUrl.slice(0, 500);
   if (result.metadata) base.metadata = result.metadata;
   if (result.series) base.series = result.series;
+  if (Array.isArray(result.races)) base.races = result.races.slice(0, 12);
   if (result.zrl) base.zrl = result.zrl;
   if (typeof result.summary === "string") base.summary = result.summary.slice(0, 500);
   if (typeof result.confirmMessageDa === "string") base.confirmMessageDa = result.confirmMessageDa.slice(0, 1500);
@@ -621,6 +632,20 @@ const coachToolDefinitions = [
   {
     type: "function",
     function: {
+      name: "get_activity_metrics",
+      description: "Power analysis for ONE of the asking athlete's activities: mean-maximal power curve, normalized power, intensity factor, TSS, aerobic decoupling and detected work intervals. Use when they ask how a specific session went, whether intervals were good, or how hard a ride actually was. Costs a Strava request, so call it for one activity at a time, not across a week.",
+      parameters: {
+        type: "object",
+        properties: {
+          activity_id: { type: "string", description: "Strava activity id from get_recent_activities" }
+        },
+        required: ["activity_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "get_zwiftpower_context",
       description: "Optional ZwiftPower snapshot for the asking athlete (category, phenotype, FTP) if they have a linked Zwift ID.",
       parameters: { type: "object", properties: {} }
@@ -680,6 +705,57 @@ const coachToolDefinitions = [
           }
         },
         required: ["notes"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_workout_file",
+      description: "Build a Zwift workout (.zwo) and send it to the athlete as a file they can ride. Use when prescribing a specific structured session and they would benefit from executing it exactly. Power is set as a fraction of their FTP, so Zwift scales it for them. Do not use for general advice or an easy ride — only for a structured session worth following step by step.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Short workout name, e.g. 'VO2 5x4' or 'Tærskel 2x20'." },
+          description: { type: "string", description: "One or two sentences on the purpose of the session." },
+          steps: {
+            type: "array",
+            description: "Ordered steps. Start with a warmup and end with a cooldown.",
+            items: {
+              type: "object",
+              properties: {
+                type: { type: "string", enum: ["warmup", "steady", "intervals", "freeride", "cooldown"] },
+                duration: { type: "number", description: "Seconds. For warmup, steady, freeride and cooldown." },
+                power: { type: "number", description: "Fraction of FTP for a steady step, e.g. 0.65." },
+                powerFrom: { type: "number", description: "Warmup/cooldown start, fraction of FTP." },
+                powerTo: { type: "number", description: "Warmup/cooldown end, fraction of FTP." },
+                repeat: { type: "number", description: "Interval repetitions." },
+                onDuration: { type: "number", description: "Work seconds per repetition." },
+                offDuration: { type: "number", description: "Recovery seconds per repetition." },
+                onPower: { type: "number", description: "Work power, fraction of FTP, e.g. 1.05." },
+                offPower: { type: "number", description: "Recovery power, fraction of FTP, e.g. 0.55." }
+              },
+              required: ["type"]
+            }
+          }
+        },
+        required: ["name", "steps"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_club_races",
+      description: "DZR club race series and their usual weekly ride times (ZRL, WTRL TTT, DRS, Club Ladder, DZR After Party). Use when planning the athlete's week around racing, or when they mention a club race and you need to know when it runs.",
+      parameters: {
+        type: "object",
+        properties: {
+          series: {
+            type: "string",
+            description: "Optional filter, e.g. 'WTRL ZRL' or 'DRS'. Omit for all series."
+          }
+        }
       }
     }
   },
@@ -903,7 +979,16 @@ function resolveUser(userString, message) {
 /**
  * Execute a single tool call
  */
-async function executeSingleToolCall(toolCall, message) {
+/**
+ * @param {object} [turn] Per-turn context resolved once in handleChatMessage.
+ *   { eligible: boolean, profile: object|null }
+ *
+ * Membership and the coach profile used to be re-fetched inside every single tool call.
+ * isPaidClubMember is a document read plus a payments collection query, and getCoachProfile
+ * decrypts, so a turn with three parallel Strava tools spent roughly eight Firestore operations
+ * on nothing but authorisation — all of it on the latency path in front of the athlete.
+ */
+async function executeSingleToolCall(toolCall, message, turn) {
   const { name, arguments: argsString } = toolCall.function;
   let args;
   
@@ -1253,8 +1338,9 @@ async function executeSingleToolCall(toolCall, message) {
       case "get_athlete_zones":
       case "get_recent_activities":
       case "get_activity_details":
+      case "get_activity_metrics":
       case "get_zwiftpower_context": {
-        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
         if (!eligible) {
           return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
         }
@@ -1265,17 +1351,109 @@ async function executeSingleToolCall(toolCall, message) {
         else if (name === "get_athlete_zones") coachResult = await strava.getAthleteZones(discordId);
         else if (name === "get_recent_activities") coachResult = await strava.getRecentActivities(discordId, { days: args.days });
         else if (name === "get_activity_details") coachResult = await strava.getActivityDetails(discordId, args.activity_id);
+        else if (name === "get_activity_metrics") coachResult = await strava.getActivityMetrics(discordId, args.activity_id);
         else coachResult = await strava.getZwiftPowerContext(discordId);
         return { tool_call_id: toolCall.id, ...(coachResult || { success: false, message: "No data" }) };
       }
 
-      case "search_past_notes": {
-        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+      case "send_workout_file": {
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
         if (!eligible) {
           return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
         }
         try {
-          const profile = await getCoachProfile(message.author.id);
+          const built = buildZwo({ name: args.name, description: args.description, steps: args.steps });
+          const outline = describeWorkout(args.steps);
+          const minutes = Math.round(built.durationSeconds / 60);
+
+          // Zwift only reads custom workouts from a local folder, and only on PC/Mac. Naming the
+          // athlete's own folder removes most of the friction; saying the rest plainly stops
+          // iPad and Apple TV riders assuming the file is broken.
+          let folder = "Documents/Zwift/Workouts/<dit Zwift-ID>/";
+          try {
+            const zwiftId = await getUserZwiftId(message.author.id);
+            if (zwiftId) folder = `Documents/Zwift/Workouts/${zwiftId}/`;
+          } catch {
+            /* fall back to the generic path */
+          }
+
+          const body = [
+            `🚴 **${args.name}** — ca. ${minutes} min`,
+            outline,
+            "",
+            "**Sådan bruger du filen**",
+            `1. Gem den i \`${folder}\``,
+            "2. Genstart Zwift",
+            "3. Find den under Workouts → Custom Workouts",
+            "",
+            "Det kræver PC eller Mac. På iPad, iPhone og Apple TV kan man ikke lægge filer ind — brug en computer til at installere den.",
+          ].join("\n");
+
+          await message.channel.send({
+            content: body,
+            files: [new AttachmentBuilder(Buffer.from(built.xml, "utf8"), { name: built.filename })],
+            flags: MessageFlags.SuppressEmbeds,
+          });
+
+          return {
+            tool_call_id: toolCall.id,
+            success: true,
+            sent: true,
+            message: "Workout file sent with its outline and install steps. Do not repeat the step list in your reply — say briefly why this session, and what to watch for while riding it.",
+          };
+        } catch (err) {
+          console.error("send_workout_file failed:", err?.message || err);
+          return {
+            tool_call_id: toolCall.id,
+            success: false,
+            message: "Could not build that workout file. Describe the session in text instead.",
+          };
+        }
+      }
+
+      case "get_club_races": {
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        if (!eligible) {
+          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+        }
+        try {
+          const { teams } = await getDZRTeamsAndSeries();
+          const wanted = String(args.series || "").trim().toLowerCase();
+          // Collapse teams down to series + ride time. The coach needs to know when racing
+          // happens, not the full roster, and a large payload degrades the reply.
+          const bySeries = new Map();
+          for (const team of Array.isArray(teams) ? teams : []) {
+            const series = String(team.raceSeries || "").trim();
+            if (!series) continue;
+            if (wanted && !series.toLowerCase().includes(wanted)) continue;
+            const rideTime = String(team.rideTime || "").trim();
+            if (!bySeries.has(series)) bySeries.set(series, new Set());
+            if (rideTime) bySeries.get(series).add(rideTime);
+          }
+          const races = Array.from(bySeries.entries())
+            .slice(0, 12)
+            .map(([series, times]) => ({ series, rideTimes: Array.from(times).slice(0, 6) }));
+          return {
+            tool_call_id: toolCall.id,
+            success: true,
+            races,
+            message: races.length
+              ? "Club race series and their usual ride times. Times are what team captains set; treat them as typical, not guaranteed."
+              : "No club race series found for that filter.",
+          };
+        } catch (err) {
+          console.error("get_club_races failed:", err?.message || err);
+          return { tool_call_id: toolCall.id, success: false, message: "Could not load club races." };
+        }
+      }
+
+      case "search_past_notes": {
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        if (!eligible) {
+          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+        }
+        try {
+          const profile = turn?.profile ?? await getCoachProfile(message.author.id);
           if (profile?.notesOptIn !== true) {
             return {
               tool_call_id: toolCall.id,
@@ -1313,12 +1491,12 @@ async function executeSingleToolCall(toolCall, message) {
       }
 
       case "save_chat_notes": {
-        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
         if (!eligible) {
           return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
         }
         try {
-          const profile = await getCoachProfile(message.author.id);
+          const profile = turn?.profile ?? await getCoachProfile(message.author.id);
           if (profile?.notesOptIn !== true) {
             return {
               tool_call_id: toolCall.id,
@@ -1379,12 +1557,12 @@ async function executeSingleToolCall(toolCall, message) {
       }
 
       case "propose_coach_goal": {
-        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
         if (!eligible) {
           return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
         }
         try {
-          const profile = await getCoachProfile(message.author.id);
+          const profile = turn?.profile ?? await getCoachProfile(message.author.id);
           if (profile?.notesOptIn !== true) {
             return {
               tool_call_id: toolCall.id,
@@ -1424,10 +1602,10 @@ async function executeSingleToolCall(toolCall, message) {
 /**
  * Execute multiple tool calls (supports parallel execution)
  */
-async function executeToolCalls(toolCalls, message) {
+async function executeToolCalls(toolCalls, message, turn) {
   // Execute all tool calls in parallel
   const results = await Promise.all(
-    toolCalls.map(toolCall => executeSingleToolCall(toolCall, message))
+    toolCalls.map(toolCall => executeSingleToolCall(toolCall, message, turn))
   );
   
   return results;
@@ -1446,6 +1624,7 @@ function clearConversation(userId) {
   }
 
   // Legacy: clear any per-user conversation (old behavior)
+  flushCoachSession(key);
   userConversations.delete(key);
   const timer = conversationTimers.get(key);
   if (timer) {
@@ -1456,6 +1635,7 @@ function clearConversation(userId) {
   // New: clear all scoped conversations for this user across guilds/channels
   for (const k of Array.from(userConversations.keys())) {
     if (typeof k === "string" && k.endsWith(`:${key}`)) {
+      flushCoachSession(k);
       userConversations.delete(k);
     }
   }
@@ -1472,6 +1652,8 @@ function clearConversation(userId) {
 
 function clearConversationForKey(conversationKey) {
   const key = String(conversationKey);
+  // The idle timer is the session boundary: extract notes and a summary before dropping history.
+  flushCoachSession(key);
   userConversations.delete(key);
   const timer = conversationTimers.get(key);
   if (timer) {
@@ -1574,15 +1756,40 @@ ${catalogLines}
 - Time: ${timestamp}`;
 }
 
-async function buildCoachSystemPrompt(message, userText) {
+async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
   const now = new Date();
   const today = formatCoachToday(now);
   let settingsBlock = "No Coach settings stored yet.";
   let notesBlock = "Chat notes are off.";
   let goalsBlock = "Chat notes are off. There are no saved goals.";
+  let summariesBlock = "Chat notes are off, so earlier conversations are not recorded.";
   let notesOptIn = false;
+  let loadBlock = "No weekly history yet.";
+  let athleteFacts = [];
   try {
-    const profile = await getCoachProfile(message.author.id);
+    const stored = await strava.getWeeklyLoad(message.author.id);
+    if (stored?.weekly?.length) {
+      loadBlock = formatWeeklyLoadForPrompt(stored.weekly, loadTrend(stored.weekly));
+    }
+    // Captured nightly, so having these costs nothing on a chat turn — and it lets the coach
+    // reason in W/kg from the first token instead of spending a tool call to learn a weight.
+    const kg = Number(stored?.athlete?.weightKg);
+    const ftp = Number(stored?.athlete?.ftp);
+    if (Number.isFinite(kg) && kg > 0) athleteFacts.push(`Weight: ${kg.toFixed(1)} kg`);
+    if (Number.isFinite(ftp) && ftp > 0) {
+      const wkg = Number.isFinite(kg) && kg > 0 ? ` (${(ftp / kg).toFixed(2)} W/kg)` : "";
+      athleteFacts.push(`FTP: ${Math.round(ftp)} W${wkg}`);
+    }
+    if (stored?.zwiftpower?.paceGroup) athleteFacts.push(`ZwiftPower pace group: ${stored.zwiftpower.paceGroup}`);
+    if (stored?.zwiftpower?.veloCategory) athleteFacts.push(`vELO category: ${stored.zwiftpower.veloCategory}`);
+    if (stored?.zwiftpower?.phenotype) athleteFacts.push(`Phenotype: ${stored.zwiftpower.phenotype}`);
+  } catch (err) {
+    console.error("getWeeklyLoad failed:", err?.message || err);
+  }
+
+  let profile = preloadedProfile ?? null;
+  try {
+    if (!profile) profile = await getCoachProfile(message.author.id);
     settingsBlock = formatCoachProfileForPrompt(profile);
     notesOptIn = profile?.notesOptIn === true;
   } catch (err) {
@@ -1594,6 +1801,7 @@ async function buildCoachSystemPrompt(message, userText) {
     try {
       const notes = await listCoachChatNotes(message.author.id);
       goalsBlock = formatActiveGoalsForPrompt(notes, now);
+      summariesBlock = formatSessionSummariesForPrompt(notes, now);
       const hits = retrieveRelevantNotes(notes, userText || "", { now });
       const standard = hits.filter((note) => note.kind !== "goal");
       const formatted = formatNotesForPrompt(standard, now);
@@ -1603,66 +1811,20 @@ async function buildCoachSystemPrompt(message, userText) {
     }
   }
 
-  const content = `You are DZR Coach, a cycling coach for Danish Zwift Racers. You chat in a private Discord DM with one athlete.
+  const content = buildCoachPromptText({
+    username: message.author.username,
+    today,
+    loadBlock,
+    athleteFacts,
+    settingsBlock,
+    goalsBlock,
+    summariesBlock,
+    notesBlock,
+    notesOptIn,
+    MY_PAGES_COACH_URL,
+  });
 
-## Today
-${today.line}
-Use this calendar date for everything: how old a chat note is, whether a feeling is still relevant, how far a goal is, and what "this week" means. Do not guess the date.
-Weeks start on Monday (Denmark / ISO). "This week" is the Monday–Sunday range above. Sunday is the last day of the week, not the first. "Last week" is the previous Monday–Sunday.
-
-## Data
-You may only use tools to read THIS athlete's Strava data (the Discord user talking to you). Never request or invent another rider's activities.
-Typical flow: get_recent_activities first, then get_activity_details for a specific session, plus profile/stats/zones as needed. get_zwiftpower_context is optional extra (category/phenotype).
-Saving a chat note must not skip Strava when they asked about training.
-
-## Coach settings (standing)
-${settingsBlock}
-
-These are standing constraints from the athlete's Coach settings. Read-only — there is no tool to write settings.
-If they ask what their settings are (rides/week, sports, weekly slots, injuries, reply style), summarize the Coach settings block above. You already have it. Do not say you cannot see settings. Do not invent a tool.
-If they ask to change rides per week, sports, lasting injuries, or reply style, tell them to edit Mine sider → Coach: ${MY_PAGES_COACH_URL}
-Never say you saved a setting, injury, or style to their profile.
-
-## Active goals
-${goalsBlock}
-
-${notesOptIn
-    ? `These are the only saved goals. If this block lists any, default coaching (plan, load, check-ins) toward those dates. Cite the nearest date. Injuries still override.
-If they ask what their goals are, summarize this block. Do not say you cannot see goals. If it says no saved goals, say so.
-To add or change a goal, call propose_coach_goal and wait for Ja. Never say a goal is saved until they press Ja. Only propose when they call it their mål / goal or ask you to remember a dated aim — not for a casual upcoming ride.
-If they already have 3 goals, ask which to replace and pass replaceNoteId.`
-    : `Chat notes are off, so you cannot save or remember goals. If they name an aim, still help toward it in THIS conversation. Say clearly that you will not remember it next time unless they turn chat notes on under Mine sider → Coach: ${MY_PAGES_COACH_URL}. Do not refuse to help. Do not invent a saved goal.`}
-
-## Chat notes
-${notesBlock}
-
-${notesOptIn
-    ? `Standard notes only — dated hints, not standing rules, and not goals. Compare a note's date to today: a yesterday "felt ill" note matters today; a two-week-old tired note does not mean rest them now unless they bring it up.
-If they ask to forget a note or goal, tell them to delete it on ${MY_PAGES_COACH_URL} (Coach tab).
-Use search_past_notes when they refer to something discussed earlier that is not in this block.
-When they name a feeling, one-off plan, or life schedule worth keeping, call save_chat_notes. Save silently. Never put a goal in save_chat_notes.`
-    : `Chat notes are off. Do not invent notes.`}
-
-## What goes where
-- Settings (web only): rides/week, sports, weekly slots, lasting injuries, reply style.
-- Standard notes (silent, notes on): feelings, one-off plans, life schedule. A casual "jeg kører ZRL søndag" is a standard note if worth keeping — not a goal.
-- Goals (Ja or Mine sider only): dated aims they explicitly want remembered ("tabe 3 kg inden 1. dec", "ZRL 18. okt er mit mål").
-- There is no other goal type. Never send them to a Goals form.
-
-## Coaching style
-- Obey the language in Coach settings when present; otherwise match the chat (Danish or English).
-- Be a practical endurance coach: load, recovery, easy days, intensity distribution, race prep.
-- Cite specific recent sessions (date, duration, power/HR) from tool results. Never invent numbers that were not returned by a tool.
-- If tools fail, say so and ask them to reconnect Strava if needs_reconnect/connectUrl is present.
-- Not medical advice. Do not prescribe training through illness, injury, chest pain, or disordered eating. Suggest seeing a professional when relevant.
-- Do not give doping, extreme restriction, or dangerous overtraining advice.
-- Keep replies concise (Discord) unless they asked for detailed replies. Use short bullets when listing sessions.
-- Never mention or invent Strava access tokens, refresh tokens, or Firestore documents.
-
-## Current context
-- Athlete: ${message.author.username}`;
-
-  return { content, notesOptIn };
+  return { content, notesOptIn, profile };
 }
 
 /**
@@ -1766,14 +1928,48 @@ function lastAssistantText(conversation) {
   return "";
 }
 
-function scheduleCoachNoteExtract(args) {
+// One buffer per coach conversation, flushed when the chat goes idle or gets long.
+//
+// Extraction used to run after every single exchange: a separate OpenAI call per message, each
+// seeing one exchange with no arc. That produced fragmentary, overlapping notes — which is why
+// isNearDuplicate and the "deduplicate against recent notes" prompt rule had to exist. Once per
+// conversation sees the whole thing and writes one good note where per-message wrote four
+// mediocre ones, at a fraction of the cost.
+const coachSessionBuffers = new Map();
+
+// Flush before the 30-minute idle timer if a conversation runs long, so a marathon chat is not
+// lost to a deploy.
+const SESSION_FLUSH_TURNS = 12;
+
+function bufferCoachTurn(key, { discordId, username, userMessage, assistantText }) {
+  if (!coachSessionBuffers.has(key)) {
+    coachSessionBuffers.set(key, { discordId, username, turns: [] });
+  }
+  const buffer = coachSessionBuffers.get(key);
+  buffer.username = username || buffer.username;
+  buffer.turns.push({ userMessage, assistantText });
+  return buffer;
+}
+
+/** Flush a buffered conversation into notes plus one summary. Never throws to the caller. */
+function flushCoachSession(key) {
+  const buffer = coachSessionBuffers.get(key);
+  coachSessionBuffers.delete(key);
+  if (!buffer || !buffer.turns.length) return;
   Promise.resolve()
-    .then(() => extractCoachChatNotes(args))
+    .then(() => extractCoachChatNotes(buffer))
     .catch((err) => console.error("extractCoachChatNotes failed:", err?.message || err));
 }
 
-async function extractCoachChatNotes({ discordId, username, userMessage, assistantText }) {
-  if (!openai || shouldSkipExtract(userMessage) || !String(assistantText || "").trim()) return;
+async function extractCoachChatNotes({ discordId, username, turns }) {
+  const rows = Array.isArray(turns) ? turns : [];
+  if (!openai || !rows.length) return;
+
+  // Join the conversation into one exchange for the extractor.
+  const userMessage = rows.map((t) => t.userMessage).filter(Boolean).join("\n");
+  const assistantText = rows.map((t) => t.assistantText).filter(Boolean).join("\n");
+  // A whole conversation of nothing but acknowledgements is still not worth a call.
+  if (rows.every((t) => shouldSkipExtract(t.userMessage)) || !String(assistantText).trim()) return;
   let coachSettings = "";
   let recentNotes = [];
   try {
@@ -1800,7 +1996,8 @@ async function extractCoachChatNotes({ discordId, username, userMessage, assista
   const response = await callOpenAIWithRetry(
     buildChatCompletionParams({
       messages,
-      maxTokens: 400,
+      // A whole conversation plus a summary needs more room than a single exchange did.
+      maxTokens: 900,
       reasoningEffort: "low",
     })
   );
@@ -1820,7 +2017,14 @@ async function extractCoachChatNotes({ discordId, username, userMessage, assista
       console.error("extract recordCoachUsage failed:", err?.message || err);
     }
   }
-  const parsed = parseExtractedNotes(getMessageText(response.choices[0]?.message), now.toISOString());
+  const raw = getMessageText(response.choices[0]?.message);
+  const parsed = parseExtractedNotes(raw, now.toISOString());
+  const summary = parseExtractedSummary(raw);
+  if (summary) {
+    // The conversation itself is never stored — coachHowItWorks promises that. The summary is
+    // what gives continuity across days.
+    parsed.push({ text: summary, kind: "session", at: now.toISOString() });
+  }
   if (!parsed.length) return;
   await addCoachChatNotes(discordId, parsed, { at: now });
 }
@@ -1887,8 +2091,12 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     if (!mentioned && !repliedToMe) return;
   }
   
+  // Declared outside the try because the catch block flushes it. It was previously scoped to the
+  // try, so every errored coach turn threw a ReferenceError from its own error handler after
+  // replying — losing the token accounting and burying the real OpenAI error in the logs.
+  let coachUsageTally = null;
+
   try {
-    let coachUsageTally = null;
     let notesSavedThisTurn = false;
 
     // Show typing indicator
@@ -1923,7 +2131,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     }
 
     // Shortcut: "mine stats" → use caller's linked ZwiftID directly (club bot only)
-    const normalized = cleanedMessage.toLowerCase().replace(/[!?\.]+$/g, '').trim();
+    const normalized = cleanedMessage.toLowerCase().replace(/[!?.]+$/g, '').trim();
     if (!coachOnly && (normalized === "mine stats" || normalized === "my stats")) {
       const zwiftId = await getUserZwiftId(message.author.id);
       if (!zwiftId) {
@@ -1950,9 +2158,14 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     const conversationKey = getConversationKey(message);
     const isCoachSession = coachOnly;
 
+    // Resolved once per turn and threaded into every tool call. isPaidClubMember costs a
+    // document read plus a payments query, and getCoachProfile decrypts; doing both per tool
+    // meant a three-tool turn spent ~8 Firestore operations on authorisation alone.
+    const turnContext = { eligible: false, profile: null };
+
     if (isCoachSession) {
-      const eligible = await strava.hasClubMemberRole(message.author.id);
-      if (!eligible) {
+      turnContext.eligible = await strava.hasClubMemberRole(message.author.id);
+      if (!turnContext.eligible) {
         await safeReply(message, NOT_CLUB_MEMBER_TEXT);
         return;
       }
@@ -1961,12 +2174,25 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
         await safeReply(message, unconnectedCoachText(message.author.id));
         return;
       }
+
+      if (COACH_DAILY_TOKEN_BUDGET > 0) {
+        const usedToday = await getCoachDailyTokens(message.author.id);
+        if (usedToday >= COACH_DAILY_TOKEN_BUDGET) {
+          await safeReply(
+            message,
+            "🛑 Du har brugt dagens coaching-budget. Jeg er klar igen i morgen — skriv endelig da."
+          );
+          return;
+        }
+      }
     }
 
     const knowledgeCatalog = isCoachSession ? [] : await getKnowledgeCatalog();
     const coachPrompt = isCoachSession
       ? await buildCoachSystemPrompt(message, cleanedMessage)
       : null;
+    // buildCoachSystemPrompt already fetched and decrypted the profile; reuse it.
+    turnContext.profile = coachPrompt?.profile ?? null;
     const systemPrompt = isCoachSession
       ? coachPrompt.content
       : buildSystemPrompt(message, knowledgeCatalog);
@@ -2010,12 +2236,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     });
     
     // Trim conversation if too long (keep system message)
-    if (conversation.length > MAX_CONVERSATION_LENGTH + 1) {
-      conversation = [
-        conversation[0], // Keep system message
-        ...conversation.slice(-(MAX_CONVERSATION_LENGTH))
-      ];
-    }
+    conversation = trimConversation(conversation);
     
     // Call OpenAI with retry logic
     const response = await callAndTrack(
@@ -2047,7 +2268,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
 
       while (currentToolCalls && currentToolCalls.length > 0 && iteration < maxIters) {
         // Execute all tool calls (parallel if multiple)
-        toolResults = await executeToolCalls(currentToolCalls, message);
+        toolResults = await executeToolCalls(currentToolCalls, message, turnContext);
         if (toolResults.some((r) => Array.isArray(r.saved) && r.saved.length > 0)) {
           notesSavedThisTurn = true;
         }
@@ -2073,12 +2294,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
 
         if (hasStatsCall && allSuccessful && shouldSkipGenericAnswer) {
           // Trim conversation before follow-up
-          if (conversation.length > MAX_CONVERSATION_LENGTH + 1) {
-            conversation = [
-              conversation[0],
-              ...conversation.slice(-(MAX_CONVERSATION_LENGTH))
-            ];
-          }
+          conversation = trimConversation(conversation);
 
           try {
             const isTeamStats = currentToolCalls.some(tc => tc.function.name === "team_stats");
@@ -2148,12 +2364,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
         // Generic answer step: turn tool results into a natural-language reply when tools didn't already reply.
         if (!shouldSkipGenericAnswer) {
           // Trim before asking again
-          if (conversation.length > MAX_CONVERSATION_LENGTH + 1) {
-            conversation = [
-              conversation[0],
-              ...conversation.slice(-(MAX_CONVERSATION_LENGTH))
-            ];
-          }
+          conversation = trimConversation(conversation);
 
           const postTool = await callAndTrack(
             buildChatCompletionParams({
@@ -2241,12 +2452,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     }
     
     // Trim conversation if it has grown too long after processing
-    if (conversation.length > MAX_CONVERSATION_LENGTH + 1) {
-      conversation = [
-        conversation[0],
-        ...conversation.slice(-(MAX_CONVERSATION_LENGTH))
-      ];
-    }
+    conversation = trimConversation(conversation);
 
     // Save updated conversation
     userConversations.set(conversationKey, conversation);
@@ -2255,12 +2461,14 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     resetConversationTimeout(conversationKey);
 
     if (isCoachSession && notesOptIn && !notesSavedThisTurn) {
-      scheduleCoachNoteExtract({
+      const buffer = bufferCoachTurn(conversationKey, {
         discordId: message.author.id,
         username: message.author.username,
         userMessage: cleanedMessage,
         assistantText: lastAssistantText(conversation),
       });
+      // Long conversations flush early so a deploy cannot lose the whole thing.
+      if (buffer.turns.length >= SESSION_FLUSH_TURNS) flushCoachSession(conversationKey);
     }
 
     await flushCoachUsage(coachUsageTally, message);
