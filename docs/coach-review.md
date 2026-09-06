@@ -2,6 +2,39 @@
 
 _Reviewed against `06fe73d`; prerequisites run and decisions locked 2026-09-06._
 
+---
+
+## Status: implemented
+
+Every stage below has been implemented on `claude/dzr-coach-review-h5ke6j`. The document is kept
+as the record of why each change was made — the reasoning is the part worth preserving.
+
+| Stage | Status | Notes |
+|---|---|---|
+| Prereqs | Done | Backup restore-tested; no Strava subscription; no split key |
+| 0 — webhook | Done | Case A: POST handler and its dead lookup deleted, GET kept |
+| 1 — data loss | Done | Transactions, merge-only stamps, trim fix, fail-closed crypto, canary |
+| 2 — measurable | Done | 87 unit tests, CI (typecheck, both lints, sync, prompt structure), 10-scenario golden set |
+| 3 — de-duplication | Done | `tokenCrypto`, `coachProfile`, `coachChatNotes`, `isPaidClubMember` all shared; `keyId` added |
+| 4 — latency & cost | Done | Auth N+1 removed, follow-up window widened, daily budget, pending goals persisted |
+| 5 — streams | Done | Mean-max power, NP, IF/TSS, decoupling, intervals; irregular sampling handled |
+| 6a — load trend | Done | Weekly rollups, throttled nightly backfill |
+| 6b — the sport | Done | `## Sport` section, `get_club_races` |
+| 6c — summaries | Done | Extraction moved to session close, summaries stored, privacy copy updated |
+| 6d — advice loop | Done | Recommendations saved as `plan` notes, check-in follows up on them |
+| 6e — workouts | Done | `.zwo` generated and attached with per-member install steps |
+| 6f — quality signal | Done | 👍/👎 on coach DMs, surfaced on the admin dashboard |
+| 7 — prompt | Partly | Reply contract, `language: null`, pre-loaded context, illness section. **Negation pruning deliberately left** — it needs measurement against the golden set, one at a time |
+
+**Deploy notes.** Nothing here requires a member to reconnect Strava. Two optional env vars are
+new: `COACH_DAILY_TOKEN_BUDGET` (default 300000), and `STRAVA_WEBHOOK_VERIFY_TOKEN` has moved to
+the root `.env.example`. The bot now refuses to start if `COACH_MEMORY_KEY` does not match the key
+existing coach memory was encrypted with — that is intended, and P3 confirmed the keys agree.
+
+**Still open.** Stage 7's negation pruning, and the findings listed near the end of this document
+as deferred by decision (OAuth `state` binding, `howItWorksSentAt` reset disagreement, raw error
+messages to clients, unpinned Python dependencies, `raceSignups` rules).
+
 Rewritten to be executable. Corrections from the `9bccb30` verification are applied **in place**;
 there is no longer a separate appendix contradicting the body. Findings detail is at the end as
 reference while implementing.
