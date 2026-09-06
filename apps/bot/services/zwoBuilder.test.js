@@ -69,3 +69,42 @@ test("filenames stay filesystem-safe", () => {
   assert.equal(buildZwo({ name: "Tærskel / 2×20 (hård!)", steps: [{ type: "steady", duration: 60 }] }).filename,
     "t-rskel-2-20-h-rd.zwo");
 });
+
+test("segments flatten interval blocks into individual efforts on a timeline", () => {
+  const { workoutSegments } = require("./zwoBuilder");
+  const segments = workoutSegments([
+    { type: "warmup", duration: 600, powerFrom: 0.45, powerTo: 0.75 },
+    { type: "intervals", repeat: 2, onDuration: 240, offDuration: 120, onPower: 1.05, offPower: 0.55 },
+    { type: "cooldown", duration: 300 },
+  ]);
+  // warmup + (work + recovery) x2 + cooldown
+  assert.equal(segments.length, 6);
+  assert.equal(segments[0].powerFrom, 0.45, "a ramp keeps both endpoints so it draws as a slope");
+  assert.equal(segments[0].powerTo, 0.75);
+  assert.equal(segments[1].powerFrom, 1.05);
+  assert.equal(segments[2].powerFrom, 0.55);
+});
+
+test("segments are contiguous, so the chart has no gaps or overlaps", () => {
+  const { workoutSegments } = require("./zwoBuilder");
+  const segments = workoutSegments(vo2.steps);
+  let expected = 0;
+  for (const segment of segments) {
+    assert.equal(segment.startSeconds, expected, "each segment starts where the last ended");
+    expected += segment.durationSeconds;
+  }
+  assert.equal(expected, workoutDuration(vo2.steps), "segments cover the whole workout");
+});
+
+test("a steady step becomes a flat segment", () => {
+  const { workoutSegments } = require("./zwoBuilder");
+  const [segment] = workoutSegments([{ type: "steady", duration: 1200, power: 0.85 }]);
+  assert.equal(segment.powerFrom, 0.85);
+  assert.equal(segment.powerTo, 0.85, "flat, not a ramp");
+});
+
+test("no steps means nothing to draw", () => {
+  const { workoutSegments } = require("./zwoBuilder");
+  assert.deepEqual(workoutSegments([]), []);
+  assert.deepEqual(workoutSegments(null), []);
+});
