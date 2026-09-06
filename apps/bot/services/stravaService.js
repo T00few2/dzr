@@ -3,6 +3,7 @@ const admin = require("firebase-admin");
 const config = require("../config/config");
 const shared = require("../constants.json");
 const { db, getUserZwiftId, getLatestClubStats, isPaidClubMember } = require("./firebase");
+const metrics = require("./streamMetrics");
   const {
     canEncryptTokens,
     encryptedTokenFields,
@@ -382,6 +383,102 @@ async function getZwiftPowerContext(discordId) {
   }
 }
 
+const STREAM_CACHE_COLLECTION = "coach_activity_metrics";
+
+/**
+ * Derived power metrics for one activity.
+ *
+ * Deliberately narrow. Streams are one request per activity against a per-app rate limit shared
+ * by the entire club, so this is on-demand for the single activity the athlete asked about, and
+ * cached by activity id — never swept across a date range and never called from the 08:00
+ * follow-up loop.
+ *
+ * Streams themselves are never returned: a two-hour ride is ~7,200 samples per stream, which
+ * would swamp the model's context. Only the summary below crosses the boundary.
+ */
+async function getActivityMetrics(discordId, activityId) {
+  const id = String(activityId || "").trim();
+  if (!/^\d+$/.test(id)) {
+    return { success: false, message: "Invalid activity id." };
+  }
+
+  const cacheRef = db.collection(STREAM_CACHE_COLLECTION).doc(id);
+  try {
+    const cached = await cacheRef.get();
+    if (cached.exists) {
+      const data = cached.data() || {};
+      if (String(data.discordId) === String(discordId)) {
+        return { success: true, cached: true, metrics: data.metrics || null, message: data.message || null };
+      }
+    }
+  } catch (err) {
+    console.warn("activity metrics cache read failed:", err?.message || err);
+  }
+
+  return wrapCall(discordId, async () => {
+    const { data: activity, conn } = await stravaGet(discordId, `/activities/${id}`);
+
+    const ownerId = activity?.athlete?.id;
+    if (conn.athleteId && ownerId && Number(ownerId) !== Number(conn.athleteId)) {
+      return { success: false, message: "That activity is not yours." };
+    }
+
+    // Estimated power (no meter or smart trainer) makes a power curve fiction. Refuse rather
+    // than present confident numbers derived from speed and gradient.
+    if (activity?.device_watts === false) {
+      return {
+        success: true,
+        metrics: null,
+        message: "This ride has no power meter data — Strava estimated the watts, so power numbers would be unreliable. Comment on duration, heart rate and how it felt instead.",
+      };
+    }
+
+    const { data: streams } = await stravaGet(
+      discordId,
+      `/activities/${id}/streams?keys=time,watts,heartrate&key_by_type=true`
+    );
+
+    const time = streams?.time?.data;
+    const watts = metrics.resampleTo1Hz(time, streams?.watts?.data, "zero");
+    const heartrate = metrics.resampleTo1Hz(time, streams?.heartrate?.data, "hold");
+
+    if (!watts.length) {
+      return { success: true, metrics: null, message: "No power stream on this activity." };
+    }
+
+    const ftp = Number(activity?.athlete?.ftp) || Number(conn.ftp) || null;
+    const np = metrics.normalizedPower(watts);
+    const durationSeconds = watts.length;
+
+    const summary = {
+      durationSeconds,
+      averageWatts: Math.round(watts.reduce((a, b) => a + b, 0) / watts.length),
+      normalizedPower: np,
+      intensityFactor: metrics.intensityFactor(np, ftp),
+      trainingStressScore: metrics.trainingStressScore(np, ftp, durationSeconds),
+      meanMaxPower: metrics.meanMaxPower(watts),
+      aerobicDecouplingPercent: metrics.aerobicDecoupling(watts, heartrate),
+      intervals: ftp
+        ? metrics.detectIntervals(watts, { thresholdWatts: Math.round(ftp * 0.95) }).slice(0, 12)
+        : [],
+      ftpUsed: ftp,
+    };
+
+    try {
+      await cacheRef.set({
+        discordId: String(discordId),
+        activityId: id,
+        metrics: summary,
+        cachedAt: new Date(),
+      });
+    } catch (err) {
+      console.warn("activity metrics cache write failed:", err?.message || err);
+    }
+
+    return { success: true, metrics: summary };
+  });
+}
+
 module.exports = {
   mintConnectToken,
   getConnectUrl,
@@ -395,4 +492,5 @@ module.exports = {
   getRecentActivities,
   getActivityDetails,
   getZwiftPowerContext,
+  getActivityMetrics,
 };

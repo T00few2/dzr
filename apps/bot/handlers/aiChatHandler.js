@@ -174,6 +174,7 @@ function compactToolResult(result) {
   if (result.zones) base.zones = result.zones;
   if (Array.isArray(result.activities)) base.activities = result.activities.slice(0, 40);
   if (result.activity) base.activity = result.activity;
+  if (result.metrics) base.metrics = result.metrics;
   if (typeof result.days === "number") base.days = result.days;
   if (result.needs_reconnect) base.needs_reconnect = true;
   if (result.not_club_member) base.not_club_member = true;
@@ -614,6 +615,20 @@ const coachToolDefinitions = [
             type: "string",
             description: "Strava activity id"
           }
+        },
+        required: ["activity_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_activity_metrics",
+      description: "Power analysis for ONE of the asking athlete's activities: mean-maximal power curve, normalized power, intensity factor, TSS, aerobic decoupling and detected work intervals. Use when they ask how a specific session went, whether intervals were good, or how hard a ride actually was. Costs a Strava request, so call it for one activity at a time, not across a week.",
+      parameters: {
+        type: "object",
+        properties: {
+          activity_id: { type: "string", description: "Strava activity id from get_recent_activities" }
         },
         required: ["activity_id"]
       }
@@ -1279,6 +1294,7 @@ async function executeSingleToolCall(toolCall, message, turn) {
       case "get_athlete_zones":
       case "get_recent_activities":
       case "get_activity_details":
+      case "get_activity_metrics":
       case "get_zwiftpower_context": {
         const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
         if (!eligible) {
@@ -1291,6 +1307,7 @@ async function executeSingleToolCall(toolCall, message, turn) {
         else if (name === "get_athlete_zones") coachResult = await strava.getAthleteZones(discordId);
         else if (name === "get_recent_activities") coachResult = await strava.getRecentActivities(discordId, { days: args.days });
         else if (name === "get_activity_details") coachResult = await strava.getActivityDetails(discordId, args.activity_id);
+        else if (name === "get_activity_metrics") coachResult = await strava.getActivityMetrics(discordId, args.activity_id);
         else coachResult = await strava.getZwiftPowerContext(discordId);
         return { tool_call_id: toolCall.id, ...(coachResult || { success: false, message: "No data" }) };
       }
@@ -1702,6 +1719,8 @@ What that changes:
 ## Data
 You may only use tools to read THIS athlete's Strava data (the Discord user talking to you). Never request or invent another rider's activities.
 Typical flow: get_recent_activities first, then get_activity_details for a specific session, plus profile/stats/zones as needed. get_zwiftpower_context is optional extra (category/phenotype).
+For "how was that session" or "were my intervals any good", call get_activity_metrics on that one activity. It returns the mean-maximal power curve, normalized power, IF, TSS, aerobic decoupling and detected intervals. One activity at a time — it costs a Strava request shared across the whole club.
+get_recent_activities returns averages only. Do not judge interval quality from an average; either fetch metrics or say you only have the summary. If metrics come back null because the ride has no power meter, say so and talk about duration, heart rate and feel instead.
 Saving a chat note must not skip Strava when they asked about training.
 
 ## Coach settings (standing)
