@@ -1,5 +1,5 @@
 const OpenAI = require("openai");
-const { ChannelType, MessageFlags } = require("discord.js");
+const { ChannelType, MessageFlags, AttachmentBuilder } = require("discord.js");
 const config = require("../config/config");
 const {
   getAllBotKnowledge,
@@ -31,6 +31,7 @@ const { unconnectedCoachText, NOT_CLUB_MEMBER_TEXT, USE_COACH_BOT_TEXT } = requi
 const { formatCoachProfileForPrompt } = require("../services/coachProfile");
 const { MY_PAGES_COACH_URL, noEmbedUrl } = require("../services/coachHowItWorks");
 const { proposeCoachGoal } = require("../services/coachGoalConfirm");
+const { buildZwo, describeWorkout } = require("../services/zwoBuilder");
 const {
   EPISODE_NOTE_KINDS,
   shouldSkipExtract,
@@ -709,6 +710,41 @@ const coachToolDefinitions = [
   {
     type: "function",
     function: {
+      name: "send_workout_file",
+      description: "Build a Zwift workout (.zwo) and send it to the athlete as a file they can ride. Use when prescribing a specific structured session and they would benefit from executing it exactly. Power is set as a fraction of their FTP, so Zwift scales it for them. Do not use for general advice or an easy ride — only for a structured session worth following step by step.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Short workout name, e.g. 'VO2 5x4' or 'Tærskel 2x20'." },
+          description: { type: "string", description: "One or two sentences on the purpose of the session." },
+          steps: {
+            type: "array",
+            description: "Ordered steps. Start with a warmup and end with a cooldown.",
+            items: {
+              type: "object",
+              properties: {
+                type: { type: "string", enum: ["warmup", "steady", "intervals", "freeride", "cooldown"] },
+                duration: { type: "number", description: "Seconds. For warmup, steady, freeride and cooldown." },
+                power: { type: "number", description: "Fraction of FTP for a steady step, e.g. 0.65." },
+                powerFrom: { type: "number", description: "Warmup/cooldown start, fraction of FTP." },
+                powerTo: { type: "number", description: "Warmup/cooldown end, fraction of FTP." },
+                repeat: { type: "number", description: "Interval repetitions." },
+                onDuration: { type: "number", description: "Work seconds per repetition." },
+                offDuration: { type: "number", description: "Recovery seconds per repetition." },
+                onPower: { type: "number", description: "Work power, fraction of FTP, e.g. 1.05." },
+                offPower: { type: "number", description: "Recovery power, fraction of FTP, e.g. 0.55." }
+              },
+              required: ["type"]
+            }
+          }
+        },
+        required: ["name", "steps"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "get_club_races",
       description: "DZR club race series and their usual weekly ride times (ZRL, WTRL TTT, DRS, Club Ladder, DZR After Party). Use when planning the athlete's week around racing, or when they mention a club race and you need to know when it runs.",
       parameters: {
@@ -1319,6 +1355,61 @@ async function executeSingleToolCall(toolCall, message, turn) {
         return { tool_call_id: toolCall.id, ...(coachResult || { success: false, message: "No data" }) };
       }
 
+      case "send_workout_file": {
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        if (!eligible) {
+          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+        }
+        try {
+          const built = buildZwo({ name: args.name, description: args.description, steps: args.steps });
+          const outline = describeWorkout(args.steps);
+          const minutes = Math.round(built.durationSeconds / 60);
+
+          // Zwift only reads custom workouts from a local folder, and only on PC/Mac. Naming the
+          // athlete's own folder removes most of the friction; saying the rest plainly stops
+          // iPad and Apple TV riders assuming the file is broken.
+          let folder = "Documents/Zwift/Workouts/<dit Zwift-ID>/";
+          try {
+            const zwiftId = await getUserZwiftId(message.author.id);
+            if (zwiftId) folder = `Documents/Zwift/Workouts/${zwiftId}/`;
+          } catch {
+            /* fall back to the generic path */
+          }
+
+          const body = [
+            `🚴 **${args.name}** — ca. ${minutes} min`,
+            outline,
+            "",
+            "**Sådan bruger du filen**",
+            `1. Gem den i \`${folder}\``,
+            "2. Genstart Zwift",
+            "3. Find den under Workouts → Custom Workouts",
+            "",
+            "Det kræver PC eller Mac. På iPad, iPhone og Apple TV kan man ikke lægge filer ind — brug en computer til at installere den.",
+          ].join("\n");
+
+          await message.channel.send({
+            content: body,
+            files: [new AttachmentBuilder(Buffer.from(built.xml, "utf8"), { name: built.filename })],
+            flags: MessageFlags.SuppressEmbeds,
+          });
+
+          return {
+            tool_call_id: toolCall.id,
+            success: true,
+            sent: true,
+            message: "Workout file sent with its outline and install steps. Do not repeat the step list in your reply — say briefly why this session, and what to watch for while riding it.",
+          };
+        } catch (err) {
+          console.error("send_workout_file failed:", err?.message || err);
+          return {
+            tool_call_id: toolCall.id,
+            success: false,
+            message: "Could not build that workout file. Describe the session in text instead.",
+          };
+        }
+      }
+
       case "get_club_races": {
         const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
         if (!eligible) {
@@ -1756,6 +1847,11 @@ What that changes:
 You may only use tools to read THIS athlete's Strava data (the Discord user talking to you). Never request or invent another rider's activities.
 Typical flow: get_recent_activities first, then get_activity_details for a specific session, plus profile/stats/zones as needed. get_zwiftpower_context is optional extra (category/phenotype).
 For "how was that session" or "were my intervals any good", call get_activity_metrics on that one activity. It returns the mean-maximal power curve, normalized power, IF, TSS, aerobic decoupling and detected intervals. One activity at a time — it costs a Strava request shared across the whole club.
+When you prescribe a specific structured session worth following step by step, call
+send_workout_file — it builds a Zwift .zwo and sends it with install steps. Power is a fraction of
+their FTP, so Zwift scales it. Not for easy rides or general advice. The file's message already
+lists the steps, so do not repeat them: say why this session and what to watch for.
+
 get_recent_activities returns averages only. Do not judge interval quality from an average; either fetch metrics or say you only have the summary. If metrics come back null because the ride has no power meter, say so and talk about duration, heart rate and feel instead.
 Saving a chat note must not skip Strava when they asked about training.
 
