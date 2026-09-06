@@ -38,9 +38,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: apps/bot/.nvmrc
-          cache: npm
-          cache-dependency-path: apps/bot/package-lock.json
-      - run: npm ci
+      # Deliberately no `npm ci`. The bot's dependency tree includes chartjs-node-canvas ->
+      # canvas, a native module that needs cairo/pixman headers to compile; installing it here
+      # fails on the runner and costs minutes even when it works. None of it is needed: every
+      # tested module depends on nothing outside Node's standard library, and evals/run.js only
+      # requires `openai` inside the non-dry-run branch.
+      #
       # Only pure modules are covered. Anything importing services/firebase.js initialises the
       # Firebase Admin SDK at module load and cannot run without credentials.
       - name: Unit tests
