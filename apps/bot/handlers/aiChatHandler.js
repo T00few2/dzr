@@ -32,6 +32,7 @@ const { formatCoachProfileForPrompt } = require("../services/coachProfile");
 const { MY_PAGES_COACH_URL, noEmbedUrl } = require("../services/coachHowItWorks");
 const { proposeCoachGoal } = require("../services/coachGoalConfirm");
 const { buildZwo, describeWorkout } = require("../services/zwoBuilder");
+const { renderWorkoutChart } = require("../services/workoutChart");
 const { buildCoachPromptText } = require("../services/coachPrompt");
 const {
   EPISODE_NOTE_KINDS,
@@ -1389,9 +1390,20 @@ async function executeSingleToolCall(toolCall, message, turn) {
             "Det kræver PC eller Mac. På iPad, iPhone og Apple TV kan man ikke lægge filer ind — brug en computer til at installere den.",
           ].join("\n");
 
+          const files = [new AttachmentBuilder(Buffer.from(built.xml, "utf8"), { name: built.filename })];
+
+          // The profile picture is a convenience; the .zwo is the deliverable. renderWorkoutChart
+          // returns null rather than throwing if canvas is unavailable, so a missing image never
+          // costs the athlete their workout.
+          const chart = renderWorkoutChart(args.steps, { name: args.name });
+          if (chart) {
+            files.push(new AttachmentBuilder(chart, { name: built.filename.replace(/\.zwo$/, ".png") }));
+          }
+
           await message.channel.send({
             content: body,
-            files: [new AttachmentBuilder(Buffer.from(built.xml, "utf8"), { name: built.filename })],
+            files,
+            // Suppresses link previews, not attachments — the PNG still renders inline.
             flags: MessageFlags.SuppressEmbeds,
           });
 

@@ -22,13 +22,22 @@ async function recordCoachFeedback(reaction, user) {
     if (!message?.author?.bot) return false;
     if (message.guild) return false;
 
+    // Rating only — deliberately no copy of the reply.
+    //
+    // An earlier version stored the first 280 characters of the coach's reply, on the reasoning
+    // that it was bot output rather than the athlete's words. That distinction does not hold:
+    // coach replies routinely quote the athlete's own data back at them ("du var syg i tirsdags,
+    // og med dine 72 kg..."), so the preview was illness, weight and FTP in cleartext — in a
+    // collection that, unlike coach_profiles and coach_chat_notes, is not encrypted and is not
+    // covered by the delete controls on Mine sider.
+    //
+    // The counts are what the signal is for. To read *what* was rated, open the DM: messageId
+    // identifies it. If richer context is ever needed for eval fixtures, store the exchange
+    // deliberately — encrypted, deletable and disclosed — rather than keeping half a copy here.
     await db.collection(COLLECTION).add({
       discordId: String(user.id),
       messageId: String(message.id),
       rating: emoji === "👍" ? 1 : -1,
-      // The reply text is kept short and only for reading back what was rated. It is coach
-      // output, not the athlete's words, and never leaves the admin view.
-      replyPreview: String(message.content || "").slice(0, 280),
       at: new Date(),
     });
     return true;

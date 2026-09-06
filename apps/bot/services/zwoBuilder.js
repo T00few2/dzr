@@ -103,6 +103,48 @@ function buildZwo(spec) {
   return { xml, filename: `${slug.slice(0, 48)}.zwo`, durationSeconds: workoutDuration(steps) };
 }
 
+/**
+ * Flatten steps into drawable segments on a timeline.
+ *
+ * Interval blocks expand into their individual work and recovery efforts, and ramps carry both
+ * endpoints so a warmup can be drawn as a slope rather than a step. Pure and tested, so the chart
+ * renderer stays a thin drawing layer over data that is already known to be correct.
+ *
+ * @returns {Array<{startSeconds, durationSeconds, powerFrom, powerTo}>}
+ */
+function workoutSegments(steps) {
+  const out = [];
+  let cursor = 0;
+  const push = (durationSeconds, powerFrom, powerTo) => {
+    out.push({ startSeconds: cursor, durationSeconds, powerFrom, powerTo: powerTo ?? powerFrom });
+    cursor += durationSeconds;
+  };
+
+  for (const step of Array.isArray(steps) ? steps : []) {
+    const type = String(step?.type || "steady").toLowerCase();
+    if (type === "warmup") {
+      push(clampDuration(step.duration, 600), clampPower(step.powerFrom, 0.45), clampPower(step.powerTo, 0.75));
+    } else if (type === "cooldown") {
+      push(clampDuration(step.duration, 600), clampPower(step.powerFrom, 0.65), clampPower(step.powerTo, 0.45));
+    } else if (type === "intervals") {
+      const repeat = Math.min(50, Math.max(1, Math.round(Number(step.repeat) || 1)));
+      const onDuration = clampDuration(step.onDuration, 240);
+      const offDuration = clampDuration(step.offDuration, 240);
+      const onPower = clampPower(step.onPower, 1.05);
+      const offPower = clampPower(step.offPower, 0.55);
+      for (let i = 0; i < repeat; i++) {
+        push(onDuration, onPower);
+        push(offDuration, offPower);
+      }
+    } else if (type === "freeride") {
+      push(clampDuration(step.duration, 600), clampPower(step.power, 0.6));
+    } else {
+      push(clampDuration(step.duration, 600), clampPower(step.power, 0.65));
+    }
+  }
+  return out;
+}
+
 /** Human-readable outline for the DM, so the session is legible without opening the file. */
 function describeWorkout(steps) {
   return (Array.isArray(steps) ? steps : [])
@@ -122,4 +164,4 @@ function describeWorkout(steps) {
     .join("\n");
 }
 
-module.exports = { buildZwo, describeWorkout, workoutDuration, escapeXml, MAX_STEPS };
+module.exports = { buildZwo, describeWorkout, workoutDuration, workoutSegments, escapeXml, MAX_STEPS };
