@@ -418,7 +418,12 @@ async function getWeeklyLoad(discordId) {
     const snap = await db.collection(WEEKLY_LOAD_COLLECTION).doc(String(discordId)).get();
     if (!snap.exists) return null;
     const data = snap.data() || {};
-    return { weekly: Array.isArray(data.weekly) ? data.weekly : [], updatedAt: data.updatedAt || null };
+    return {
+      weekly: Array.isArray(data.weekly) ? data.weekly : [],
+      athlete: data.athlete || null,
+      zwiftpower: data.zwiftpower || null,
+      updatedAt: data.updatedAt || null,
+    };
   } catch (err) {
     console.warn("getWeeklyLoad failed:", err?.message || err);
     return null;
@@ -430,12 +435,32 @@ async function refreshWeeklyLoad(discordId, { days = 182 } = {}) {
   const history = await fetchActivityHistory(discordId, { days });
   if (!history?.success) return history;
 
+  // Weight and FTP change slowly, so capture them on the nightly pass rather than paying a
+  // Strava call on every chat turn just to know what the athlete weighs.
   let ftp = null;
+  let athlete = null;
   try {
     const profile = await getAthleteProfile(discordId);
     ftp = Number(profile?.athlete?.ftp) || null;
+    athlete = profile?.athlete
+      ? { weightKg: profile.athlete.weight_kg ?? null, ftp, sex: profile.athlete.sex || null }
+      : null;
   } catch {
     ftp = null;
+  }
+
+  let zwiftpower = null;
+  try {
+    const zp = await getZwiftPowerContext(discordId);
+    if (zp?.success && zp.zwiftpower?.linked) {
+      zwiftpower = {
+        paceGroup: zp.zwiftpower.paceGroup ?? null,
+        veloCategory: zp.zwiftpower.veloCategory ?? null,
+        phenotype: zp.zwiftpower.phenotype ?? null,
+      };
+    }
+  } catch {
+    zwiftpower = null;
   }
 
   const weekly = weeklyLoad.rollupWeeks(history.activities, { ftp, weeks: 26 });
@@ -443,6 +468,8 @@ async function refreshWeeklyLoad(discordId, { days = 182 } = {}) {
     discordId: String(discordId),
     weekly,
     ftpUsed: ftp,
+    athlete,
+    zwiftpower,
     updatedAt: new Date(),
   });
   return { success: true, weeks: weekly.length };

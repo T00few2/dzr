@@ -1669,11 +1669,24 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
   let summariesBlock = "Chat notes are off, so earlier conversations are not recorded.";
   let notesOptIn = false;
   let loadBlock = "No weekly history yet.";
+  let athleteFacts = [];
   try {
     const stored = await strava.getWeeklyLoad(message.author.id);
     if (stored?.weekly?.length) {
       loadBlock = formatWeeklyLoadForPrompt(stored.weekly, loadTrend(stored.weekly));
     }
+    // Captured nightly, so having these costs nothing on a chat turn — and it lets the coach
+    // reason in W/kg from the first token instead of spending a tool call to learn a weight.
+    const kg = Number(stored?.athlete?.weightKg);
+    const ftp = Number(stored?.athlete?.ftp);
+    if (Number.isFinite(kg) && kg > 0) athleteFacts.push(`Weight: ${kg.toFixed(1)} kg`);
+    if (Number.isFinite(ftp) && ftp > 0) {
+      const wkg = Number.isFinite(kg) && kg > 0 ? ` (${(ftp / kg).toFixed(2)} W/kg)` : "";
+      athleteFacts.push(`FTP: ${Math.round(ftp)} W${wkg}`);
+    }
+    if (stored?.zwiftpower?.paceGroup) athleteFacts.push(`ZwiftPower pace group: ${stored.zwiftpower.paceGroup}`);
+    if (stored?.zwiftpower?.veloCategory) athleteFacts.push(`vELO category: ${stored.zwiftpower.veloCategory}`);
+    if (stored?.zwiftpower?.phenotype) athleteFacts.push(`Phenotype: ${stored.zwiftpower.phenotype}`);
   } catch (err) {
     console.error("getWeeklyLoad failed:", err?.message || err);
   }
@@ -1792,7 +1805,7 @@ When they name a feeling, one-off plan, or life schedule worth keeping, call sav
 - Be a practical endurance coach: load, recovery, easy days, intensity distribution, race prep.
 - Cite specific recent sessions (date, duration, power/HR) from tool results. Never invent numbers that were not returned by a tool.
 - If tools fail, say so and ask them to reconnect Strava if needs_reconnect/connectUrl is present.
-- Not medical advice. Do not prescribe training through illness, injury, chest pain, or disordered eating. Suggest seeing a professional when relevant.
+- Not medical advice. See the Illness and injury section for how to handle those.
 - Do not give doping, extreme restriction, or dangerous overtraining advice.
 - Never mention or invent Strava access tokens, refresh tokens, or Firestore documents.
 
@@ -1806,8 +1819,22 @@ Unless Coach settings ask for detailed replies, every answer follows this shape:
 Do not pad with caveats, summaries of what you just said, or offers to help further. If settings
 ask for detailed replies you may go longer, but keep the same order.
 
+## Illness and injury
+Coach settings list lasting injuries; chat notes carry short-term illness and fatigue. Treat them
+differently:
+- An active injury in Coach settings is a hard constraint on every session. Work around it. Never
+  prescribe through it, and never treat it as resolved because they have not mentioned it lately.
+- A recent illness or fatigue note is about right now. Check whether it still applies before
+  building on it: ask, rather than assuming a note from four days ago still holds today.
+- Returning from illness: rebuild gradually, easy and short first, and no intensity until they
+  report feeling normal at easy pace. Do not chase a missed week's load.
+- Chest pain, breathlessness at rest, dizziness, fainting, an injury that is worsening, or any
+  sign of disordered eating: stop coaching that topic and tell them to see a doctor or another
+  qualified professional. Do not offer a training workaround. You are not a medical service.
+
 ## Current context
-- Athlete: ${message.author.username}`;
+- Athlete: ${message.author.username}${athleteFacts.length ? "\n- " + athleteFacts.join("\n- ") : ""}
+${athleteFacts.length ? "These are from the nightly refresh, so they may lag a very recent change. Reason in W/kg when it helps — Zwift racing is decided on it." : "No stored profile numbers yet; fetch them with get_athlete_profile if you need weight or FTP."}`;
 
   return { content, notesOptIn, profile };
 }
