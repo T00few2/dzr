@@ -46,6 +46,7 @@ Required site env names (set in the Vercel project; never commit values):
 - Firebase client: `NEXT_PUBLIC_FIREBASE_*`
 - Firebase admin: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
 - Strava: `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_CONNECT_SECRET`, `STRAVA_REDIRECT_URI`
+- Strava webhook (optional): `STRAVA_WEBHOOK_VERIFY_TOKEN` — only if you register a push subscription; the callback fails closed without it
 - Jobs API: `CONTENT_API_BASE_URL`, `CONTENT_API_KEY`
 - Payments: `VIPPS_*` (only if membership checkout is enabled)
 
