@@ -39,12 +39,20 @@ export async function GET(req: Request) {
   })
 
   const notesOptInById = new Map<string, boolean>()
+  const followUpEveryDaysById = new Map<string, 3 | 7 | 14 | null>()
   profilesSnap.forEach((doc) => {
     const profile = unwrapCoachMemoryDoc({ ...(doc.data() || {}), discordId: doc.id })
+    const days = Number(profile.followUpEveryDays)
     notesOptInById.set(doc.id, profile.notesOptIn === true)
+    followUpEveryDaysById.set(doc.id, days === 3 || days === 7 || days === 14 ? days : null)
   })
 
-  const ids = new Set<string>([...connectionsById.keys(), ...usageById.keys(), ...notesOptInById.keys()])
+  const ids = new Set<string>([
+    ...connectionsById.keys(),
+    ...usageById.keys(),
+    ...notesOptInById.keys(),
+    ...followUpEveryDaysById.keys(),
+  ])
 
   const people = Array.from(ids).map((discordId) => {
     const conn = connectionsById.get(discordId) || null
@@ -61,6 +69,7 @@ export async function GET(req: Request) {
       connected: hasStravaRefreshToken(conn),
       connectedAt: tsToIso(conn?.connectedAt),
       notesOptIn: notesOptInById.get(discordId) === true,
+      followUpEveryDays: followUpEveryDaysById.get(discordId) ?? null,
       messageCount: Number(usage?.messageCount || 0),
       openaiCalls: Number(usage?.openaiCalls || 0),
       promptTokens: Number(usage?.promptTokens || 0),
@@ -119,6 +128,7 @@ export async function GET(req: Request) {
     (acc, p) => {
       acc.connected += p.connected ? 1 : 0
       acc.notesOn += p.notesOptIn ? 1 : 0
+      acc.checkInOn += p.followUpEveryDays ? 1 : 0
       acc.messageCount += p.messageCount
       acc.openaiCalls += p.openaiCalls
       acc.promptTokens += p.promptTokens
@@ -126,7 +136,7 @@ export async function GET(req: Request) {
       acc.totalTokens += p.totalTokens
       return acc
     },
-    { connected: 0, notesOn: 0, messageCount: 0, openaiCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+    { connected: 0, notesOn: 0, checkInOn: 0, messageCount: 0, openaiCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 }
   )
 
   return NextResponse.json({

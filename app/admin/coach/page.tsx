@@ -28,6 +28,7 @@ type Person = {
   connected: boolean
   connectedAt: string | null
   notesOptIn: boolean
+  followUpEveryDays: 3 | 7 | 14 | null
   messageCount: number
   openaiCalls: number
   promptTokens: number
@@ -52,6 +53,11 @@ type EventRow = {
 
 function fmt(n: number) {
   return Number(n || 0).toLocaleString()
+}
+
+function fmtCheckIn(days: Person['followUpEveryDays']) {
+  if (days === 3 || days === 7 || days === 14) return `Every ${days} days`
+  return 'Off'
 }
 
 function fmtTime(iso: string | null) {
@@ -112,9 +118,10 @@ export default function CoachAdminPage() {
       <Text color="gray.300" mb={6}>
         Strava sign-ups and OpenAI token usage for coaching DMs. Usage starts after the bot is redeployed with tracking.
       </Text>
-      <SimpleGrid columns={{ base: 2, md: 3, lg: 7 }} spacing={4} mb={8}>
+      <SimpleGrid columns={{ base: 2, md: 4, lg: 8 }} spacing={4} mb={8}>
         <Stat><StatLabel>Strava connected</StatLabel><StatNumber>{fmt(totals.connected)}</StatNumber></Stat>
         <Stat><StatLabel>Notes on</StatLabel><StatNumber>{fmt(totals.notesOn)}</StatNumber></Stat>
+        <Stat><StatLabel>Check-in on</StatLabel><StatNumber>{fmt(totals.checkInOn)}</StatNumber></Stat>
         <Stat><StatLabel>People</StatLabel><StatNumber>{fmt(totals.people)}</StatNumber></Stat>
         <Stat><StatLabel>Coach messages</StatLabel><StatNumber>{fmt(totals.messageCount)}</StatNumber></Stat>
         <Stat><StatLabel>OpenAI calls</StatLabel><StatNumber>{fmt(totals.openaiCalls)}</StatNumber></Stat>
@@ -135,6 +142,7 @@ export default function CoachAdminPage() {
               <Th color="gray.400">User</Th>
               <Th color="gray.400">Strava</Th>
               <Th color="gray.400">Notes</Th>
+              <Th color="gray.400">Check-in</Th>
               <Th color="gray.400" isNumeric>Messages</Th>
               <Th color="gray.400" isNumeric>API calls</Th>
               <Th color="gray.400" isNumeric>Prompt</Th>
@@ -157,6 +165,7 @@ export default function CoachAdminPage() {
                   ) : null}
                 </Td>
                 <Td color={p.notesOptIn ? 'green.300' : 'gray.500'}>{p.notesOptIn ? 'On' : 'Off'}</Td>
+                <Td color={p.followUpEveryDays ? 'green.300' : 'gray.500'}>{fmtCheckIn(p.followUpEveryDays)}</Td>
                 <Td isNumeric>{fmt(p.messageCount)}</Td>
                 <Td isNumeric>{fmt(p.openaiCalls)}</Td>
                 <Td isNumeric>{fmt(p.promptTokens)}</Td>
