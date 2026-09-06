@@ -10,7 +10,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "lint:bot": "eslint apps/bot --no-eslintrc --config .eslintrc.bot.json --ext .js --max-warnings 25"
+    "lint:bot": "eslint apps/bot --no-eslintrc --config .eslintrc.bot.json --ext .js --max-warnings 25",
+    "sync:shared": "node scripts/sync-shared.js",
+    "check:shared": "node scripts/sync-shared.js --check"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.651.1",
