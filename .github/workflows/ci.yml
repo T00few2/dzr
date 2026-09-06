@@ -45,6 +45,11 @@ jobs:
       # Firebase Admin SDK at module load and cannot run without credentials.
       - name: Unit tests
         run: npm test
+      # Structure-only pass over the coach prompt: no API calls, no cost. The full golden set
+      # (npm run eval) needs an OpenAI key and is deliberately not in CI — model output is not
+      # perfectly deterministic, and a flaky required check is one people learn to ignore.
+      - name: Coach prompt structure
+        run: npm run eval:dry
 
   shared-sync:
     name: Shared copies are in sync
