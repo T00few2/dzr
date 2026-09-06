@@ -9,7 +9,9 @@
 // training toward it. The two runtimes must agree or the website and the coach would disagree
 // about which goals exist.
 
-const NOTE_KINDS = ["feeling", "plan", "preference_transient", "life", "race", "goal"];
+// "session" is a short summary of one conversation, written when a chat goes idle. It gives
+// cross-day continuity without storing the transcript, which the privacy copy rules out.
+const NOTE_KINDS = ["feeling", "plan", "preference_transient", "life", "race", "goal", "session"];
 const EPISODE_NOTE_KINDS = ["feeling", "plan", "preference_transient", "life"];
 const MAX_NOTE_TEXT = 280;
 const MAX_NOTES_PER_ATHLETE = 200;
@@ -277,6 +279,7 @@ function retrieveRelevantNotes(notes, query, { limit = RETRIEVE_LIMIT, now = new
     .map((note) => ({ note, score: scoreNote(note, query, now) }))
     .filter((row) => {
       if (row.note?.kind === "goal") return false;
+      if (row.note?.kind === "session") return false; // shown in their own block
       const key = row.note.id || `${row.note.eventDate || ""}:${row.note.text}`;
       return row.score >= minScore && !pinnedKeys.has(key);
     });
@@ -330,6 +333,18 @@ function formatActiveGoalsForPrompt(notes, now = new Date()) {
   return goals.map((note) => formatGoalLine(note, now)).join("\n");
 }
 
+/** The most recent session summaries, oldest first, for the "previous conversations" block. */
+function formatSessionSummariesForPrompt(notes, now = new Date(), limit = 8) {
+  const rows = (Array.isArray(notes) ? notes : [])
+    .filter((note) => note?.kind === "session" && note.text)
+    .sort((a, b) => String(a.at || "").localeCompare(String(b.at || "")))
+    .slice(-limit);
+  if (!rows.length) return "No earlier conversations recorded.";
+  return rows
+    .map((note) => `- ${formatNoteDate(note.at)} (${formatNoteAge(note.at, now)}): ${note.text}`)
+    .join("\n");
+}
+
 function formatNotesForPrompt(notes, now = new Date()) {
   const list = Array.isArray(notes) ? notes.filter((n) => n && n.text) : [];
   if (!list.length) return "";
@@ -363,8 +378,9 @@ function buildExtractMessages({ userMessage, assistantText, coachSettings, recen
     })
     .join("\n");
 
-  const system = `You extract dated coaching episode notes from one Discord exchange.
-Return JSON only: {"notes":[{"text":"one or two sentences","kind":"feeling|plan|preference_transient|life","eventDate":"YYYY-MM-DD or omit"}]}
+  const system = `You extract dated coaching episode notes from one coaching conversation, and write one short summary of it.
+Return JSON only: {"summary":"1-3 sentences","notes":[{"text":"one or two sentences","kind":"feeling|plan|preference_transient|life","eventDate":"YYYY-MM-DD or omit"}]}
+The summary is what the coach will see next time instead of the conversation itself, which is not stored. Say what the athlete was dealing with and what was agreed. Skip pleasantries.
 Rules:
 - As many notes as are genuinely useful, max 8. Prefer none over noise.
 - Capture transient state: illness, fatigue, mood, skipped session, how a ride felt, one-off plans, life schedule that may change tomorrow.
@@ -386,16 +402,37 @@ ${coachSettings || "(none)"}
 ## Recent notes (skip duplicates)
 ${recent || "(none)"}
 
-## Athlete
+## Conversation
 ${userMessage || ""}
 
-## Coach reply
+## Coach replies
 ${assistantText || ""}`;
 
   return [
     { role: "system", content: system },
     { role: "user", content: user },
   ];
+}
+
+/** The summary string from an extraction response, or "" when absent or unusable. */
+function parseExtractedSummary(rawText) {
+  const text = String(rawText || "").trim();
+  if (!text) return "";
+  let parsed = null;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        parsed = JSON.parse(text.slice(start, end + 1));
+      } catch {
+        parsed = null;
+      }
+    }
+  }
+  return typeof parsed?.summary === "string" ? clip(parsed.summary, MAX_NOTE_TEXT) : "";
 }
 
 function parseExtractedNotes(rawText, fallbackAt) {
@@ -444,10 +481,12 @@ module.exports = {
   activeGoalNotes,
   formatActiveGoalsForPrompt,
   formatNotesForPrompt,
+  formatSessionSummariesForPrompt,
   formatNoteDate,
   formatCoachToday,
   formatNoteAge,
   shouldSkipExtract,
   buildExtractMessages,
   parseExtractedNotes,
+  parseExtractedSummary,
 };

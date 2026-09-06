@@ -35,6 +35,8 @@ const {
   shouldSkipExtract,
   buildExtractMessages,
   parseExtractedNotes,
+  parseExtractedSummary,
+  formatSessionSummariesForPrompt,
   retrieveRelevantNotes,
   searchNotes,
   formatNotesForPrompt,
@@ -1526,6 +1528,7 @@ function clearConversation(userId) {
   }
 
   // Legacy: clear any per-user conversation (old behavior)
+  flushCoachSession(key);
   userConversations.delete(key);
   const timer = conversationTimers.get(key);
   if (timer) {
@@ -1536,6 +1539,7 @@ function clearConversation(userId) {
   // New: clear all scoped conversations for this user across guilds/channels
   for (const k of Array.from(userConversations.keys())) {
     if (typeof k === "string" && k.endsWith(`:${key}`)) {
+      flushCoachSession(k);
       userConversations.delete(k);
     }
   }
@@ -1552,6 +1556,8 @@ function clearConversation(userId) {
 
 function clearConversationForKey(conversationKey) {
   const key = String(conversationKey);
+  // The idle timer is the session boundary: extract notes and a summary before dropping history.
+  flushCoachSession(key);
   userConversations.delete(key);
   const timer = conversationTimers.get(key);
   if (timer) {
@@ -1660,6 +1666,7 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
   let settingsBlock = "No Coach settings stored yet.";
   let notesBlock = "Chat notes are off.";
   let goalsBlock = "Chat notes are off. There are no saved goals.";
+  let summariesBlock = "Chat notes are off, so earlier conversations are not recorded.";
   let notesOptIn = false;
   let loadBlock = "No weekly history yet.";
   try {
@@ -1685,6 +1692,7 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
     try {
       const notes = await listCoachChatNotes(message.author.id);
       goalsBlock = formatActiveGoalsForPrompt(notes, now);
+      summariesBlock = formatSessionSummariesForPrompt(notes, now);
       const hits = retrieveRelevantNotes(notes, userText || "", { now });
       const standard = hits.filter((note) => note.kind !== "goal");
       const formatted = formatNotesForPrompt(standard, now);
@@ -1759,6 +1767,9 @@ If they ask what their goals are, summarize this block. Do not say you cannot se
 To add or change a goal, call propose_coach_goal and wait for Ja. Never say a goal is saved until they press Ja. Only propose when they call it their mål / goal or ask you to remember a dated aim — not for a casual upcoming ride.
 If they already have 3 goals, ask which to replace and pass replaceNoteId.`
     : `Chat notes are off, so you cannot save or remember goals. If they name an aim, still help toward it in THIS conversation. Say clearly that you will not remember it next time unless they turn chat notes on under Mine sider → Coach: ${MY_PAGES_COACH_URL}. Do not refuse to help. Do not invent a saved goal.`}
+
+## Previous conversations
+${summariesBlock}
 
 ## Chat notes
 ${notesBlock}
@@ -1902,14 +1913,48 @@ function lastAssistantText(conversation) {
   return "";
 }
 
-function scheduleCoachNoteExtract(args) {
+// One buffer per coach conversation, flushed when the chat goes idle or gets long.
+//
+// Extraction used to run after every single exchange: a separate OpenAI call per message, each
+// seeing one exchange with no arc. That produced fragmentary, overlapping notes — which is why
+// isNearDuplicate and the "deduplicate against recent notes" prompt rule had to exist. Once per
+// conversation sees the whole thing and writes one good note where per-message wrote four
+// mediocre ones, at a fraction of the cost.
+const coachSessionBuffers = new Map();
+
+// Flush before the 30-minute idle timer if a conversation runs long, so a marathon chat is not
+// lost to a deploy.
+const SESSION_FLUSH_TURNS = 12;
+
+function bufferCoachTurn(key, { discordId, username, userMessage, assistantText }) {
+  if (!coachSessionBuffers.has(key)) {
+    coachSessionBuffers.set(key, { discordId, username, turns: [] });
+  }
+  const buffer = coachSessionBuffers.get(key);
+  buffer.username = username || buffer.username;
+  buffer.turns.push({ userMessage, assistantText });
+  return buffer;
+}
+
+/** Flush a buffered conversation into notes plus one summary. Never throws to the caller. */
+function flushCoachSession(key) {
+  const buffer = coachSessionBuffers.get(key);
+  coachSessionBuffers.delete(key);
+  if (!buffer || !buffer.turns.length) return;
   Promise.resolve()
-    .then(() => extractCoachChatNotes(args))
+    .then(() => extractCoachChatNotes(buffer))
     .catch((err) => console.error("extractCoachChatNotes failed:", err?.message || err));
 }
 
-async function extractCoachChatNotes({ discordId, username, userMessage, assistantText }) {
-  if (!openai || shouldSkipExtract(userMessage) || !String(assistantText || "").trim()) return;
+async function extractCoachChatNotes({ discordId, username, turns }) {
+  const rows = Array.isArray(turns) ? turns : [];
+  if (!openai || !rows.length) return;
+
+  // Join the conversation into one exchange for the extractor.
+  const userMessage = rows.map((t) => t.userMessage).filter(Boolean).join("\n");
+  const assistantText = rows.map((t) => t.assistantText).filter(Boolean).join("\n");
+  // A whole conversation of nothing but acknowledgements is still not worth a call.
+  if (rows.every((t) => shouldSkipExtract(t.userMessage)) || !String(assistantText).trim()) return;
   let coachSettings = "";
   let recentNotes = [];
   try {
@@ -1936,7 +1981,8 @@ async function extractCoachChatNotes({ discordId, username, userMessage, assista
   const response = await callOpenAIWithRetry(
     buildChatCompletionParams({
       messages,
-      maxTokens: 400,
+      // A whole conversation plus a summary needs more room than a single exchange did.
+      maxTokens: 900,
       reasoningEffort: "low",
     })
   );
@@ -1956,7 +2002,14 @@ async function extractCoachChatNotes({ discordId, username, userMessage, assista
       console.error("extract recordCoachUsage failed:", err?.message || err);
     }
   }
-  const parsed = parseExtractedNotes(getMessageText(response.choices[0]?.message), now.toISOString());
+  const raw = getMessageText(response.choices[0]?.message);
+  const parsed = parseExtractedNotes(raw, now.toISOString());
+  const summary = parseExtractedSummary(raw);
+  if (summary) {
+    // The conversation itself is never stored — coachHowItWorks promises that. The summary is
+    // what gives continuity across days.
+    parsed.push({ text: summary, kind: "session", at: now.toISOString() });
+  }
   if (!parsed.length) return;
   await addCoachChatNotes(discordId, parsed, { at: now });
 }
@@ -2382,12 +2435,14 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     resetConversationTimeout(conversationKey);
 
     if (isCoachSession && notesOptIn && !notesSavedThisTurn) {
-      scheduleCoachNoteExtract({
+      const buffer = bufferCoachTurn(conversationKey, {
         discordId: message.author.id,
         username: message.author.username,
         userMessage: cleanedMessage,
         assistantText: lastAssistantText(conversation),
       });
+      // Long conversations flush early so a deploy cannot lose the whole thing.
+      if (buffer.turns.length >= SESSION_FLUSH_TURNS) flushCoachSession(conversationKey);
     }
 
     await flushCoachUsage(coachUsageTally, message);

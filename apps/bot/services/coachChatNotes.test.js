@@ -162,3 +162,46 @@ test("search honours the sinceDays window", () => {
   assert.equal(searchNotes(notes, "syg", { now }).length, 2);
   assert.equal(searchNotes(notes, "syg", { sinceDays: 7, now }).length, 1);
 });
+
+test("session summaries render oldest-first with their age", () => {
+  const { formatSessionSummariesForPrompt } = require("./coachChatNotes");
+  const now = at("2026-09-06");
+  const notes = [
+    { kind: "session", text: "Newer chat", at: "2026-09-05T10:00:00.000Z" },
+    { kind: "session", text: "Older chat", at: "2026-09-01T10:00:00.000Z" },
+    { kind: "feeling", text: "not a summary", at: "2026-09-05T10:00:00.000Z" },
+  ];
+  const text = formatSessionSummariesForPrompt(notes, now);
+  assert.ok(text.indexOf("Older chat") < text.indexOf("Newer chat"), "chronological");
+  assert.ok(!text.includes("not a summary"), "only session summaries appear here");
+  assert.match(text, /yesterday/);
+});
+
+test("no summaries reads as a clear statement", () => {
+  const { formatSessionSummariesForPrompt } = require("./coachChatNotes");
+  assert.equal(formatSessionSummariesForPrompt([], at("2026-09-06")), "No earlier conversations recorded.");
+});
+
+test("summaries are excluded from keyword retrieval, since they have their own block", () => {
+  const { retrieveRelevantNotes } = require("./coachChatNotes");
+  const now = at("2026-09-06");
+  const notes = [
+    { id: "s", kind: "session", text: "talked about knee pain", at: "2026-09-05T10:00:00.000Z" },
+    { id: "f", kind: "feeling", text: "knee pain after intervals", at: "2026-09-05T10:00:00.000Z" },
+  ];
+  const hits = retrieveRelevantNotes(notes, "knee pain", { now });
+  assert.ok(hits.some((n) => n.id === "f"));
+  assert.ok(!hits.some((n) => n.id === "s"), "would otherwise appear twice in the prompt");
+});
+
+test("a conversation summary parses alongside its notes", () => {
+  const { parseExtractedSummary, parseExtractedNotes } = require("./coachChatNotes");
+  const raw = JSON.stringify({
+    summary: "Ill Tuesday, agreed to keep the week easy.",
+    notes: [{ text: "Var syg tirsdag", kind: "feeling" }],
+  });
+  assert.match(parseExtractedSummary(raw), /keep the week easy/);
+  assert.equal(parseExtractedNotes(raw, "2026-09-06T12:00:00.000Z").length, 1);
+  assert.equal(parseExtractedSummary('{"notes":[]}'), "", "absent summary is empty, not undefined");
+  assert.equal(parseExtractedSummary("garbage"), "");
+});

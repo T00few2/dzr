@@ -233,7 +233,7 @@ function unwrapCoachMemoryDoc(data) {
 function packChatNote(plain) {
   const src = plain && typeof plain === "object" ? plain : {};
   const kind = String(src.kind || "").trim().toLowerCase();
-  const allowed = new Set(["feeling", "plan", "preference_transient", "life", "race", "goal"]);
+  const allowed = new Set(["feeling", "plan", "preference_transient", "life", "race", "goal", "session"]);
   const eventDate = String(src.eventDate || "").trim().slice(0, 10);
   return {
     text: String(src.text || "").slice(0, 280),
