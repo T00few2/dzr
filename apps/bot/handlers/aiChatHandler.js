@@ -10,6 +10,7 @@ const {
   listCoachChatNotes,
   addCoachChatNotes,
   markCoachAthleteMessage,
+  getCoachDailyTokens,
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
 const { trimConversation } = require("../services/conversationTrim");
@@ -67,6 +68,9 @@ const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const MAX_TOOL_ITERATIONS = 2;
 const COACH_MAX_TOOL_ITERATIONS = 4;
 const COACH_MAX_TOKENS = 16000;
+// Per-athlete daily ceiling. Usage was recorded but never enforced, so a runaway loop or a very
+// chatty day had no backstop. Generous by design: this is a safety net, not a rationing device.
+const COACH_DAILY_TOKEN_BUDGET = Number.parseInt(process.env.COACH_DAILY_TOKEN_BUDGET || "300000", 10);
 const COACH_REASONING_EFFORT = "low";
 
 // AI Model Configuration - can be changed to test different models
@@ -2185,6 +2189,17 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
       if (!connected) {
         await safeReply(message, unconnectedCoachText(message.author.id));
         return;
+      }
+
+      if (COACH_DAILY_TOKEN_BUDGET > 0) {
+        const usedToday = await getCoachDailyTokens(message.author.id);
+        if (usedToday >= COACH_DAILY_TOKEN_BUDGET) {
+          await safeReply(
+            message,
+            "🛑 Du har brugt dagens coaching-budget. Jeg er klar igen i morgen — skriv endelig da."
+          );
+          return;
+        }
       }
     }
 

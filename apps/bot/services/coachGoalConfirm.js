@@ -1,5 +1,11 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require("discord.js");
-const { addCoachChatNotes, listCoachChatNotes } = require("./firebase");
+const {
+  addCoachChatNotes,
+  listCoachChatNotes,
+  savePendingGoal,
+  getPendingGoal,
+  clearPendingGoal,
+} = require("./firebase");
 const { activeGoalNotes, MAX_ACTIVE_GOALS, sanitizeEventDate } = require("./coachChatNotes");
 
 const PENDING_TTL_MS = 10 * 60 * 1000;
@@ -9,18 +15,35 @@ function pendingKey(discordId) {
   return String(discordId || "").trim();
 }
 
-function clearPending(discordId) {
+// Pending proposals are mirrored to Firestore as well as memory. The in-memory copy keeps the
+// happy path instant; the stored copy means a deploy between the proposal and the athlete
+// pressing Ja no longer makes the button report "udløbet".
+async function clearPending(discordId) {
   const key = pendingKey(discordId);
   const existing = pendingGoals.get(key);
   if (existing?.timeout) clearTimeout(existing.timeout);
   pendingGoals.delete(key);
+  await clearPendingGoal(key);
 }
 
-function storePending(discordId, payload) {
+async function storePending(discordId, payload) {
   const key = pendingKey(discordId);
-  clearPending(key);
+  await clearPending(key);
   const timeout = setTimeout(() => pendingGoals.delete(key), PENDING_TTL_MS);
   pendingGoals.set(key, { ...payload, timeout });
+  try {
+    await savePendingGoal(key, payload, PENDING_TTL_MS);
+  } catch (err) {
+    console.warn("savePendingGoal failed:", err?.message || err);
+  }
+}
+
+/** Memory first, then Firestore — the stored copy survives a restart. */
+async function readPending(discordId) {
+  const key = pendingKey(discordId);
+  const inMemory = pendingGoals.get(key);
+  if (inMemory) return inMemory;
+  return getPendingGoal(key);
 }
 
 function goalButtons() {
@@ -54,7 +77,7 @@ async function proposeCoachGoal({ discordId, channel, text, eventDate, replaceNo
     ? `Save this as a goal?\n**${clipped}**\nDate: **${date}**\n\nI only remember it if you press Ja.`
     : `Skal jeg gemme dette som mål?\n**${clipped}**\nDato: **${date}**\n\nJeg husker det først, når du trykker Ja.`;
 
-  storePending(id, { text: clipped, eventDate: date, replaceNoteId: replaceId || null });
+  await storePending(id, { text: clipped, eventDate: date, replaceNoteId: replaceId || null });
   await channel.send({
     content: da,
     components: [goalButtons()],
@@ -77,7 +100,7 @@ async function handleCoachGoalButton(interaction) {
   const discordId = interaction.user?.id;
   if (!discordId) return true;
 
-  const pending = pendingGoals.get(pendingKey(discordId));
+  const pending = await readPending(discordId);
   if (!pending) {
     await interaction.reply({
       content: "Det forslag er udløbet. Skriv målet igen, så spørger jeg på ny.",
@@ -87,7 +110,7 @@ async function handleCoachGoalButton(interaction) {
   }
 
   if (customId === "coach_goal_no") {
-    clearPending(discordId);
+    await clearPending(discordId);
     await interaction.update({
       content: "Okay — jeg gemte ikke målet.",
       components: [],
@@ -100,7 +123,7 @@ async function handleCoachGoalButton(interaction) {
     kind: "goal",
     eventDate: pending.eventDate,
   }], { allowGoals: true, replaceNoteId: pending.replaceNoteId });
-  clearPending(discordId);
+  await clearPending(discordId);
   const saved = Array.isArray(result?.saved) ? result.saved : [];
   const skipped = Array.isArray(result?.skipped) ? result.skipped : [];
   const failed = !saved.length;

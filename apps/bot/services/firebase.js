@@ -392,6 +392,17 @@ const COACH_USAGE_COLLECTION = shared.firestore?.coachUsage || "coach_usage";
 const COACH_USAGE_EVENTS_COLLECTION = shared.firestore?.coachUsageEvents || "coach_usage_events";
 const COACH_PROFILES_COLLECTION = shared.firestore?.coachProfiles || "coach_profiles";
 
+const COACH_USAGE_DAILY_COLLECTION = "coach_usage_daily";
+const PENDING_GOALS_COLLECTION = "coach_pending_goals";
+
+function usageDayKey(discordId, now = new Date()) {
+  const day = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Europe/Copenhagen",
+  }).format(now);
+  return `${discordId}_${day}`;
+}
+
+
 function coachProfileRef(discordId) {
   return db.collection(COACH_PROFILES_COLLECTION).doc(String(discordId));
 }
@@ -526,6 +537,16 @@ async function recordCoachUsage({ discordId, username, model, promptTokens, comp
         updatedAt: now,
       }, { merge: true });
     });
+    // Per-day counter that backs the daily budget. Separate from the cumulative doc above,
+    // which only ever increments and cannot answer "how much today".
+    await db.collection(COACH_USAGE_DAILY_COLLECTION).doc(usageDayKey(id, now)).set({
+      discordId: id,
+      day: usageDayKey(id, now).split("_")[1],
+      totalTokens: admin.firestore.FieldValue.increment(total),
+      openaiCalls: admin.firestore.FieldValue.increment(calls),
+      updatedAt: now,
+    }, { merge: true });
+
     await db.collection(COACH_USAGE_EVENTS_COLLECTION).add({
       discordId: id,
       username: username || null,
@@ -578,9 +599,69 @@ async function checkCoachKeyCanary() {
   return verifyCoachCanary(stored) ? { status: "ok" } : { status: "mismatch" };
 }
 
+/**
+ * Tokens this athlete has used today.
+ *
+ * coach_usage is cumulative — it only ever increments and carries no per-day breakdown — so it
+ * cannot back a daily cap. This is a separate per-day counter.
+ */
+async function getCoachDailyTokens(discordId, now = new Date()) {
+  const id = String(discordId || "").trim();
+  if (!id) return 0;
+  try {
+    const snap = await db.collection(COACH_USAGE_DAILY_COLLECTION).doc(usageDayKey(id, now)).get();
+    return snap.exists ? Number(snap.data()?.totalTokens || 0) : 0;
+  } catch (err) {
+    // Fail open: a Firestore blip must not lock an athlete out of coaching.
+    console.warn("getCoachDailyTokens failed:", err?.message || err);
+    return 0;
+  }
+}
+
+/** Save a proposed goal so a deploy cannot silently expire a pending Ja/Nej. */
+async function savePendingGoal(discordId, payload, ttlMs) {
+  const id = String(discordId || "").trim();
+  if (!id) return;
+  await db.collection(PENDING_GOALS_COLLECTION).doc(id).set({
+    discordId: id,
+    ...payload,
+    expiresAt: new Date(Date.now() + ttlMs).toISOString(),
+  });
+}
+
+/** Read a pending goal, treating an expired one as absent. */
+async function getPendingGoal(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return null;
+  try {
+    const snap = await db.collection(PENDING_GOALS_COLLECTION).doc(id).get();
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    if (data.expiresAt && Date.parse(data.expiresAt) < Date.now()) return null;
+    return data;
+  } catch (err) {
+    console.warn("getPendingGoal failed:", err?.message || err);
+    return null;
+  }
+}
+
+async function clearPendingGoal(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return;
+  try {
+    await db.collection(PENDING_GOALS_COLLECTION).doc(id).delete();
+  } catch (err) {
+    console.warn("clearPendingGoal failed:", err?.message || err);
+  }
+}
+
 module.exports = {
   db,
   checkCoachKeyCanary,
+  getCoachDailyTokens,
+  savePendingGoal,
+  getPendingGoal,
+  clearPendingGoal,
   getUserZwiftId,
   linkUserZwiftId,
   getTodaysClubStats,

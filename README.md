@@ -91,6 +91,8 @@ Optional second bot **DZR Coach** (silent in channels; coaching DMs only). Creat
 
 Required bot env names: `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`, `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`. Also set `CONTENT_API_*`, `OPENAI_API_KEY`, and `STRAVA_*` for the features that use them.
 
+Optional: `COACH_DAILY_TOKEN_BUDGET` caps each athlete's coaching tokens per day (default 300000, `0` disables).
+
 ## Shared constants
 
 `packages/shared/constants.json` is the source of truth for `siteOrigin`, Discord guild/role IDs, and Firestore collection names.
