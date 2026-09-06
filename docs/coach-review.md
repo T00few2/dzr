@@ -1,50 +1,412 @@
-# DZR Coach — review and improvement proposal
+# DZR Coach — review and execution plan
 
-_Point-in-time review, September 2026, against commit 06fe73d._
+_Reviewed against `06fe73d`; prerequisites run and decisions locked 2026-09-06._
 
-## Context
+Rewritten to be executable. Corrections from the `9bccb30` verification are applied **in place**;
+there is no longer a separate appendix contradicting the body. Findings detail is at the end as
+reference while implementing.
 
-You asked for an honest view of the DZR Coach setup and suggestions to improve it. This is a
-review plus a sequenced proposal — **no code changes**, per your choice. Weighted toward the
-three areas you flagged: correctness/data loss, coaching quality & evals, and
-architecture/duplication.
-
-Scope read: `apps/bot/handlers/aiChatHandler.js`, `apps/bot/services/coach*.js`,
-`stravaService.js`, `tokenCrypto.js`, `firebase.js`, `scheduler.js`; `app/api/coach/*`,
-`app/api/strava/*`, `app/api/admin/coach`, `app/lib/coach*.ts`, `app/lib/tokenCrypto.ts`,
-`app/lib/stravaAuth.ts`, `firestore.rules`, the members-zone and admin UI, and `apps/api`.
+Review baseline: `06fe73d`. Verified still current against `9bccb30` (docs + Render config only —
+no coach logic changed).
 
 ---
 
-## Summary of proposed changes
+## Prerequisites — status after the 2026-09-06 run
 
-| # | Change | Why | Rough effort |
-|---|---|---|---|
-| **0** | Authenticate `POST /api/strava/webhook` | Anyone can wipe a named member's coach data today | Hours |
-| **1** | **Back up Firestore first**, then: transactions on profile writes; fix conversation trim; fail closed when no encryption key; try/catch in admin route; cap web-written notes | Silent data loss and a mid-turn crash class | ~1 day |
-| **2** | `node --test` on the already-pure helpers + CI + lint/typecheck `apps/**`; then a ~25-case prompt golden set | Nothing currently catches a regression | ~2 days |
-| **3** | Extract `tokenCrypto` / `coachProfile` / `coachChatNotes` / `isPaidClubMember` into `packages/shared` | Two hand-synced copies of the crypto; drift = unreadable memory | ~1 day, after 2 |
-| **4** | Resolve membership + profile once per turn; widen follow-up window; persist pending goals; daily token budget | 8 Firestore ops of pure auth per turn; follow-ups skip on a missed minute | ~half day |
-| **5** | Fetch activity streams → compute mean-max power, NP, IF/TSS, decoupling, intervals in code | It can't answer "was that interval session good?" | ~2 days |
-| **6a** | Weekly load rollups (12–26 weeks) via the existing scheduler | Can't see past 28 days, so can't periodise | ~1 day |
-| **6b** | `## Sport` section + expose race calendar/phenotype | It doesn't know its riders are indoors on Zwift | ~half day |
-| **6c** | Move note extraction to session close; emit notes **+** a conversation summary | Per-message extraction is N calls and worse notes | ~1 day |
-| **6d** | Save recommendations as `plan` notes; check them in the follow-up | Advice is never followed up | ~half day |
-| **6e** | Generate `.zwo` and attach it to the coach DM, with install instructions + profile PNG | Turns prose into an executable session | ~1–2 days |
-| **6f** | 👍/👎 on coach DMs; test higher reasoning effort on the synthesis turn | No quality signal at all today | ~half day |
-| **7** | Rebalance the prompt: reply contract, `language: null` default, pre-loaded context, illness section, prune negations | Five of eight sections are storage policy; one is coaching | ~1 day, after 2 |
+| # | Status | Result |
+|---|---|---|
+| P1 | ✅ Done, restore-tested | 17 profiles, 10 connections, 14 notes (14/14 `noteEnc`, all decrypting). Safety net is `backups/p1b-firestore-2026-09-06T18-06-01-021Z/` — the only remaining folder. **Restore verified, not assumed; do not re-block Stage 1 on it.** |
+| P2 | ✅ Done | `200 []` — no live subscription. **Stage 0 is Case A.** `STRAVA_WEBHOOK_VERIFY_TOKEN` unset locally and absent on Vercel, exactly as the GET handler's fail-closed path predicted. |
+| P3 | ✅ Done — no split | 17/17 `memoryEnc` decrypt with the explicit `COACH_MEMORY_KEY`; 0/17 with the fallback. 8 profiles carrying bot-written `lastAthleteMessageAt` decrypt with that same key, so **Render and Vercel agree**. |
 
-**Suggested order:** 0 alone and immediately → 1 → 2 → then 5, 6a, 6b, 6c in whatever order
-appeals (these are the coaching-quality wins) → 3 and 7 once the tests exist to prove nothing
-broke → 4, 6d–6f as capacity allows.
+### P1b — subcollection traversal (resolved)
 
-**If you only do three:** 0 (security), 2 (tests), 6a (longitudinal load). The first stops a
-live risk, the second makes everything after it safe to change, the third is the largest single
-jump in how good the coaching actually is.
+The first pass returned 4 `coach_chat_notes` docs holding only `discordId` and `updatedAt` — the
+**parent stub**, not the data. Notes live at `coach_chat_notes/{discordId}/notes/{autoId}`, and
+the parent is written as exactly `{discordId, updatedAt}` by design (`firebase.js:132`), so a
+plain `collection().get()` silently captured nothing. `listCollections()` per parent recovered
+14 notes, all encrypted and all decrypting.
 
-> **Read "Before you start" at the end of this document first.** It corrects three errors in
-> the stages below, lists the assumptions that could invalidate them, and adds the backup step
-> this plan originally lacked.
+**Keep this as a standing rule:** any future backup, migration or admin export of coach data must
+recurse into subcollections, or it will look successful while containing none of the notes.
+
+### Housekeeping from the backup run
+
+- ✅ **`/backups/` is gitignored** (`7da61a7`), and the `.vercel` duplicates were cleaned up in the
+  follow-up `6337433`. `.env*.local` remains covered by the earlier block — no regression.
+- ✅ **Superseded parent-only export deleted.** Only
+  `backups/p1b-firestore-2026-09-06T18-06-01-021Z/` remains.
+- ✅ **Restore tested.** On-disk dump re-counted (17/17 `memoryEnc`, 14/14 `noteEnc`, 10/10 token
+  enc); one bot-stamped profile written to `_p1b_restore_test`, read back, `memoryEnc` decrypted
+  with `COACH_MEMORY_KEY`, yielding a normal coach object; scratch doc deleted. **The safety net
+  is verified, not assumed.**
+- ✅ **`strava_connections/271709901724581888` deleted.** That member was already treated as
+  disconnected; ciphertext remains in the dump if ever needed.
+
+### Also worth acting on
+
+- **No plaintext anywhere.** All 17 profiles carry `memoryEnc`; all 10 connections carry
+  `accessTokenEnc`/`refreshTokenEnc`. The plaintext-fallback finding is real in the *code* but
+  **not realised in production** — so the "re-encrypt keyless docs" task in Stage 1 is unnecessary.
+- **The one undecryptable connection has been deleted** (`strava_connections/271709901724581888`);
+  its ciphertext survives in the P1b dump. It had already been failing safe — `getConnection`
+  caught the decrypt error and returned null (`stravaService.js:56-59`), so `isStravaConnected`
+  was false and that member saw the reconnect prompt. **Keep it as evidence, not as a live row:**
+  with no key identifier stored, a rotated-key document was indistinguishable from a corrupt one,
+  which is exactly why `keyId` is worth doing.
+- `STRAVA_TOKEN_KEY` is unset on both, so tokens use the
+  `dzr-strava-tokens:$STRAVA_CONNECT_SECRET` fallback consistently. Fine, but it means rotating
+  `STRAVA_CONNECT_SECRET` silently breaks every stored token — see `keyId` in **Stage 3**.
+
+---
+
+## Stage 0 — close the webhook (ship alone, first)
+
+**Problem:** `app/api/strava/webhook/route.ts:25-45` POST authenticates nothing and calls
+`wipeCoachStravaForDiscordId`, deleting a member's coach profile, every chat note and their
+Strava connection, keyed only on `owner_id` — a public Strava athlete ID.
+
+**P2 settled this: Case A.** `push_subscriptions` returned `[]`, and
+`STRAVA_WEBHOOK_VERIFY_TOKEN` is unset on Vercel — so the GET handler's `!expected` guard (`:18`)
+would have 403'd every registration attempt. Strava has never POSTed to this endpoint. Every
+request it has ever received was unsolicited.
+
+### Locked decision — Case A, no auto-wipe
+
+**Rationale (owner's call, and it corrects an error in the earlier draft):** hooking the wipe to
+`needs_reconnect` conflated two different things. `needs_reconnect` means *the token is dead, ask
+them to reauthorise* — often transient — not *consent was withdrawn*. Wiping coach memory on a
+refresh failure would destroy data on a recoverable condition. **Explicit disconnect on the site
+remains the only wipe path.**
+
+Scope:
+
+1. **Delete the POST handler** (`app/api/strava/webhook/route.ts:25-45`).
+2. **Keep the GET handler** — it already 403s without a verify token, and it leaves the door open
+   to registering a subscription later.
+3. **Delete `findDiscordIdByStravaAthleteId`** (`wipeCoachStrava.ts:50-66`). Verified: the POST
+   handler is its only caller, so it becomes dead code. Its `.limit(2)`-then-`docs[0]` ambiguity
+   bug is deleted along with it — which is why the separate fix is dropped.
+4. **Keep `wipeCoachStravaForDiscordId`** — still used by `disconnect/route.ts:17`.
+5. **Move `STRAVA_WEBHOOK_VERIFY_TOKEN`** from `apps/bot/.env.example:23` to the root
+   `.env.example` and the README's Vercel list. It is read only by the GET handler
+   (`webhook/route.ts:8`), which is being kept, so it stays live — and the misfiling is why it was
+   never set.
+
+**Dropped** (they only matter if something is still allowed to wipe automatically): soft-delete
+with purge, wipe logging, athlete-id ambiguity fix.
+
+**Verify:** POST the forged deauth body at a preview deploy → 405/404. `grep -r` confirms no
+remaining reference to `findDiscordIdByStravaAthleteId`. Explicit disconnect on the site still
+wipes correctly.
+
+---
+
+## Stage 1 — stop losing data
+
+**Safety net in place and verified:** the P1b export (17 profiles, 10 connections, 14 notes, all
+decrypting), with a successful restore already proven. Nothing here is blocked on further backup
+work.
+
+| Fix | Where |
+|---|---|
+| Move `lastAthleteMessageAt` / `lastFollowUpAt` / `howItWorksSentAt` to `{merge:true}` field-only updates, so `markCoachAthleteMessage` / `markCoachFollowUpSent` stop rewriting the whole doc | `apps/bot/services/firebase.js:483-513`. Already outside the ciphertext (`tokenCrypto.ts:253-273`), so this is nearly free |
+| Wrap profile PUT and the notes goal-cap check in `runTransaction` | `app/api/coach/profile/route.ts:61-76`, `app/api/coach/notes/route.ts:84-86` |
+| Replace the four positional `slice(-(MAX_CONVERSATION_LENGTH))` trims with a helper that cuts back to a `user` boundary and never orphans a `tool` message from its `tool_calls` parent | `aiChatHandler.js:2013, 2076, 2151, 2244` |
+| Fail closed when no encryption key: throw at write time, plus a boot assertion | `tokenCrypto` both copies. P3 cleared this as safe to ship. **Scope it honestly: this proves "we will never write plaintext." It does not detect drift** — Vercel and Render can both have a key set and have *different* keys, which is the actual P3 failure mode, and `if (!process.env.COACH_MEMORY_KEY) throw` would sail straight past it |
+| Drift detection, **bot side** — canary decrypt at startup | In `bot.js` only. Render is one long-lived process, so decrypt a **dedicated `_coach_key_canary` doc** — a tiny known ciphertext written once at deploy/setup — and crash on failure. **Never a real member's profile**: deleting that athlete would take the bot down. **Never in `tokenCrypto` module scope** — on Vercel that read would fire on every cold start of every coach route, and one Firestore blip would 500 the members zone |
+| Drift detection, **Next side** — surface decrypt failures on the admin dashboard | The bot's canary proves *the bot's* key works; it cannot see Vercel using a different one. `admin/coach/route.ts` already decrypts all 17 profiles on load, so once the Stage 1 try/catch degrades instead of throwing, count the failures and show "N profiles failed to decrypt". Free — no new reads, no per-request cost — and a human checking the dashboard after a deploy is the drift signal |
+| ~~`keyId` here~~ → **defer to Stage 3** | It is a persist-format change that would be written twice (JS + TS) and then thrown away when Stage 3 consolidates. Do it once, in the shared module. **Whenever it lands: additive and optional on read — never fail a read on a missing `keyId`**, or all 17 profiles + 14 notes + 9 connections break at once |
+| ~~One-off re-encrypt pass for keyless docs~~ **Not needed** | P1 confirmed everything is already encrypted. The plaintext-fallback path is a real code defect, never exercised in production |
+| **`defaultProfile()` seeds `language: "da"`** — change to `null` | `coachProfile.js:246`. `ensureDefaultCoachProfile` writes it during `/coach` before the first message, so the prompt's "otherwise match the chat" branch never runs and English speakers get Danish. One line, no evals needed — this is a data bug, not a prompt rewrite. UI already supports null (`CoachMemoryEditor.tsx:620`) |
+| **Reply contract** in the coach system prompt | `buildCoachSystemPrompt` (`aiChatHandler.js:1652-1659`). `style.length` defaults to null so `formatStyle` emits nothing, leaving only "keep replies concise" against `COACH_MAX_TOKENS = 16000` — `safeReplyChunks` exists because replies overrun. Specify: direct answer first, ≤3 bullets of evidence with real dates/numbers, one recommendation, ≤1 question. Cheap and reversible; re-measure once the Stage 2 golden set exists, since its effect is the hardest here to judge by eye |
+| Turning notes off deletes them **before** the profile PUT | `CoachMemoryEditor.tsx:243-248`. A failed PUT loses the notes with the toggle still on. Reorder: save first, delete after success |
+| Weekly-slot delete by array index | `profile/route.ts:116-119`. `sanitizeWeekly` may drop rows and shift indices, so the wrong row is deleted. Use the row id |
+| try/catch around `unwrapCoachMemoryDoc`, mirroring `app/lib/coachChatNotes.ts:20-33`; add `.limit()` to the four unbounded scans | `app/api/admin/coach/route.ts:43-48` |
+| Cap note count on the web path; prune expired goals | `app/api/coach/notes/route.ts` |
+
+**Priority note:** the trim bug is *derived from reading the code, not observed*. Grep Render logs
+for OpenAI 400s mentioning `tool_calls` before spending time on it; no hits in months ⇒ demote.
+
+**Verify:** concurrent PUT + `markCoachAthleteMessage`, assert neither write is lost. Unit test the
+trim helper against a recorded conversation containing tool calls.
+
+---
+
+## Stage 2 — make quality measurable
+
+**Testable as-is** (no side effects on import): `coachChatNotes.js`, `coachProfile.js`,
+`tokenCrypto.js`. That covers `sanitizeEventDate`, `activeGoalNotes`, `retrieveRelevantNotes`,
+`searchNotes`, `formatCoachToday`, `formatNoteAge`, `parseExtractedNotes`, `isNearDuplicate`,
+`shouldSkipExtract`, `publicFields`, `formatCoachProfileForPrompt`, `sanitizeWeekly`, and an
+encrypt→decrypt round-trip including the plaintext-passthrough path.
+
+**Not testable as-is — correction to the earlier draft:** `isFollowUpDue` cannot be imported.
+`coachFollowUp.js:13` requires `./firebase`, which calls `admin.initializeApp()` at module load
+(`firebase.js:31`), so the import crashes without credentials. Extract the pure follow-up logic
+into its own module first. Same trap for anything transitively importing `firebase.js`.
+
+- Runner: `node --test` (built into Node 22, no new dependency).
+- Freeze `formatCoachToday` against fixed dates spanning a DST boundary and a Sunday.
+- **Lint correction:** do *not* simply drop `"ignorePatterns": ["apps/**"]` —
+  `next/core-web-vitals` is a React config and produces noise against a CommonJS bot. Give
+  `apps/bot` its own config with a node/commonjs env.
+- CI: `.github/workflows/ci.yml` running lint, `tsc --noEmit`, `node --test`.
+
+**Golden-set eval** (~25 fixtures: profile + notes + tool results + athlete message → real model).
+Assertions must be **structural or judge-based, never exact-match**, or it will flap and be
+ignored. Run on demand, not in CI — it costs tokens. Assert: goal only called saved after Ja;
+never claims to have saved a *setting*; refuses to prescribe through an active injury; cites only
+numbers present in tool results; answers "what are my settings?" from the block; resolves "this
+week" to the right Monday–Sunday.
+
+**Verify:** break `sanitizeEventDate` deliberately, confirm CI catches it.
+
+---
+
+## Stage 3 — de-duplicate the JS/TS copies
+
+`tokenCrypto`, `coachProfile`, `coachChatNotes` and `isPaidClubMember` exist twice, line-for-line,
+in JS and TS. They must stay byte-compatible or coach memory becomes unreadable.
+
+**The original "import from `packages/shared`" design is dead — confirmed, not suspected.**
+`render.yaml` (added in `9bccb30`) pins `rootDir: apps/bot`, and the README restates that
+`constants.json` is copied into the app trees "because Render and Cloud Run build those folders as
+the project root". `require("../../packages/shared/...")` cannot resolve from the bot.
+
+**Use copy-sync instead**, extending the pattern already documented for `constants.json` —
+**but to `apps/bot` only, never `apps/api`.** The Flask app has no `tokenCrypto`, `coachProfile`,
+`coachChatNotes` or `isPaidClubMember`, Cloud Run cannot run that JS, and a third copy would be a
+third place to drift. `constants.json` is copied there because it is language-neutral data; this
+is not.
+
+- Source of truth in `packages/shared/coach/` — CommonJS + JSDoc.
+- A sync script copies it into `apps/bot/` as part of the release step. Next imports the source
+  directly.
+- Land `keyId` here (deferred from Stage 1) so the persist-format change is written once —
+  additive, optional on read.
+- **`render.yaml`'s `buildFilter` only fires on `apps/bot/**`** (ignoring `apps/api/**`, `app/**`,
+  `components/**`), so an edit to `packages/shared/**` does not even rebuild the bot. The sync
+  output must land inside `apps/bot/` to deploy at all, and **CI must fail when the copies drift
+  from the source** — otherwise the failure is silent.
+- Next imports the source directly via the `@/*` alias. Note it degrades to `any` under
+  `strict: true` unless `checkJs` is enabled; that is a real cost on the side that currently has
+  types.
+- Delete the vestigial `profile.goals` throughout.
+
+Do this **after** Stage 2. Re-export the Firestore backup (P1) first — this stage moves the
+encryption code between runtimes.
+
+**Verify:** Stage 2 tests pass against the shared module from both runtimes; decrypt a document
+written by the *old* bot code using the *new* module.
+
+---
+
+## Stage 4 — latency and cost
+
+- Resolve membership + profile **once per turn**, thread through `executeToolCalls`. Currently
+  `isPaidClubMember` (a doc get **plus** a `payments` query) runs in `handleChatMessage` *and* in
+  every tool call (`aiChatHandler.js:1257, 1273, 1316, 1382`) — ~8 Firestore ops of pure auth per
+  turn, on the latency path.
+- **Daily token budget — correction:** it cannot read `coach_usage`. That doc is cumulative
+  (`recordCoachUsage` increments forever; only `firstUsedAt`/`lastUsedAt`). Needs a new per-day
+  doc or a date-range query over `coach_usage_events`.
+- Widen the follow-up window: `coachFollowUp.js:240` fires only when `hour===8 && minute===0`, so
+  one missed tick skips the day. Change to first tick at or after 08:00, guarded by `lastRunDate`.
+- Persist `pendingGoals` (`coachGoalConfirm.js:6`) with a TTL so a deploy doesn't silently expire
+  a pending Ja.
+
+---
+
+## Stage 5 — activity streams
+
+No streams call exists anywhere in the repo; the bot uses five endpoints only. This is an
+implementation gap, not a Strava limit. `activity:read_all` is already in `STRAVA_SCOPES`
+(`stravaAuth.ts:5`), so **no member has to reconnect**.
+
+Fetch `/activities/{id}/streams`, **compute in code, return a small summary** — streams never
+enter the model context (a 2h ride is ~7,200 points per stream).
+
+Compute: mean-max power at 5s/15s/30s/1m/5m/8m/12m/20m/60m; normalized power; IF/TSS when FTP
+known; aerobic decoupling; time-in-zone against `/athlete/zones`; detected work intervals.
+
+Three traps:
+
+1. **Streams are not uniformly sampled.** Smart recording is irregular — that is what the `time`
+   stream is for. Naive array windowing assumes 1 Hz and yields *silently wrong* power curves.
+   Resample against `time`, and respect `moving` for paused segments.
+2. **Gate on `device_watts`** (already kept by `compactActivityDetails`). False ⇒ power is
+   estimated from speed/grade and a curve off it is fiction. Refuse rather than emit it.
+3. **Rate limit** is per-app, shared across the whole club. On-demand only, for the one activity
+   asked about, cached in Firestore by activity id. Never in the 08:00 follow-up loop.
+
+Sequence after Stage 2 (so the metric functions land with coverage) and Stage 4.
+
+---
+
+## Stage 6 — coaching quality
+
+**6a — longitudinal load.** `getRecentActivities` clamps to 1–28 days (`stravaService.js:320`), so
+the coach cannot see trend and cannot periodise. Nightly rollup via the existing scheduler storing
+weekly aggregates; feed 12–26 weeks as a compact table. **The risk is the first backfill, not the
+nightly job** — ~6 months of paginated history per athlete against a shared rate limit needs a
+throttled one-off job.
+
+**6b — it does not know the sport.** "Zwift" appears in the coach prompt only in the club's name
+and one tool description. The *club* bot prompt says "virtual racing in Zwift" outright (`:1537`);
+the coach does not. Consequences: no coasting indoors, so `moving_time ≈ elapsed_time` and load is
+systematically underestimated; Zwift races are decided in the first two minutes; w/kg racing with
+hard category boundaries makes weight advice competitively loaded (note `propose_coach_goal`'s own
+example is *"tabe 3 kg"*, against a single "no extreme restriction" bullet); Danish winters move
+everyone indoors Oct–Mar. **The signal already arrives** — `compactActivity` returns `sport_type`
+and `trainer`, and Zwift writes `VirtualRide`. Add a `## Sport` section. Also expose the race
+calendar: `getDZRTeamsAndSeries` returns `rideTime` and the club bot uses it, but it is absent from
+`coachToolDefinitions`.
+
+**6c — session summaries; move extraction to session close.** Do *not* persist raw turns — that
+contradicts `coachHowItWorks.js` ("samtalen gemmes ikke"). Today extraction runs **per message**
+(`aiChatHandler.js:2257-2264`), a separate call per exchange, so each sees one exchange with no arc
+and emits fragmentary overlapping notes — which is why `isNearDuplicate` had to exist. Move it to
+the existing 30-minute idle boundary (`:1487-1501`) and emit notes **plus** a 1–3 sentence summary
+in one call. Cross-day continuity, no transcript, and fewer calls. Flush on idle timer **or** N
+turns — the timer is in-memory and a deploy would otherwise lose every summary. Raise the 400-token
+budget for session-level extraction. Update the "gemmes ikke" copy to say what *is* kept.
+
+**6d — close the advice loop.** `plan` is already a note kind: persist recommendations as dated
+`plan` notes and have `coachFollowUp.js` compare them to what was ridden.
+
+**6e — workout files.** Generate `.zwo` and attach to the coach DM (decided). Mechanics are proven
+(`commandHandlers.js:237-239`, `quizService.js:263-277`); `sendNoEmbeds` (`coachDm.js:22`) and
+`safeReplyChunks` (`aiChatHandler.js:745`) are string-only and need a couple of lines each, while
+`safeReply` already passes objects through. `.zwo` targets are FTP-relative, so the file is correct
+even if the FTP estimate is not. **Ship install instructions with it** — Zwift reads only
+`Documents/Zwift/Workouts/<zwift-id>/` on PC/Mac; iPad and Apple TV have no accessible folder, so
+say so rather than leaving those riders assuming it is broken. `getUserZwiftId` lets you name the
+exact folder. **Verify the folder path on a real install first** — wrong once is wrong for every
+member. Render a profile PNG alongside (`chartjs-node-canvas` is already a dependency).
+
+**6f — quality signal.** 👍/👎 on coach DMs, logged beside the per-turn `coach_usage` write. Then
+test raising `reasoning_effort` above `"low"` on the final synthesis turn only.
+
+**Caution:** `parseExtractedNotes` is a second model deciding what to remember, unreviewed;
+mis-extracted facts steer coaching silently. Surface recent notes occasionally so they can be
+corrected.
+
+---
+
+## Stage 7 — the prompt (after Stage 2)
+
+Of eight sections in `buildCoachSystemPrompt` (`:1606-1663`), five are memory bookkeeping and one
+is coaching. ~18 accumulated negations, several now enforced in code anyway (`:1975` filters the
+note tools when `notesOptIn` is false).
+
+**Moved to Stage 1** (they do not need evals): the `language: null` seed, and the **reply
+contract** — direct answer first, ≤3 bullets of evidence with real dates/numbers, one
+recommendation, ≤1 question. Both are cheap and reversible. Worth re-measuring the reply contract
+once the golden set exists, since its effect is the hardest of the two to judge by eye.
+
+Remaining here, because they want measurement behind them:
+
+1. **Pre-load `## Current context`** — currently just the username. Weight, FTP, ZP category are
+   cheap and stable and today cost a tool round-trip.
+2. **Interim honesty line** until Stage 5 lands: summary metrics and laps only, not power curves.
+3. Move bookkeeping into tool `description` fields; promote illness/injury to its own section with
+   a decision rule; prune negations one at a time against the golden set.
+
+---
+
+## Suggested order
+
+`0` → `1` → `2` → `4` → then `5`, `6a`, `6b`, `6c` → `3` and `7` once tests exist → `6d–6f` as
+capacity allows.
+
+**Stage 4 now precedes 5 and 6a**, resolving a contradiction in the earlier draft (the Stage 5
+body said "after 2 and 4" while the order listed 5 first). After 4 is correct: both 5 and 6a add
+Strava calls against a per-app quota shared by the whole club, and Stage 4 cuts the existing
+per-turn load first.
+
+**If only three:** `0`, `1` (at minimum the merge/transaction half), `2`.
+
+6a is *not* in that three, correcting the earlier draft. The lost-write race discards member
+settings today; adding a rate-limited historical backfill on top of an unfixed write path is the
+wrong order regardless of how much 6a improves the coaching. (Precisely: rollups land in a new
+collection rather than `coach_profiles`, so 6a does not itself widen the race — but shipping a
+load-bearing feature while a known silent data-loss bug is live is still the wrong call.) Demote
+6a until the timestamp stamps cannot be clobbered.
+
+Effort estimates deliberately omitted — the ordering is the durable part.
+
+---
+
+## Findings reference
+
+Detail behind the stages above, for use while implementing.
+
+**P0** — `webhook/route.ts:25-45` POST unauthenticated; `wipeCoachStrava.ts:15,35,41` deletes
+profile + all notes + connection and DMs the member.
+
+**P1** — Profile writes are read→mutate→full `.set()` on both sides
+(`firebase.js:483-513`, `profile/route.ts:61-76`): a DM landing mid-save silently discards the save;
+the reverse order drops `lastAthleteMessageAt` and breaks follow-up scheduling. — Conversation trim
+is positional and can orphan a `tool` message from its `tool_calls` parent, 400ing mid-turn. —
+`encryptSecret` returns plaintext when no key is set (`tokenCrypto.ts:92-98`) yet
+`encryptedTokenFields` still writes it to `...Enc` and stamps `tokenEncVersion: 1`; contradicts
+`StravaPrivacyContent.tsx:40` and `CoachMemoryEditor.tsx:435`. No key id ⇒ rotation impossible.
+
+**P2** — One undecryptable doc 500s the admin dashboard (`admin/coach/route.ts:43-48`), which also
+runs four unbounded scans including all of `users` → *Stage 1*. — Membership N+1 → *Stage 4*. — No
+note cap on the web path; `activeGoalNotes` counts only future goals so expired ones never prune,
+and past 200 notes `limit(200)` silently drops goals from the prompt → *Stage 1*.
+
+**P3** — In-memory state dies on restart (`userConversations`, `conversationTimers`,
+`pendingGoals`) and breaks entirely on >1 instance → *Stage 4 / 6c*. — `getActivityDetails` only
+checks ownership when `conn.athleteId` is set (`stravaService.js:345`), populated only as a side
+effect of `getAthleteStats`; the web callback already stores it, so backfill on connect →
+*Stage 4*. — Notes-off delete ordering and weekly-slot delete by index → **moved into Stage 1**.
+
+### Explicitly deferred — not in any stage, by decision
+
+- **OAuth `state` is an unbound bearer token** (`stravaAuth.ts:27-52`) — no cookie/nonce/PKCE, so
+  whoever holds a connect link can bind their own Strava and `callback/route.ts:88` full-`.set()`s
+  it. Real, but requires a DM connect link to leak first, and the fix is a nonce cookie plus
+  callback changes — not cheap. Revisit if links are ever shared outside DMs.
+- **`howItWorksSentAt` reset disagreement** (`profile/route.ts:130` keeps it,
+  `clearCoachData.ts:37-49` nulls it) — cosmetic: reconnect re-sends the intro DM, in-app reset
+  does not.
+- **Raw `err.message` returned to clients** across coach routes — information disclosure, low
+  value to an authenticated member.
+- **`apps/api/requirements.txt` pins no versions**, `openai` included — a Cloud Run rebuild can
+  take a breaking major. Outside the coach stack.
+- **`raceSignups` is `allow read, write: if true`** (`firestore.rules:22-27`) — same database,
+  outside the coach stack, but worth its own ticket.
+
+---
+
+## Decisions log — do not re-propose
+
+- **Shared code cannot be imported from `packages/shared`.** `rootDir: apps/bot` in `render.yaml`.
+  Copy-sync only.
+- **Do not persist raw conversation turns.** Summaries only; the privacy copy promises it.
+- **`.zwo` ships as a DM attachment**, not a hosted link — decided, despite the PC/Mac-only
+  install constraint.
+- **Deploy source is settled.** All three runtimes build from `T00few2/dzr` as of `9bccb30`; the
+  old remotes are rollback-only.
+- **Stage 0 is Case A.** No Strava subscription exists (`[]`, 2026-09-06); delete the POST
+  handler. Do not build the secret-URL / `subscription_id` variant.
+- **No automatic wipe, ever.** Explicit disconnect on the site is the only path that erases coach
+  data. Do **not** revive wiping on `needs_reconnect` — that signal means "token dead, ask them to
+  reauthorise," which is often transient, not "consent withdrawn." An earlier draft proposed it;
+  it was wrong.
+- **Copy-sync targets `apps/bot` only.** Never `apps/api` — the Flask app has none of these
+  modules and Cloud Run cannot run the JS. A third copy is a third place to drift.
+- **`keyId` must be additive and optional on read.** Failing a read on a missing `keyId` breaks
+  every existing document at once.
+- **No split encryption key.** Render and Vercel both use the explicit `COACH_MEMORY_KEY`
+  (17/17 decrypt; fallback 0/17). Fail-closed is safe to ship.
+- **No plaintext in production.** Every profile and connection is encrypted; no migration pass
+  needed.
+- **A naive `collection().get()` export misses chat notes.** They are a subcollection under
+  `coach_chat_notes/{discordId}/notes`. Any backup must recurse.
 
 ---
 
@@ -92,568 +454,4 @@ hard parts are done properly:
 
 ---
 
-## Findings, by severity
-
-### P0 — `POST /api/strava/webhook` is unauthenticated and destructive
-
-`app/api/strava/webhook/route.ts:25-45`. The `GET` handler checks `hub.verify_token`. The
-`POST` handler checks **nothing**:
-
-```ts
-export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({}))
-  if (objectType === 'athlete' && aspect === 'update' && authorized === 'false') {
-    const discordId = await findDiscordIdByStravaAthleteId(ownerId)
-    if (discordId) await wipeCoachStravaForDiscordId(discordId, {...})
-```
-
-`wipeCoachStravaForDiscordId` (`app/lib/wipeCoachStrava.ts:15,35,41`) deletes the coach
-profile, **every chat note**, and the Strava connection, then DMs the athlete. The only input
-is `owner_id` — a Strava athlete ID, which is public in every Strava profile URL. Anyone can
-POST that JSON and irreversibly wipe a named member's coaching history, or spam DMs.
-
-Strava does not sign webhooks, so the fix is defence in depth: compare `body.subscription_id`
-against the stored subscription ID, require a secret path segment or header, and reject
-anything else. Also `STRAVA_WEBHOOK_VERIFY_TOKEN` is missing from the root `.env.example`
-(it's only in `apps/bot/.env.example`).
-
-### P1 — Coach profile saves can be silently wiped by an incoming DM
-
-Both sides do read → mutate → **full `.set()`**, no transaction, no merge:
-
-- Bot: `markCoachAthleteMessage` / `markCoachFollowUpSent` (`apps/bot/services/firebase.js:483-513`)
-  read the whole profile, then `writeCoachProfileDoc` → `coachProfileRef(id).set(...)`.
-- Web: `PUT /api/coach/profile` (`app/api/coach/profile/route.ts:61-76`) does the same.
-
-Concrete failure: a member is editing rides/week on *Mine sider* and hits save. In that
-window a DM arrives, `markCoachAthleteMessage` fires, reads the pre-save profile and writes it
-back whole — the save is gone, with no error shown. The reverse order silently drops the
-`lastAthleteMessageAt` stamp, which then breaks follow-up scheduling.
-
-Fix: `runTransaction`, or split the timestamps out of the encrypted blob so they can be a
-plain `{merge:true}` field update. The timestamps are already stored outside the ciphertext
-(`tokenCrypto.ts:253-273`), so the second option is close to free.
-
-### P1 — Conversation trimming can produce a request OpenAI rejects
-
-`aiChatHandler.js:2013-2018`, `:2076-2081`, `:2151-2156`, `:2244-2249` all do:
-
-```js
-conversation = [conversation[0], ...conversation.slice(-(MAX_CONVERSATION_LENGTH))]
-```
-
-The slice is positional. If the cut lands such that a `role:"tool"` message is kept but the
-`assistant` message carrying its `tool_calls` is dropped, the next request 400s
-(*"messages with role 'tool' must be a response to a preceding message with tool_calls"*).
-A coach turn with 4 tool iterations pushes many tool messages, so this is reachable — and the
-`:2151` trim runs *mid-turn*, so the athlete sees the generic error reply. Trim must move the
-cut back to a `user` boundary and never orphan a tool message.
-
-### P1 — "Encrypted" fields can silently hold plaintext
-
-`encryptSecret` returns plaintext unchanged when no key is set (`app/lib/tokenCrypto.ts:92-98`),
-and `encryptedTokenFields` still writes it into `accessTokenEnc`/`refreshTokenEnc` **and stamps
-`tokenEncVersion: 1`**. With no key, `app/api/strava/callback/route.ts:82-87` puts Strava
-tokens in Firestore in cleartext across four fields, two of them named `...Enc`. The only
-signal is a `console.warn`.
-
-This contradicts what members are told: *"Strava-tokens (krypteret)"*
-(`components/StravaPrivacyContent.tsx:40`), *"Det gemmes krypteret"*
-(`CoachMemoryEditor.tsx:435`). Fix: fail closed — refuse to boot or refuse to write when
-`canEncryptTokens()` / `canEncryptCoachMemory()` is false. Related: there is no key ID stored,
-only `EncVersion: 1`, so **key rotation is impossible** — rotating `COACH_MEMORY_KEY` bricks
-every existing doc.
-
-### P2 — OAuth `state` is an unbound bearer token
-
-`app/lib/stravaAuth.ts:27-52`. `state` carries the *victim's* discordId, HMAC-signed, 20-min
-TTL, with no cookie/nonce/PKCE binding to the browser. Whoever holds a connect link can
-complete the flow with their own Strava account, and `callback/route.ts:88` does a full `.set()`
-— so their rides become the victim's coaching data. Needs the DM link to leak first, so real
-risk is low, but a nonce cookie is a small fix.
-
-### P2 — One bad doc bricks the admin dashboard
-
-`app/api/admin/coach/route.ts:43-48` calls `unwrapCoachMemoryDoc` in a `forEach` with no
-try/catch, and the handler has none either. `unwrapCoachMemoryDoc` throws on a missing key
-(`tokenCrypto.ts:54`) or malformed JSON. One undecryptable profile → unhandled 500 for the
-whole page. `app/lib/coachChatNotes.ts:20-33` already does this correctly; copy that. The same
-route also runs four unbounded collection scans per load, including all of `users`.
-
-### P2 — Membership check is an N+1 on every coach turn
-
-`hasClubMemberRole` → `isPaidClubMember` does a doc get **plus a `payments` collection query**
-(`apps/bot/services/firebase.js:367-399`). It runs once in `handleChatMessage` *and again
-inside every single tool call* (`aiChatHandler.js:1257`, `:1273`, `:1316`, `:1382`). A turn
-with three parallel Strava tools is ~8 Firestore ops of pure auth, on the latency path. Resolve
-once per turn and pass it down. `getCoachProfile` is likewise fetched and decrypted 2-3× per
-turn.
-
-### P2 — No cap on notes written via the web
-
-The bot prunes to `MAX_NOTES_PER_ATHLETE = 200` (`coachChatNotes.js:4`,
-`firebase.js:pruneCoachChatNotes`). `POST /api/coach/notes` has no cap. And `activeGoalNotes`
-only counts *future* goals, so expired ones never prune. The privacy page's *"højst 200 noter"*
-is only true of bot-written notes. Once past 200, `listCoachChatNotes`' `limit(200)` means
-goals start silently disappearing from the prompt.
-
-### P3 — smaller things worth a sweep
-
-- Follow-ups only fire in a **one-minute window** (`coachFollowUp.js:240`: `hour===8 && minute===0`).
-  A slow tick or a Render restart at 08:00 skips the whole day. The `bot_state` guard already
-  makes it idempotent — just widen to "any tick at or after 08:00, once per day".
-- All in-memory state dies on restart: `userConversations`, `conversationTimers`,
-  and `pendingGoals` (`coachGoalConfirm.js:6`) — a pending Ja/Nej silently expires on deploy,
-  and the button then says "udløbet". Also breaks if Render ever runs >1 instance.
-- `getActivityDetails` only verifies ownership when `conn.athleteId` is set
-  (`stravaService.js:345`), and `athleteId` is only populated as a side effect of
-  `getAthleteStats`. The web callback already stores it — backfill on connect.
-- Turning notes off deletes the notes **before** the profile PUT
-  (`CoachMemoryEditor.tsx:243-248`); if the PUT fails the notes are gone but the toggle is
-  still on.
-- Deleting a weekly slot by array index (`profile/route.ts:116-119`) is unsafe because
-  `sanitizeWeekly` may drop rows and shift indices. Use the row id.
-- Two reset paths disagree on `howItWorksSentAt` (`profile/route.ts:130` keeps it,
-  `clearCoachData.ts:37-49` nulls it), so reconnecting re-sends the intro DM but an in-app
-  reset doesn't.
-- 500 responses return raw `err.message` to clients across all coach routes.
-- `profile.goals` is permanently `[]` on both sides — vestigial, delete it.
-- `apps/api/requirements.txt` pins **no versions at all**, including `openai`. A Cloud Run
-  rebuild can pick up a breaking major.
-- Legacy Firestore rules: `raceSignups` is `allow read, write: if true`
-  (`firestore.rules:22-27`). Out of coach scope but it's the same database.
-
----
-
-## Proposal
-
-Five stages, each independently shippable and independently verifiable. Stage 0 should go out
-on its own.
-
-### Stage 0 — close the webhook (do this first, alone)
-
-- `app/api/strava/webhook/route.ts`: verify `body.subscription_id` against a new
-  `STRAVA_WEBHOOK_SUBSCRIPTION_ID` env var; reject with 200-but-no-op on mismatch (Strava
-  retries on non-2xx). Add the shared secret to the path or a header.
-- Constant-time compare in the GET handler (reuse `safeEqual` from `stravaAuth.ts:20-25`).
-- Log every wipe attempt with `owner_id` and outcome.
-- Document `STRAVA_WEBHOOK_VERIFY_TOKEN` + the new var in the root `.env.example`.
-
-*Verify:* `curl -X POST` the forged deauth body against a preview deployment with a real
-athlete ID → expect no-op; then replay a genuine Strava payload → expect the wipe.
-
-### Stage 1 — stop losing data
-
-> **Step 0, before any code: export `coach_profiles`, `coach_chat_notes` and
-> `strava_connections` from Firestore.** This stage changes encryption behaviour on live member
-> data and there is no staging environment — Render, Vercel and Cloud Run all serve real members
-> directly. Every other item in this plan is recoverable from git; corrupted or unreadable coach
-> memory is not.
-
-- Move `lastAthleteMessageAt` / `lastFollowUpAt` / `howItWorksSentAt` to `{merge: true}`
-  field-only updates. They already live outside the ciphertext
-  (`tokenCrypto.ts:253-273`), so `markCoachAthleteMessage` and `markCoachFollowUpSent`
-  (`apps/bot/services/firebase.js:483-513`) stop rewriting the whole document.
-- Wrap `PUT /api/coach/profile` (`route.ts:61-76`) and the notes POST goal-cap check
-  (`app/api/coach/notes/route.ts:84-86`) in `runTransaction`.
-- Fix the conversation trim: replace the four `slice(-(MAX_CONVERSATION_LENGTH))` sites in
-  `aiChatHandler.js` with a helper that walks back to a safe `user` boundary and never keeps a
-  `tool` message whose parent `assistant` was dropped.
-- Fail closed on missing keys: `canEncryptTokens()` / `canEncryptCoachMemory()` false should
-  throw at write time, not warn. Add a boot-time assertion in both runtimes.
-- Add a `keyId` alongside `EncVersion` so rotation becomes possible later.
-- Wrap `unwrapCoachMemoryDoc` in try/catch in `app/api/admin/coach/route.ts:43-48`, mirroring
-  `app/lib/coachChatNotes.ts:20-33`; add `.limit()` to the four scans.
-- Cap note count in `POST /api/coach/notes` and prune expired goals on both paths.
-
-*Verify:* a script that PUTs a profile while firing `markCoachAthleteMessage` concurrently, and
-asserts neither write is lost; a unit test for the trim helper against a recorded coach
-conversation containing tool calls.
-
-### Stage 2 — make quality measurable (the highest-leverage change)
-
-This is what turns prompt tuning from guesswork into engineering.
-
-- Add a test runner. Node 22 has `node:test` built in — no new dependency, `node --test`.
-- Extract the pure logic that already exists and test it directly. It is *already* pure and
-  exported, which is why this is cheap:
-  - `coachChatNotes.js`: `sanitizeEventDate`, `activeGoalNotes`, `retrieveRelevantNotes`,
-    `searchNotes`, `formatCoachToday`, `formatNoteAge`, `parseExtractedNotes`,
-    `isNearDuplicate`, `shouldSkipExtract`.
-  - `coachProfile.js`: `publicFields`, `formatCoachProfileForPrompt`, `sanitizeWeekly`.
-  - `tokenCrypto.js`: encrypt → decrypt round-trip, and the plaintext-passthrough path.
-  - `coachFollowUp.js`: `isFollowUpDue`.
-  - Freeze `formatCoachToday` against fixed dates spanning a DST boundary and a Sunday —
-    that's the ISO-week bug class you already guarded against in the prompt.
-- Add a **golden-set eval** for the prompt itself: ~20-30 recorded scenarios as JSON fixtures
-  (fake profile + notes + Strava tool results + athlete message), run through
-  `buildCoachSystemPrompt` and the real model, asserting behaviours you already encoded as
-  rules:
-  - names a goal as saved *only* after Ja;
-  - never claims to have saved a *setting*;
-  - refuses to prescribe through an active injury;
-  - cites only numbers present in the tool results;
-  - answers "what are my settings?" from the block instead of claiming it can't see them;
-  - resolves "this week" to the right Monday–Sunday range.
-  Run on demand, not per-commit, since it costs tokens.
-- Add `.github/workflows/ci.yml`: `npm run lint`, `tsc --noEmit`, `node --test apps/bot`.
-- Drop `"ignorePatterns": ["apps/**"]` from `.eslintrc.json` and add a `apps/bot/jsconfig.json`
-  with `checkJs` so the bot gets at least loose type checking. Expect a cleanup pass.
-
-*Verify:* CI green on a PR; deliberately break `sanitizeEventDate` and confirm CI catches it.
-
-### Stage 3 — kill the duplication
-
-Order matters: don't move code until Stage 2 tests exist to prove behaviour is unchanged.
-**Take the same Firestore export as Stage 1 first** — this stage moves the encryption code
-between runtimes, and a decrypt mismatch is not recoverable from git.
-
-- Create `packages/shared/coach/` as plain CommonJS-compatible JS with JSDoc types (not TS —
-  Render and Cloud Run build `apps/*` as their own project root, and you've deliberately
-  avoided npm workspaces per the README).
-- Move, in this order, running the Stage 2 tests against both old copies first to confirm they
-  agree: `tokenCrypto` → `coachProfile` sanitisers → `coachChatNotes` → `isPaidClubMember`.
-- Have the Next side import via the existing `@/*` path alias, and keep the bot's
-  copy-into-`apps/bot` step for `constants.json` extended to the new shared dir — same pattern
-  the README already documents.
-- Delete `profile.goals` throughout while you're in there.
-
-*Verify:* the Stage 2 unit tests pass against the shared module from both runtimes; decrypt a
-document written by the *old* bot code with the *new* shared module.
-
-### Stage 4 — coaching quality and cost
-
-You deprioritised cost, so this is last, but two items pay for themselves:
-
-- Resolve membership and profile **once per turn** and thread them through `executeToolCalls`
-  instead of re-querying per tool (`aiChatHandler.js:1257,1273,1316,1382`). Pure latency and
-  Firestore-spend win, no behaviour change.
-- Add a simple per-user daily token budget checked against the `coach_usage` doc you already
-  maintain — you're recording everything and enforcing nothing.
-- Widen the follow-up window in `coachFollowUp.js:240` to "first tick at or after 08:00 local,
-  once per `lastRunDate`".
-- Persist `pendingGoals` to Firestore with a TTL so a deploy doesn't silently expire a pending
-  Ja.
-- Optional, once evals exist: the note-extraction call (`extractCoachChatNotes`) fires on
-  nearly every turn and roughly doubles per-turn cost. With a golden set you can measure
-  whether folding it into the main call as a tool loses anything.
-
----
-
-### Stage 5 — activity streams: the real coaching-quality upgrade
-
-The bot calls five Strava endpoints (`stravaService.js`): `/athlete`, `/athletes/{id}/stats`,
-`/athlete/zones`, `/athlete/activities`, `/activities/{id}`. **No streams call exists anywhere
-in the repo.** This is an implementation gap, not a Strava limitation.
-
-`GET /activities/{id}/streams` returns per-second `watts`, `heartrate`, `cadence`,
-`velocity_smooth`, `altitude`, `distance`, `grade_smooth`, `moving`, `time`. Note Strava has
-**no power-curve endpoint** — mean-max power is derived by rolling-max over the watts stream,
-in your own code.
-
-**No re-consent needed.** `STRAVA_SCOPES` is already `read,activity:read_all,profile:read_all`
-(`stravaAuth.ts:5`); `activity:read_all` is what streams on private activities require. Existing
-members do not have to reconnect.
-
-**Hard design constraint: streams never enter the model context.** A 2-hour ride at 1 Hz is
-~7,200 points per stream. `compactToolResult` would mangle it and the token budget would go
-immediately. Shape must be fetch → compute in code → return a small summary:
-
-- mean-max power at 5s / 15s / 30s / 1m / 5m / 8m / 12m / 20m / 60m
-- normalized power; IF/TSS when FTP is known (already available via `/athlete` or ZwiftPower)
-- aerobic decoupling (first-half vs second-half power:HR ratio)
-- time in zone, computed against the boundaries `/athlete/zones` already returns
-- detected work intervals (contiguous blocks above threshold) with duration and average
-
-~150 lines of pure array-in/numbers-out functions — squarely the kind of code Stage 2 covers,
-and the kind you do not want untested.
-
-Two gates:
-
-1. **Check `device_watts`** (already kept by `compactActivityDetails`). When false, power is
-   Strava's estimate from speed and grade and a power curve off it is fiction. Refuse to
-   compute rather than emit a confident-looking curve.
-2. **Rate limits.** One request per activity, against a per-app quota shared by all members
-   (default tier is roughly ~100 / 15 min and ~1,000 / day — confirm the app's actual quota).
-   On-demand only, for the single activity asked about, cached in Firestore by activity id.
-   Not across a 14-day window, and never inside the 08:00 follow-up job that already loops up
-   to 25 athletes.
-
-Sequence this after Stage 2 (tests) so the metric functions land with coverage, and after
-Stage 4 (the per-turn membership/profile resolution) so the extra call isn't stacked on top of
-the existing N+1.
-
-### Stage 6 — coaching quality beyond the prompt
-
-Ordered by expected impact. The first three outweigh any prompt edit.
-
-**6.1 Longitudinal load (the periodisation gap).** `getRecentActivities` clamps to 1–28 days
-(`stravaService.js:320`); the coach sees nothing earlier, so it cannot reason about trend and
-cannot periodise — only report. Add a nightly rollup to the existing scheduler storing
-per-athlete weekly aggregates (hours, load proxy, session count, intensity distribution), and
-feed 12–26 weeks into the prompt as a compact table. A few hundred tokens buys ramp rate,
-monotony and "four weeks without a rest week". Cheaper than widening the activity fetch, and it
-is the difference between a log reader and a coach. Pairs naturally with Stage 5 (real TSS once
-streams exist).
-
-**6.2 The coach does not know the sport it is coaching.**
-
-"Zwift" appears in the coach prompt twice: in the club's name (`aiChatHandler.js:1606`) and in
-the `get_zwiftpower_context` tool description. **Nothing states that these are indoor riders on
-a virtual platform.** The *club* bot prompt says it outright — "a cycling club focused on
-virtual racing in Zwift" (`:1537`) — so the stats bot knows and the coach does not.
-
-This changes the advice, not just the flavour:
-
-- **No coasting indoors.** Continuous pedalling, no freewheeling descents: two hours on Zwift
-  is materially more stress than two hours outdoors, and `moving_time ≈ elapsed_time` reads as
-  an implausibly consistent ride. A coach unaware of this systematically underestimates load.
-- **Zwift races are decided in the first two minutes** — an all-out effort well above threshold
-  from the gun. Generic endurance advice prescribes a steady warm-up and misses the event.
-- **w/kg racing with hard category boundaries** (ZP A/B/C/D, vELO — already fetched by
-  `getZwiftPowerContext`). This makes weight advice competitively loaded; note
-  `propose_coach_goal`'s own example goal is *"tabe 3 kg"*. Against a single "no extreme
-  restriction" bullet, this is where the missing context has a safety edge, not just a quality
-  one.
-- **ERG vs free ride** changes what a session is — relevant as soon as 6.5 generates `.zwo`.
-- **Danish winters** move everyone indoors Oct–Mar; a January indoor block is not detraining.
-
-**The signal already arrives.** `compactActivity` (`stravaService.js:195-217`) returns
-`sport_type` and `trainer: !!a.trainer`; Zwift writes `VirtualRide`. The model receives the
-indoor/outdoor flag on every activity and has never been told what it means — a two-line fix on
-data already paid for.
-
-Full version is a `## Sport` section: indoor virtual riders; `VirtualRide`/`trainer:true` means
-Zwift; treat duration as continuous load; racing is w/kg by category with an explosive start;
-club series are ZRL, TTT, DRS, Club Ladder, DZR After Party; members speak in routes (Alpe du
-Zwift, Epic KOM), already catalogued under `public/`.
-
-**Plus the race calendar you already hold.** `getDZRTeamsAndSeries` returns series, division
-and `rideTime` and the club bot uses it, but it is absent from `coachToolDefinitions` — so the
-coach cannot say "you race ZRL Tuesday 19:30, so Monday is easy". Expose the role-panel data
-and the athlete's team roles. Likewise phenotype is fetched and never acted on: one paragraph
-mapping phenotype to race-week needs. Together this is what makes it DZR's coach rather than a
-generic one.
-
-**6.3 Session summaries, and move note extraction to session close.**
-
-*Do not persist raw turns.* Storing a transcript would contradict the promise in
-`coachHowItWorks.js` — *"Chatten er privat, og samtalen gemmes ikke."* Continuity should come
-from summaries, not messages.
-
-Today, extraction is **per message, not per session**. Two paths write notes:
-the `save_chat_notes` tool (model-invoked mid-turn, present only when `notesOptIn` —
-filtered at `aiChatHandler.js:1975`), and an automatic extractor at `:2257-2264` that fires
-after *every* exchange as a separate fire-and-forget OpenAI call (`extractCoachChatNotes`,
-400 tokens, low effort). It is skipped when the model already saved that turn, and
-`shouldSkipExtract` drops sub-10-character or bare "ja/nej/ok/tak" messages
-(`coachChatNotes.js:336-344`). Otherwise a five-message conversation costs five extraction
-calls.
-
-That granularity hurts quality more than cost: each call sees one exchange with no arc, so it
-emits fragmentary overlapping notes — which is exactly why `isNearDuplicate` and the
-"Deduplicate against recent notes" prompt rule had to exist. A session-level extract sees the
-whole conversation and writes one good note where per-message writes four mediocre ones.
-
-**Change:** move extraction to the existing session boundary — `resetConversationTimeout`
-already clears the conversation after 30 minutes idle (`:62`, `:1487-1501`). On close, make
-*one* call emitting both the episode notes **and** a 1–3 sentence conversation summary. Store
-summaries as their own note kind, keep the last ~10, and inject them into the prompt as a short
-"tidligere samtaler" block.
-
-This gives cross-day continuity with no transcript, makes the 30-minute timeout a non-issue
-(so it can stay as-is), and *reduces* cost from N calls per conversation to one.
-
-Wrinkle: the timer is an in-memory `setTimeout`, so a Render restart means it never fires and
-that session's summary is lost. Flush on idle timer **or** N turns, whichever comes first —
-losing an occasional summary is acceptable, losing every one across a deploy is not. Update the
-"samtalen gemmes ikke" copy to state what *is* kept.
-
-**6.4 Close the advice loop.** Advice is given and never checked. `plan` is already a note kind:
-persist concrete recommendations as dated `plan` notes, then have `coachFollowUp.js` compare
-them against what was actually ridden ("Tuesday was meant to be easy — it was 250 W for an
-hour; how did it feel?"). Following up on its own advice is most of what distinguishes a coach
-from an advice vending machine.
-
-**6.5 Prescribe workouts — delivery matters more than generation.**
-
-Sending is easy and already proven here: `AttachmentBuilder` → `{ files: [...] }` is used at
-`commandHandlers.js:237-239` (rider-stat PNGs) and `quizService.js:263-277`. DMs take
-attachments identically — no permission (a guild construct) and no intent involved — and the
-coach already holds an open DM channel (`coachDm.js:67-68`, `coachFollowUp.js:186-188`).
-`MessageFlags.SuppressEmbeds`, used throughout to kill link previews, does not suppress
-attachments, so an image still renders inline.
-
-Two helpers are string-only and need a couple of lines each: `sendNoEmbeds` (`coachDm.js:22`,
-used by the intro DM and follow-up) and `safeReplyChunks` (`aiChatHandler.js:745`, the coach's
-main reply path via `replyFn` at `:1979`). `safeReply` (`:720`) already passes an object
-through, so `safeReply(message, { content, files, flags })` works today unchanged.
-
-`public/in-the-zone-2/*.zwo` gives two working file structures to copy.
-Useful property: `.zwo` power targets are **FTP-relative** (`Power="1.05"` = 105% FTP, seconds
-for duration), so a generated file is correct even when the FTP estimate is not — Zwift scales
-against the rider's own setting.
-
-**Decision: send the `.zwo` as a DM attachment.** Build it in memory and attach it to the coach
-DM alongside the reply — no hosting, no third party, works with what is already deployed.
-
-Because the file is the deliverable, the DM must carry install instructions or most members
-will download it and stall. Zwift reads custom workouts from
-`Documents/Zwift/Workouts/<zwift-id>/` on Windows and macOS — the folder name is the numeric
-Zwift ID, and Zwift needs a restart to pick up a new file. `getUserZwiftId` is already
-available, so the DM can name that member's exact folder rather than a generic path. State
-plainly that installing needs a PC or Mac: iPad, iPhone and Apple TV have no user-accessible
-workout folder, and riders on those devices should be told to install from a computer rather
-than left assuming it is broken.
-
-Also render a profile PNG next to the file — a few lines with `chartjs-node-canvas`, and it
-lets the athlete read the session at a glance in the DM without opening anything.
-
-Optional later, not required for this: a hosted copy in the members zone (root `package.json`
-already has `@aws-sdk/client-s3`) would make workouts re-downloadable and give a **history of
-prescriptions**, which is what 6.4's follow-up loop needs to compare intent against what was
-actually ridden. A sync partner such as intervals.icu is the only route that reaches Apple
-TV/iPad directly, at the cost of a one-time per-member connect.
-
-**6.6 Get a real quality signal.** Add 👍/👎 reactions on coach DMs, logged alongside the
-per-turn `coach_usage` write. Combined with the Stage 2 golden set this gives automated
-regression detection *and* member sentiment; today there is neither, so every prompt change is
-a guess. Once measurable, test raising `reasoning_effort` from `"low"` on the final synthesis
-turn only — low is right for tool routing, probably wrong where the coaching judgement happens.
-
-**Caution on the note extractor.** `parseExtractedNotes` is a second model deciding what to
-remember, unreviewed, and mis-extracted "facts" then steer future coaching silently — the
-athlete only discovers them on Mine sider. Surface recent notes occasionally (in the follow-up
-DM, or a light "I noted you were ill Tuesday — correct?") so bad data is caught before it
-compounds.
-
-## The prompt itself — and how the bot will feel
-
-Separate from the code. `buildCoachSystemPrompt` (`aiChatHandler.js:1606-1663`).
-
-### Diagnosis
-
-**The budget is misallocated.** Of eight sections, five are about memory bookkeeping (settings
-vs. notes vs. goals, what goes where, where each is edited, what not to claim about each). One
-section — eight bullets — is about coaching. The prompt is a policy document about its own
-storage model that also mentions training. The *club* bot prompt (`:1537`) carries more voice
-guidance than the coach does, which is inverted: the coach is the one people have a
-relationship with.
-
-**~18 negations, competing.** "Do not guess the date", "Never invent", "Do not say you cannot
-see", "Never say you saved", "Do not refuse to help", "Never put a goal in save_chat_notes"…
-Each is scar tissue from an observed failure — honest engineering — but nothing was ever
-removed, and several are now enforced in code regardless: `:1975` filters the note tools out
-entirely when `notesOptIn` is false, so the model cannot invent a note call.
-
-**Expected feel:** competent, cautious, slightly bureaucratic. Strong on dates and volume,
-good at citing real sessions; prone to meta-commentary about goals and settings when the
-athlete just asked how their week went. And **reactive rather than curious** — nothing tells
-it to ask anything. `coachFollowUp.js:136` explicitly says "one question"; the chat prompt
-does not, so the scheduled 08:00 DM will feel warmer than a live conversation.
-
-### Four concrete fixes
-
-1. **Danish by default, even to English speakers.** `defaultProfile()` (`coachProfile.js:246`)
-   seeds `language: "da"`, written by `ensureDefaultCoachProfile` during `/coach` before the
-   first message. `formatStyle` therefore always emits "always reply in Danish", and the
-   prompt's "otherwise match the chat" branch never runs until the athlete finds Mine sider and
-   selects "default". Seed `language: null`; the UI already supports it
-   (`CoachMemoryEditor.tsx:620`).
-2. **Say what it cannot see** — until Stage 5 below lands. `compactActivity` returns averages
-   (avg/weighted/max watts, avg HR) plus laps when present. Asked "was that interval session
-   good?", it has an average and no instruction to admit it. Interim line: *"You see summary
-   metrics and laps only, not power curves or intervals. Say so rather than inferring interval
-   quality from an average."* This is the fastest credibility loss with strong riders — and the
-   real fix is to close the gap, not document it.
-3. **Give it a reply contract.** `length` defaults to `null` so `formatStyle` emits nothing;
-   the only bound is "Keep replies concise (Discord)" against `COACH_MAX_TOKENS = 16000`.
-   `safeReplyChunks` is the symptom. Specify: direct answer first, ≤3 bullets of evidence with
-   real dates/numbers, one recommendation, ≤1 question. Probably the highest-yield single edit.
-4. **Pre-load `## Current context`.** It is currently just the username. Weight, FTP and ZP
-   category are cheap, stable, and today cost a tool round-trip; inline them so the model
-   reasons in W/kg from the first token.
-
-### Structural
-
-- Move the bookkeeping rules into the tool `description` fields — read at decision time, and
-  several are already duplicated there — and spend the reclaimed prompt on coaching craft.
-- Promote illness/injury from one bullet to its own section with a decision rule. The notes
-  system is *designed* to record "syg"/"træt" and reason over them; one line of guardrail is
-  thin for that.
-- Once the Stage 2 golden set exists, remove negations one at a time and measure. Treat the
-  prompt as versioned code with a regression suite, not as an append-only log of past bugs.
-
-## Notes on what I'd leave alone
-
-- The three-way settings/notes/goals split. It's the best idea in the codebase.
-- `gpt-5-mini` with `reasoning_effort: "low"`. Right call for Discord latency.
-- The separate coach bot identity. Worth the extra process.
-- The Danish-first copy and the `noEmbedUrl` treatment. Small, but it's why it feels finished.
-
----
-
-## Before you start — corrections and assumptions to verify
-
-Added after a critical re-read of this plan. The first two items can waste days if skipped.
-
-### Errors in the proposal above
-
-1. **`isFollowUpDue` is not unit-testable as Stage 2 lists it.** `coachFollowUp.js:13` requires
-   `./firebase`, which calls `admin.initializeApp()` at module load (`firebase.js:31`), so any
-   test importing it crashes without credentials — the same trap for anything transitively
-   importing `firebase.js`. Only `coachChatNotes.js`, `coachProfile.js` and `tokenCrypto.js` are
-   importable as-is. Extract the pure follow-up logic first.
-2. **The Stage 4 daily token budget cannot read `coach_usage`.** That doc is cumulative —
-   `recordCoachUsage` increments `totalTokens` forever with only `firstUsedAt` / `lastUsedAt`,
-   no daily bucket. A daily cap needs a new per-day doc or a date-range query over
-   `coach_usage_events`.
-3. **Dropping `ignorePatterns: ["apps/**"]` applies the wrong linter.**
-   `next/core-web-vitals` is a React config; against a CommonJS Node bot it yields noise, not
-   signal. Give `apps/bot` its own config with a node/commonjs env.
-
-### Verify before starting, by blast radius
-
-- **Which repo actually deploys.** The README says Cloud Run "currently still tracks
-  `T00few2/zwiftpower`" and Render "currently tracks `T00few2/bot`", and this repo contains **no
-  deploy config at all** — no `render.yaml`, `vercel.json`, `Dockerfile` or `cloudbuild`. If the
-  services still build from the old repos, merged changes silently do not ship, or are reverted
-  by the next old-repo deploy. Check this first; it is cheap and invalidates everything else.
-- **Stage 3 may be structurally impossible as written.** If Render's root directory is
-  `apps/bot`, `require("../../packages/shared/...")` will not resolve — those files are outside
-  the build context. That is exactly why `constants.json` is *copied* into `apps/bot/` and
-  `apps/api/` today. Stage 3 must therefore keep a copy-sync script, publish a private package,
-  or change the deploy root. Confirm the root-directory setting before writing any of it.
-- **Fail-closed encryption could take production down.** Confirm `STRAVA_CONNECT_SECRET` (or the
-  dedicated keys) is set on **both** Render and Vercel first. It also does not repair existing
-  damage: `unwrapCoachMemoryDoc` reads plaintext transparently and never rewrites it encrypted,
-  so any keyless-written doc stays plaintext forever. `needsTokenMigration` covers Strava
-  tokens; there is no coach-memory equivalent. Plan a one-off re-encrypt pass.
-- **Strava streams are not uniformly sampled** (Stage 5). Smart recording produces irregular
-  intervals — that is what the `time` stream is for. Naive array windowing assumes 1 Hz and
-  produces *silently wrong* mean-max power; `moving` must also be respected for paused
-  segments. Confidently-wrong power numbers are the worst failure mode available to a coach.
-- **6a's backfill, not its nightly job, is the risk.** Steady-state rollups are cheap; the first
-  run needs ~6 months of paginated history per athlete against a per-app rate limit shared
-  across the club. Throttled one-off backfill, not a synchronous job.
-- **Verify the Zwift workouts folder path** (`Documents/Zwift/Workouts/<zwift-id>/`) on a real
-  install before DMing it to the club — wrong naming is wrong for every member at once.
-- **Webhook re-registration** (Stage 0). Adding a secret path segment requires deleting and
-  recreating the Strava subscription via their API. Miss it and deauth events stop arriving
-  silently, so revoked users keep their data — worse than today. Also check the subscription
-  exists at all: if `STRAVA_WEBHOOK_VERIFY_TOKEN` was never set on Vercel, validation failed and
-  there may be none, in which case deleting the POST handler outright is the safer fix.
-- **The trim bug is derived, not observed.** Grep Render logs for OpenAI 400s mentioning
-  `tool_calls` before spending time on it. No hits in months → lower its priority.
-
-### Missing from the original plan
-
-**Take a backup.** Stages 1 and 3 touch encryption and write paths on live member data, and
-there is no staging environment — Render, Vercel and Cloud Run all serve real members directly.
-Export `coach_profiles`, `coach_chat_notes` and `strava_connections` from Firestore before
-either stage. This is the difference between a bug and an unrecoverable incident.
-
-### On the effort estimates
-
-They are relative sizing, not commitments, and assume familiarity with the code. Treat the
-ordering as the durable part of this plan; treat the day counts as a sketch.
+_Earlier long-form review prose (full findings detail and prompt critique) is preserved in git at `91b058c`._
