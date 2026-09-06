@@ -12,6 +12,7 @@ const {
   markCoachAthleteMessage,
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
+const { trimConversation } = require("../services/conversationTrim");
 const { 
   handleRiderStats, 
   handleTeamStats, 
@@ -60,7 +61,6 @@ const COACH_NOTE_TOOLS = new Set(["search_past_notes", "save_chat_notes", "propo
 
 // Configuration
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-const MAX_CONVERSATION_LENGTH = 20; // Last 20 messages (10 exchanges)
 const MAX_TOOL_ITERATIONS = 2;
 const COACH_MAX_TOOL_ITERATIONS = 4;
 const COACH_MAX_TOKENS = 16000;
@@ -2010,12 +2010,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     });
     
     // Trim conversation if too long (keep system message)
-    if (conversation.length > MAX_CONVERSATION_LENGTH + 1) {
-      conversation = [
-        conversation[0], // Keep system message
-        ...conversation.slice(-(MAX_CONVERSATION_LENGTH))
-      ];
-    }
+    conversation = trimConversation(conversation);
     
     // Call OpenAI with retry logic
     const response = await callAndTrack(
@@ -2073,12 +2068,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
 
         if (hasStatsCall && allSuccessful && shouldSkipGenericAnswer) {
           // Trim conversation before follow-up
-          if (conversation.length > MAX_CONVERSATION_LENGTH + 1) {
-            conversation = [
-              conversation[0],
-              ...conversation.slice(-(MAX_CONVERSATION_LENGTH))
-            ];
-          }
+          conversation = trimConversation(conversation);
 
           try {
             const isTeamStats = currentToolCalls.some(tc => tc.function.name === "team_stats");
@@ -2148,12 +2138,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
         // Generic answer step: turn tool results into a natural-language reply when tools didn't already reply.
         if (!shouldSkipGenericAnswer) {
           // Trim before asking again
-          if (conversation.length > MAX_CONVERSATION_LENGTH + 1) {
-            conversation = [
-              conversation[0],
-              ...conversation.slice(-(MAX_CONVERSATION_LENGTH))
-            ];
-          }
+          conversation = trimConversation(conversation);
 
           const postTool = await callAndTrack(
             buildChatCompletionParams({
@@ -2241,12 +2226,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     }
     
     // Trim conversation if it has grown too long after processing
-    if (conversation.length > MAX_CONVERSATION_LENGTH + 1) {
-      conversation = [
-        conversation[0],
-        ...conversation.slice(-(MAX_CONVERSATION_LENGTH))
-      ];
-    }
+    conversation = trimConversation(conversation);
 
     // Save updated conversation
     userConversations.set(conversationKey, conversation);
