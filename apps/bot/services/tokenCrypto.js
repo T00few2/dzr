@@ -246,8 +246,32 @@ function persistCoachMemoryDoc(plain) {
   };
 }
 
+const COACH_CANARY_PLAINTEXT = "dzr-coach-key-canary-v1";
+
+/**
+ * Encrypt the fixed canary string with the current coach key.
+ * Stored once, then decrypted at bot startup to prove the key still matches the one that
+ * encrypted existing coach memory. Uses a constant of its own rather than a member's profile:
+ * pointing the canary at real data means deleting that athlete takes the bot down.
+ */
+function makeCoachCanary() {
+  return encryptWithKey(requireKey(getCoachKey(), "coach key canary"), COACH_CANARY_PLAINTEXT);
+}
+
+/** True when `value` decrypts to the canary string under the current coach key. */
+function verifyCoachCanary(value) {
+  try {
+    return decryptWithKey(getCoachKey(), value, "coach key canary") === COACH_CANARY_PLAINTEXT;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   PREFIX,
+  COACH_CANARY_PLAINTEXT,
+  makeCoachCanary,
+  verifyCoachCanary,
   canEncryptTokens,
   canEncryptCoachMemory,
   encryptSecret,

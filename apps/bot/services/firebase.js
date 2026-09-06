@@ -9,6 +9,8 @@ const {
 const {
   canEncryptCoachMemory,
   unwrapCoachMemoryDoc,
+  makeCoachCanary,
+  verifyCoachCanary,
   persistCoachMemoryDoc,
   unwrapChatNoteDoc,
   persistChatNoteDoc,
@@ -565,8 +567,46 @@ async function recordCoachUsage({ discordId, username, model, promptTokens, comp
   }
 }
 
+const COACH_KEY_CANARY_STATE = "coach_key_canary";
+
+/**
+ * Prove the coach encryption key still matches the one that encrypted existing coach memory.
+ *
+ * Failing closed on a missing key (tokenCrypto.requireKey) only proves a key exists. It cannot
+ * catch the case that actually corrupts data: Vercel and Render both configured, with different
+ * values, so each writes memory the other cannot read. This decrypts a stored canary to catch it.
+ *
+ * Returns a result rather than throwing, so the caller can distinguish:
+ *   - "mismatch"  -> the key is wrong; the bot must not start and write under it
+ *   - "unavailable" -> Firestore could not be read; log and carry on, do not crash-loop
+ */
+async function checkCoachKeyCanary() {
+  let snap;
+  try {
+    snap = await getBotState(COACH_KEY_CANARY_STATE);
+  } catch (err) {
+    return { status: "unavailable", message: err?.message || String(err) };
+  }
+
+  const stored = snap?.value;
+  if (!stored) {
+    try {
+      await setBotState(COACH_KEY_CANARY_STATE, {
+        value: makeCoachCanary(),
+        createdAt: new Date().toISOString(),
+      });
+      return { status: "created" };
+    } catch (err) {
+      return { status: "unavailable", message: err?.message || String(err) };
+    }
+  }
+
+  return verifyCoachCanary(stored) ? { status: "ok" } : { status: "mismatch" };
+}
+
 module.exports = {
   db,
+  checkCoachKeyCanary,
   getUserZwiftId,
   linkUserZwiftId,
   getTodaysClubStats,
