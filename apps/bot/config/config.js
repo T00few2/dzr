@@ -37,8 +37,11 @@ module.exports = {
     privateKey: process.env.FIREBASE_PRIVATE_KEY,
   },
   server: {
-    port: 3000,
-    keepAliveUrl: "https://bot-tdnm.onrender.com",
+    port: Number.parseInt(process.env.PORT || "3000", 10),
+    keepAliveUrl:
+      process.env.RENDER_EXTERNAL_URL ||
+      process.env.KEEP_ALIVE_URL ||
+      "https://bot-tdnm.onrender.com",
     keepAliveInterval: 24 * 60 * 60 * 1000, // 24 hours. Not needed anymore. Remove at some point
   },
   contentApi: {

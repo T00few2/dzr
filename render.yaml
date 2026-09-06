@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+# Discord bot only. The Next.js site stays on Vercel; Flask jobs stay on Cloud Run.
+# Documents the live Render service `bot` (Oregon, Node).
+# Do not Apply this Blueprint again; that would create a second service.
+previews:
+  generation: off
+
+services:
+  - type: web
+    name: bot
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: apps/bot
+    buildCommand: npm ci
+    startCommand: node bot.js
+    healthCheckPath: /
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - apps/bot/**
+      ignoredPaths:
+        - apps/api/**
+        - app/**
+        - components/**
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DISCORD_GUILD_ID
+        value: "1195850595014299669"
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: COACH_BOT_TOKEN
+        sync: false
+      - key: COACH_BOT_CLIENT_ID
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: CONTENT_API_BASE_URL
+        sync: false
+      - key: CONTENT_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: STRAVA_CLIENT_ID
+        sync: false
+      - key: STRAVA_CLIENT_SECRET
+        sync: false
+      - key: STRAVA_CONNECT_SECRET
+        sync: false
+      - key: COACH_MEMORY_KEY
+        sync: false
+      - key: STRAVA_TOKEN_KEY
+        sync: false
+      - key: DISCORD_WELCOME_CHANNEL_ID
+        sync: false
+      - key: DISCORD_APPROVAL_CHANNEL_ID
+        sync: false
+      - key: ZP_ROLE_D
+        sync: false
+      - key: ZP_ROLE_C
+        sync: false
+      - key: ZP_ROLE_B
+        sync: false
+      - key: ZP_ROLE_A
+        sync: false
+      - key: KMS_CHANNEL_ID
+        sync: false
+      - key: KMS_EVENT_ISO
+        sync: false
+      - key: QUIZ_CHANNEL_ID
+        sync: false
