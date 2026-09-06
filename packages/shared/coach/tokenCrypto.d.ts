@@ -48,6 +48,15 @@ export type CoachChatNotePlain = {
   eventDate?: string | null
 }
 
+/** Short non-reversible fingerprint of the configured key, or null when none is set. */
+export function coachKeyId(): string | null
+export function tokenKeyId(): string | null
+/** 'unknown' for documents predating keyId — never treat that as a mismatch. */
+export function compareKeyId(
+  storedKeyId: string | null | undefined,
+  currentKeyId: string | null | undefined
+): 'match' | 'mismatch' | 'unknown' | 'no_key'
+
 export const PREFIX: string
 export const COACH_CANARY_PLAINTEXT: string
 

@@ -3,7 +3,7 @@ import { requireAdmin } from '@/app/api/admin/_lib/auth'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { COLLECTIONS } from '@/app/lib/sharedConstants'
 import { toIso } from '@/app/lib/stravaAuth'
-import { hasStravaRefreshToken, unwrapCoachMemoryDoc } from '@/app/lib/tokenCrypto'
+import { hasStravaRefreshToken, unwrapCoachMemoryDoc, coachKeyId, compareKeyId } from '@/app/lib/tokenCrypto'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -43,7 +43,12 @@ export async function GET(req: Request) {
   // doubles as key-drift detection — if Vercel and Render ever encrypt under different keys,
   // this number goes up and an admin sees it.
   const undecryptable: string[] = []
+  // Stored key fingerprints. 'unknown' means the document predates keyId, which is expected for
+  // anything written before it existed and is not a problem.
+  const currentKeyId = coachKeyId()
+  const keyIdStatus = { match: 0, mismatch: 0, unknown: 0, no_key: 0 }
   profilesSnap.forEach((doc) => {
+    keyIdStatus[compareKeyId((doc.data() || {}).memoryKeyId, currentKeyId)] += 1
     try {
       const profile = unwrapCoachMemoryDoc({ ...(doc.data() || {}), discordId: doc.id })
       const days = Number(profile.followUpEveryDays)
@@ -169,8 +174,11 @@ export async function GET(req: Request) {
     people,
     events,
     // Key-drift signal. Should always be 0. A non-zero count means some coach_profiles documents
-    // cannot be decrypted with the key this runtime holds — most likely Vercel and Render have
-    // drifted apart, or COACH_MEMORY_KEY was rotated (there is no keyId yet to tell those apart).
+    // cannot be decrypted with the key this runtime holds — Vercel and Render have drifted apart,
+    // or COACH_MEMORY_KEY was rotated. keyIdStatus below distinguishes those two.
     undecryptableProfiles: undecryptable.length,
+    // Diagnostic for the above: a mismatch says the key changed, an unknown says the document
+    // simply predates fingerprinting. Without this the two look identical from a failed decrypt.
+    keyIdStatus,
   })
 }

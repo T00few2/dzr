@@ -58,3 +58,33 @@ test("decryption still passes through legacy plaintext values", () => {
   const legacy = { discordId: "1", sports: ["running"], notesOptIn: false };
   assert.deepEqual(tc.unwrapCoachMemoryDoc(legacy).sports, ["running"]);
 });
+
+test("keyId is a short fingerprint that does not expose the key", () => {
+  const tc = loadWithKey("a-very-secret-key");
+  const id = tc.coachKeyId();
+  assert.equal(typeof id, "string");
+  assert.equal(id.length, 8);
+  assert.ok(!id.includes("secret"), "must not contain the key material");
+});
+
+test("different keys produce different fingerprints", () => {
+  const a = loadWithKey("key-one").coachKeyId();
+  const b = loadWithKey("key-two").coachKeyId();
+  assert.notEqual(a, b);
+});
+
+test("documents written before keyId existed still read", () => {
+  const tc = loadWithKey("key-one");
+  const doc = tc.persistCoachMemoryDoc({ discordId: "1", sports: ["cycling"] });
+  delete doc.memoryKeyId; // simulate a document from before this field existed
+  assert.deepEqual(tc.unwrapCoachMemoryDoc(doc).sports, ["cycling"], "a missing keyId must not fail the read");
+});
+
+test("compareKeyId distinguishes a rotated key from a legacy document", () => {
+  const tc = loadWithKey("key-one");
+  const current = tc.coachKeyId();
+  assert.equal(tc.compareKeyId(current, current), "match");
+  assert.equal(tc.compareKeyId("deadbeef", current), "mismatch", "a real key change");
+  assert.equal(tc.compareKeyId(undefined, current), "unknown", "predates keyId, not a problem");
+  assert.equal(tc.compareKeyId(current, null), "no_key");
+});

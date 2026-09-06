@@ -113,6 +113,44 @@ function requireKey(key, label) {
   return key;
 }
 
+/**
+ * Short, non-reversible fingerprint of a key.
+ *
+ * Stored alongside ciphertext so a decrypt failure can be diagnosed: without it, a document
+ * encrypted under a rotated or mismatched key is indistinguishable from a corrupt one — exactly
+ * the ambiguity hit by strava_connections/271709901724581888, which decrypted under no known key
+ * and could not be explained.
+ *
+ * Domain-separated from the key itself, and truncated, so it reveals nothing about the key.
+ */
+function keyFingerprint(key) {
+  if (!key) return null;
+  return crypto.createHash("sha256").update("dzr-keyid:").update(key).digest("hex").slice(0, 8);
+}
+
+/** Fingerprint of the coach memory key currently configured, or null. */
+function coachKeyId() {
+  return keyFingerprint(getCoachKey());
+}
+
+/** Fingerprint of the Strava token key currently configured, or null. */
+function tokenKeyId() {
+  return keyFingerprint(getTokenKey());
+}
+
+/**
+ * Compare a stored fingerprint against the current key.
+ *
+ * Returns "unknown" when the document predates keyId — which is every document written before
+ * this change. Reads must never fail on that: treating a missing keyId as a mismatch would break
+ * all existing coach data at once.
+ */
+function compareKeyId(storedKeyId, currentKeyId) {
+  if (!storedKeyId) return "unknown";
+  if (!currentKeyId) return "no_key";
+  return storedKeyId === currentKeyId ? "match" : "mismatch";
+}
+
 function canEncryptTokens() {
   return Boolean(getTokenKey());
 }
@@ -148,6 +186,7 @@ function encryptedTokenFields(accessToken, refreshToken) {
     accessTokenEnc: encryptSecret(accessToken),
     refreshTokenEnc: encryptSecret(refreshToken),
     tokenEncVersion: 1,
+    tokenKeyId: tokenKeyId(),
   };
 }
 
@@ -233,6 +272,7 @@ function persistChatNoteDoc(plain) {
     ...meta,
     noteEnc: encryptWithKey(key, JSON.stringify(packed)),
     noteEncVersion: 1,
+    noteKeyId: coachKeyId(),
   };
 }
 
@@ -252,6 +292,7 @@ function persistCoachMemoryDoc(plain) {
     ...meta,
     memoryEnc: encryptWithKey(key, JSON.stringify(packed)),
     memoryEncVersion: 1,
+    memoryKeyId: coachKeyId(),
   };
 }
 
@@ -278,6 +319,9 @@ function verifyCoachCanary(value) {
 
 module.exports = {
   PREFIX,
+  coachKeyId,
+  tokenKeyId,
+  compareKeyId,
   COACH_CANARY_PLAINTEXT,
   makeCoachCanary,
   verifyCoachCanary,

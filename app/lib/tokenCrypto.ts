@@ -20,6 +20,9 @@ export type {
 
 export {
   PREFIX,
+  coachKeyId,
+  tokenKeyId,
+  compareKeyId,
   COACH_CANARY_PLAINTEXT,
   canEncryptTokens,
   canEncryptCoachMemory,
