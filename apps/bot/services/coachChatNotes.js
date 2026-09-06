@@ -19,6 +19,8 @@ function clip(value, max) {
   return String(value || "").trim().slice(0, max);
 }
 
+const WEEKDAY_MON0 = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+
 function calendarDateInTz(value, tz = COACH_TZ) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -28,6 +30,37 @@ function calendarDateInTz(value, tz = COACH_TZ) {
     day: "2-digit",
     timeZone: tz,
   }).format(date);
+}
+
+function addIsoDays(iso, days) {
+  const [year, month, day] = String(iso || "").split("-").map(Number);
+  if (![year, month, day].every(Number.isFinite)) return "";
+  const next = new Date(Date.UTC(year, month - 1, day + days));
+  return next.toISOString().slice(0, 10);
+}
+
+function weekdayMon0InTz(date, tz = COACH_TZ) {
+  const key = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: tz }).format(date);
+  return WEEKDAY_MON0[key] ?? 0;
+}
+
+function formatIsoDateShort(iso) {
+  const [year, month, day] = String(iso || "").split("-").map(Number);
+  if (![year, month, day].every(Number.isFinite)) return iso || "";
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function currentIsoWeek(now) {
+  const date = now instanceof Date ? now : new Date(now);
+  const today = calendarDateInTz(date);
+  const monday = addIsoDays(today, -weekdayMon0InTz(date));
+  const sunday = addIsoDays(monday, 6);
+  return { monday, sunday };
 }
 
 function formatCoachToday(now = new Date()) {
@@ -46,13 +79,19 @@ function formatCoachToday(now = new Date()) {
     hour12: false,
     timeZone: COACH_TZ,
   }).format(date);
+  const week = currentIsoWeek(date);
+  const weekLine = week.monday && week.sunday
+    ? ` Weeks start Monday: this week is ${formatIsoDateShort(week.monday)} – ${formatIsoDateShort(week.sunday)} (${week.monday}–${week.sunday}).`
+    : " Weeks start Monday (ISO / Denmark), not Sunday.";
   return {
     iso,
     weekday,
     longDate,
     time,
     tz: COACH_TZ,
-    line: `Today is ${weekday}, ${longDate} (${iso}) in ${COACH_TZ}. Local time ${time}.`,
+    weekMonday: week.monday || null,
+    weekSunday: week.sunday || null,
+    line: `Today is ${weekday}, ${longDate} (${iso}) in ${COACH_TZ}. Local time ${time}.${weekLine}`,
   };
 }
 
@@ -323,7 +362,7 @@ Rules:
 - As many notes as are genuinely useful, max 8. Prefer none over noise, except upcoming races and standing goals.
 - Capture transient state: illness, fatigue, mood, skipped session, how a ride felt, one-off plans, life schedule that may change tomorrow.
 - If the athlete names a standing aim (lose weight, stay in shape, get fitter, win races as an aim — not a calendar date), add a kind "goal" note. Skip if that aim is already in recent notes.
-- If the athlete names a race, event, or target date (a calendar date, "next Sunday", "om 2 uger", Zwift race, ZRL, klubmesterskab, etc.), add a kind "race" note. Resolve the date from Today into eventDate as YYYY-MM-DD. Text is the event name only. Do not invent dates. Skip if that eventDate is already in recent notes.
+- If the athlete names a race, event, or target date (a calendar date, "next Sunday", "om 2 uger", Zwift race, ZRL, klubmesterskab, etc.), add a kind "race" note. Resolve the date from Today into eventDate as YYYY-MM-DD. Weeks start Monday. Text is the event name only. Do not invent dates. Skip if that eventDate is already in recent notes.
 - kind feeling = illness/fatigue/mood/soreness that is not a lasting injury they want obeyed every session.
 - Do NOT copy standing constraints already in Coach settings (rides/week, weekly slots, lasting injuries, reply style). Goals are chat notes, not settings.
 - Do NOT invent facts. Do NOT store Strava numbers unless the athlete stated them in this exchange.

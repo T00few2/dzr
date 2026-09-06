@@ -593,7 +593,7 @@ const coachToolDefinitions = [
         properties: {
           days: {
             type: "number",
-            description: "Lookback window in days (1-28). Default 14."
+            description: "Lookback window in days (1-28). Default 14. For 'this week' (Monday–Sunday, Denmark), fetch enough days to cover from this Monday."
           }
         }
       }
@@ -1545,6 +1545,7 @@ async function buildCoachSystemPrompt(message, userText) {
 ## Today
 ${today.line}
 Use this calendar date for everything: how old a chat note is, whether a feeling is still relevant, how far an upcoming race is, and what "this week" means. Do not guess the date.
+Weeks start on Monday (Denmark / ISO). "This week" is the Monday–Sunday range above. Sunday is the last day of the week, not the first. "Last week" is the previous Monday–Sunday.
 
 ## Data
 You may only use tools to read THIS athlete's Strava data (the Discord user talking to you). Never request or invent another rider's activities.
