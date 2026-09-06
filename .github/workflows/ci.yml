@@ -18,8 +18,14 @@ jobs:
       - run: npm ci
       - name: Typecheck
         run: npx tsc --noEmit
-      - name: Lint
+      - name: Lint site
         run: npm run lint
+      # apps/** is excluded from next lint (it is a React config, wrong for a CommonJS bot), so
+      # the bot had no static checking at all. no-undef alone already caught a real bug: a
+      # variable declared inside a try and read from its catch, which made every errored coach
+      # turn throw from its own error handler.
+      - name: Lint bot
+        run: npm run lint:bot
 
   bot:
     name: Bot (tests)

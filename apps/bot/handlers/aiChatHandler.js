@@ -1906,8 +1906,12 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     if (!mentioned && !repliedToMe) return;
   }
   
+  // Declared outside the try because the catch block flushes it. It was previously scoped to the
+  // try, so every errored coach turn threw a ReferenceError from its own error handler after
+  // replying — losing the token accounting and burying the real OpenAI error in the logs.
+  let coachUsageTally = null;
+
   try {
-    let coachUsageTally = null;
     let notesSavedThisTurn = false;
 
     // Show typing indicator
@@ -1942,7 +1946,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     }
 
     // Shortcut: "mine stats" → use caller's linked ZwiftID directly (club bot only)
-    const normalized = cleanedMessage.toLowerCase().replace(/[!?\.]+$/g, '').trim();
+    const normalized = cleanedMessage.toLowerCase().replace(/[!?.]+$/g, '').trim();
     if (!coachOnly && (normalized === "mine stats" || normalized === "my stats")) {
       const zwiftId = await getUserZwiftId(message.author.id);
       if (!zwiftId) {

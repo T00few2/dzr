@@ -22,7 +22,6 @@ const {
 const {
   FOLLOW_UP_TZ,
   FOLLOW_UP_HOUR,
-  calendarDateInTz,
   shouldRunFollowUpSweep,
   isFollowUpDue,
 } = require("./coachFollowUpSchedule");
