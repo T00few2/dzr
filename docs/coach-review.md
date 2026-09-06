@@ -21,7 +21,7 @@ Scope read: `apps/bot/handlers/aiChatHandler.js`, `apps/bot/services/coach*.js`,
 | # | Change | Why | Rough effort |
 |---|---|---|---|
 | **0** | Authenticate `POST /api/strava/webhook` | Anyone can wipe a named member's coach data today | Hours |
-| **1** | Transactions on profile writes; fix conversation trim; fail closed when no encryption key; try/catch in admin route; cap web-written notes | Silent data loss and a mid-turn crash class | ~1 day |
+| **1** | **Back up Firestore first**, then: transactions on profile writes; fix conversation trim; fail closed when no encryption key; try/catch in admin route; cap web-written notes | Silent data loss and a mid-turn crash class | ~1 day |
 | **2** | `node --test` on the already-pure helpers + CI + lint/typecheck `apps/**`; then a ~25-case prompt golden set | Nothing currently catches a regression | ~2 days |
 | **3** | Extract `tokenCrypto` / `coachProfile` / `coachChatNotes` / `isPaidClubMember` into `packages/shared` | Two hand-synced copies of the crypto; drift = unreadable memory | ~1 day, after 2 |
 | **4** | Resolve membership + profile once per turn; widen follow-up window; persist pending goals; daily token budget | 8 Firestore ops of pure auth per turn; follow-ups skip on a missed minute | ~half day |
@@ -244,6 +244,12 @@ athlete ID → expect no-op; then replay a genuine Strava payload → expect the
 
 ### Stage 1 — stop losing data
 
+> **Step 0, before any code: export `coach_profiles`, `coach_chat_notes` and
+> `strava_connections` from Firestore.** This stage changes encryption behaviour on live member
+> data and there is no staging environment — Render, Vercel and Cloud Run all serve real members
+> directly. Every other item in this plan is recoverable from git; corrupted or unreadable coach
+> memory is not.
+
 - Move `lastAthleteMessageAt` / `lastFollowUpAt` / `howItWorksSentAt` to `{merge: true}`
   field-only updates. They already live outside the ciphertext
   (`tokenCrypto.ts:253-273`), so `markCoachAthleteMessage` and `markCoachFollowUpSent`
@@ -299,6 +305,8 @@ This is what turns prompt tuning from guesswork into engineering.
 ### Stage 3 — kill the duplication
 
 Order matters: don't move code until Stage 2 tests exist to prove behaviour is unchanged.
+**Take the same Firestore export as Stage 1 first** — this stage moves the encryption code
+between runtimes, and a decrypt mismatch is not recoverable from git.
 
 - Create `packages/shared/coach/` as plain CommonJS-compatible JS with JSDoc types (not TS —
   Render and Cloud Run build `apps/*` as their own project root, and you've deliberately
