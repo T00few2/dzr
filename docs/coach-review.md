@@ -42,6 +42,10 @@ broke → 4, 6d–6f as capacity allows.
 live risk, the second makes everything after it safe to change, the third is the largest single
 jump in how good the coaching actually is.
 
+> **Read "Before you start" at the end of this document first.** It corrects three errors in
+> the stages below, lists the assumptions that could invalidate them, and adds the backup step
+> this plan originally lacked.
+
 ---
 
 ## Honest assessment
@@ -578,3 +582,70 @@ does not, so the scheduled 08:00 DM will feel warmer than a live conversation.
 - `gpt-5-mini` with `reasoning_effort: "low"`. Right call for Discord latency.
 - The separate coach bot identity. Worth the extra process.
 - The Danish-first copy and the `noEmbedUrl` treatment. Small, but it's why it feels finished.
+
+---
+
+## Before you start — corrections and assumptions to verify
+
+Added after a critical re-read of this plan. The first two items can waste days if skipped.
+
+### Errors in the proposal above
+
+1. **`isFollowUpDue` is not unit-testable as Stage 2 lists it.** `coachFollowUp.js:13` requires
+   `./firebase`, which calls `admin.initializeApp()` at module load (`firebase.js:31`), so any
+   test importing it crashes without credentials — the same trap for anything transitively
+   importing `firebase.js`. Only `coachChatNotes.js`, `coachProfile.js` and `tokenCrypto.js` are
+   importable as-is. Extract the pure follow-up logic first.
+2. **The Stage 4 daily token budget cannot read `coach_usage`.** That doc is cumulative —
+   `recordCoachUsage` increments `totalTokens` forever with only `firstUsedAt` / `lastUsedAt`,
+   no daily bucket. A daily cap needs a new per-day doc or a date-range query over
+   `coach_usage_events`.
+3. **Dropping `ignorePatterns: ["apps/**"]` applies the wrong linter.**
+   `next/core-web-vitals` is a React config; against a CommonJS Node bot it yields noise, not
+   signal. Give `apps/bot` its own config with a node/commonjs env.
+
+### Verify before starting, by blast radius
+
+- **Which repo actually deploys.** The README says Cloud Run "currently still tracks
+  `T00few2/zwiftpower`" and Render "currently tracks `T00few2/bot`", and this repo contains **no
+  deploy config at all** — no `render.yaml`, `vercel.json`, `Dockerfile` or `cloudbuild`. If the
+  services still build from the old repos, merged changes silently do not ship, or are reverted
+  by the next old-repo deploy. Check this first; it is cheap and invalidates everything else.
+- **Stage 3 may be structurally impossible as written.** If Render's root directory is
+  `apps/bot`, `require("../../packages/shared/...")` will not resolve — those files are outside
+  the build context. That is exactly why `constants.json` is *copied* into `apps/bot/` and
+  `apps/api/` today. Stage 3 must therefore keep a copy-sync script, publish a private package,
+  or change the deploy root. Confirm the root-directory setting before writing any of it.
+- **Fail-closed encryption could take production down.** Confirm `STRAVA_CONNECT_SECRET` (or the
+  dedicated keys) is set on **both** Render and Vercel first. It also does not repair existing
+  damage: `unwrapCoachMemoryDoc` reads plaintext transparently and never rewrites it encrypted,
+  so any keyless-written doc stays plaintext forever. `needsTokenMigration` covers Strava
+  tokens; there is no coach-memory equivalent. Plan a one-off re-encrypt pass.
+- **Strava streams are not uniformly sampled** (Stage 5). Smart recording produces irregular
+  intervals — that is what the `time` stream is for. Naive array windowing assumes 1 Hz and
+  produces *silently wrong* mean-max power; `moving` must also be respected for paused
+  segments. Confidently-wrong power numbers are the worst failure mode available to a coach.
+- **6a's backfill, not its nightly job, is the risk.** Steady-state rollups are cheap; the first
+  run needs ~6 months of paginated history per athlete against a per-app rate limit shared
+  across the club. Throttled one-off backfill, not a synchronous job.
+- **Verify the Zwift workouts folder path** (`Documents/Zwift/Workouts/<zwift-id>/`) on a real
+  install before DMing it to the club — wrong naming is wrong for every member at once.
+- **Webhook re-registration** (Stage 0). Adding a secret path segment requires deleting and
+  recreating the Strava subscription via their API. Miss it and deauth events stop arriving
+  silently, so revoked users keep their data — worse than today. Also check the subscription
+  exists at all: if `STRAVA_WEBHOOK_VERIFY_TOKEN` was never set on Vercel, validation failed and
+  there may be none, in which case deleting the POST handler outright is the safer fix.
+- **The trim bug is derived, not observed.** Grep Render logs for OpenAI 400s mentioning
+  `tool_calls` before spending time on it. No hits in months → lower its priority.
+
+### Missing from the original plan
+
+**Take a backup.** Stages 1 and 3 touch encryption and write paths on live member data, and
+there is no staging environment — Render, Vercel and Cloud Run all serve real members directly.
+Export `coach_profiles`, `coach_chat_notes` and `strava_connections` from Firestore before
+either stage. This is the difference between a bug and an unrecoverable incident.
+
+### On the effort estimates
+
+They are relative sizing, not commitments, and assume familiarity with the code. Treat the
+ordering as the durable part of this plan; treat the day counts as a sketch.
