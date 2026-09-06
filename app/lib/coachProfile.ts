@@ -138,7 +138,10 @@ export function defaultCoachProfile(): CoachProfile {
     weekly: [],
     injuries: [],
     goals: [],
-    style: { length: null, language: 'da', tone: null, notes: '' },
+    // language stays null so the coach matches whatever language the athlete writes in.
+    // Seeding 'da' here ran before the athlete's first message and made the prompt's
+    // "otherwise match the chat" branch unreachable, so English speakers got Danish.
+    style: { length: null, language: null, tone: null, notes: '' },
     notesOptIn: false,
     followUpEveryDays: null,
   }

@@ -465,51 +465,48 @@ async function ensureDefaultCoachProfile(discordId) {
   return toPlainProfile(doc);
 }
 
+const FIRESTORE_NOT_FOUND = 5; // gRPC NOT_FOUND
+
+/**
+ * Stamp one bot-owned timestamp on a coach profile.
+ *
+ * These fields are stored OUTSIDE the encrypted blob (see persistCoachMemoryDoc), so they can be
+ * written as a single-field merge. That matters: the previous implementation read the whole
+ * profile, re-encrypted it and wrote it back with .set(), so a stamp landing while the athlete
+ * was saving settings on Mine sider silently discarded their save — and the reverse ordering
+ * dropped the stamp and broke follow-up scheduling.
+ *
+ * update() also fails with NOT_FOUND when the document is absent, which preserves the old
+ * "do nothing for users who have never opened Coach" behaviour without needing a read first.
+ */
+async function stampCoachProfile(discordId, field) {
+  const id = String(discordId || "").trim();
+  if (!id) return false;
+  try {
+    await coachProfileRef(id).update({ [field]: new Date().toISOString() });
+    return true;
+  } catch (err) {
+    if (err?.code === FIRESTORE_NOT_FOUND) return false;
+    throw err;
+  }
+}
+
 async function markCoachHowItWorksSent(discordId) {
   const id = String(discordId || "").trim();
   if (!id) return;
-  const snap = await coachProfileRef(id).get();
-  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.exists ? snap.data() || {} : {}) });
-  await writeCoachProfileDoc(id, {
-    ...publicFields(existing),
-    updatedAt: existing.updatedAt || new Date(),
-    updatedBy: "user",
-    howItWorksSentAt: new Date().toISOString(),
-    lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
-    lastFollowUpAt: existing.lastFollowUpAt || null,
-  });
+  // Unlike the other two, this one must create the profile if it is missing.
+  if (!(await stampCoachProfile(id, "howItWorksSentAt"))) {
+    await ensureDefaultCoachProfile(id);
+    await stampCoachProfile(id, "howItWorksSentAt");
+  }
 }
 
 async function markCoachAthleteMessage(discordId) {
-  const id = String(discordId || "").trim();
-  if (!id) return;
-  const snap = await coachProfileRef(id).get();
-  if (!snap.exists) return;
-  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.data() || {}) });
-  await writeCoachProfileDoc(id, {
-    ...publicFields(existing),
-    updatedAt: existing.updatedAt || new Date(),
-    updatedBy: existing.updatedBy || "user",
-    howItWorksSentAt: existing.howItWorksSentAt || null,
-    lastAthleteMessageAt: new Date().toISOString(),
-    lastFollowUpAt: existing.lastFollowUpAt || null,
-  });
+  await stampCoachProfile(discordId, "lastAthleteMessageAt");
 }
 
 async function markCoachFollowUpSent(discordId) {
-  const id = String(discordId || "").trim();
-  if (!id) return;
-  const snap = await coachProfileRef(id).get();
-  if (!snap.exists) return;
-  const existing = unwrapCoachMemoryDoc({ discordId: id, ...(snap.data() || {}) });
-  await writeCoachProfileDoc(id, {
-    ...publicFields(existing),
-    updatedAt: existing.updatedAt || new Date(),
-    updatedBy: existing.updatedBy || "user",
-    howItWorksSentAt: existing.howItWorksSentAt || null,
-    lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
-    lastFollowUpAt: new Date().toISOString(),
-  });
+  await stampCoachProfile(discordId, "lastFollowUpAt");
 }
 
 async function listCoachProfiles() {

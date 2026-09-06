@@ -40,11 +40,23 @@ export async function GET(req: Request) {
 
   const notesOptInById = new Map<string, boolean>()
   const followUpEveryDaysById = new Map<string, 3 | 7 | 14 | null>()
+  // Decrypt failures must not take the dashboard down: unwrapCoachMemoryDoc throws on a missing
+  // or mismatched key, and one bad document previously 500'd the whole page. Counting them here
+  // doubles as key-drift detection — if Vercel and Render ever encrypt under different keys,
+  // this number goes up and an admin sees it.
+  const undecryptable: string[] = []
   profilesSnap.forEach((doc) => {
-    const profile = unwrapCoachMemoryDoc({ ...(doc.data() || {}), discordId: doc.id })
-    const days = Number(profile.followUpEveryDays)
-    notesOptInById.set(doc.id, profile.notesOptIn === true)
-    followUpEveryDaysById.set(doc.id, days === 3 || days === 7 || days === 14 ? days : null)
+    try {
+      const profile = unwrapCoachMemoryDoc({ ...(doc.data() || {}), discordId: doc.id })
+      const days = Number(profile.followUpEveryDays)
+      notesOptInById.set(doc.id, profile.notesOptIn === true)
+      followUpEveryDaysById.set(doc.id, days === 3 || days === 7 || days === 14 ? days : null)
+    } catch (err) {
+      console.error('admin/coach: could not decrypt coach profile', doc.id, err)
+      undecryptable.push(doc.id)
+      notesOptInById.set(doc.id, false)
+      followUpEveryDaysById.set(doc.id, null)
+    }
   })
 
   const ids = new Set<string>([
@@ -143,5 +155,9 @@ export async function GET(req: Request) {
     totals: { ...totals, people: people.length },
     people,
     events,
+    // Key-drift signal. Should always be 0. A non-zero count means some coach_profiles documents
+    // cannot be decrypted with the key this runtime holds — most likely Vercel and Render have
+    // drifted apart, or COACH_MEMORY_KEY was rotated (there is no keyId yet to tell those apart).
+    undecryptableProfiles: undecryptable.length,
   })
 }
