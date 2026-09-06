@@ -81,6 +81,29 @@ function toIso(value) {
   return null;
 }
 
+/**
+ * Refuse to write unencrypted secrets.
+ *
+ * encryptSecret()/encryptWithKey() previously fell back to returning the plaintext when no key
+ * was configured, and the caller still wrote it into the *Enc fields and stamped
+ * tokenEncVersion: 1 — so a doc could claim to be encrypted while holding cleartext, and the
+ * only signal was a console.warn. Production is clean (verified: all profiles, notes and
+ * connections are encrypted), so failing closed here cannot break existing data; it stops the
+ * degraded state from ever being entered.
+ *
+ * Reads deliberately still accept plaintext: decryptWithKey() passes through values without the
+ * enc:v1: prefix, so any legacy document stays readable.
+ */
+function requireKey(key, label) {
+  if (!key) {
+    throw new Error(
+      `Refusing to write ${label} unencrypted: set COACH_MEMORY_KEY (or STRAVA_CONNECT_SECRET). ` +
+      `Both Vercel and Render must use the same value.`
+    );
+  }
+  return key;
+}
+
 function canEncryptTokens() {
   return Boolean(getTokenKey());
 }
@@ -92,9 +115,7 @@ function canEncryptCoachMemory() {
 function encryptSecret(plaintext) {
   const text = String(plaintext || "");
   if (!text) return "";
-  const key = getTokenKey();
-  if (!key) return text;
-  return encryptWithKey(key, text);
+  return encryptWithKey(requireKey(getTokenKey(), "Strava tokens"), text);
 }
 
 function decryptSecret(value) {
@@ -198,10 +219,7 @@ function persistChatNoteDoc(plain) {
     discordId: plain?.discordId || null,
     at: plain?.at || new Date(),
   };
-  const key = getCoachKey();
-  if (!key) {
-    return { ...meta, ...packed };
-  }
+  const key = requireKey(getCoachKey(), "coach chat notes");
   return {
     ...meta,
     noteEnc: encryptWithKey(key, JSON.stringify(packed)),
@@ -220,10 +238,7 @@ function persistCoachMemoryDoc(plain) {
     lastAthleteMessageAt: plain?.lastAthleteMessageAt || null,
     lastFollowUpAt: plain?.lastFollowUpAt || null,
   };
-  const key = getCoachKey();
-  if (!key) {
-    return { ...meta, ...packed };
-  }
+  const key = requireKey(getCoachKey(), "coach memory");
   return {
     ...meta,
     memoryEnc: encryptWithKey(key, JSON.stringify(packed)),
