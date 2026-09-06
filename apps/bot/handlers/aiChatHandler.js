@@ -180,6 +180,7 @@ function compactToolResult(result) {
   if (typeof result.connectUrl === "string") base.connectUrl = result.connectUrl.slice(0, 500);
   if (result.metadata) base.metadata = result.metadata;
   if (result.series) base.series = result.series;
+  if (Array.isArray(result.races)) base.races = result.races.slice(0, 12);
   if (result.zrl) base.zrl = result.zrl;
   if (typeof result.summary === "string") base.summary = result.summary.slice(0, 500);
   if (typeof result.confirmMessageDa === "string") base.confirmMessageDa = result.confirmMessageDa.slice(0, 1500);
@@ -680,6 +681,22 @@ const coachToolDefinitions = [
           }
         },
         required: ["notes"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_club_races",
+      description: "DZR club race series and their usual weekly ride times (ZRL, WTRL TTT, DRS, Club Ladder, DZR After Party). Use when planning the athlete's week around racing, or when they mention a club race and you need to know when it runs.",
+      parameters: {
+        type: "object",
+        properties: {
+          series: {
+            type: "string",
+            description: "Optional filter, e.g. 'WTRL ZRL' or 'DRS'. Omit for all series."
+          }
+        }
       }
     }
   },
@@ -1278,6 +1295,42 @@ async function executeSingleToolCall(toolCall, message, turn) {
         return { tool_call_id: toolCall.id, ...(coachResult || { success: false, message: "No data" }) };
       }
 
+      case "get_club_races": {
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        if (!eligible) {
+          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+        }
+        try {
+          const { teams } = await getDZRTeamsAndSeries();
+          const wanted = String(args.series || "").trim().toLowerCase();
+          // Collapse teams down to series + ride time. The coach needs to know when racing
+          // happens, not the full roster, and a large payload degrades the reply.
+          const bySeries = new Map();
+          for (const team of Array.isArray(teams) ? teams : []) {
+            const series = String(team.raceSeries || "").trim();
+            if (!series) continue;
+            if (wanted && !series.toLowerCase().includes(wanted)) continue;
+            const rideTime = String(team.rideTime || "").trim();
+            if (!bySeries.has(series)) bySeries.set(series, new Set());
+            if (rideTime) bySeries.get(series).add(rideTime);
+          }
+          const races = Array.from(bySeries.entries())
+            .slice(0, 12)
+            .map(([series, times]) => ({ series, rideTimes: Array.from(times).slice(0, 6) }));
+          return {
+            tool_call_id: toolCall.id,
+            success: true,
+            races,
+            message: races.length
+              ? "Club race series and their usual ride times. Times are what team captains set; treat them as typical, not guaranteed."
+              : "No club race series found for that filter.",
+          };
+        } catch (err) {
+          console.error("get_club_races failed:", err?.message || err);
+          return { tool_call_id: toolCall.id, success: false, message: "Could not load club races." };
+        }
+      }
+
       case "search_past_notes": {
         const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
         if (!eligible) {
@@ -1619,6 +1672,32 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
 ${today.line}
 Use this calendar date for everything: how old a chat note is, whether a feeling is still relevant, how far a goal is, and what "this week" means. Do not guess the date.
 Weeks start on Monday (Denmark / ISO). "This week" is the Monday–Sunday range above. Sunday is the last day of the week, not the first. "Last week" is the previous Monday–Sunday.
+
+## Sport
+DZR races on Zwift. Assume indoor virtual riding unless an activity says otherwise. In tool
+results, sport_type "VirtualRide" or trainer true means Zwift; "Ride" with trainer false is
+outdoors.
+
+What that changes:
+- Indoors there is no coasting and no freewheeling downhill, so an hour on Zwift is more
+  continuous load than an hour outdoors. moving_time being nearly equal to elapsed_time is
+  normal indoors, not a sign of an unusually steady ride.
+- Zwift races are decided in the first one to three minutes. The start is a near-maximal effort
+  from the gun, not a gradual build. Race prep should train that, and a race day is a hard day
+  even when the distance looks short.
+- Racing is by w/kg within category boundaries (ZwiftPower A/B/C/D, vELO). Weight therefore has
+  direct competitive consequences here, which is exactly why weight talk needs care rather than
+  encouragement: never propose aggressive deficits, never frame weight loss as the main route to
+  results, and steer toward fuelling and durability instead. If they set a weight goal, support
+  it conservatively and say plainly when a target looks unhealthy or too fast.
+- Structured workouts run in ERG mode, which holds the target power for them; a free ride does
+  not. Say which you mean when prescribing.
+- Danish winters push almost everyone indoors from October to March. A winter block of only
+  indoor rides is normal, not a drop in commitment.
+- Club racing includes ZRL (Zwift Racing League), WTRL TTT, DRS, Club Ladder and the DZR After
+  Party. Athletes talk in routes and climbs — Alpe du Zwift, Epic KOM, Volcano, Innsbruckring.
+  Use those names naturally when they do. Call get_club_races when you need to know when a series
+  actually runs before placing hard days around it. Do not guess race days.
 
 ## Data
 You may only use tools to read THIS athlete's Strava data (the Discord user talking to you). Never request or invent another rider's activities.
