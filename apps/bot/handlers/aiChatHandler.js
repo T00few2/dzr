@@ -903,7 +903,16 @@ function resolveUser(userString, message) {
 /**
  * Execute a single tool call
  */
-async function executeSingleToolCall(toolCall, message) {
+/**
+ * @param {object} [turn] Per-turn context resolved once in handleChatMessage.
+ *   { eligible: boolean, profile: object|null }
+ *
+ * Membership and the coach profile used to be re-fetched inside every single tool call.
+ * isPaidClubMember is a document read plus a payments collection query, and getCoachProfile
+ * decrypts, so a turn with three parallel Strava tools spent roughly eight Firestore operations
+ * on nothing but authorisation — all of it on the latency path in front of the athlete.
+ */
+async function executeSingleToolCall(toolCall, message, turn) {
   const { name, arguments: argsString } = toolCall.function;
   let args;
   
@@ -1254,7 +1263,7 @@ async function executeSingleToolCall(toolCall, message) {
       case "get_recent_activities":
       case "get_activity_details":
       case "get_zwiftpower_context": {
-        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
         if (!eligible) {
           return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
         }
@@ -1270,12 +1279,12 @@ async function executeSingleToolCall(toolCall, message) {
       }
 
       case "search_past_notes": {
-        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
         if (!eligible) {
           return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
         }
         try {
-          const profile = await getCoachProfile(message.author.id);
+          const profile = turn?.profile ?? await getCoachProfile(message.author.id);
           if (profile?.notesOptIn !== true) {
             return {
               tool_call_id: toolCall.id,
@@ -1313,12 +1322,12 @@ async function executeSingleToolCall(toolCall, message) {
       }
 
       case "save_chat_notes": {
-        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
         if (!eligible) {
           return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
         }
         try {
-          const profile = await getCoachProfile(message.author.id);
+          const profile = turn?.profile ?? await getCoachProfile(message.author.id);
           if (profile?.notesOptIn !== true) {
             return {
               tool_call_id: toolCall.id,
@@ -1379,12 +1388,12 @@ async function executeSingleToolCall(toolCall, message) {
       }
 
       case "propose_coach_goal": {
-        const eligible = await strava.hasClubMemberRole(message.author.id, message.client, message.guild);
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
         if (!eligible) {
           return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
         }
         try {
-          const profile = await getCoachProfile(message.author.id);
+          const profile = turn?.profile ?? await getCoachProfile(message.author.id);
           if (profile?.notesOptIn !== true) {
             return {
               tool_call_id: toolCall.id,
@@ -1424,10 +1433,10 @@ async function executeSingleToolCall(toolCall, message) {
 /**
  * Execute multiple tool calls (supports parallel execution)
  */
-async function executeToolCalls(toolCalls, message) {
+async function executeToolCalls(toolCalls, message, turn) {
   // Execute all tool calls in parallel
   const results = await Promise.all(
-    toolCalls.map(toolCall => executeSingleToolCall(toolCall, message))
+    toolCalls.map(toolCall => executeSingleToolCall(toolCall, message, turn))
   );
   
   return results;
@@ -1574,15 +1583,16 @@ ${catalogLines}
 - Time: ${timestamp}`;
 }
 
-async function buildCoachSystemPrompt(message, userText) {
+async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
   const now = new Date();
   const today = formatCoachToday(now);
   let settingsBlock = "No Coach settings stored yet.";
   let notesBlock = "Chat notes are off.";
   let goalsBlock = "Chat notes are off. There are no saved goals.";
   let notesOptIn = false;
+  let profile = preloadedProfile ?? null;
   try {
-    const profile = await getCoachProfile(message.author.id);
+    if (!profile) profile = await getCoachProfile(message.author.id);
     settingsBlock = formatCoachProfileForPrompt(profile);
     notesOptIn = profile?.notesOptIn === true;
   } catch (err) {
@@ -1671,7 +1681,7 @@ ask for detailed replies you may go longer, but keep the same order.
 ## Current context
 - Athlete: ${message.author.username}`;
 
-  return { content, notesOptIn };
+  return { content, notesOptIn, profile };
 }
 
 /**
@@ -1959,9 +1969,14 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     const conversationKey = getConversationKey(message);
     const isCoachSession = coachOnly;
 
+    // Resolved once per turn and threaded into every tool call. isPaidClubMember costs a
+    // document read plus a payments query, and getCoachProfile decrypts; doing both per tool
+    // meant a three-tool turn spent ~8 Firestore operations on authorisation alone.
+    const turnContext = { eligible: false, profile: null };
+
     if (isCoachSession) {
-      const eligible = await strava.hasClubMemberRole(message.author.id);
-      if (!eligible) {
+      turnContext.eligible = await strava.hasClubMemberRole(message.author.id);
+      if (!turnContext.eligible) {
         await safeReply(message, NOT_CLUB_MEMBER_TEXT);
         return;
       }
@@ -1976,6 +1991,8 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     const coachPrompt = isCoachSession
       ? await buildCoachSystemPrompt(message, cleanedMessage)
       : null;
+    // buildCoachSystemPrompt already fetched and decrypted the profile; reuse it.
+    turnContext.profile = coachPrompt?.profile ?? null;
     const systemPrompt = isCoachSession
       ? coachPrompt.content
       : buildSystemPrompt(message, knowledgeCatalog);
@@ -2051,7 +2068,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
 
       while (currentToolCalls && currentToolCalls.length > 0 && iteration < maxIters) {
         // Execute all tool calls (parallel if multiple)
-        toolResults = await executeToolCalls(currentToolCalls, message);
+        toolResults = await executeToolCalls(currentToolCalls, message, turnContext);
         if (toolResults.some((r) => Array.isArray(r.saved) && r.saved.length > 0)) {
           notesSavedThisTurn = true;
         }
