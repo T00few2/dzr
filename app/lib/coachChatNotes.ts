@@ -3,10 +3,10 @@ import { unwrapChatNoteDoc, type CoachChatNoteKind } from '@/app/lib/tokenCrypto
 
 export const COACH_CHAT_NOTES_COLLECTION = COLLECTIONS.coachChatNotes || 'coach_chat_notes'
 export const COACH_CHAT_NOTES_SUBCOLLECTION = 'notes'
-// Mirrors MAX_NOTES_PER_ATHLETE in apps/bot/services/coachChatNotes.js. The bot prunes to
-// this; the web path must refuse past it, or notes grow beyond what listNotes() reads back
-// and older goals silently vanish from the coach prompt.
-export const MAX_NOTES_PER_ATHLETE = 200
+// Single source of truth, shared with the bot: it prunes to this and the web path refuses past
+// it, or notes grow beyond what listNotes() reads back and older goals silently vanish from the
+// coach prompt.
+export { MAX_NOTES_PER_ATHLETE } from '@/packages/shared/coach/coachChatNotes'
 export { MAX_ACTIVE_GOALS, activeGoalNotes, sanitizeGoalEventDate } from '@/app/lib/coachGoals'
 
 export type CoachChatNote = {

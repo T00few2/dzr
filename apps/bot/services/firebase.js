@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const config = require("../config/config");
 const shared = require("../constants.json");
+const { isPaidClubMember: sharedIsPaidClubMember } = require("./membership");
 const {
   emptyProfile,
   defaultProfile,
@@ -363,42 +364,15 @@ async function getAllBotKnowledge() {
 }
 
 /**
- * Paid DZR club membership for the current year (Vipps).
- * Verified Member Discord role is not enough.
+ * Paid DZR club membership for the current year.
+ * Logic lives in the shared module so the bot and the website cannot disagree about who is a
+ * member — this is the gate on the whole coach feature.
  */
 async function isPaidClubMember(discordId) {
-  const id = String(discordId || "").trim();
-  if (!id) return false;
-  const year = new Date().getUTCFullYear();
-  try {
-    const membershipSnap = await db.collection("memberships").doc(id).get();
-    const membership = membershipSnap.exists ? membershipSnap.data() || {} : {};
-    if (
-      String(membership.currentStatus || "") === "club" &&
-      typeof membership.coveredThroughYear === "number" &&
-      membership.coveredThroughYear >= year
-    ) {
-      return true;
-    }
-
-    const paymentsSnap = await db
-      .collection("payments")
-      .where("userId", "==", id)
-      .where("status", "==", "succeeded")
-      .get();
-
-    let maxCovered = null;
-    paymentsSnap.forEach((doc) => {
-      const covered = doc.data()?.coveredThroughYear;
-      if (typeof covered === "number" && (maxCovered == null || covered > maxCovered)) {
-        maxCovered = covered;
-      }
-    });
-    return maxCovered != null && maxCovered >= year;
-  } catch (err) {
-    console.error("isPaidClubMember failed", err?.message || err);
-    return false;
-  }
+  return sharedIsPaidClubMember(db, {
+    memberships: shared.firestore?.memberships || "memberships",
+    payments: shared.firestore?.payments || "payments",
+  }, discordId);
 }
 
 /**

@@ -25,6 +25,8 @@ const TARGETS = [
   // JS only goes to the bot. The Flask API cannot run it and a third copy is a third place to drift.
   ["packages/shared/coach/tokenCrypto.js", "apps/bot/services/tokenCrypto.js"],
   ["packages/shared/coach/coachProfile.js", "apps/bot/services/coachProfile.js"],
+  ["packages/shared/coach/coachChatNotes.js", "apps/bot/services/coachChatNotes.js"],
+  ["packages/shared/coach/membership.js", "apps/bot/services/membership.js"],
 ];
 
 const checkOnly = process.argv.includes("--check");

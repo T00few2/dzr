@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { COLLECTIONS, SITE_ORIGIN } from '@/app/lib/sharedConstants'
+import { isPaidClubMember as sharedIsPaidClubMember } from '@/packages/shared/coach/membership'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 
 export const STRAVA_SCOPES = 'read,activity:read_all,profile:read_all'
@@ -171,42 +172,16 @@ export async function revokeStravaGrant(opts: {
 }
 
 /**
- * Paid DZR club membership for the current year (Vipps).
- * Verified Member / community Discord roles are not enough.
+ * Paid DZR club membership for the current year.
+ * Logic lives in the shared module so the bot and the website cannot disagree about who is a
+ * member — this is the gate on the whole coach feature.
  */
 export async function isPaidClubMember(discordId: string): Promise<boolean> {
-  const id = String(discordId || '').trim()
-  if (!id) return false
-  const year = new Date().getUTCFullYear()
-  try {
-    const membershipSnap = await adminDb.collection(COLLECTIONS.memberships).doc(id).get()
-    const membership = membershipSnap.exists ? membershipSnap.data() || {} : {}
-    if (
-      String(membership.currentStatus || '') === 'club' &&
-      typeof membership.coveredThroughYear === 'number' &&
-      membership.coveredThroughYear >= year
-    ) {
-      return true
-    }
-
-    const paymentsSnap = await adminDb
-      .collection(COLLECTIONS.payments)
-      .where('userId', '==', id)
-      .where('status', '==', 'succeeded')
-      .get()
-
-    let maxCovered: number | null = null
-    paymentsSnap.forEach((doc) => {
-      const covered = doc.data()?.coveredThroughYear
-      if (typeof covered === 'number' && (maxCovered == null || covered > maxCovered)) {
-        maxCovered = covered
-      }
-    })
-    return maxCovered != null && maxCovered >= year
-  } catch (err) {
-    console.error('isPaidClubMember failed', err)
-    return false
-  }
+  return sharedIsPaidClubMember(
+    adminDb,
+    { memberships: COLLECTIONS.memberships, payments: COLLECTIONS.payments },
+    discordId
+  )
 }
 
 export async function hasClubMemberRole(discordId: string): Promise<boolean> {
