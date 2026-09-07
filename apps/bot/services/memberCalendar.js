@@ -38,6 +38,10 @@ const MAX_COACH_ENTRIES_PER_WEEK = 5;
 // a goal eight months out does not crowd out this week.
 const DEFAULT_HORIZON_DAYS = 60;
 
+// How far back. Short on purpose: the coach follows up on what was agreed recently, and a longer
+// window turns the prompt into a training log the model has to wade through.
+const DEFAULT_LOOK_BACK_DAYS = 10;
+
 function clip(value, max) {
   return String(value == null ? "" : value).replace(/\s+/g, " ").trim().slice(0, max);
 }
@@ -137,6 +141,25 @@ function upcomingEntries(entries, now = new Date(), horizonDays = DEFAULT_HORIZO
     .sort(compareEntries);
 }
 
+/**
+ * Entries from just before today, oldest first.
+ *
+ * The coach cannot follow up on what it cannot see, and upcomingEntries starts at today — so a
+ * session planned for last Tuesday was invisible to it. Deliberately short: this is "what did we
+ * agree recently", not a training log.
+ */
+function recentEntries(entries, now = new Date(), lookBackDays = DEFAULT_LOOK_BACK_DAYS) {
+  const today = calendarDateInTz(now);
+  if (!today) return [];
+  const from = addIsoDays(today, -Math.max(1, lookBackDays));
+  return (Array.isArray(entries) ? entries : [])
+    .filter((entry) => {
+      const date = String(entry?.eventDate || "");
+      return /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= from && date < today;
+    })
+    .sort(compareEntries);
+}
+
 function formatEntryLine(entry, now) {
   const until = formatDaysUntil(entry.eventDate, now);
   const when = until ? `${entry.eventDate} (${until})` : entry.eventDate;
@@ -155,11 +178,31 @@ function formatEntryLine(entry, now) {
  * the athlete confirmed with a Ja and there are at most three, while a calendar entry is a plan
  * that may well move. Rendering them together would both duplicate the goal lines and invite the
  * coach to treat "maybe ride Thursday" with the weight of "ZRL final on 12 May".
+ *
+ * Recent past entries are listed separately from upcoming ones. Following up on what was planned
+ * is half the value of having a calendar, and it cannot happen if the coach only ever sees the
+ * future. They stay in their own section because the two ask different questions: one is "what
+ * should we plan around", the other "did this happen".
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.includeRecent] set false where only the forward view is wanted
  */
-function formatCalendarForPrompt(entries, now = new Date()) {
+function formatCalendarForPrompt(entries, now = new Date(), { includeRecent = true } = {}) {
   const upcoming = upcomingEntries(entries, now);
-  if (!upcoming.length) return "";
-  return upcoming.map((entry) => formatEntryLine(entry, now)).join("\n");
+  const recent = includeRecent ? recentEntries(entries, now) : [];
+  if (!upcoming.length && !recent.length) return "";
+
+  const lines = [];
+  if (recent.length) {
+    lines.push("Recently planned:");
+    for (const entry of recent) lines.push(formatEntryLine(entry, now));
+  }
+  if (upcoming.length) {
+    if (lines.length) lines.push("");
+    lines.push("Coming up:");
+    for (const entry of upcoming) lines.push(formatEntryLine(entry, now));
+  }
+  return lines.join("\n");
 }
 
 /** Coach rows written in the last seven days, used to enforce MAX_COACH_ENTRIES_PER_WEEK. */
@@ -180,6 +223,7 @@ module.exports = {
   MAX_ENTRIES_PER_MEMBER,
   MAX_COACH_ENTRIES_PER_WEEK,
   DEFAULT_HORIZON_DAYS,
+  DEFAULT_LOOK_BACK_DAYS,
   sanitizeEntryKind,
   sanitizeEntrySource,
   sanitizeEntryStatus,
@@ -187,6 +231,7 @@ module.exports = {
   sanitizeSourceEventId,
   sanitizeCalendarEntry,
   upcomingEntries,
+  recentEntries,
   formatCalendarForPrompt,
   countRecentCoachEntries,
 };

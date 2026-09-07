@@ -20,6 +20,7 @@ export const MAX_ENTRY_TEXT: number
 export const MAX_ENTRIES_PER_MEMBER: number
 export const MAX_COACH_ENTRIES_PER_WEEK: number
 export const DEFAULT_HORIZON_DAYS: number
+export const DEFAULT_LOOK_BACK_DAYS: number
 
 export function sanitizeEntryKind(value: unknown): CalendarEntryKind
 export function sanitizeEntrySource(value: unknown): CalendarEntrySource
@@ -41,10 +42,21 @@ export function upcomingEntries<T extends { eventDate?: string | null; startTime
   horizonDays?: number
 ): T[]
 
-/** Upcoming entries, one per line. Empty string when there is nothing in the horizon. */
+/** The look-back window, oldest first: entries before today, back to lookBackDays. */
+export function recentEntries<T extends { eventDate?: string | null; startTime?: string | null }>(
+  entries: T[] | null | undefined,
+  now?: Date,
+  lookBackDays?: number
+): T[]
+
+/**
+ * "Recently planned" and "Coming up" sections, one entry per line.
+ * Empty string when both windows are empty.
+ */
 export function formatCalendarForPrompt(
   entries: CalendarEntry[] | null | undefined,
-  now?: Date
+  now?: Date,
+  options?: { includeRecent?: boolean }
 ): string
 
 export function countRecentCoachEntries(

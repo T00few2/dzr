@@ -6,6 +6,7 @@ const {
   sanitizeStartTime,
   sanitizeSourceEventId,
   upcomingEntries,
+  recentEntries,
   formatCalendarForPrompt,
   countRecentCoachEntries,
   MAX_ENTRY_TEXT,
@@ -122,6 +123,33 @@ test("upcomingEntries tolerates junk input", () => {
   assert.deepStrictEqual(upcomingEntries([null, {}], NOW), []);
 });
 
+test("recentEntries covers the days just before today, oldest first", () => {
+  const entries = [
+    { eventDate: "2026-08-25", text: "too long ago" },
+    { eventDate: "2026-08-28", text: "edge of a 10 day look-back" },
+    { eventDate: "2026-09-05", text: "two days ago" },
+    { eventDate: "2026-09-07", text: "today belongs to upcoming, not recent" },
+    { eventDate: "2026-09-10", text: "future" },
+  ];
+  assert.deepStrictEqual(
+    recentEntries(entries, NOW).map((e) => e.text),
+    ["edge of a 10 day look-back", "two days ago"]
+  );
+});
+
+test("recentEntries and upcomingEntries do not overlap", () => {
+  const entries = [
+    { eventDate: "2026-09-05", text: "past" },
+    { eventDate: "2026-09-07", text: "today" },
+    { eventDate: "2026-09-10", text: "future" },
+  ];
+  const recent = recentEntries(entries, NOW).map((e) => e.text);
+  const upcoming = upcomingEntries(entries, NOW).map((e) => e.text);
+  assert.deepStrictEqual(recent, ["past"]);
+  assert.deepStrictEqual(upcoming, ["today", "future"]);
+  assert.deepStrictEqual(recent.filter((t) => upcoming.includes(t)), [], "no entry in both windows");
+});
+
 test("formatCalendarForPrompt renders dates, times and coach attribution", () => {
   const entries = [
     { eventDate: "2026-09-10", startTime: "15:17", text: "After Party (C)", kind: "race", source: "member", status: "planned" },
@@ -141,6 +169,35 @@ test("formatCalendarForPrompt renders dates, times and coach attribution", () =>
   assert.doesNotMatch(block, /Goals:/);
 });
 
+test("formatCalendarForPrompt separates what was planned from what is coming", () => {
+  const entries = [
+    { eventDate: "2026-09-04", text: "4x8 tærskel", kind: "session", source: "coach", status: "planned" },
+    { eventDate: "2026-09-05", text: "rolig tur", kind: "session", source: "member", status: "done" },
+    { eventDate: "2026-09-10", startTime: "15:17", text: "After Party (C)", kind: "race", source: "member", status: "planned" },
+  ];
+  const block = formatCalendarForPrompt(entries, NOW);
+  const lines = block.split("\n");
+
+  assert.strictEqual(lines[0], "Recently planned:");
+  assert.ok(lines.indexOf("Coming up:") > lines.indexOf("Recently planned:"));
+  // The whole point of the look-back: a session planned three days ago is visible, still marked
+  // planned, so the coach can ask whether it happened instead of assuming either way.
+  assert.match(block, /2026-09-04 \(3 days ago\) — 4x8 tærskel \(session\) \[added by coach\]/);
+  assert.match(block, /2026-09-05 \(2 days ago\) — rolig tur \(session\) \[done\]/);
+  assert.match(block, /2026-09-10 \(in 3 days\) 15:17 — After Party \(C\)/);
+});
+
+test("formatCalendarForPrompt can be asked for the forward view only", () => {
+  const entries = [
+    { eventDate: "2026-09-04", text: "past session", kind: "session", source: "member", status: "planned" },
+    { eventDate: "2026-09-10", text: "future race", kind: "race", source: "member", status: "planned" },
+  ];
+  const block = formatCalendarForPrompt(entries, NOW, { includeRecent: false });
+  assert.doesNotMatch(block, /Recently planned:/);
+  assert.doesNotMatch(block, /past session/);
+  assert.match(block, /future race/);
+});
+
 test("formatCalendarForPrompt is empty when there is nothing to say", () => {
   assert.strictEqual(formatCalendarForPrompt([], NOW), "");
   assert.strictEqual(formatCalendarForPrompt(null, NOW), "");
@@ -148,6 +205,11 @@ test("formatCalendarForPrompt is empty when there is nothing to say", () => {
     formatCalendarForPrompt([{ eventDate: "2027-06-01", text: "x" }], NOW),
     "",
     "an entry past the horizon must not produce an empty block"
+  );
+  assert.strictEqual(
+    formatCalendarForPrompt([{ eventDate: "2026-01-01", text: "x" }], NOW),
+    "",
+    "nor one before the look-back"
   );
 });
 

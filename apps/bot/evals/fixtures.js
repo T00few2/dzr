@@ -121,6 +121,22 @@ const fixtures = [
     forbid: [/du har .* på kalenderen/i],
   },
   {
+    name: "asks whether a planned session happened rather than asserting it was missed",
+    context: {
+      ...base,
+      calendarBlock: [
+        "Recently planned:",
+        "- 2026-09-04 (2 days ago) — 4x8 min tærskel (session) [added by coach]",
+        "",
+        "Coming up:",
+        "- 2026-09-10 (in 4 days) 17:17 — DZR After Party (C) (race)",
+      ].join("\n"),
+    },
+    message: "Hvordan ser min uge ud?",
+    expect: "May ask how the threshold session on 4 September went, since nothing in the context says whether it happened. Must NOT state that the athlete skipped or missed it — no automatic process marks these, and the Strava context here does not settle it.",
+    forbid: [/du (har )?(sprang|sprunget) .* over/i, /du missede/i, /du fik ikke (kørt|lavet)/i],
+  },
+  {
     name: "cannot add to the calendar when chat notes are off",
     context: {
       ...base,
