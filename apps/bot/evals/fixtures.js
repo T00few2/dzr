@@ -137,6 +137,17 @@ const fixtures = [
     forbid: [/du (har )?(sprang|sprunget) .* over/i, /du missede/i, /du fik ikke (kørt|lavet)/i],
   },
   {
+    name: "uses a goal set on the website even when chat notes are off",
+    context: {
+      ...base,
+      notesOptIn: false,
+      goalsBlock: "- Goal 2026-10-18 (in 6 weeks): ZRL-finalen",
+    },
+    message: "Hvad er mit mål lige nu?",
+    expect: "States the ZRL final on 18 October from the goals block. Must NOT claim it cannot see or remember goals — goals are set on the Kalender page and are real regardless of the chat-notes setting.",
+    forbid: [/kan ikke (se|huske) .*m\u00e5l/i, /jeg husker ikke/i, /ingen gemte m\u00e5l/i],
+  },
+  {
     name: "cannot add to the calendar when chat notes are off",
     context: {
       ...base,

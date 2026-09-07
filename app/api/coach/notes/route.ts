@@ -11,8 +11,7 @@ import {
   toClientCoachChatNote,
   MAX_NOTES_PER_ATHLETE,
 } from '@/app/lib/coachChatNotes'
-import { COACH_PROFILES_COLLECTION } from '@/app/lib/coachProfile'
-import { canEncryptCoachMemory, persistChatNoteDoc, unwrapCoachMemoryDoc } from '@/app/lib/tokenCrypto'
+import { canEncryptCoachMemory, persistChatNoteDoc } from '@/app/lib/tokenCrypto'
 import { deleteAllCoachChatNotes } from '@/app/lib/clearCoachData'
 
 export const dynamic = 'force-dynamic'
@@ -66,12 +65,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Club membership required' }, { status: 403 })
     }
 
-    const profileSnap = await adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId).get()
-    const profile = unwrapCoachMemoryDoc({ ...(profileSnap.data() || {}), discordId })
-    if (profile.notesOptIn !== true) {
-      return NextResponse.json({ error: 'Chat-noter skal være slået til' }, { status: 403 })
-    }
-
+    // Deliberately NOT gated on notesOptIn. That setting governs what the coach may silently
+    // extract from a conversation; a goal typed into a form on the Kalender page is not that, and
+    // gating it would put a form on a page the member can see that refuses everything they enter.
+    // propose_coach_goal — a goal the coach derives from chat — stays gated.
     const body = await req.json().catch(() => ({}))
     const text = String(body?.text || '').trim().slice(0, 280)
     const eventDate = sanitizeGoalEventDate(body?.eventDate)

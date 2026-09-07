@@ -28,7 +28,7 @@ import {
 } from '@chakra-ui/react'
 import type { CoachInjury, CoachProfile, CoachWeeklySlot } from '@/app/lib/coachProfile'
 import type { CoachChatNote } from '@/app/lib/coachChatNotes'
-import { MAX_ACTIVE_GOALS, activeGoalNotes } from '@/app/lib/coachGoals'
+import { activeGoalNotes } from '@/app/lib/coachGoals'
 
 const SPORT_OPTIONS = ['cycling', 'running', 'swimming', 'strength']
 const SPORT_LABELS: Record<string, string> = {
@@ -131,8 +131,6 @@ export default function CoachMemoryEditor() {
   const [chatNotes, setChatNotes] = useState<CoachChatNote[]>([])
   const [notesLoading, setNotesLoading] = useState(true)
   const [extraSport, setExtraSport] = useState('')
-  const [goalText, setGoalText] = useState('')
-  const [goalDate, setGoalDate] = useState('')
   const [ridesMin, setRidesMin] = useState('')
   const [ridesMax, setRidesMax] = useState('')
   const [clearConfirm, setClearConfirm] = useState<ClearConfirm | null>(null)
@@ -369,30 +367,6 @@ export default function CoachMemoryEditor() {
     const date = new Date(at)
     if (Number.isNaN(date.getTime())) return at.slice(0, 10)
     return date.toLocaleString('da-DK', { dateStyle: 'medium', timeStyle: 'short' })
-  }
-
-  async function addGoal() {
-    setSaving(true)
-    try {
-      const res = await fetch('/api/coach/notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: goalText, kind: 'goal', eventDate: goalDate }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast({ title: data?.error || 'Kunne ikke gemme målet', status: 'error' })
-        return
-      }
-      setChatNotes(Array.isArray(data?.notes) ? data.notes : [])
-      setGoalText('')
-      setGoalDate('')
-      toast({ title: 'Mål gemt', status: 'success' })
-    } catch (err: any) {
-      toast({ title: err?.message || 'Kunne ikke gemme målet', status: 'error' })
-    } finally {
-      setSaving(false)
-    }
   }
 
   async function deleteChatNote(id: string) {
@@ -723,83 +697,17 @@ export default function CoachMemoryEditor() {
 
       {savedNotesOptIn && (
         <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
+          {/* Goal setting moved to the Kalender page: this tab is settings, and a goal is a
+              dated thing that belongs among the member's other dated things. Storage is unchanged
+              — goals are still coach notes — so only the form moved. */}
           <Heading size="sm" mb={2}>Mål</Heading>
-          <Text color="gray.400" fontSize="sm" mb={3}>
-            Et mål er datobundet (fx et løb eller at tabe vægt inden en dato). Coachen styrer træningen efter dine aktive mål. Højst {MAX_ACTIVE_GOALS} ad gangen. DZR Coach kan også foreslå et mål i chatten — det gemmes først, når du trykker Ja.
+          <Text color="gray.400" fontSize="sm" mb={6}>
+            Mål sætter og sletter du nu i{' '}
+            <Box as="a" href="/members-zone/calendar" textDecoration="underline">
+              kalenderen
+            </Box>
+            , sammen med dine planlagte ture og løb.
           </Text>
-          {notesLoading ? (
-            <Spinner size="sm" mb={4} />
-          ) : (
-            <Stack spacing={3} mb={4}>
-              {activeGoalNotes(chatNotes).map((note) => (
-                <Flex
-                  key={note.id}
-                  gap={3}
-                  align="flex-start"
-                  justify="space-between"
-                  bg="gray.800"
-                  borderWidth="1px"
-                  borderColor="gray.600"
-                  borderRadius="md"
-                  p={3}
-                >
-                  <Box>
-                    <Text fontSize="xs" color="gray.500">Mål {note.eventDate}</Text>
-                    <Text fontSize="sm" color="gray.100">{note.text}</Text>
-                  </Box>
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    color="red.300"
-                    _hover={{ bg: 'whiteAlpha.100', color: 'red.200' }}
-                    onClick={() => setClearConfirm({ kind: 'note', id: note.id })}
-                    isDisabled={saving}
-                  >
-                    Slet
-                  </Button>
-                </Flex>
-              ))}
-              {activeGoalNotes(chatNotes).length === 0 && (
-                <Text color="gray.500" fontSize="sm">Ingen aktive mål.</Text>
-              )}
-            </Stack>
-          )}
-          {activeGoalNotes(chatNotes).length >= MAX_ACTIVE_GOALS ? (
-            <Text color="gray.400" fontSize="sm" mb={4}>
-              Du har {MAX_ACTIVE_GOALS} aktive mål. Slet et, før du tilføjer et nyt.
-            </Text>
-          ) : (
-            <Stack spacing={2} mb={4} maxW="520px">
-              <Input
-                placeholder="Fx tabe 3 kg, eller ZRL-finalen"
-                value={goalText}
-                onChange={(e) => setGoalText(e.target.value)}
-                bg="gray.800"
-                borderColor="gray.600"
-                size="sm"
-              />
-              <HStack>
-                <Input
-                  type="date"
-                  value={goalDate}
-                  onChange={(e) => setGoalDate(e.target.value)}
-                  bg="gray.800"
-                  borderColor="gray.600"
-                  size="sm"
-                  maxW="200px"
-                />
-                <Button
-                  size="sm"
-                  onClick={addGoal}
-                  isLoading={saving}
-                  isDisabled={!goalText.trim() || !goalDate}
-                  {...secondaryButtonProps}
-                >
-                  Gem mål
-                </Button>
-              </HStack>
-            </Stack>
-          )}
 
           <Heading size="sm" mb={2}>Chat-noter</Heading>
           <Text color="gray.400" fontSize="sm" mb={3}>

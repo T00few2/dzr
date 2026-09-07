@@ -1907,20 +1907,24 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
     console.error("listCalendarEntries failed:", err?.message || err);
   }
 
-  if (notesOptIn) {
-    notesBlock = "None retrieved for this message.";
-    goalsBlock = "No saved goals.";
-    try {
-      const notes = await listCoachChatNotes(message.author.id);
-      goalsBlock = formatActiveGoalsForPrompt(notes, now);
+  // Goals are read whatever notesOptIn says, because a goal can now be set from the Kalender page
+  // and a form-entered goal is not conversation the coach extracted. Retrieval and session
+  // summaries stay gated — those genuinely are extracted from chat. Firestore cannot filter on an
+  // encrypted kind, so everything is decrypted and only the goals are kept when notes are off.
+  goalsBlock = "No saved goals.";
+  if (notesOptIn) notesBlock = "None retrieved for this message.";
+  try {
+    const notes = await listCoachChatNotes(message.author.id);
+    goalsBlock = formatActiveGoalsForPrompt(notes, now);
+    if (notesOptIn) {
       summariesBlock = formatSessionSummariesForPrompt(notes, now);
       const hits = retrieveRelevantNotes(notes, userText || "", { now });
       const standard = hits.filter((note) => note.kind !== "goal");
       const formatted = formatNotesForPrompt(standard, now);
       if (formatted) notesBlock = formatted;
-    } catch (err) {
-      console.error("listCoachChatNotes failed:", err?.message || err);
     }
+  } catch (err) {
+    console.error("listCoachChatNotes failed:", err?.message || err);
   }
 
   const content = buildCoachPromptText({

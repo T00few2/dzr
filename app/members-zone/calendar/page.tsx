@@ -35,7 +35,17 @@ type Entry = {
   status: 'planned' | 'done' | 'skipped';
 };
 
-type Goal = { id: string; text: string; eventDate: string };
+type Goal = { id: string; text: string; eventDate: string; expired?: boolean };
+
+/**
+ * One row of the agenda. Goals and entries come from different collections with independent id
+ * spaces, so the discriminator is what stops a delete going to the wrong endpoint.
+ */
+type Row =
+  | { rowKind: 'entry'; entry: Entry; eventDate: string; startTime: string | null }
+  | { rowKind: 'goal'; goal: Goal; eventDate: string; startTime: null };
+
+const MAX_ACTIVE_GOALS = 3;
 
 const KIND_LABELS: Record<Entry['kind'], string> = {
   session: 'Træning',
@@ -50,6 +60,24 @@ const KIND_COLORS: Record<Entry['kind'], string> = {
   event: 'purple',
   other: 'gray',
 };
+
+/**
+ * The coach notes endpoint returns every note kind; keep the goals, live and expired alike, and
+ * mark which is which. The page shows live ones in the agenda and expired ones under Tidligere,
+ * where they can be deleted.
+ */
+function goalsFrom(notes: unknown): Goal[] {
+  const today = todayIso();
+  return (Array.isArray(notes) ? notes : [])
+    .filter((n: any) => n?.kind === 'goal' && typeof n?.eventDate === 'string' && n?.text)
+    .map((n: any) => ({
+      id: String(n.id),
+      text: String(n.text),
+      eventDate: n.eventDate,
+      expired: n.eventDate < today,
+    }))
+    .sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+}
 
 /** Copenhagen's date, so "i dag" matches the club's day rather than the browser's timezone. */
 function todayIso() {
@@ -78,8 +106,12 @@ export default function CalendarPage() {
 
   const [entries, setEntries] = useState<Entry[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [isClubMember, setIsClubMember] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingGoal, setSavingGoal] = useState(false);
+  const [goalText, setGoalText] = useState('');
+  const [goalDate, setGoalDate] = useState('');
 
   const [events, setEvents] = useState<ZwiftEventSummary[]>([]);
   const [racingScore, setRacingScore] = useState<number | null>(null);
@@ -105,6 +137,7 @@ export default function CalendarPage() {
       const data = await res.json();
       setEntries(Array.isArray(data.entries) ? data.entries : []);
       setGoals(Array.isArray(data.goals) ? data.goals : []);
+      setIsClubMember(data.isClubMember === true);
     } catch {
       toast({ title: 'Kunne ikke hente kalenderen', status: 'error', duration: 4000 });
     } finally {
@@ -197,6 +230,40 @@ export default function CalendarPage() {
     }
   }
 
+  async function addGoal() {
+    setSavingGoal(true);
+    try {
+      // Goals still live in coach memory, so they go through the coach notes endpoint rather than
+      // the calendar one — the page shows them together, the stores stay separate.
+      const res = await fetch('/api/coach/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: goalText.trim(), kind: 'goal', eventDate: goalDate }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Kunne ikke gemme målet');
+      setGoals(goalsFrom(data?.notes));
+      setGoalText('');
+      setGoalDate('');
+      toast({ title: 'Mål gemt', status: 'success', duration: 3000 });
+    } catch (err: any) {
+      toast({ title: err?.message || 'Kunne ikke gemme målet', status: 'error', duration: 4000 });
+    } finally {
+      setSavingGoal(false);
+    }
+  }
+
+  async function removeGoal(id: string) {
+    try {
+      const res = await fetch(`/api/coach/notes?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Kunne ikke slette målet');
+      setGoals(goalsFrom(data?.notes));
+    } catch (err: any) {
+      toast({ title: err?.message || 'Kunne ikke slette målet', status: 'error', duration: 4000 });
+    }
+  }
+
   async function clearAll() {
     if (!window.confirm('Slette hele din kalender? Det kan ikke fortrydes.')) return;
     try {
@@ -227,18 +294,38 @@ export default function CalendarPage() {
 
   // The API returns newest first so the read is cheap; the agenda wants the opposite, and past
   // entries stay visible below rather than being hidden — they are the record of what was planned.
+  //
+  // Goals are merged into the same list rather than kept in a block of their own: a goal is a
+  // dated thing the member is working toward, so it belongs in the run of dates, marked with a
+  // star. Expired goals fall into Tidligere by the same date rule as everything else, which is
+  // where they can be deleted.
   const { upcoming, past } = useMemo(() => {
     const today = todayIso();
-    const sorted = [...entries].sort((a, b) => {
+    const rows: Row[] = [
+      ...entries.map((entry): Row => ({
+        rowKind: 'entry',
+        entry,
+        eventDate: entry.eventDate,
+        startTime: entry.startTime,
+      })),
+      ...goals.map((goal): Row => ({
+        rowKind: 'goal',
+        goal,
+        eventDate: goal.eventDate,
+        startTime: null,
+      })),
+    ].sort((a, b) => {
       const byDate = a.eventDate.localeCompare(b.eventDate);
       if (byDate !== 0) return byDate;
+      // A goal is the anchor for its day, so it leads; then timed rows, then untimed.
+      if (a.rowKind !== b.rowKind) return a.rowKind === 'goal' ? -1 : 1;
       return (a.startTime || '99:99').localeCompare(b.startTime || '99:99');
     });
     return {
-      upcoming: sorted.filter((e) => e.eventDate >= today),
-      past: sorted.filter((e) => e.eventDate < today).reverse(),
+      upcoming: rows.filter((r) => r.eventDate >= today),
+      past: rows.filter((r) => r.eventDate < today).reverse(),
     };
-  }, [entries]);
+  }, [entries, goals]);
 
   if (status === 'loading' || (session && loading)) return <LoadingSpinnerMemb />;
   if (!session) return null;
@@ -293,6 +380,39 @@ export default function CalendarPage() {
     </Flex>
   );
 
+  const renderGoal = (goal: Goal) => (
+    <Flex
+      key={`goal:${goal.id}`}
+      align="center"
+      justify="space-between"
+      gap={3}
+      py={2}
+      opacity={goal.expired ? 0.6 : 1}
+    >
+      <Box minW={0}>
+        <HStack spacing={2} mb={1} flexWrap="wrap">
+          <Text fontSize="sm" aria-label="Mål" role="img">⭐</Text>
+          <Badge colorScheme="yellow">Mål</Badge>
+          {goal.expired && <Badge variant="subtle" colorScheme="gray">udløbet</Badge>}
+        </HStack>
+        <Text color="white" fontWeight="bold" noOfLines={2}>{goal.text}</Text>
+        <Text color="gray.500" fontSize="xs">{formatDay(goal.eventDate)}</Text>
+      </Box>
+      <IconButton
+        aria-label="Slet mål"
+        icon={<DeleteIcon />}
+        size="xs"
+        variant="ghost"
+        color="gray.400"
+        flexShrink={0}
+        onClick={() => removeGoal(goal.id)}
+      />
+    </Flex>
+  );
+
+  const renderRow = (row: Row, dimmed = false) =>
+    row.rowKind === 'goal' ? renderGoal(row.goal) : renderEntry(row.entry, dimmed);
+
   return (
     <Container maxW="4xl" py={8}>
       <Heading color="white" size="xl" mb={2}>Kalender</Heading>
@@ -301,26 +421,64 @@ export default function CalendarPage() {
         kan coachen også se den og tage højde for den.
       </Text>
 
-      {goals.length > 0 && (
-        <Box mb={8}>
-          <Heading color="white" size="sm" mb={2}>Mål</Heading>
-          <Stack spacing={1} mb={2}>
-            {goals.map((goal) => (
-              <Text key={goal.id} color="gray.200" fontSize="sm">
-                {formatDay(goal.eventDate)} — {goal.text}
-              </Text>
-            ))}
-          </Stack>
-          {/* Read-only on purpose: goals live in coach memory, capped at three and confirmed with
-              a Ja. Editing them here would mean two places writing the same row. */}
-          <Text color="gray.500" fontSize="xs">
-            Mål redigeres under{' '}
-            <Box as="a" href="/members-zone/my-pages?tab=2" textDecoration="underline">
-              My Pages → Coach
-            </Box>.
+      {/* Goals are club-only because they are coach memory and the coach comes with membership.
+          The rest of the calendar is open to every verified member, so this is one section that
+          explains itself rather than a gate on the page. */}
+      <Box bg="gray.900" borderWidth="1px" borderColor="gray.700" rounded="md" p={4} mb={4}>
+        <HStack mb={3} spacing={2}>
+          <Text fontSize="sm" role="img" aria-label="Mål">⭐</Text>
+          <Heading color="white" size="sm">Sæt et mål</Heading>
+        </HStack>
+        {!isClubMember ? (
+          <Text color="gray.400" fontSize="sm">
+            Mål følger med DZR Coach, som er en del af klubmedlemskabet. Du kan stadig planlægge
+            træning og løb i kalenderen nedenfor.
           </Text>
-        </Box>
-      )}
+        ) : goals.filter((g) => !g.expired).length >= MAX_ACTIVE_GOALS ? (
+          <Text color="gray.400" fontSize="sm">
+            Du har {MAX_ACTIVE_GOALS} aktive mål. Slet et nedenfor, før du tilføjer et nyt.
+          </Text>
+        ) : (
+          <>
+            <Text color="gray.500" fontSize="xs" mb={2}>
+              Et mål er en dato du træner frem mod. Coachen styrer træningen efter det —
+              højst {MAX_ACTIVE_GOALS} ad gangen.
+            </Text>
+            <Stack spacing={2}>
+              <Input
+                placeholder="Fx tabe 3 kg, eller ZRL-finalen"
+                value={goalText}
+                maxLength={MAX_ENTRY_TEXT}
+                onChange={(e) => setGoalText(e.target.value)}
+                bg="gray.800"
+                borderColor="gray.600"
+                size="sm"
+              />
+              <HStack>
+                <Input
+                  type="date"
+                  value={goalDate}
+                  min={todayIso()}
+                  onChange={(e) => setGoalDate(e.target.value)}
+                  bg="gray.800"
+                  borderColor="gray.600"
+                  size="sm"
+                  maxW="180px"
+                />
+                <Button
+                  size="sm"
+                  colorScheme="yellow"
+                  onClick={addGoal}
+                  isLoading={savingGoal}
+                  isDisabled={!goalText.trim() || !goalDate || savingGoal}
+                >
+                  Gem mål
+                </Button>
+              </HStack>
+            </Stack>
+          </>
+        )}
+      </Box>
 
       <Box bg="gray.900" borderWidth="1px" borderColor="gray.700" rounded="md" p={4} mb={8}>
         <Heading color="white" size="sm" mb={3}>Tilføj til kalenderen</Heading>
@@ -466,7 +624,7 @@ export default function CalendarPage() {
         <Text color="gray.500" fontSize="sm" mb={8}>Ingenting planlagt endnu.</Text>
       ) : (
         <Stack divider={<Divider borderColor="gray.700" />} mb={8}>
-          {upcoming.map((entry) => renderEntry(entry))}
+          {upcoming.map((row) => renderRow(row))}
         </Stack>
       )}
 
@@ -474,7 +632,7 @@ export default function CalendarPage() {
         <>
           <Heading color="white" size="sm" mb={2}>Tidligere</Heading>
           <Stack divider={<Divider borderColor="gray.700" />} mb={8}>
-            {past.slice(0, 20).map((entry) => renderEntry(entry, true))}
+            {past.slice(0, 20).map((row) => renderRow(row, true))}
           </Stack>
         </>
       )}

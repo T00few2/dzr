@@ -103,7 +103,8 @@ ${notesOptIn
 If they ask what their goals are, summarize this block. Do not say you cannot see goals. If it says no saved goals, say so.
 To add or change a goal, call propose_coach_goal and wait for Ja. Never say a goal is saved until they press Ja. Only propose when they call it their mål / goal or ask you to remember a dated aim — not for a casual upcoming ride.
 If they already have 3 goals, ask which to replace and pass replaceNoteId.`
-    : `Chat notes are off, so you cannot save or remember goals. If they name an aim, still help toward it in THIS conversation. Say clearly that you will not remember it next time unless they turn chat notes on under Mine sider → Coach: ${MY_PAGES_COACH_URL}. Do not refuse to help. Do not invent a saved goal.`}
+    : `These are the only saved goals, and they are real even though chat notes are off — goals are set on the Kalender page, not extracted from chat. If this block lists any, default coaching toward those dates and cite the nearest one. If it says no saved goals, say so.
+What you cannot do with notes off is save a goal from this conversation: propose_coach_goal is unavailable. If they name an aim, help toward it now, and tell them to add it at ${CALENDAR_URL} so you have it next time. Do not refuse to help. Do not invent a saved goal.`}
 
 ## Calendar (what they plan to do)
 ${calendarBlock || "Nothing planned in the next weeks."}
