@@ -30,6 +30,7 @@
     "coachUsage": "coach_usage",
     "coachUsageEvents": "coach_usage_events",
     "coachProfiles": "coach_profiles",
-    "coachChatNotes": "coach_chat_notes"
+    "coachChatNotes": "coach_chat_notes",
+    "memberCalendar": "member_calendar"
   }
 }

@@ -3,10 +3,12 @@
 import React, { useState, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import NextLink from 'next/link';
 import {
   Box,
   Container,
   Heading,
+  Text,
   Tabs,
   TabList,
   TabPanels,
@@ -19,7 +21,6 @@ import { HOLDKAPTAJN_ROLE_ID } from '@/app/lib/sharedConstants';
 // Import child page components
 import dynamic from 'next/dynamic';
 
-const RaceCalendar = dynamic(() => import('./race-calendar/page'), { ssr: false });
 const ZRL = dynamic(() => import('./zrl/page'), { ssr: false });
 const TeamManagement = dynamic(() => import('./team-management/page'), { ssr: false });
 
@@ -62,9 +63,17 @@ function RacingPageContent() {
 
   return (
     <Container maxW="7xl" py={8}>
-      <Heading color="white" size="xl" mb={6}>
+      <Heading color="white" size="xl" mb={2}>
         Racing
       </Heading>
+      {/* The old Race Calendar tab was a Google Calendar embed the app could not read. Its
+          replacement is personal rather than club-wide, so it lives in its own section. */}
+      <Text color="gray.400" mb={6}>
+        Leder du efter løbskalenderen? Planlæg dine egne løb og træning under{' '}
+        <Box as={NextLink} href="/members-zone/calendar" textDecoration="underline" color="gray.200">
+          Kalender
+        </Box>.
+      </Text>
       
       <Tabs index={tabIndex} onChange={handleTabChange} colorScheme="red" variant="enclosed">
         <TabList borderColor="gray.600">
@@ -76,9 +85,6 @@ function RacingPageContent() {
               Team Management
             </Tab>
           )}
-          <Tab color="gray.300" _selected={{ color: 'white', bg: 'gray.800', borderColor: 'gray.600', borderBottomColor: 'gray.800' }}>
-            Race Calendar
-          </Tab>
         </TabList>
 
         <TabPanels>
@@ -90,9 +96,6 @@ function RacingPageContent() {
               <TeamManagement />
             </TabPanel>
           )}
-          <TabPanel px={0}>
-            <RaceCalendar />
-          </TabPanel>
         </TabPanels>
       </Tabs>
     </Container>

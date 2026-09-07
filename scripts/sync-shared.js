@@ -27,6 +27,7 @@ const TARGETS = [
   ["packages/shared/coach/coachProfile.js", "apps/bot/services/coachProfile.js"],
   ["packages/shared/coach/coachChatNotes.js", "apps/bot/services/coachChatNotes.js"],
   ["packages/shared/coach/membership.js", "apps/bot/services/membership.js"],
+  ["packages/shared/coach/memberCalendar.js", "apps/bot/services/memberCalendar.js"],
 ];
 
 const checkOnly = process.argv.includes("--check");

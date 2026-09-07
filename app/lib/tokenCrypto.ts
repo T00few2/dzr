@@ -10,6 +10,10 @@
  * by the other, and nothing enforced that. CI now fails if the copies drift.
  */
 export type {
+  CalendarEntryKind,
+  CalendarEntrySource,
+  CalendarEntryStatus,
+  CalendarEntryPlain,
   CoachStyle,
   CoachInjury,
   CoachWeeklySlot,
@@ -36,6 +40,8 @@ export {
   persistCoachMemoryDoc,
   unwrapChatNoteDoc,
   persistChatNoteDoc,
+  unwrapCalendarEntryDoc,
+  persistCalendarEntryDoc,
   makeCoachCanary,
   verifyCoachCanary,
 } from '@/packages/shared/coach/tokenCrypto'
@@ -51,6 +57,7 @@ export const SECRET_DOC_KEYS = [
   'refreshTokenEnc',
   'memoryEnc',
   'noteEnc',
+  'entryEnc',
   'privateKey',
   'idToken',
   'clientSecret',

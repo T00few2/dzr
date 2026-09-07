@@ -93,6 +93,40 @@ export function unwrapChatNoteDoc(data: Record<string, unknown> | null | undefin
 }
 export function persistChatNoteDoc(plain: CoachChatNotePlain): Record<string, unknown>
 
+export type CalendarEntryKind = 'session' | 'race' | 'event' | 'other'
+export type CalendarEntrySource = 'member' | 'coach'
+export type CalendarEntryStatus = 'planned' | 'done' | 'skipped'
+
+export interface CalendarEntryPlain {
+  id?: string | null
+  discordId?: string | null
+  eventDate: string
+  text: string
+  kind?: CalendarEntryKind
+  startTime?: string | null
+  source?: CalendarEntrySource
+  status?: CalendarEntryStatus
+  sourceEventId?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+/** Throws if the coach key is missing or the stored value cannot be decrypted. */
+export function unwrapCalendarEntryDoc(data: Record<string, unknown> | null | undefined): {
+  id: string | null
+  discordId: string | null
+  eventDate: string | null
+  source: CalendarEntrySource
+  status: CalendarEntryStatus
+  createdAt: string | null
+  updatedAt: string | null
+  text: string
+  kind: CalendarEntryKind
+  startTime: string | null
+  sourceEventId: string | null
+}
+export function persistCalendarEntryDoc(plain: CalendarEntryPlain): Record<string, unknown>
+
 /** Encrypt/verify the fixed canary string used to detect key drift at bot startup. */
 export function makeCoachCanary(): string
 export function verifyCoachCanary(value: unknown): boolean

@@ -41,7 +41,7 @@ import {
 import { HamburgerIcon } from '@chakra-ui/icons'
 import { LiaMountainSolid } from "react-icons/lia";
 import { Im500Px } from "react-icons/im";
-import { MdDirectionsBike, MdInsights, MdInfo } from "react-icons/md";
+import { MdDirectionsBike, MdInsights, MdInfo, MdCalendarMonth } from "react-icons/md";
 import { IconType } from 'react-icons'
 import { FaTrophy } from "react-icons/fa6";
 import { AiOutlineAim } from "react-icons/ai";
@@ -320,6 +320,7 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
                 <ProfileNavItem href="/about" icon={MdInfo}>About</ProfileNavItem>
                 <ProfileNavItem href="/about/racing" icon={FaTrophy}>Løb</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/racing" icon={FaTrophy}>Racing</ProfileNavItem>
+                <ProfileNavItem href="/members-zone/calendar" icon={MdCalendarMonth}>Kalender</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/stats-hub" icon={MdInsights}>Stats</ProfileNavItem>
                 <ProfileNavItem href="/members-zone/my-pages" icon={FaUserCircle}>My Pages</ProfileNavItem>
                 {isAdmin && (
