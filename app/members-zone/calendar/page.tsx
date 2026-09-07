@@ -19,9 +19,11 @@ import {
   Text,
   useToast,
 } from '@chakra-ui/react';
-import { DeleteIcon } from '@chakra-ui/icons';
+import { DeleteIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
 import { MAX_ENTRY_TEXT } from '@/app/lib/memberCalendar';
+import { suggestedSubgroup } from '@/packages/shared/zwiftEvents';
+import type { ZwiftEventSummary, ZwiftEventSubgroup } from '@/packages/shared/zwiftEvents';
 
 type Entry = {
   id: string;
@@ -79,6 +81,11 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [events, setEvents] = useState<ZwiftEventSummary[]>([]);
+  const [racingScore, setRacingScore] = useState<number | null>(null);
+  const [eventsUnavailable, setEventsUnavailable] = useState(false);
+  const [addingEventId, setAddingEventId] = useState<number | null>(null);
+
   const [text, setText] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -105,9 +112,28 @@ export default function CalendarPage() {
     }
   }, [toast]);
 
+  // Suggestions are secondary: a failure here must leave the calendar itself working, so it has
+  // its own request and its own failure state rather than sharing the calendar's.
+  const loadEvents = useCallback(async () => {
+    try {
+      const res = await fetch('/api/calendar/events', { cache: 'no-store' });
+      if (!res.ok) throw new Error('load failed');
+      const data = await res.json();
+      setEvents(Array.isArray(data.events) ? data.events : []);
+      setRacingScore(typeof data.racingScore === 'number' ? data.racingScore : null);
+      setEventsUnavailable(data.unavailable === true);
+    } catch {
+      setEvents([]);
+      setEventsUnavailable(true);
+    }
+  }, []);
+
   useEffect(() => {
-    if (session) load();
-  }, [session, load]);
+    if (session) {
+      load();
+      loadEvents();
+    }
+  }, [session, load, loadEvents]);
 
   async function addEntry() {
     setSaving(true);
@@ -137,6 +163,37 @@ export default function CalendarPage() {
       setEntries(data.entries || []);
     } catch (err: any) {
       toast({ title: err?.message || 'Kunne ikke slette', status: 'error', duration: 4000 });
+    }
+  }
+
+  /**
+   * Add one category of a DZR event.
+   *
+   * Stores the subgroup's own start time, never the parent event's: the categories go off up to
+   * five minutes apart, and the wrong minute is how someone misses their race.
+   */
+  async function addFromEvent(event: ZwiftEventSummary, subgroup: ZwiftEventSubgroup) {
+    setAddingEventId(event.id);
+    try {
+      const res = await fetch('/api/calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: `${event.name} (${subgroup.label})`,
+          eventDate: subgroup.eventDate,
+          startTime: subgroup.startTime,
+          kind: event.eventType === 'RACE' ? 'race' : 'event',
+          sourceEventId: `${event.id}:${subgroup.id}`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Kunne ikke gemme');
+      setEntries(data.entries || []);
+      toast({ title: `Lagt i kalenderen: ${event.name} (${subgroup.label})`, status: 'success', duration: 3000 });
+    } catch (err: any) {
+      toast({ title: err?.message || 'Kunne ikke gemme', status: 'error', duration: 4000 });
+    } finally {
+      setAddingEventId(null);
     }
   }
 
@@ -316,6 +373,93 @@ export default function CalendarPage() {
           </HStack>
         </Stack>
       </Box>
+
+      {(events.length > 0 || eventsUnavailable) && (
+        <Box mb={8}>
+          <Heading color="white" size="sm" mb={1}>DZR-løb i denne uge</Heading>
+          {eventsUnavailable ? (
+            <Text color="gray.500" fontSize="sm">
+              Kunne ikke hente løbene fra Zwift lige nu. Du kan stadig tilføje dem manuelt ovenfor.
+            </Text>
+          ) : (
+            <>
+              <Text color="gray.400" fontSize="sm" mb={3}>
+                Vælg din kategori — hver kategori har sit eget starttidspunkt.
+                {racingScore != null && ` Din Racing Score er ${Math.round(racingScore)}.`}
+              </Text>
+              <Stack spacing={3}>
+                {events.map((event) => {
+                  const likely = suggestedSubgroup(event, racingScore);
+                  const alreadyAdded = new Set(
+                    entries
+                      .filter((e) => e.eventDate === event.eventDate)
+                      .map((e) => e.text.trim().toLowerCase())
+                  );
+                  return (
+                    <Box
+                      key={event.id}
+                      bg="gray.900"
+                      borderWidth="1px"
+                      borderColor="gray.700"
+                      rounded="md"
+                      p={3}
+                    >
+                      <HStack justify="space-between" align="start" mb={2} gap={2}>
+                        <Box minW={0}>
+                          <Text color="white" fontWeight="bold" noOfLines={1}>{event.name}</Text>
+                          <Text color="gray.500" fontSize="xs">
+                            {formatDay(event.eventDate)}
+                            {event.distanceKm ? ` · ${event.distanceKm} km` : ''}
+                            {event.durationMinutes ? ` · ${event.durationMinutes} min` : ''}
+                          </Text>
+                        </Box>
+                        <Box
+                          as="a"
+                          href={event.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          color="gray.400"
+                          fontSize="xs"
+                          flexShrink={0}
+                        >
+                          Zwift <ExternalLinkIcon mb="2px" />
+                        </Box>
+                      </HStack>
+                      <HStack flexWrap="wrap" spacing={2}>
+                        {event.subgroups.map((subgroup) => {
+                          const added = alreadyAdded.has(`${event.name} (${subgroup.label})`.toLowerCase());
+                          return (
+                            <Button
+                              key={subgroup.id}
+                              size="xs"
+                              variant={likely === subgroup.label ? 'solid' : 'outline'}
+                              colorScheme={likely === subgroup.label ? 'red' : 'gray'}
+                              color={likely === subgroup.label ? undefined : 'gray.300'}
+                              isDisabled={added}
+                              isLoading={addingEventId === event.id}
+                              onClick={() => addFromEvent(event, subgroup)}
+                              title={subgroup.scoreRange ? `Racing Score ${subgroup.scoreRange}` : subgroup.paceRange || undefined}
+                            >
+                              {added ? '✓ ' : ''}{subgroup.label} · {subgroup.startTime}
+                            </Button>
+                          );
+                        })}
+                      </HStack>
+                      {likely && (
+                        // A hint, not a choice. Stats go stale and plenty of members have no
+                        // linked Zwift id, so the member always clicks the category themselves.
+                        <Text color="gray.500" fontSize="xs" mt={2}>
+                          Ud fra din score ser {likely} ud til at passe — men vælg selv.
+                        </Text>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </>
+          )}
+        </Box>
+      )}
 
       <Heading color="white" size="sm" mb={2}>Kommende</Heading>
       {upcoming.length === 0 ? (

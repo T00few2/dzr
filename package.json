@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "next lint",
     "lint:bot": "eslint apps/bot --no-eslintrc --config .eslintrc.bot.json --ext .js --max-warnings 25",
+    "test": "node --test \"packages/shared/**/*.test.js\"",
     "sync:shared": "node scripts/sync-shared.js",
     "check:shared": "node scripts/sync-shared.js --check"
   },
