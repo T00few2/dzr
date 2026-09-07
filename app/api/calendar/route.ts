@@ -69,7 +69,6 @@ async function listEntries(discordId: string) {
  * and duplicating them into member_calendar would create two rows that could disagree.
  */
 async function listGoals(discordId: string) {
-  if (!(await hasClubMemberRole(discordId))) return []
   const snap = await adminDb
     .collection(COACH_CHAT_NOTES_COLLECTION)
     .doc(discordId)
@@ -85,11 +84,19 @@ async function listGoals(discordId: string) {
       console.error('calendar: could not decrypt note', doc.id, err)
     }
   }
-  return activeGoalNotes(notes).map((note: any) => ({
-    id: note.id,
-    text: note.text,
-    eventDate: note.eventDate,
-  }))
+  // Expired goals come back too, flagged. They are inert — activeGoalNotes filters them out of the
+  // coach prompt — but they still occupy the per-athlete note budget, and the only other place to
+  // delete them sits behind the chat-notes toggle. A member with notes off would have no way to
+  // clear one at all, so the calendar carries them.
+  const active = new Set(activeGoalNotes(notes).map((note: any) => note.id))
+  return notes
+    .filter((note: any) => note.kind === 'goal' && note.text && note.eventDate)
+    .map((note: any) => ({
+      id: note.id,
+      text: note.text,
+      eventDate: note.eventDate,
+      expired: !active.has(note.id),
+    }))
 }
 
 export async function GET(req: Request) {
@@ -97,8 +104,15 @@ export async function GET(req: Request) {
     const { discordId } = await sessionMember(req)
     if (!discordId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 })
 
-    const [entries, goals] = await Promise.all([listEntries(discordId), listGoals(discordId)])
-    return NextResponse.json({ entries, goals })
+    // Club membership decides whether the goal form is offered at all — goals are coach memory,
+    // and the coach comes with club membership. The calendar itself is open to every verified
+    // member, so this is a per-section flag rather than a gate on the page.
+    const isClubMember = await hasClubMemberRole(discordId)
+    const [entries, goals] = await Promise.all([
+      listEntries(discordId),
+      isClubMember ? listGoals(discordId) : Promise.resolve([]),
+    ])
+    return NextResponse.json({ entries, goals, isClubMember })
   } catch (err) {
     console.error('calendar GET failed:', err)
     return NextResponse.json({ error: 'Kunne ikke hente kalenderen' }, { status: 500 })

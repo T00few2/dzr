@@ -184,17 +184,20 @@ async function sendOneFollowUp(profile) {
     console.warn("coach follow-up calendar failed:", err?.message || err);
   }
 
+  // Goals ungated, retrieval gated — same split the chat path uses. A goal set on the Kalender
+  // page is form-entered, not extracted from a conversation, so a member with chat notes off can
+  // still have one and the check-in should steer toward it.
   let notesBlock = "";
   let goalsBlock = "No saved goals.";
-  if (profile.notesOptIn === true) {
-    try {
-      const notes = await listCoachChatNotes(discordId);
-      goalsBlock = formatActiveGoalsForPrompt(notes);
+  try {
+    const notes = await listCoachChatNotes(discordId);
+    goalsBlock = formatActiveGoalsForPrompt(notes);
+    if (profile.notesOptIn === true) {
       const hits = retrieveRelevantNotes(notes, "training week follow up", { now: new Date() });
       notesBlock = formatNotesForPrompt(hits.filter((note) => note.kind !== "goal")) || "";
-    } catch (err) {
-      console.warn("coach follow-up notes failed:", err?.message || err);
     }
+  } catch (err) {
+    console.warn("coach follow-up notes failed:", err?.message || err);
   }
 
   let username = null;
