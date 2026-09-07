@@ -20,13 +20,6 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
-    match /raceSignups/{docId} {
-      allow read, write: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
-    }
-
     // Coaching / membership — client SDK must not read these.
     // Admin SDK (Next API + Discord bot) bypasses rules.
     // Unmatched collections are already denied by default; these are explicit.
@@ -39,6 +32,16 @@ service cloud.firestore {
     match /coach_chat_notes/{id} {
       allow read, write: if false;
       match /notes/{noteId} {
+        allow read, write: if false;
+      }
+    }
+    // The member calendar is reached only through app/api/calendar, which authenticates with
+    // NextAuth and uses the Admin SDK. No client ever holds a Firebase credential for it, so
+    // deny-all here is the correct posture — not owner-only, which would imply a client path
+    // that does not exist. Entries are encrypted regardless.
+    match /member_calendar/{id} {
+      allow read, write: if false;
+      match /entries/{entryId} {
         allow read, write: if false;
       }
     }

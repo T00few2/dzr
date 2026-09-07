@@ -296,6 +296,76 @@ function persistCoachMemoryDoc(plain) {
   };
 }
 
+/**
+ * Member calendar entries.
+ *
+ * Encrypted with the coach key even though the calendar is not coach data: members write free
+ * text into it ("easy week, still coughing"), which is the same category of personal detail the
+ * coach memory bar was set for. Reusing the key rather than introducing a second one keeps the
+ * canary and keyId drift detection covering this collection too.
+ *
+ * eventDate, source and status stay OUTSIDE the ciphertext so the API can order and filter
+ * without decrypting every row — the same split coach_profiles uses for its timestamps.
+ */
+function packCalendarEntry(plain) {
+  const src = plain && typeof plain === "object" ? plain : {};
+  const kind = String(src.kind || "").trim().toLowerCase();
+  const kinds = new Set(["session", "race", "event", "other"]);
+  const startTime = String(src.startTime || "").trim();
+  const sourceEventId = String(src.sourceEventId || "").trim().slice(0, 64);
+  return {
+    text: String(src.text || "").slice(0, 280),
+    kind: kinds.has(kind) ? kind : "session",
+    startTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(startTime) ? startTime : null,
+    sourceEventId: /^[A-Za-z0-9_:-]+$/.test(sourceEventId) ? sourceEventId : null,
+  };
+}
+
+function unwrapCalendarEntryDoc(data) {
+  const src = data && typeof data === "object" ? data : {};
+  let packed = null;
+  if (src.entryEnc) {
+    const json = decryptWithKey(getCoachKey(), src.entryEnc, "calendar entry");
+    const parsed = JSON.parse(json || "{}");
+    packed = packCalendarEntry(parsed && typeof parsed === "object" ? parsed : {});
+  }
+  const fromPlain = packed || packCalendarEntry(src);
+  const eventDate = String(src.eventDate || "").trim().slice(0, 10);
+  return {
+    id: src.id || null,
+    discordId: src.discordId || null,
+    // Read back verbatim, never re-validated: sanitizeEventDate rejects past dates, which is
+    // right on the way in and would silently blank every entry that has already happened.
+    eventDate: /^\d{4}-\d{2}-\d{2}$/.test(eventDate) ? eventDate : null,
+    source: src.source === "coach" ? "coach" : "member",
+    status: ["planned", "done", "skipped"].includes(src.status) ? src.status : "planned",
+    createdAt: toIso(src.createdAt),
+    updatedAt: toIso(src.updatedAt),
+    text: fromPlain.text,
+    kind: fromPlain.kind,
+    startTime: fromPlain.startTime,
+    sourceEventId: fromPlain.sourceEventId,
+  };
+}
+
+function persistCalendarEntryDoc(plain) {
+  const packed = packCalendarEntry(plain);
+  const src = plain && typeof plain === "object" ? plain : {};
+  const eventDate = String(src.eventDate || "").trim().slice(0, 10);
+  const key = requireKey(getCoachKey(), "calendar entries");
+  return {
+    discordId: src.discordId || null,
+    eventDate: /^\d{4}-\d{2}-\d{2}$/.test(eventDate) ? eventDate : null,
+    source: src.source === "coach" ? "coach" : "member",
+    status: ["planned", "done", "skipped"].includes(src.status) ? src.status : "planned",
+    createdAt: src.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    entryEnc: encryptWithKey(key, JSON.stringify(packed)),
+    entryEncVersion: 1,
+    entryKeyId: coachKeyId(),
+  };
+}
+
 const COACH_CANARY_PLAINTEXT = "dzr-coach-key-canary-v1";
 
 /**
@@ -337,4 +407,6 @@ module.exports = {
   persistCoachMemoryDoc,
   unwrapChatNoteDoc,
   persistChatNoteDoc,
+  unwrapCalendarEntryDoc,
+  persistCalendarEntryDoc,
 };

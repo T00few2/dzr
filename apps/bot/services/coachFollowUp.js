@@ -6,6 +6,7 @@ const { sendNoEmbeds } = require("./coachDm");
 const {
   listCoachProfiles,
   listCoachChatNotes,
+  listCalendarEntries,
   markCoachFollowUpSent,
   recordCoachUsage,
   getBotState,
@@ -18,6 +19,7 @@ const {
   formatActiveGoalsForPrompt,
   formatCoachToday,
 } = require("./coachChatNotes");
+const { formatCalendarForPrompt } = require("./memberCalendar");
 
 const {
   FOLLOW_UP_TZ,
@@ -77,7 +79,7 @@ function extractTokenUsage(response) {
   return { promptTokens, completionTokens, totalTokens };
 }
 
-async function generateFollowUpText({ profile, activities, notesBlock, goalsBlock, username }) {
+async function generateFollowUpText({ profile, activities, notesBlock, goalsBlock, calendarBlock, username }) {
   const language = profile?.style?.language === "en" ? "en" : "da";
   const fallback = language === "en" ? FALLBACK_EN : FALLBACK_DA;
   if (!openai) return fallback;
@@ -99,7 +101,9 @@ Rules:
 - Weeks start Monday (Denmark / ISO). Sunday is the last day of the week.
 - If Active goals lists any, default the check-in toward the nearest dated goal. Injuries still override.
 - Use Coach settings and chat notes as hints. Do not say you saved a note or changed settings.
-- If a chat note records advice you gave (kind "plan"), check it against the Strava list and lead with that: whether it happened, and how it went. Following up on your own advice is the point of a check-in. Ask, do not accuse — a missed session usually has a reason worth hearing.
+- The Calendar is what the athlete planned to do. Lead with it: a race or event in the next days is the thing to write about, and a session under "Recently planned" is worth asking how it went. Following up on what was planned is the point of a check-in.
+- A calendar row still marked planned does NOT mean it was skipped. Nothing marks these automatically and a ride can be missing from Strava for dull reasons, so check the Strava list and ask rather than assert. A missed session usually has a reason worth hearing — ask, do not accuse.
+- A chat note of kind "plan" records advice YOU gave, which is not the same as what they planned. Use it as context for the question, not as a record of their intentions.
 - Not medical advice. No doping or extreme restriction.
 - Do not mention tokens, Firestore, or this being a scheduled job.`,
       },
@@ -114,6 +118,9 @@ ${settings}
 
 ## Active goals
 ${goalsBlock || "No saved goals."}
+
+## Calendar
+${calendarBlock || "(nothing planned)"}
 
 ## Chat notes
 ${notesBlock || "(none)"}
@@ -166,6 +173,17 @@ async function sendOneFollowUp(profile) {
     console.warn("coach follow-up Strava failed:", err?.message || err);
   }
 
+  // Read ungated, exactly as the chat path does: notesOptIn governs silent extraction from
+  // conversation, and a calendar entry is something the athlete typed into a form themselves.
+  // Without this the 08:00 check-in cheerfully asks how training is going on the morning of
+  // someone's race.
+  let calendarBlock = "";
+  try {
+    calendarBlock = formatCalendarForPrompt(await listCalendarEntries(discordId));
+  } catch (err) {
+    console.warn("coach follow-up calendar failed:", err?.message || err);
+  }
+
   let notesBlock = "";
   let goalsBlock = "No saved goals.";
   if (profile.notesOptIn === true) {
@@ -188,7 +206,7 @@ async function sendOneFollowUp(profile) {
     username = null;
   }
 
-  const text = await generateFollowUpText({ profile, activities, notesBlock, goalsBlock, username });
+  const text = await generateFollowUpText({ profile, activities, notesBlock, goalsBlock, calendarBlock, username });
   try {
     await sendFollowUpDm(discordId, text);
   } catch (err) {

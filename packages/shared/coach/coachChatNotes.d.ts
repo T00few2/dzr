@@ -18,6 +18,12 @@ export const EPISODE_NOTE_KINDS: string[]
 /** Null unless the date is YYYY-MM-DD, today or later, and within two years. */
 export function sanitizeEventDate(value: unknown, now?: Date): string | null
 
+/** Calendar date in Europe/Copenhagen ("YYYY-MM-DD"), not the server's timezone. */
+export function calendarDateInTz(value: Date | string | number, tz?: string): string
+export function addIsoDays(iso: string, days: number): string
+/** "tomorrow", "in 3 weeks", "2 days ago"; empty string when the date is unparseable. */
+export function formatDaysUntil(eventDate: unknown, now?: Date): string
+
 /** Goals that are still live: correct kind, non-empty text, unexpired date. Capped and sorted. */
 export function activeGoalNotes<T extends CoachGoalLike>(notes: T[], now?: Date): T[]
 

@@ -26,6 +26,10 @@ jobs:
       # turn throw from its own error handler.
       - name: Lint bot
         run: npm run lint:bot
+      # Shared modules the bot does not get a synced copy of — only the website uses them, so the
+      # bot job's services/**/*.test.js glob would never see them and they would ship untested.
+      - name: Shared unit tests
+        run: npm test
 
   bot:
     name: Bot (tests)

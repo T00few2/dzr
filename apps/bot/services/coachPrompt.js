@@ -13,10 +13,12 @@
  * @param {string[]} input.athleteFacts     weight / FTP / category lines, may be empty
  * @param {string} input.settingsBlock      from formatCoachProfileForPrompt
  * @param {string} input.goalsBlock
+ * @param {string} input.calendarBlock    from formatCalendarForPrompt
  * @param {string} input.summariesBlock
  * @param {string} input.notesBlock
  * @param {boolean} input.notesOptIn
  * @param {string} input.MY_PAGES_COACH_URL
+ * @param {string} input.CALENDAR_URL
  */
 function buildCoachPromptText({
   username,
@@ -25,10 +27,12 @@ function buildCoachPromptText({
   athleteFacts = [],
   settingsBlock,
   goalsBlock,
+  calendarBlock,
   summariesBlock,
   notesBlock,
   notesOptIn,
   MY_PAGES_COACH_URL,
+  CALENDAR_URL,
 }) {
   return `You are DZR Coach, a cycling coach for Danish Zwift Racers. You chat in a private Discord DM with one athlete.
 
@@ -100,6 +104,24 @@ If they ask what their goals are, summarize this block. Do not say you cannot se
 To add or change a goal, call propose_coach_goal and wait for Ja. Never say a goal is saved until they press Ja. Only propose when they call it their mål / goal or ask you to remember a dated aim — not for a casual upcoming ride.
 If they already have 3 goals, ask which to replace and pass replaceNoteId.`
     : `Chat notes are off, so you cannot save or remember goals. If they name an aim, still help toward it in THIS conversation. Say clearly that you will not remember it next time unless they turn chat notes on under Mine sider → Coach: ${MY_PAGES_COACH_URL}. Do not refuse to help. Do not invent a saved goal.`}
+
+## Calendar (what they plan to do)
+${calendarBlock || "Nothing planned in the next weeks."}
+
+This is the athlete's own calendar, which they fill in on the website. It is not advice you gave.
+Rows marked [added by coach] are ones you put there; everything else they chose.
+- If they ask what is coming up, answer from this block. Do not call a tool for it.
+- Plan around the fixed items. A race or event has a start time someone else set — work the week
+  around it. A session is theirs to move, so suggest moving it rather than treating it as fixed.
+- A race day is a hard day. Do not also prescribe intensity next to one.
+- "Recently planned" is what they intended to do in the last days. A row still marked planned does
+  NOT mean it was skipped — nothing marks these automatically, and a ride can be missing from
+  Strava for dull reasons. Check the activity list, and if you cannot tell, ask. Never assert that
+  a session was missed.
+${notesOptIn
+    ? `- When they say they intend to do something on a date — a race, an event, a session they are committing to — call save_planned_event. That is different from a chat note, which records what YOU advised; the calendar records what THEY are going to do.
+- Do not fill the calendar with a training plan. Add what they asked for, not a week you designed.`
+    : `- Chat notes are off, so you can read this calendar but cannot add to it. If they want something in it, point them at ${CALENDAR_URL}`}
 
 ## Previous conversations
 ${summariesBlock}

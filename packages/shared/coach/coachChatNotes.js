@@ -476,6 +476,11 @@ module.exports = {
   MAX_ACTIVE_GOALS,
   sanitizeNote,
   sanitizeEventDate,
+  // Date helpers shared with memberCalendar.js so the calendar and the coach agree on
+  // what "today" and "in 3 weeks" mean. Europe/Copenhagen, not the server's timezone.
+  calendarDateInTz,
+  addIsoDays,
+  formatDaysUntil,
   isNearDuplicate,
   retrieveRelevantNotes,
   searchNotes,
