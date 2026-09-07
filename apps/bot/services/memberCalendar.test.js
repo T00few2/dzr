@@ -122,33 +122,38 @@ test("upcomingEntries tolerates junk input", () => {
   assert.deepStrictEqual(upcomingEntries([null, {}], NOW), []);
 });
 
-test("formatCalendarForPrompt separates goals from plans and labels coach rows", () => {
+test("formatCalendarForPrompt renders dates, times and coach attribution", () => {
   const entries = [
     { eventDate: "2026-09-10", startTime: "15:17", text: "After Party (C)", kind: "race", source: "member", status: "planned" },
     { eventDate: "2026-09-12", startTime: null, text: "easy 90 min", kind: "session", source: "coach", status: "planned" },
   ];
-  const goals = [{ eventDate: "2026-10-01", text: "sub-60 on Alpe" }];
-  const block = formatCalendarForPrompt(entries, goals, NOW);
+  const block = formatCalendarForPrompt(entries, NOW);
 
-  assert.match(block, /^Goals:/);
-  assert.match(block, /2026-10-01 \(in 3 weeks\) — sub-60 on Alpe/);
-  assert.match(block, /Planned:/);
-  assert.match(block, /2026-09-10 \(in 3 days\) 15:17 — After Party \(C\) \(race\)/);
-  assert.match(block, /\[added by coach\]/);
-  assert.doesNotMatch(block, /After Party \(C\) \(race\) \[added by coach\]/, "member rows are unlabelled");
+  assert.match(block, /2026-09-10 \(in 3 days\) 15:17 — After Party \(C\) \(race\)$/m);
+  assert.match(block, /easy 90 min \(session\) \[added by coach\]/);
+  assert.doesNotMatch(
+    block,
+    /After Party \(C\) \(race\) \[added by coach\]/,
+    "the athlete's own rows are unlabelled"
+  );
+  // Goals live in their own prompt section; repeating them here would duplicate the lines and
+  // blur a confirmed commitment with a plan that may move.
+  assert.doesNotMatch(block, /Goals:/);
 });
 
 test("formatCalendarForPrompt is empty when there is nothing to say", () => {
-  assert.strictEqual(formatCalendarForPrompt([], [], NOW), "");
-  assert.strictEqual(formatCalendarForPrompt(null, null, NOW), "");
-  // An entry outside the horizon must not produce a stray "Planned:" heading with nothing under it.
-  assert.strictEqual(formatCalendarForPrompt([{ eventDate: "2027-06-01", text: "x" }], [], NOW), "");
+  assert.strictEqual(formatCalendarForPrompt([], NOW), "");
+  assert.strictEqual(formatCalendarForPrompt(null, NOW), "");
+  assert.strictEqual(
+    formatCalendarForPrompt([{ eventDate: "2027-06-01", text: "x" }], NOW),
+    "",
+    "an entry past the horizon must not produce an empty block"
+  );
 });
 
 test("formatCalendarForPrompt marks non-planned status", () => {
   const block = formatCalendarForPrompt(
     [{ eventDate: "2026-09-08", text: "intervals", kind: "session", source: "member", status: "skipped" }],
-    [],
     NOW
   );
   assert.match(block, /\[skipped\]/);

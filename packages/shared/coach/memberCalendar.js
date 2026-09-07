@@ -149,31 +149,17 @@ function formatEntryLine(entry, now) {
 }
 
 /**
- * The `## Upcoming` prompt block: the member's calendar plus their active goals.
+ * The calendar block for the coach prompt.
  *
- * Goals are listed separately rather than merged in. A goal is a commitment the athlete confirmed
- * and there are at most three; a calendar entry is a plan that may well move. Flattening the two
- * would let the coach treat "maybe ride Thursday" with the weight of "ZRL final on 12 May".
+ * Entries only. Goals deliberately stay in their own prompt section: a goal is a dated commitment
+ * the athlete confirmed with a Ja and there are at most three, while a calendar entry is a plan
+ * that may well move. Rendering them together would both duplicate the goal lines and invite the
+ * coach to treat "maybe ride Thursday" with the weight of "ZRL final on 12 May".
  */
-function formatCalendarForPrompt(entries, goals, now = new Date()) {
+function formatCalendarForPrompt(entries, now = new Date()) {
   const upcoming = upcomingEntries(entries, now);
-  const activeGoals = Array.isArray(goals) ? goals : [];
-  if (!upcoming.length && !activeGoals.length) return "";
-
-  const lines = [];
-  if (activeGoals.length) {
-    lines.push("Goals:");
-    for (const goal of activeGoals) {
-      const until = formatDaysUntil(goal.eventDate, now);
-      lines.push(`- ${goal.eventDate}${until ? ` (${until})` : ""} — ${goal.text}`);
-    }
-  }
-  if (upcoming.length) {
-    if (lines.length) lines.push("");
-    lines.push("Planned:");
-    for (const entry of upcoming) lines.push(formatEntryLine(entry, now));
-  }
-  return lines.join("\n");
+  if (!upcoming.length) return "";
+  return upcoming.map((entry) => formatEntryLine(entry, now)).join("\n");
 }
 
 /** Coach rows written in the last seven days, used to enforce MAX_COACH_ENTRIES_PER_WEEK. */

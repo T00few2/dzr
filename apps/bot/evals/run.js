@@ -33,7 +33,7 @@ function checkPromptStructure(prompt, fixture) {
   const problems = [];
   const required = [
     "## Today", "## Sport", "## Training load", "## Coach settings",
-    "## Active goals", "## Chat notes", "## Illness and injury",
+    "## Active goals", "## Calendar", "## Chat notes", "## Illness and injury",
     "## Reply shape", "## Current context",
   ];
   for (const heading of required) {

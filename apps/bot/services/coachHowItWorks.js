@@ -1,6 +1,9 @@
 const { siteOrigin } = require("../constants.json");
 
 const MY_PAGES_COACH_URL = `${siteOrigin}/members-zone/my-pages?tab=2`;
+// Its own section rather than a Coach tab: every verified member has a calendar, including those
+// who never open the coach, and My Pages is where you change settings, not where you plan a week.
+const CALENDAR_URL = `${siteOrigin}/members-zone/calendar`;
 
 function noEmbedUrl(url) {
   const raw = String(url || "").trim();
@@ -27,6 +30,12 @@ function coachHowItWorksText({ includeStartHint = false } = {}) {
     "**Feedback**",
     "Reagér med 👍 eller 👎 på mine svar, hvis du vil. Det er anonymt over for de andre og hjælper med at gøre coachingen bedre.",
     "",
+    "**Kalender**",
+    "Du kan planlægge din egen træning og dine løb i kalenderen:",
+    noEmbedUrl(CALENDAR_URL),
+    "",
+    "Den er din — kun du kan se den, og den bliver ikke slettet, selvom du slår coachen fra. Jeg kan altid se den, så jeg kan tage højde for dine løb og planer. Jeg tilføjer kun selv noget, hvis chat-noter er slået til, og det står tydeligt, hvad jeg har lagt ind.",
+    "",
     "**Chat-noter**",
     "Chatten er privat. Selve samtalen gemmes ikke — men når en samtale slutter, gemmer jeg et kort resumé af den, så jeg kan huske tråden næste gang. Når chat-noter er slået til, gemmer jeg stille korte notater (fx at du var syg, eller en engangsplan) — uden at spørge dig. Datobundne mål (et løb, tabe vægt inden en dato) sætter du under Mine sider, eller jeg foreslår dem i chatten og gemmer først, når du trykker Ja. Så styrer jeg træningen efter dem. Faste rammer (ture om ugen, skader, svartone) retter du selv under Mine sider. Du kan altid se og slette noterne der.",
   ];
@@ -38,6 +47,7 @@ function coachHowItWorksText({ includeStartHint = false } = {}) {
 
 module.exports = {
   MY_PAGES_COACH_URL,
+  CALENDAR_URL,
   noEmbedUrl,
   coachHowItWorksText,
 };

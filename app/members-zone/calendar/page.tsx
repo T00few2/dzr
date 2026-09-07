@@ -140,6 +140,19 @@ export default function CalendarPage() {
     }
   }
 
+  async function clearAll() {
+    if (!window.confirm('Slette hele din kalender? Det kan ikke fortrydes.')) return;
+    try {
+      const res = await fetch('/api/calendar?all=1', { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Kunne ikke slette');
+      setEntries([]);
+      toast({ title: 'Kalenderen er tømt', status: 'success', duration: 3000 });
+    } catch (err: any) {
+      toast({ title: err?.message || 'Kunne ikke slette', status: 'error', duration: 4000 });
+    }
+  }
+
   async function setStatus(id: string, next: Entry['status']) {
     try {
       const res = await fetch('/api/calendar', {
@@ -316,9 +329,19 @@ export default function CalendarPage() {
       {past.length > 0 && (
         <>
           <Heading color="white" size="sm" mb={2}>Tidligere</Heading>
-          <Stack divider={<Divider borderColor="gray.700" />}>
+          <Stack divider={<Divider borderColor="gray.700" />} mb={8}>
             {past.slice(0, 20).map((entry) => renderEntry(entry, true))}
           </Stack>
+        </>
+      )}
+
+      {entries.length > 0 && (
+        <>
+          <Divider borderColor="gray.700" mb={4} />
+          {/* Kalenderen bliver ikke slettet sammen med coach-data, så den skal have sin egen. */}
+          <Button size="xs" variant="ghost" color="gray.500" onClick={clearAll}>
+            Slet hele kalenderen
+          </Button>
         </>
       )}
     </Container>

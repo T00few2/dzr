@@ -48,6 +48,14 @@ export async function resetCoachProfileToDefault(discordId: string) {
   )
 }
 
+/**
+ * Wipe coach memory: chat notes and the profile.
+ *
+ * Deliberately does NOT touch member_calendar. The calendar is the member's own — every verified
+ * member has one, including those who never open the coach — and turning the coach off or
+ * disconnecting Strava must not erase what they planned. Adding it here would be a silent data
+ * loss the member never asked for.
+ */
 export async function clearCoachProfileAndNotes(discordId: string) {
   const id = String(discordId || '').trim()
   if (!id) return

@@ -41,9 +41,9 @@ export function upcomingEntries<T extends { eventDate?: string | null; startTime
   horizonDays?: number
 ): T[]
 
+/** Upcoming entries, one per line. Empty string when there is nothing in the horizon. */
 export function formatCalendarForPrompt(
   entries: CalendarEntry[] | null | undefined,
-  goals: Array<{ eventDate: string; text: string }> | null | undefined,
   now?: Date
 ): string
 

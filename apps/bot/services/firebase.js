@@ -15,6 +15,8 @@ const {
   persistCoachMemoryDoc,
   unwrapChatNoteDoc,
   persistChatNoteDoc,
+  unwrapCalendarEntryDoc,
+  persistCalendarEntryDoc,
 } = require("./tokenCrypto");
 const {
   MAX_NOTES_PER_ATHLETE,
@@ -24,6 +26,12 @@ const {
   isNearDuplicate,
   activeGoalNotes,
 } = require("./coachChatNotes");
+const {
+  MAX_ENTRIES_PER_MEMBER,
+  MAX_COACH_ENTRIES_PER_WEEK,
+  sanitizeCalendarEntry,
+  countRecentCoachEntries,
+} = require("./memberCalendar");
 
 // Initialize Firebase
 const privateKey = config.firebase.privateKey;
@@ -42,6 +50,7 @@ admin.initializeApp({
 
 const db = admin.firestore();
 const COACH_CHAT_NOTES_COLLECTION = shared.firestore?.coachChatNotes || "coach_chat_notes";
+const MEMBER_CALENDAR_COLLECTION = shared.firestore?.memberCalendar || "member_calendar";
 
 function coachChatNotesCol(discordId) {
   return db.collection(COACH_CHAT_NOTES_COLLECTION).doc(String(discordId)).collection("notes");
@@ -78,6 +87,76 @@ async function pruneCoachChatNotes(discordId) {
   const batch = db.batch();
   snap.docs.slice(0, overflow).forEach((doc) => batch.delete(doc.ref));
   await batch.commit();
+}
+
+/**
+ * Member calendar.
+ *
+ * Not coach data: every verified member has one, including those without a coach, and the coach
+ * data wipe deliberately leaves it alone. The bot reads it always and writes to it only when
+ * chat notes are on — see addCalendarEntry.
+ */
+function memberCalendarCol(discordId) {
+  return db.collection(MEMBER_CALENDAR_COLLECTION).doc(String(discordId)).collection("entries");
+}
+
+function unwrapCalendarDocSafe(doc) {
+  try {
+    const entry = unwrapCalendarEntryDoc({ ...(doc.data() || {}), id: doc.id });
+    if (!entry?.text || !entry.eventDate) return null;
+    return entry;
+  } catch (err) {
+    console.warn("unwrapCalendarEntryDoc failed:", err?.message || err);
+    return null;
+  }
+}
+
+async function listCalendarEntries(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return [];
+  const snap = await memberCalendarCol(id)
+    .orderBy("eventDate", "desc")
+    .limit(MAX_ENTRIES_PER_MEMBER)
+    .get();
+  return snap.docs.map(unwrapCalendarDocSafe).filter(Boolean);
+}
+
+/**
+ * Write one coach-proposed entry.
+ *
+ * Capped per week because a model handed a calendar it can fill will write a full training plan
+ * into it, and the member's own entries then read as noise in their own calendar. Returns a
+ * reason rather than throwing so the tool can tell the athlete what happened.
+ *
+ * @returns {Promise<{ok: boolean, reason?: string, entry?: object}>}
+ */
+async function addCalendarEntry(discordId, incoming, { source = "coach" } = {}) {
+  const id = String(discordId || "").trim();
+  if (!id) return { ok: false, reason: "no_discord_id" };
+
+  const entry = sanitizeCalendarEntry({ ...incoming, source });
+  if (!entry) return { ok: false, reason: "invalid" };
+
+  const existing = await listCalendarEntries(id);
+  if (existing.length >= MAX_ENTRIES_PER_MEMBER) return { ok: false, reason: "full" };
+  if (source === "coach" && countRecentCoachEntries(existing) >= MAX_COACH_ENTRIES_PER_WEEK) {
+    return { ok: false, reason: "coach_weekly_cap" };
+  }
+  // Adding the same thing twice on the same day is the failure mode here: the model re-proposes
+  // a session it already saved earlier in the conversation.
+  const duplicate = existing.some(
+    (row) =>
+      row.eventDate === entry.eventDate &&
+      row.text.trim().toLowerCase() === entry.text.trim().toLowerCase()
+  );
+  if (duplicate) return { ok: false, reason: "duplicate" };
+
+  await memberCalendarCol(id).doc().set(persistCalendarEntryDoc({ ...entry, discordId: id }));
+  await db.collection(MEMBER_CALENDAR_COLLECTION).doc(id).set(
+    { discordId: id, updatedAt: new Date() },
+    { merge: true }
+  );
+  return { ok: true, entry };
 }
 
 function noteSkip(raw, reason, extra = {}) {
@@ -685,4 +764,6 @@ module.exports = {
   listCoachProfiles,
   listCoachChatNotes,
   addCoachChatNotes,
+  listCalendarEntries,
+  addCalendarEntry,
 }; 

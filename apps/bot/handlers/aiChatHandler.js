@@ -11,6 +11,8 @@ const {
   addCoachChatNotes,
   markCoachAthleteMessage,
   getCoachDailyTokens,
+  listCalendarEntries,
+  addCalendarEntry,
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
 const { trimConversation } = require("../services/conversationTrim");
@@ -29,11 +31,15 @@ const { startQuizFromMessage } = require("../services/quizService");
 const strava = require("../services/stravaService");
 const { unconnectedCoachText, NOT_CLUB_MEMBER_TEXT, USE_COACH_BOT_TEXT } = require("../services/coachDm");
 const { formatCoachProfileForPrompt } = require("../services/coachProfile");
-const { MY_PAGES_COACH_URL, noEmbedUrl } = require("../services/coachHowItWorks");
+const { MY_PAGES_COACH_URL, CALENDAR_URL, noEmbedUrl } = require("../services/coachHowItWorks");
 const { proposeCoachGoal } = require("../services/coachGoalConfirm");
 const { buildZwo, describeWorkout } = require("../services/zwoBuilder");
 const { renderWorkoutChart } = require("../services/workoutChart");
 const { buildCoachPromptText } = require("../services/coachPrompt");
+const {
+  formatCalendarForPrompt,
+  MAX_COACH_ENTRIES_PER_WEEK,
+} = require("../services/memberCalendar");
 const {
   EPISODE_NOTE_KINDS,
   shouldSkipExtract,
@@ -64,7 +70,14 @@ try {
 // Store conversations per user
 const userConversations = new Map();
 const conversationTimers = new Map();
-const COACH_NOTE_TOOLS = new Set(["search_past_notes", "save_chat_notes", "propose_coach_goal"]);
+const COACH_NOTE_TOOLS = new Set([
+  "search_past_notes",
+  "save_chat_notes",
+  "propose_coach_goal",
+  // Reading the calendar is ungated, but writing to it is not: a coach-written row derived
+  // from a conversation is persisted conversation content, so it follows the same consent.
+  "save_planned_event",
+]);
 
 // Configuration
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
@@ -779,6 +792,36 @@ const coachToolDefinitions = [
           replaceNoteId: {
             type: "string",
             description: "If they already have 3 active goals, the id of the goal to replace."
+          }
+        },
+        required: ["text", "eventDate"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "save_planned_event",
+      description: "Put something the athlete intends to DO on their calendar: a race, an event, or a session they are committing to. This is not the same as a chat note, which records advice YOU gave — the calendar records what THEY are going to do. Use it when they say they are riding or racing on a date, or when they accept a session you suggested for a specific day. Do not use it to write out a training plan they did not ask for, and do not use it for a dated aim they call their goal — that is propose_coach_goal.",
+      parameters: {
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+            description: "Short description in the athlete's language, e.g. 'DZR After Party (C)' or '2 timer roligt'."
+          },
+          eventDate: {
+            type: "string",
+            description: "Future date YYYY-MM-DD. Resolve relative dates from Today. Weeks start Monday."
+          },
+          kind: {
+            type: "string",
+            enum: ["session", "race", "event", "other"],
+            description: "race and event have a start time someone else set; session is training they can move."
+          },
+          startTime: {
+            type: "string",
+            description: "Optional local start time HH:MM. Only set it if you actually know it — never guess a race start."
           }
         },
         required: ["text", "eventDate"]
@@ -1599,7 +1642,54 @@ async function executeSingleToolCall(toolCall, message, turn) {
           return { tool_call_id: toolCall.id, success: false, message: "Could not propose a goal." };
         }
       }
-      
+
+      case "save_planned_event": {
+        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        if (!eligible) {
+          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+        }
+        try {
+          const profile = turn?.profile ?? await getCoachProfile(message.author.id);
+          if (profile?.notesOptIn !== true) {
+            return {
+              tool_call_id: toolCall.id,
+              success: false,
+              message: `Chat notes are off, so you cannot add to their calendar. They can add it themselves on the Kalender page: ${CALENDAR_URL}`,
+            };
+          }
+          const result = await addCalendarEntry(message.author.id, {
+            text: args.text,
+            eventDate: args.eventDate,
+            kind: args.kind,
+            startTime: args.startTime,
+          });
+          if (result.ok) {
+            return {
+              tool_call_id: toolCall.id,
+              success: true,
+              entry: result.entry,
+              message: "Added to their calendar. Mention it in one short clause; do not list the calendar back to them.",
+            };
+          }
+          // Every failure is reported with a reason the model can act on, rather than a generic
+          // error it would either hide or retry blindly.
+          const reasons = {
+            invalid: "Not saved: the text was empty or the date was not a valid future YYYY-MM-DD.",
+            duplicate: "Not saved: that is already on their calendar for that date. Say it is already there.",
+            full: `Not saved: their calendar is full. They can delete some entries at ${CALENDAR_URL}`,
+            coach_weekly_cap: `Not saved: you have already added ${MAX_COACH_ENTRIES_PER_WEEK} entries to their calendar this week. Suggest the session in the chat instead, and let them add it at ${CALENDAR_URL}`,
+          };
+          return {
+            tool_call_id: toolCall.id,
+            success: false,
+            message: reasons[result.reason] || "Could not add it to their calendar.",
+          };
+        } catch (err) {
+          console.error("save_planned_event failed:", err?.message || err);
+          return { tool_call_id: toolCall.id, success: false, message: "Could not add it to their calendar." };
+        }
+      }
+
       default:
         await safeReply(message, `❌ Unknown command: ${name}`);
         return { tool_call_id: toolCall.id, success: false, message: `Unknown command: ${name}` };
@@ -1807,6 +1897,16 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
   } catch (err) {
     console.error("getCoachProfile failed:", err?.message || err);
   }
+  // The calendar is read for everyone, whatever notesOptIn says. That setting governs silent
+  // extraction from conversation; the calendar is what the athlete deliberately typed into a form,
+  // so the coach seeing it is the point. Writing to it is still gated — see save_planned_event.
+  let calendarBlock = "";
+  try {
+    calendarBlock = formatCalendarForPrompt(await listCalendarEntries(message.author.id), now);
+  } catch (err) {
+    console.error("listCalendarEntries failed:", err?.message || err);
+  }
+
   if (notesOptIn) {
     notesBlock = "None retrieved for this message.";
     goalsBlock = "No saved goals.";
@@ -1830,10 +1930,12 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
     athleteFacts,
     settingsBlock,
     goalsBlock,
+    calendarBlock,
     summariesBlock,
     notesBlock,
     notesOptIn,
     MY_PAGES_COACH_URL,
+    CALENDAR_URL,
   });
 
   return { content, notesOptIn, profile };

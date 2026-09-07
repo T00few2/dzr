@@ -171,13 +171,32 @@ export async function DELETE(req: Request) {
     const { discordId } = await sessionMember(req)
     if (!discordId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 })
 
-    const id = String(new URL(req.url).searchParams.get('id') || '').trim()
-    if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+    const url = new URL(req.url)
+    const id = String(url.searchParams.get('id') || '').trim()
+    const deleteAll = url.searchParams.get('all') === '1'
 
-    // Scoped to the caller's own subcollection, so an id from someone else's calendar simply
-    // does not exist here — ownership is structural rather than checked.
-    await entriesCol(discordId).doc(id).delete()
-    return NextResponse.json({ ok: true, entries: await listEntries(discordId) })
+    if (id) {
+      // Scoped to the caller's own subcollection, so an id from someone else's calendar simply
+      // does not exist here — ownership is structural rather than checked.
+      await entriesCol(discordId).doc(id).delete()
+      return NextResponse.json({ ok: true, entries: await listEntries(discordId) })
+    }
+
+    if (!deleteAll) return NextResponse.json({ error: 'Specify id or all=1' }, { status: 400 })
+
+    // The calendar's own delete. The coach data wipe deliberately does not reach this collection,
+    // so without this a member would have no way to clear it in one go.
+    const col = entriesCol(discordId)
+    for (;;) {
+      const snap = await col.limit(400).get()
+      if (snap.empty) break
+      const batch = adminDb.batch()
+      snap.docs.forEach((doc) => batch.delete(doc.ref))
+      await batch.commit()
+      if (snap.size < 400) break
+    }
+    await adminDb.collection(MEMBER_CALENDAR_COLLECTION).doc(discordId).delete().catch(() => undefined)
+    return NextResponse.json({ ok: true, entries: [] })
   } catch (err) {
     console.error('calendar DELETE failed:', err)
     return NextResponse.json({ error: 'Kunne ikke slette' }, { status: 500 })
