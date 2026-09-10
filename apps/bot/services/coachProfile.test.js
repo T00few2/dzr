@@ -38,22 +38,46 @@ test("weekly slots accept Danish and English day names and drop unusable rows", 
   }).weekly;
   assert.equal(weekly.length, 1);
   assert.equal(weekly[0].sport, "cycling");
-  assert.deepEqual(weekly[0].days, ["mon", "wed", "sun"], "stored in week order");
-  assert.equal(weekly[0].startTime, null, "time is optional and absent by default");
+  assert.deepEqual(
+    weekly[0].days,
+    [
+      { day: "mon", startTime: null },
+      { day: "wed", startTime: null },
+      { day: "sun", startTime: null },
+    ],
+    "stored in week order, one optional time per day"
+  );
 });
 
-test("weekly slots keep an optional start time", () => {
+test("weekly slots keep an optional start time per day", () => {
   const weekly = publicFields({
     weekly: [
-      { sport: "cycling", days: ["tue"], startTime: "19:00" },
-      { sport: "cycling", days: ["tue"], startTime: "06:30" },
+      {
+        sport: "cycling",
+        days: [
+          { day: "tue", startTime: "06:30" },
+          { day: "thu", startTime: "19:00" },
+        ],
+      },
       { sport: "running", days: ["sat"], startTime: "half seven" },
     ],
   }).weekly;
-  assert.equal(weekly.length, 3);
-  assert.equal(weekly[0].startTime, "19:00");
-  assert.equal(weekly[1].startTime, "06:30");
-  assert.equal(weekly[2].startTime, null, "unusable times are dropped, the slot remains");
+  assert.equal(weekly.length, 2);
+  assert.deepEqual(weekly[0].days, [
+    { day: "tue", startTime: "06:30" },
+    { day: "thu", startTime: "19:00" },
+  ]);
+  assert.equal(weekly[1].days[0].startTime, null, "unusable times are dropped, the day remains");
+});
+
+test("a row-level start time from the old shape is copied onto every day", () => {
+  const weekly = publicFields({
+    weekly: [{ sport: "cycling", days: ["mon", "wed"], startTime: "19:00" }],
+  }).weekly;
+  assert.deepEqual(weekly[0].days, [
+    { day: "mon", startTime: "19:00" },
+    { day: "wed", startTime: "19:00" },
+  ]);
 });
 
 test("weekly slots are deduplicated", () => {
@@ -132,9 +156,15 @@ test("ride frequency is stated as a ceiling the coach must respect", () => {
 
 test("weekly slot times reach the prompt as Copenhagen clock times", () => {
   const prompt = formatCoachProfileForPrompt({
-    weekly: [{ sport: "cycling", days: ["tue", "thu"], startTime: "19:00" }],
+    weekly: [{
+      sport: "cycling",
+      days: [
+        { day: "tue", startTime: "06:30" },
+        { day: "thu", startTime: "19:00" },
+      ],
+    }],
   });
-  assert.match(prompt, /cycling on Tuesday, Thursday at 19:00/);
+  assert.match(prompt, /cycling on Tuesday at 06:30, Thursday at 19:00/);
   assert.match(prompt, /Europe\/Copenhagen/);
 });
 

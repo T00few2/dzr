@@ -86,21 +86,37 @@ function sanitizeSports(value) {
   return uniqueStrings(value, 12, 40);
 }
 
-function sanitizeDays(value) {
-  const out = [];
-  const seen = new Set();
+function dayAlias(value) {
+  const key = String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return DAY_ALIASES[key] || null;
+}
+
+/**
+ * One optional clock time per day. Also reads the older shapes: a list of day-name strings,
+ * and a single row-level startTime which is copied onto every day.
+ */
+function sanitizeWeeklyDays(value, fallbackStartTime) {
+  const byDay = new Map();
   for (const raw of Array.isArray(value) ? value : []) {
-    const key = String(raw || "")
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-    const day = DAY_ALIASES[key];
-    if (!day || seen.has(day)) continue;
-    seen.add(day);
-    out.push(day);
+    if (typeof raw === "string") {
+      const day = dayAlias(raw);
+      if (!day || byDay.has(day)) continue;
+      byDay.set(day, { day, startTime: fallbackStartTime });
+      continue;
+    }
+    if (!raw || typeof raw !== "object") continue;
+    const day = dayAlias(raw.day || raw.id);
+    if (!day || byDay.has(day)) continue;
+    byDay.set(day, {
+      day,
+      startTime: sanitizeStartTime(raw.startTime) || fallbackStartTime,
+    });
   }
-  return DAY_ORDER.filter((d) => out.includes(d));
+  return DAY_ORDER.filter((d) => byDay.has(d)).map((d) => byDay.get(d));
 }
 
 function sanitizeWeekly(value) {
@@ -109,14 +125,13 @@ function sanitizeWeekly(value) {
   for (const raw of Array.isArray(value) ? value : []) {
     if (!raw || typeof raw !== "object") continue;
     const sport = clip(raw.sport, 40).toLowerCase();
-    const days = sanitizeDays(raw.days);
+    const fallbackTime = sanitizeStartTime(raw.startTime);
+    const days = sanitizeWeeklyDays(raw.days, fallbackTime);
     if (!sport || !days.length) continue;
-    const startTime = sanitizeStartTime(raw.startTime);
-    // Time is part of identity: Monday 06:00 and Monday 19:00 are two slots, not a duplicate.
-    const key = `${sport}:${days.join(",")}:${startTime || ""}`;
+    const key = `${sport}:${days.map((d) => `${d.day}:${d.startTime || ""}`).join(",")}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    rows.push({ sport, days, startTime });
+    rows.push({ sport, days });
     if (rows.length >= 14) break;
   }
   return rows;
@@ -284,13 +299,17 @@ function formatCoachProfileForPrompt(profile) {
   if (data.weekly.length) {
     const weekly = data.weekly
       .map((row) => {
-        const days = row.days.map((d) => DAY_LABELS[d] || d).join(", ");
-        const time = row.startTime ? ` at ${row.startTime}` : "";
-        return `${row.sport} on ${days}${time}`;
+        const days = row.days
+          .map((slot) => {
+            const name = DAY_LABELS[slot.day] || slot.day;
+            return slot.startTime ? `${name} at ${slot.startTime}` : name;
+          })
+          .join(", ");
+        return `${row.sport} on ${days}`;
       })
       .join("; ");
     lines.push(`- Fixed weekly slots: ${weekly}`);
-    if (data.weekly.some((row) => row.startTime)) {
+    if (data.weekly.some((row) => row.days.some((slot) => slot.startTime))) {
       lines.push("- Weekly slot times are Europe/Copenhagen. Prefer them for ordinary training; a dated calendar race still wins a clash.");
     }
   }

@@ -23,6 +23,7 @@ export type {
   CoachStyleLength,
   CoachStyleLanguage,
   CoachStyleTone,
+  CoachWeeklyDay,
   CoachWeeklySlot,
   CoachInjury,
   CoachFollowUpDays,

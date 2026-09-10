@@ -143,8 +143,7 @@ export default function CoachMemoryEditor() {
       sports: profile.sports || [],
       weekly: (profile.weekly || []).map((row) => ({
         sport: row.sport,
-        days: row.days || [],
-        startTime: row.startTime || null,
+        days: Array.isArray(row.days) ? row.days : [],
       })),
       injuries: profile.injuries || [],
       goals: [],
@@ -221,7 +220,7 @@ export default function CoachMemoryEditor() {
   function addWeekly() {
     setForm((prev) => ({
       ...prev,
-      weekly: [...prev.weekly, { sport: 'strength', days: [], startTime: null }],
+      weekly: [...prev.weekly, { sport: 'strength', days: [] }],
     }))
   }
 
@@ -492,12 +491,12 @@ export default function CoachMemoryEditor() {
           <Button size="xs" onClick={addWeekly} {...secondaryButtonProps}>Tilføj dag</Button>
         </Flex>
         <Text color="gray.500" fontSize="xs" mb={2}>
-          Tid er valgfri og gælder de afkrydsede dage. Samme sport morgen og aften? Tilføj to rækker.
+          Tid er valgfri for hver dag. Samme sport to gange på én dag? Tilføj to rækker.
         </Text>
         <Stack spacing={3}>
           {form.weekly.map((row, index) => (
-            <Box key={`${row.sport}-${row.startTime || 'any'}-${index}`} borderWidth="1px" borderColor="gray.700" borderRadius="md" p={3}>
-              <HStack align="flex-start" spacing={3} wrap="wrap">
+            <Box key={`${row.sport}-${index}`} borderWidth="1px" borderColor="gray.700" borderRadius="md" p={3}>
+              <HStack align="flex-start" spacing={3} wrap="wrap" mb={2}>
                 <Select
                   value={row.sport}
                   onChange={(e) => updateWeekly(index, { ...row, sport: e.target.value })}
@@ -511,35 +510,6 @@ export default function CoachMemoryEditor() {
                     <option value={row.sport}>{row.sport}</option>
                   )}
                 </Select>
-                <Input
-                  type="time"
-                  value={row.startTime || ''}
-                  onChange={(e) => updateWeekly(index, { ...row, startTime: e.target.value || null })}
-                  bg="gray.800"
-                  borderColor="gray.600"
-                  size="sm"
-                  maxW="130px"
-                  aria-label="Valgfri tid"
-                  title="Valgfri tid"
-                />
-                <HStack wrap="wrap" spacing={3}>
-                  {DAYS.map((day) => (
-                    <Checkbox
-                      key={day.id}
-                      isChecked={row.days.includes(day.id)}
-                      onChange={() => {
-                        const days = row.days.includes(day.id)
-                          ? row.days.filter((d) => d !== day.id)
-                          : [...row.days, day.id]
-                        updateWeekly(index, { ...row, days })
-                      }}
-                      colorScheme="red"
-                      size="sm"
-                    >
-                      {day.label}
-                    </Checkbox>
-                  ))}
-                </HStack>
                 <Button
                   size="xs"
                   variant="ghost"
@@ -549,6 +519,46 @@ export default function CoachMemoryEditor() {
                 >
                   Slet
                 </Button>
+              </HStack>
+              <HStack wrap="wrap" spacing={2} align="flex-start">
+                {DAYS.map((day) => {
+                  const slot = row.days.find((d) => d.day === day.id)
+                  return (
+                    <Box key={day.id} minW="92px">
+                      <Checkbox
+                        isChecked={Boolean(slot)}
+                        onChange={() => {
+                          const days = slot
+                            ? row.days.filter((d) => d.day !== day.id)
+                            : [...row.days, { day: day.id, startTime: null }]
+                          updateWeekly(index, { ...row, days })
+                        }}
+                        colorScheme="red"
+                        size="sm"
+                      >
+                        {day.label}
+                      </Checkbox>
+                      {slot && (
+                        <Input
+                          type="time"
+                          value={slot.startTime || ''}
+                          onChange={(e) => {
+                            const startTime = e.target.value || null
+                            updateWeekly(index, {
+                              ...row,
+                              days: row.days.map((d) => (d.day === day.id ? { ...d, startTime } : d)),
+                            })
+                          }}
+                          bg="gray.800"
+                          borderColor="gray.600"
+                          size="xs"
+                          mt={1}
+                          aria-label={`Tid ${day.label}`}
+                        />
+                      )}
+                    </Box>
+                  )
+                })}
               </HStack>
             </Box>
           ))}
