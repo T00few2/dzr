@@ -6,23 +6,22 @@ import { useRouter } from 'next/navigation';
 import {
   Box,
   Button,
+  Collapse,
   Container,
   Divider,
   HStack,
   Heading,
-  Input,
   Stack,
   Text,
   useToast,
 } from '@chakra-ui/react';
+import { ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
-import { MAX_ENTRY_TEXT } from '@/app/lib/memberCalendar';
 import type { ZwiftEventSummary, ZwiftEventSubgroup } from '@/packages/shared/zwiftEvents';
 import { CalendarRow } from './CalendarRow';
 import DayModal from './DayModal';
 import MonthGrid from './MonthGrid';
 import {
-  MAX_ACTIVE_GOALS,
   sortAgendaRows,
   todayIso,
   type Entry,
@@ -31,8 +30,7 @@ import {
 
 /**
  * The coach notes endpoint returns every note kind; keep the goals, live and expired alike, and
- * mark which is which. The page shows live ones in the agenda and expired ones under Tidligere,
- * where they can be deleted.
+ * mark which is which. Expired ones fall under Tidligere, where they can be deleted.
  */
 function goalsFrom(notes: unknown): Goal[] {
   const today = todayIso();
@@ -58,8 +56,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
-  const [goalText, setGoalText] = useState('');
-  const [goalDate, setGoalDate] = useState('');
+  const [pastOpen, setPastOpen] = useState(false);
 
   const [events, setEvents] = useState<ZwiftEventSummary[]>([]);
   const [racingScore, setRacingScore] = useState<number | null>(null);
@@ -154,14 +151,15 @@ export default function CalendarPage() {
    * Stores the subgroup's own start time, never the parent event's: the categories go off up to
    * five minutes apart, and the wrong minute is how someone misses their race.
    */
-  async function addFromEvent(event: ZwiftEventSummary, subgroup: ZwiftEventSubgroup) {
+  async function addFromEvent(event: ZwiftEventSummary, subgroup: ZwiftEventSubgroup, asGoal: boolean) {
     setAddingEventId(event.id);
     try {
+      const text = `${event.name} (${subgroup.label})`;
       const res = await fetch('/api/calendar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: `${event.name} (${subgroup.label})`,
+          text,
           eventDate: subgroup.eventDate,
           startTime: subgroup.startTime,
           kind: event.eventType === 'RACE' ? 'race' : 'event',
@@ -171,6 +169,9 @@ export default function CalendarPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Kunne ikke gemme');
       setEntries(data.entries || []);
+      if (asGoal) {
+        await addGoal(text, subgroup.eventDate, { quiet: true });
+      }
       toast({ title: `Lagt i kalenderen: ${event.name} (${subgroup.label})`, status: 'success', duration: 3000 });
     } catch (err: any) {
       toast({ title: err?.message || 'Kunne ikke gemme', status: 'error', duration: 4000 });
@@ -179,7 +180,7 @@ export default function CalendarPage() {
     }
   }
 
-  async function addGoal() {
+  async function addGoal(text: string, eventDate: string, opts?: { quiet?: boolean }) {
     setSavingGoal(true);
     try {
       // Goals still live in coach memory, so they go through the coach notes endpoint rather than
@@ -187,16 +188,16 @@ export default function CalendarPage() {
       const res = await fetch('/api/coach/notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: goalText.trim(), kind: 'goal', eventDate: goalDate }),
+        body: JSON.stringify({ text: text.trim(), kind: 'goal', eventDate }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Kunne ikke gemme målet');
       setGoals(goalsFrom(data?.notes));
-      setGoalText('');
-      setGoalDate('');
-      toast({ title: 'Mål gemt', status: 'success', duration: 3000 });
+      if (!opts?.quiet) toast({ title: 'Mål gemt', status: 'success', duration: 3000 });
+      return true;
     } catch (err: any) {
       toast({ title: err?.message || 'Kunne ikke gemme målet', status: 'error', duration: 4000 });
+      return false;
     } finally {
       setSavingGoal(false);
     }
@@ -241,19 +242,17 @@ export default function CalendarPage() {
     }
   }
 
-  // The API returns newest first so the read is cheap; the agenda wants the opposite, and past
-  // entries stay visible below rather than being hidden — they are the record of what was planned.
-  const { upcoming, past } = useMemo(() => {
+  const past = useMemo(() => {
     const today = todayIso();
-    const rows = sortAgendaRows(entries, goals);
-    return {
-      upcoming: rows.filter((r) => r.eventDate >= today),
-      past: rows.filter((r) => r.eventDate < today).reverse(),
-    };
+    return sortAgendaRows(entries, goals)
+      .filter((r) => r.eventDate < today)
+      .reverse();
   }, [entries, goals]);
 
   if (status === 'loading' || (session && loading)) return <LoadingSpinnerMemb />;
   if (!session) return null;
+
+  const pastShown = past.slice(0, 20);
 
   return (
     <Container maxW="7xl" py={8}>
@@ -262,65 +261,6 @@ export default function CalendarPage() {
         Din egen plan: træning, løb og events. Kun du kan se den. Har du DZR Coach slået til,
         kan coachen også se den og tage højde for den. Klik på en dag for at tilføje.
       </Text>
-
-      {/* Goals are club-only because they are coach memory and the coach comes with membership.
-          The rest of the calendar is open to every verified member, so this is one section that
-          explains itself rather than a gate on the page. */}
-      <Box bg="gray.900" borderWidth="1px" borderColor="gray.700" rounded="md" p={4} mb={4}>
-        <HStack mb={3} spacing={2}>
-          <Text fontSize="sm" role="img" aria-label="Mål">⭐</Text>
-          <Heading color="white" size="sm">Sæt et mål</Heading>
-        </HStack>
-        {!isClubMember ? (
-          <Text color="gray.400" fontSize="sm">
-            Mål følger med DZR Coach, som er en del af klubmedlemskabet. Du kan stadig planlægge
-            træning og løb i kalenderen nedenfor.
-          </Text>
-        ) : goals.filter((g) => !g.expired).length >= MAX_ACTIVE_GOALS ? (
-          <Text color="gray.400" fontSize="sm">
-            Du har {MAX_ACTIVE_GOALS} aktive mål. Slet et nedenfor, før du tilføjer et nyt.
-          </Text>
-        ) : (
-          <>
-            <Text color="gray.500" fontSize="xs" mb={2}>
-              Et mål er en dato du træner frem mod. Coachen styrer træningen efter det —
-              højst {MAX_ACTIVE_GOALS} ad gangen.
-            </Text>
-            <Stack spacing={2}>
-              <Input
-                placeholder="Fx tabe 3 kg, eller ZRL-finalen"
-                value={goalText}
-                maxLength={MAX_ENTRY_TEXT}
-                onChange={(e) => setGoalText(e.target.value)}
-                bg="gray.800"
-                borderColor="gray.600"
-                size="sm"
-              />
-              <HStack>
-                <Input
-                  type="date"
-                  value={goalDate}
-                  min={todayIso()}
-                  onChange={(e) => setGoalDate(e.target.value)}
-                  bg="gray.800"
-                  borderColor="gray.600"
-                  size="sm"
-                  maxW="180px"
-                />
-                <Button
-                  size="sm"
-                  colorScheme="yellow"
-                  onClick={addGoal}
-                  isLoading={savingGoal}
-                  isDisabled={!goalText.trim() || !goalDate || savingGoal}
-                >
-                  Gem mål
-                </Button>
-              </HStack>
-            </Stack>
-          </>
-        )}
-      </Box>
 
       <MonthGrid
         entries={entries}
@@ -350,39 +290,34 @@ export default function CalendarPage() {
         </Text>
       )}
 
-      <Heading color="white" size="sm" mb={2}>Kommende</Heading>
-      {upcoming.length === 0 ? (
-        <Text color="gray.500" fontSize="sm" mb={8}>Ingenting planlagt endnu. Klik på en dag i kalenderen for at tilføje.</Text>
-      ) : (
-        <Stack divider={<Divider borderColor="gray.700" />} mb={8}>
-          {upcoming.map((row) => (
-            <CalendarRow
-              key={row.rowKind === 'goal' ? `goal:${row.goal.id}` : row.entry.id}
-              row={row}
-              onStatus={setStatus}
-              onRemoveEntry={removeEntry}
-              onRemoveGoal={removeGoal}
-            />
-          ))}
-        </Stack>
-      )}
-
-      {past.length > 0 && (
-        <>
-          <Heading color="white" size="sm" mb={2}>Tidligere</Heading>
-          <Stack divider={<Divider borderColor="gray.700" />} mb={8}>
-            {past.slice(0, 20).map((row) => (
-              <CalendarRow
-                key={row.rowKind === 'goal' ? `goal:${row.goal.id}` : row.entry.id}
-                row={row}
-                dimmed
-                onStatus={setStatus}
-                onRemoveEntry={removeEntry}
-                onRemoveGoal={removeGoal}
-              />
-            ))}
-          </Stack>
-        </>
+      {pastShown.length > 0 && (
+        <Box mb={8}>
+          <Button
+            variant="ghost"
+            color="gray.300"
+            size="sm"
+            px={0}
+            rightIcon={pastOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+            onClick={() => setPastOpen((open) => !open)}
+            aria-expanded={pastOpen}
+          >
+            Tidligere ({pastShown.length})
+          </Button>
+          <Collapse in={pastOpen} animateOpacity>
+            <Stack divider={<Divider borderColor="gray.700" />} mt={2}>
+              {pastShown.map((row) => (
+                <CalendarRow
+                  key={row.rowKind === 'goal' ? `goal:${row.goal.id}` : row.entry.id}
+                  row={row}
+                  dimmed
+                  onStatus={setStatus}
+                  onRemoveEntry={removeEntry}
+                  onRemoveGoal={removeGoal}
+                />
+              ))}
+            </Stack>
+          </Collapse>
+        </Box>
       )}
 
       {entries.length > 0 && (
@@ -401,11 +336,14 @@ export default function CalendarPage() {
         goals={goals}
         events={events}
         racingScore={racingScore}
+        isClubMember={isClubMember}
         saving={saving}
+        savingGoal={savingGoal}
         addingEventId={addingEventId}
         onClose={() => setSelectedDate(null)}
         onAddEntry={addEntry}
         onAddFromEvent={addFromEvent}
+        onAddGoal={addGoal}
         onStatus={setStatus}
         onRemoveEntry={removeEntry}
         onRemoveGoal={removeGoal}

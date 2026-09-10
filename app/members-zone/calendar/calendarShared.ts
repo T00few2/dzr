@@ -23,6 +23,44 @@ export type Row =
 
 export const MAX_ACTIVE_GOALS = 3;
 
+export function matchingGoal(goals: Goal[], eventDate: string, text: string) {
+  const needle = text.trim().toLowerCase();
+  if (!needle) return null;
+  return goals.find((goal) => goal.eventDate === eventDate && goal.text.trim().toLowerCase() === needle) || null;
+}
+
+export function activeGoalCount(goals: Goal[]) {
+  return goals.filter((goal) => !goal.expired).length;
+}
+
+export function goalStarLabel(opts: { isClubMember: boolean; atLimit: boolean; isGoal: boolean }) {
+  if (!opts.isClubMember) {
+    return 'Mål følger med DZR Coach, som er en del af klubmedlemskabet.';
+  }
+  if (opts.isGoal) {
+    return 'Dette er et mål. Coachen styrer træningen efter det. Klik for at fjerne.';
+  }
+  if (opts.atLimit) {
+    return `Du har ${MAX_ACTIVE_GOALS} aktive mål. Fjern et, før du sætter et nyt.`;
+  }
+  return `Sæt som mål. Coachen styrer træningen efter det — højst ${MAX_ACTIVE_GOALS} ad gangen.`;
+}
+
+/** Agenda rows for one day, without a separate goal row when the same text is already an entry. */
+export function rowsForDate(entries: Entry[], goals: Goal[], date: string): Row[] {
+  const dayEntries = entries.filter((entry) => entry.eventDate === date);
+  const dayGoals = goals.filter((goal) => goal.eventDate === date);
+  const covered = new Set(
+    dayEntries
+      .map((entry) => matchingGoal(dayGoals, date, entry.text)?.id)
+      .filter((id): id is string => Boolean(id)),
+  );
+  return sortAgendaRows(
+    dayEntries,
+    dayGoals.filter((goal) => !covered.has(goal.id)),
+  );
+}
+
 export const KIND_LABELS: Record<Entry['kind'], string> = {
   session: 'Træning',
   race: 'Løb',

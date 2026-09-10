@@ -22,12 +22,16 @@ import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { MAX_ENTRY_TEXT } from '@/app/lib/memberCalendar';
 import { suggestedSubgroup } from '@/packages/shared/zwiftEvents';
 import type { ZwiftEventSummary, ZwiftEventSubgroup } from '@/packages/shared/zwiftEvents';
-import { CalendarRow } from './CalendarRow';
+import { CalendarEntryRow, CalendarGoalRow, GoalStarButton } from './CalendarRow';
 import {
+  MAX_ACTIVE_GOALS,
+  activeGoalCount,
   eventsOnDate,
   formatDay,
+  goalStarLabel,
   isSubgroupAdded,
-  sortAgendaRows,
+  matchingGoal,
+  rowsForDate,
   todayIso,
   type Entry,
   type Goal,
@@ -39,11 +43,14 @@ export default function DayModal({
   goals,
   events,
   racingScore,
+  isClubMember,
   saving,
+  savingGoal,
   addingEventId,
   onClose,
   onAddEntry,
   onAddFromEvent,
+  onAddGoal,
   onStatus,
   onRemoveEntry,
   onRemoveGoal,
@@ -53,7 +60,9 @@ export default function DayModal({
   goals: Goal[];
   events: ZwiftEventSummary[];
   racingScore: number | null;
+  isClubMember: boolean;
   saving: boolean;
+  savingGoal: boolean;
   addingEventId: number | null;
   onClose: () => void;
   onAddEntry: (payload: {
@@ -62,7 +71,8 @@ export default function DayModal({
     startTime: string | null;
     kind: Entry['kind'];
   }) => Promise<boolean>;
-  onAddFromEvent: (event: ZwiftEventSummary, subgroup: ZwiftEventSubgroup) => Promise<void>;
+  onAddFromEvent: (event: ZwiftEventSummary, subgroup: ZwiftEventSubgroup, asGoal: boolean) => Promise<void>;
+  onAddGoal: (text: string, eventDate: string) => Promise<boolean>;
   onStatus: (id: string, next: Entry['status']) => void;
   onRemoveEntry: (id: string) => void;
   onRemoveGoal: (id: string) => void;
@@ -70,38 +80,54 @@ export default function DayModal({
   const [text, setText] = useState('');
   const [time, setTime] = useState('');
   const [kind, setKind] = useState<Entry['kind']>('session');
+  const [asGoal, setAsGoal] = useState(false);
+  const [dzrAsGoal, setDzrAsGoal] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     setText('');
     setTime('');
     setKind('session');
+    setAsGoal(false);
+    setDzrAsGoal({});
   }, [date]);
 
   const today = todayIso();
   const canAdd = Boolean(date && date >= today);
+  const atLimit = activeGoalCount(goals) >= MAX_ACTIVE_GOALS;
+  const canStarNew = isClubMember && !atLimit;
   const dayEvents = useMemo(() => (date ? eventsOnDate(events, date) : []), [events, date]);
-  const dayRows = useMemo(() => {
-    if (!date) return [];
-    return sortAgendaRows(
-      entries.filter((entry) => entry.eventDate === date),
-      goals.filter((goal) => goal.eventDate === date),
-    );
-  }, [date, entries, goals]);
+  const dayRows = useMemo(() => (date ? rowsForDate(entries, goals, date) : []), [date, entries, goals]);
 
   const canSubmit = canAdd && text.trim().length > 0 && !saving;
+  const addStarLabel = goalStarLabel({ isClubMember, atLimit, isGoal: asGoal });
 
   async function submit() {
     if (!date || !canSubmit) return;
-    const ok = await onAddEntry({
+    const payload = {
       text: text.trim(),
       eventDate: date,
       startTime: time || null,
       kind,
-    });
-    if (ok) {
-      setText('');
-      setTime('');
+    };
+    const ok = await onAddEntry(payload);
+    if (!ok) return;
+    if (asGoal && canStarNew) {
+      await onAddGoal(payload.text, date);
     }
+    setText('');
+    setTime('');
+    setAsGoal(false);
+  }
+
+  async function toggleEntryGoal(entry: Entry) {
+    if (!date) return;
+    const existing = matchingGoal(goals, entry.eventDate, entry.text);
+    if (existing) {
+      onRemoveGoal(existing.id);
+      return;
+    }
+    if (!canStarNew) return;
+    await onAddGoal(entry.text, entry.eventDate);
   }
 
   return (
@@ -125,6 +151,7 @@ export default function DayModal({
                   <Stack spacing={3}>
                     {dayEvents.map((event) => {
                       const likely = suggestedSubgroup(event, racingScore);
+                      const starred = Boolean(dzrAsGoal[event.id]);
                       return (
                         <Box
                           key={event.id}
@@ -143,18 +170,26 @@ export default function DayModal({
                                 {event.durationMinutes ? `${event.durationMinutes} min` : ''}
                               </Text>
                             </Box>
-                            <Box
-                              as="a"
-                              href={event.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              color="gray.400"
-                              fontSize="xs"
-                              flexShrink={0}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Zwift <ExternalLinkIcon mb="2px" />
-                            </Box>
+                            <HStack spacing={1} flexShrink={0}>
+                              <GoalStarButton
+                                isGoal={starred}
+                                label={goalStarLabel({ isClubMember, atLimit, isGoal: starred })}
+                                disabled={!starred && !canStarNew}
+                                onClick={() => setDzrAsGoal((prev) => ({ ...prev, [event.id]: !prev[event.id] }))}
+                                size="xs"
+                              />
+                              <Box
+                                as="a"
+                                href={event.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                color="gray.400"
+                                fontSize="xs"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                Zwift <ExternalLinkIcon mb="2px" />
+                              </Box>
+                            </HStack>
                           </HStack>
                           <HStack flexWrap="wrap" spacing={2}>
                             {event.subgroups.map((subgroup) => {
@@ -168,7 +203,7 @@ export default function DayModal({
                                   color={likely === subgroup.label ? undefined : 'gray.300'}
                                   isDisabled={added}
                                   isLoading={addingEventId === event.id}
-                                  onClick={() => onAddFromEvent(event, subgroup)}
+                                  onClick={() => onAddFromEvent(event, subgroup, starred && canStarNew)}
                                   title={subgroup.scoreRange ? `Racing Score ${subgroup.scoreRange}` : subgroup.paceRange || undefined}
                                 >
                                   {added ? '✓ ' : ''}{subgroup.label} · {subgroup.startTime}
@@ -192,16 +227,37 @@ export default function DayModal({
                 <Box>
                   <Heading color="white" size="sm" mb={1}>Din plan</Heading>
                   <Stack divider={<Divider borderColor="gray.700" />}>
-                    {dayRows.map((row) => (
-                      <CalendarRow
-                        key={row.rowKind === 'goal' ? `goal:${row.goal.id}` : row.entry.id}
-                        row={row}
-                        showDate={false}
-                        onStatus={onStatus}
-                        onRemoveEntry={onRemoveEntry}
-                        onRemoveGoal={onRemoveGoal}
-                      />
-                    ))}
+                    {dayRows.map((row) => {
+                      if (row.rowKind === 'goal') {
+                        return (
+                          <CalendarGoalRow
+                            key={`goal:${row.goal.id}`}
+                            goal={row.goal}
+                            showDate={false}
+                            onRemove={onRemoveGoal}
+                          />
+                        );
+                      }
+                      const linked = matchingGoal(goals, row.entry.eventDate, row.entry.text);
+                      return (
+                        <CalendarEntryRow
+                          key={row.entry.id}
+                          entry={row.entry}
+                          showDate={false}
+                          isGoal={Boolean(linked)}
+                          goalLabel={goalStarLabel({
+                            isClubMember,
+                            atLimit,
+                            isGoal: Boolean(linked),
+                          })}
+                          canToggleGoal={canStarNew}
+                          savingGoal={savingGoal}
+                          onToggleGoal={() => toggleEntryGoal(row.entry)}
+                          onStatus={onStatus}
+                          onRemove={onRemoveEntry}
+                        />
+                      );
+                    })}
                   </Stack>
                 </Box>
               )}
@@ -242,6 +298,12 @@ export default function DayModal({
                         <option value="event">Event</option>
                         <option value="other">Andet</option>
                       </Select>
+                      <GoalStarButton
+                        isGoal={asGoal}
+                        label={addStarLabel}
+                        disabled={!asGoal && !canStarNew}
+                        onClick={() => setAsGoal((v) => !v)}
+                      />
                       <Button size="sm" colorScheme="red" onClick={submit} isLoading={saving} isDisabled={!canSubmit}>
                         Tilføj
                       </Button>

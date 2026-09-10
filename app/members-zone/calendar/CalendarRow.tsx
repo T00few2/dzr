@@ -1,19 +1,65 @@
 'use client';
 
-import { Badge, Box, Button, Flex, HStack, IconButton, Text } from '@chakra-ui/react';
+import { Badge, Box, Button, Flex, HStack, IconButton, Text, Tooltip } from '@chakra-ui/react';
 import { DeleteIcon } from '@chakra-ui/icons';
+import { FaRegStar, FaStar } from 'react-icons/fa';
 import { KIND_COLORS, KIND_LABELS, formatDay, type Entry, type Goal, type Row } from './calendarShared';
+
+export function GoalStarButton({
+  isGoal,
+  label,
+  disabled,
+  isLoading,
+  onClick,
+  size = 'sm',
+}: {
+  isGoal: boolean;
+  label: string;
+  disabled?: boolean;
+  isLoading?: boolean;
+  onClick: () => void;
+  size?: 'xs' | 'sm';
+}) {
+  return (
+    <Tooltip label={label} hasArrow placement="top" openDelay={250}>
+      <Box as="span" display="inline-flex">
+        <IconButton
+          aria-label={isGoal ? 'Fjern som mål' : 'Sæt som mål'}
+          aria-pressed={isGoal}
+          icon={isGoal ? <FaStar /> : <FaRegStar />}
+          size={size}
+          variant="ghost"
+          color={isGoal ? 'yellow.300' : 'gray.500'}
+          _hover={{ color: 'yellow.300', bg: 'whiteAlpha.100' }}
+          isDisabled={disabled}
+          isLoading={isLoading}
+          onClick={onClick}
+        />
+      </Box>
+    </Tooltip>
+  );
+}
 
 export function CalendarEntryRow({
   entry,
   dimmed = false,
   showDate = true,
+  isGoal = false,
+  goalLabel,
+  onToggleGoal,
+  savingGoal = false,
+  canToggleGoal = true,
   onStatus,
   onRemove,
 }: {
   entry: Entry;
   dimmed?: boolean;
   showDate?: boolean;
+  isGoal?: boolean;
+  goalLabel?: string;
+  onToggleGoal?: () => void;
+  savingGoal?: boolean;
+  canToggleGoal?: boolean;
   onStatus: (id: string, next: Entry['status']) => void;
   onRemove: (id: string) => void;
 }) {
@@ -28,6 +74,7 @@ export function CalendarEntryRow({
       <Box minW={0}>
         <HStack spacing={2} mb={1} flexWrap="wrap">
           <Badge colorScheme={KIND_COLORS[entry.kind]}>{KIND_LABELS[entry.kind]}</Badge>
+          {isGoal && <Badge colorScheme="yellow">Mål</Badge>}
           {entry.startTime && (
             <Text color="gray.300" fontSize="sm" fontWeight="bold">{entry.startTime}</Text>
           )}
@@ -46,6 +93,16 @@ export function CalendarEntryRow({
         )}
       </Box>
       <HStack spacing={1} flexShrink={0}>
+        {onToggleGoal && goalLabel && (
+          <GoalStarButton
+            isGoal={isGoal}
+            label={goalLabel}
+            disabled={!isGoal && !canToggleGoal}
+            isLoading={savingGoal}
+            onClick={onToggleGoal}
+            size="xs"
+          />
+        )}
         <Button
           size="xs"
           variant="ghost"
