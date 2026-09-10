@@ -821,7 +821,7 @@ const coachToolDefinitions = [
           },
           startTime: {
             type: "string",
-            description: "Optional local start time HH:MM. Only set it if you actually know it — never guess a race start."
+            description: "Optional Europe/Copenhagen wall-clock HH:MM. Set it when they name a time (\"kl. 19\", a DZR subgroup start). Omit it when they do not — an untimed session may float around that day's fixtures. Never guess a race start."
           }
         },
         required: ["text", "eventDate"]

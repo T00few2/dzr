@@ -157,8 +157,9 @@ test("formatCalendarForPrompt renders dates, times and coach attribution", () =>
   ];
   const block = formatCalendarForPrompt(entries, NOW);
 
-  assert.match(block, /2026-09-10 \(in 3 days\) 15:17 — After Party \(C\) \(race\)$/m);
+  assert.match(block, /2026-09-10 \(in 3 days\) at 15:17 — After Party \(C\) \(race\)$/m);
   assert.match(block, /easy 90 min \(session\) \[added by coach\]/);
+  assert.doesNotMatch(block, /easy 90 min \(session\).*at /, "untimed rows must not invent a clock time");
   assert.doesNotMatch(
     block,
     /After Party \(C\) \(race\) \[added by coach\]/,
@@ -184,7 +185,7 @@ test("formatCalendarForPrompt separates what was planned from what is coming", (
   // planned, so the coach can ask whether it happened instead of assuming either way.
   assert.match(block, /2026-09-04 \(3 days ago\) — 4x8 tærskel \(session\) \[added by coach\]/);
   assert.match(block, /2026-09-05 \(2 days ago\) — rolig tur \(session\) \[done\]/);
-  assert.match(block, /2026-09-10 \(in 3 days\) 15:17 — After Party \(C\)/);
+  assert.match(block, /2026-09-10 \(in 3 days\) at 15:17 — After Party \(C\)/);
 });
 
 test("formatCalendarForPrompt can be asked for the forward view only", () => {

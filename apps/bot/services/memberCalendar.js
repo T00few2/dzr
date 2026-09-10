@@ -163,7 +163,9 @@ function recentEntries(entries, now = new Date(), lookBackDays = DEFAULT_LOOK_BA
 function formatEntryLine(entry, now) {
   const until = formatDaysUntil(entry.eventDate, now);
   const when = until ? `${entry.eventDate} (${until})` : entry.eventDate;
-  const time = entry.startTime ? ` ${entry.startTime}` : "";
+  // "at HH:MM" so a clock time cannot be read as a duration or a leftover date fragment.
+  // Untimed rows stay untimed: that is the signal they may float around the day's fixtures.
+  const time = entry.startTime ? ` at ${entry.startTime}` : "";
   // Coach-written rows are labelled so the coach can tell its own suggestion from the athlete's
   // commitment, and does not treat something it proposed as something they decided.
   const who = entry.source === "coach" ? " [added by coach]" : "";

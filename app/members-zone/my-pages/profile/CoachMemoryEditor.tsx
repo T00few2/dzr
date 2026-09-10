@@ -141,7 +141,11 @@ export default function CoachMemoryEditor() {
       ...emptyForm(),
       ...profile,
       sports: profile.sports || [],
-      weekly: profile.weekly || [],
+      weekly: (profile.weekly || []).map((row) => ({
+        sport: row.sport,
+        days: row.days || [],
+        startTime: row.startTime || null,
+      })),
       injuries: profile.injuries || [],
       goals: [],
       style: profile.style || { length: null, language: null, tone: null, notes: '' },
@@ -217,7 +221,7 @@ export default function CoachMemoryEditor() {
   function addWeekly() {
     setForm((prev) => ({
       ...prev,
-      weekly: [...prev.weekly, { sport: 'strength', days: [] }],
+      weekly: [...prev.weekly, { sport: 'strength', days: [], startTime: null }],
     }))
   }
 
@@ -487,9 +491,12 @@ export default function CoachMemoryEditor() {
           <FormLabel mb={0}>Faste træningsdage</FormLabel>
           <Button size="xs" onClick={addWeekly} {...secondaryButtonProps}>Tilføj dag</Button>
         </Flex>
+        <Text color="gray.500" fontSize="xs" mb={2}>
+          Tid er valgfri og gælder de afkrydsede dage. Samme sport morgen og aften? Tilføj to rækker.
+        </Text>
         <Stack spacing={3}>
           {form.weekly.map((row, index) => (
-            <Box key={`${row.sport}-${index}`} borderWidth="1px" borderColor="gray.700" borderRadius="md" p={3}>
+            <Box key={`${row.sport}-${row.startTime || 'any'}-${index}`} borderWidth="1px" borderColor="gray.700" borderRadius="md" p={3}>
               <HStack align="flex-start" spacing={3} wrap="wrap">
                 <Select
                   value={row.sport}
@@ -504,6 +511,17 @@ export default function CoachMemoryEditor() {
                     <option value={row.sport}>{row.sport}</option>
                   )}
                 </Select>
+                <Input
+                  type="time"
+                  value={row.startTime || ''}
+                  onChange={(e) => updateWeekly(index, { ...row, startTime: e.target.value || null })}
+                  bg="gray.800"
+                  borderColor="gray.600"
+                  size="sm"
+                  maxW="130px"
+                  aria-label="Valgfri tid"
+                  title="Valgfri tid"
+                />
                 <HStack wrap="wrap" spacing={3}>
                   {DAYS.map((day) => (
                     <Checkbox

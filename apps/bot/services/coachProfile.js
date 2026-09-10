@@ -7,6 +7,8 @@
 // settings actually mean, and a divergence would have the bot and the website normalising the
 // same profile differently.
 
+const { sanitizeStartTime } = require("./memberCalendar");
+
 const DAY_ALIASES = {
   mon: "mon",
   monday: "mon",
@@ -109,10 +111,12 @@ function sanitizeWeekly(value) {
     const sport = clip(raw.sport, 40).toLowerCase();
     const days = sanitizeDays(raw.days);
     if (!sport || !days.length) continue;
-    const key = `${sport}:${days.join(",")}`;
+    const startTime = sanitizeStartTime(raw.startTime);
+    // Time is part of identity: Monday 06:00 and Monday 19:00 are two slots, not a duplicate.
+    const key = `${sport}:${days.join(",")}:${startTime || ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    rows.push({ sport, days });
+    rows.push({ sport, days, startTime });
     if (rows.length >= 14) break;
   }
   return rows;
@@ -279,9 +283,16 @@ function formatCoachProfileForPrompt(profile) {
   if (data.sports.length) lines.push(`- Sports: ${data.sports.join(", ")}`);
   if (data.weekly.length) {
     const weekly = data.weekly
-      .map((row) => `${row.sport} on ${row.days.map((d) => DAY_LABELS[d] || d).join(", ")}`)
+      .map((row) => {
+        const days = row.days.map((d) => DAY_LABELS[d] || d).join(", ");
+        const time = row.startTime ? ` at ${row.startTime}` : "";
+        return `${row.sport} on ${days}${time}`;
+      })
       .join("; ");
     lines.push(`- Fixed weekly slots: ${weekly}`);
+    if (data.weekly.some((row) => row.startTime)) {
+      lines.push("- Weekly slot times are Europe/Copenhagen. Prefer them for ordinary training; a dated calendar race still wins a clash.");
+    }
   }
   if (data.injuries.length) {
     const injuries = data.injuries

@@ -105,7 +105,7 @@ const fixtures = [
     context: {
       ...base,
       calendarBlock: [
-        "- 2026-09-10 (in 4 days) 15:17 — DZR After Party (C) (race)",
+        "- 2026-09-10 (in 4 days) at 15:17 — DZR After Party (C) (race)",
         "- 2026-09-12 (in 6 days) — 2 timer roligt (session)",
       ].join("\n"),
     },
@@ -129,7 +129,7 @@ const fixtures = [
         "- 2026-09-04 (2 days ago) — 4x8 min tærskel (session) [added by coach]",
         "",
         "Coming up:",
-        "- 2026-09-10 (in 4 days) 17:17 — DZR After Party (C) (race)",
+        "- 2026-09-10 (in 4 days) at 17:17 — DZR After Party (C) (race)",
       ].join("\n"),
     },
     message: "Hvordan ser min uge ud?",
@@ -152,11 +152,35 @@ const fixtures = [
     context: {
       ...base,
       notesOptIn: false,
-      calendarBlock: "- 2026-09-10 (in 4 days) 15:17 — DZR After Party (C) (race)",
+      calendarBlock: "- 2026-09-10 (in 4 days) at 15:17 — DZR After Party (C) (race)",
     },
     message: "Kan du sætte en rolig tur på min kalender på fredag?",
     expect: "Explains it cannot add to the calendar because chat notes are off, and points at the Kalender page so they can add it themselves. Must NOT claim it added anything.",
     forbid: [/(har|jeg har) (nu )?(lagt|tilføjet|sat) .*kalender/i],
+  },
+  {
+    name: "does not stack intensity on the morning of an evening race",
+    context: {
+      ...base,
+      calendarBlock: [
+        "Coming up:",
+        "- 2026-09-10 (in 4 days) at 17:17 — DZR After Party (C) (race)",
+      ].join("\n"),
+    },
+    message: "Kan jeg køre 5x5 min VO2 max torsdag morgen?",
+    expect: "Treats Thursday 10 September as a race day because of the After Party at 17:17. Must NOT prescribe the VO2 max session as a hard morning before that race. May suggest a short easy spin or moving the intervals to another day.",
+  },
+  {
+    name: "places an untimed session around a timed race the same day",
+    context: {
+      ...base,
+      calendarBlock: [
+        "Coming up:",
+        "- 2026-09-10 (in 4 days) at 17:17 — DZR After Party (C) (race)",
+      ].join("\n"),
+    },
+    message: "Jeg vil også have en rolig 90 min torsdag",
+    expect: "Places the easy ride in a gap around 17:17 (morning, or well after the race), not overlapping the start. Must NOT schedule it so it would run into the 17:17 race, and must NOT treat the easy ride as another hard session that day.",
   },
 ];
 

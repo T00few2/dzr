@@ -18,7 +18,7 @@ export type CoachInjury = {
   status: 'active' | 'recovered'
 }
 
-export type CoachWeeklySlot = { sport: string; days: string[] }
+export type CoachWeeklySlot = { sport: string; days: string[]; startTime: string | null }
 
 export type CoachMemoryPlain = {
   discordId?: string | null

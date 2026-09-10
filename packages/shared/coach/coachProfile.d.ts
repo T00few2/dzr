@@ -13,7 +13,7 @@ export type CoachStyle = {
   notes: string
 }
 
-export type CoachWeeklySlot = { sport: string; days: string[] }
+export type CoachWeeklySlot = { sport: string; days: string[]; startTime: string | null }
 
 export type CoachInjury = {
   id: string
