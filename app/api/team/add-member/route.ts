@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing roleId or zwiftId' }, { status: 400 });
     }
 
-    // Confirm requester is the team captain for the specified roleId
+    // Captains can only manage their own team; Discord admins can manage any team
     const explicitDoc = await adminDb.collection('selfRoles').doc('1195850595014299669').get();
     let selfRolesDoc: any | null = null;
     if (explicitDoc.exists) {
@@ -43,8 +43,8 @@ export async function POST(request: Request) {
         }
       }
     }
-    if (!isCaptain) {
-      return NextResponse.json({ error: 'Only the team captain for this role can add members.' }, { status: 403 });
+    if (!isAdmin && !isCaptain) {
+      return NextResponse.json({ error: 'Only the team captain or a Discord admin can add members.' }, { status: 403 });
     }
 
     // Lookup Discord ID from zwiftId

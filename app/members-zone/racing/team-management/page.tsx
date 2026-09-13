@@ -177,7 +177,9 @@ export default function TeamManagementPage() {
       </Stack>
 
       <Text mt={2}>
-        Create and manage your teams here. This page is restricted to Holdkaptajn.
+        {isAdmin
+          ? 'As a Discord admin you can add and remove members for all teams.'
+          : 'Create and manage your teams here. This page is restricted to Holdkaptajn and Discord admins.'}
       </Text>
 
       <Divider my={6} />
@@ -190,13 +192,13 @@ export default function TeamManagementPage() {
 
       <Divider my={6} />
 
-      <Heading size="md" mb={2}>Your teams</Heading>
+      <Heading size="md" mb={2}>{isAdmin ? 'Teams' : 'Your teams'}</Heading>
       {myTeams.length === 0 ? (
         <Text>You have not registered any teams yet.</Text>
       ) : (
         <>
           <FormControl maxW={{ base: '100%', sm: '360px' }}>
-            <FormLabel color='white'>My teams</FormLabel>
+            <FormLabel color='white'>{isAdmin ? 'All teams' : 'My teams'}</FormLabel>
             <Select bg='white' color='black' value={selectedTeamId || ''} onChange={(e) => setSelectedTeamId(e.target.value || null)}>
               {myTeams.map(t => (
                 <option key={t.id} value={t.id || ''}>{t.name}{t.raceSeries ? ` • ${t.raceSeries}` : ''}</option>
