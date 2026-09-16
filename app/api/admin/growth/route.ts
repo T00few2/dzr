@@ -76,35 +76,42 @@ function fillCumulative(byDay: Record<string, number>, today: string) {
   return { firstJoinDate: first, series }
 }
 
+function zwiftpowerCohortSeries(
+  zpIds: string[],
+  companionJoinById: Map<string, string>,
+  today: string,
+) {
+  const byDay: Record<string, number> = {}
+  let undated = 0
+  zpIds.forEach((id) => {
+    const day = companionJoinById.get(id)
+    if (day) byDay[day] = (byDay[day] || 0) + 1
+    else undated += 1
+  })
+  const filled = fillCumulative(byDay, today)
+  if (!filled.series.length) {
+    if (!zpIds.length) return filled
+    return {
+      firstJoinDate: today,
+      series: [{ day: today, added: zpIds.length, cumulative: zpIds.length }],
+    }
+  }
+  if (undated > 0) {
+    const last = filled.series[filled.series.length - 1]
+    last.added += undated
+    last.cumulative += undated
+  }
+  return filled
+}
+
 async function snapshotZwiftpowerCount(total: number, today: string) {
   await adminDb.collection(COLLECTIONS.zwiftpowerRosterCounts).doc(today).set({
     dateKey: today,
     memberCount: total,
     timestamp: new Date().toISOString(),
+    estimated: true,
+    estimatedMode: 'cohort_companion_join',
   }, { merge: true })
-}
-
-async function loadZwiftpowerSeries(today: string, currentTotal: number) {
-  await snapshotZwiftpowerCount(currentTotal, today).catch(() => {})
-  try {
-    const snap = await adminDb.collection(COLLECTIONS.zwiftpowerRosterCounts).get()
-    const points = snap.docs
-      .map((d) => {
-        const data = d.data() as { dateKey?: string; memberCount?: number }
-        const day = data.dateKey || d.id
-        const count = Number(data.memberCount)
-        if (!day || !Number.isFinite(count)) return null
-        return { day, cumulative: count }
-      })
-      .filter((row): row is { day: string; cumulative: number } => Boolean(row))
-      .sort((a, b) => a.day.localeCompare(b.day))
-    if (!points.some((p) => p.day === today)) {
-      points.push({ day: today, cumulative: currentTotal })
-    }
-    return points
-  } catch {
-    return currentTotal > 0 ? [{ day: today, cumulative: currentTotal }] : []
-  }
 }
 
 export async function GET(req: Request) {
@@ -116,14 +123,24 @@ export async function GET(req: Request) {
     adminDb.collection(COLLECTIONS.zwiftpowerClubMembers).limit(100000).get(),
   ])
   const byDay: Record<string, number> = {}
+  const companionJoinById = new Map<string, string>()
   let estimated = 0
   snap.docs.forEach((d) => {
-    const { day, estimated: usedEstimate } = joinDateForMember(d.data() as Record<string, unknown>, today)
+    const data = d.data() as Record<string, unknown>
+    const { day, estimated: usedEstimate } = joinDateForMember(data, today)
     if (usedEstimate) estimated += 1
     byDay[day] = (byDay[day] || 0) + 1
+    companionJoinById.set(d.id, day)
+    if (data.profileId != null) companionJoinById.set(String(data.profileId), day)
+    if (data.zwiftId != null) companionJoinById.set(String(data.zwiftId), day)
   })
   const { firstJoinDate, series } = fillCumulative(byDay, today)
-  const zwiftpowerSeries = await loadZwiftpowerSeries(today, zpSnap.size)
+  const zpCohort = zwiftpowerCohortSeries(
+    zpSnap.docs.map((d) => String((d.data() as { zwid?: unknown }).zwid || d.id)),
+    companionJoinById,
+    today,
+  )
+  snapshotZwiftpowerCount(zpSnap.size, today).catch(() => {})
   return NextResponse.json({
     total: snap.size,
     estimatedJoinDates: estimated,
@@ -131,7 +148,8 @@ export async function GET(req: Request) {
     series,
     zwiftpower: {
       total: zpSnap.size,
-      series: zwiftpowerSeries,
+      estimated: true,
+      series: zpCohort.series.map((row) => ({ day: row.day, cumulative: row.cumulative })),
     },
   })
 }

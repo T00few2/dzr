@@ -99,7 +99,7 @@ export function GrowthChart({ data }: { data: GrowthChartPoint[] }) {
               name="ZwiftPower"
               stroke={CHART_COLORS.zwiftpower}
               strokeWidth={2}
-              dot={{ r: 2 }}
+              dot={false}
               connectNulls
             />
           ) : null}

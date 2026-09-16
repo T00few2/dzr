@@ -132,7 +132,7 @@ export default function StatsAdminPage() {
           label="Club members"
           value={fmt(growth?.total)}
           helper={[
-            zpTotal != null ? `ZwiftPower ${fmt(zpTotal)}` : null,
+            zpTotal != null ? `ZwiftPower ${fmt(zpTotal)}${growth?.zwiftpower?.estimated ? ' (est.)' : ''}` : null,
             growth?.firstJoinDate ? `First join ${fmtDay(growth.firstJoinDate)}` : null,
           ].filter(Boolean).join(' · ') || 'Companion club roster'}
           loading={loadingGrowth && !growth}

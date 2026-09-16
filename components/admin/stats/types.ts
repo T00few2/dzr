@@ -11,6 +11,7 @@ export type GrowthResponse = {
   series: GrowthSeriesPoint[]
   zwiftpower: {
     total: number
+    estimated?: boolean
     series: { day: string; cumulative: number }[]
   }
 }
