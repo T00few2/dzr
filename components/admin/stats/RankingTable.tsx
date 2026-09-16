@@ -1,19 +1,25 @@
-import { Box, Heading, Table, Tbody, Td, Text, Th, Thead, Tr } from '@chakra-ui/react'
+import { Box, Flex, Heading, Table, Tbody, Td, Text, Th, Thead, Tr } from '@chakra-ui/react'
+import type { ReactNode } from 'react'
 
 export default function RankingTable({
   title,
   rows,
   empty,
   loading,
+  actions,
 }: {
   title: string
   rows: { id?: string; name: string; total: number; detail?: string }[]
   empty: string
   loading?: boolean
+  actions?: ReactNode
 }) {
   return (
     <Box borderWidth="1px" borderColor="gray.700" rounded="md" p={5} bg="gray.900" h="100%">
-      <Heading size="sm" mb={3}>{title}</Heading>
+      <Flex justify="space-between" align="center" mb={3} gap={3} wrap="wrap">
+        <Heading size="sm">{title}</Heading>
+        {actions}
+      </Flex>
       {loading ? (
         <Text color="gray.500" fontSize="sm">Loading…</Text>
       ) : !rows.length ? (
