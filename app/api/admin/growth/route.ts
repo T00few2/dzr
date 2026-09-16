@@ -36,36 +36,62 @@ function parseRosterTimestamp(value: unknown): Date | null {
   return null
 }
 
-function joinDateForMember(data: Record<string, unknown>): { day: string; estimated: boolean } {
+function utcDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
+function nextUtcDateKey(day: string): string {
+  const dt = new Date(`${day}T00:00:00.000Z`)
+  dt.setUTCDate(dt.getUTCDate() + 1)
+  return utcDateKey(dt)
+}
+
+function joinDateForMember(data: Record<string, unknown>, today: string): { day: string; estimated: boolean } {
   const joined =
     parseRosterTimestamp(data.membershipCreatedOn)
     || parseRosterTimestamp(data.createdOn)
-  if (joined) return { day: joined.toISOString().slice(0, 10), estimated: false }
+  if (joined) {
+    const day = utcDateKey(joined)
+    return { day: day > today ? today : day, estimated: false }
+  }
 
   const fallback = parseRosterTimestamp(data.rosterSyncedAt) || parseRosterTimestamp(data.updatedAt)
-  if (fallback) return { day: fallback.toISOString().slice(0, 10), estimated: true }
+  if (fallback) {
+    const day = utcDateKey(fallback)
+    return { day: day > today ? today : day, estimated: true }
+  }
 
-  return { day: new Date().toISOString().slice(0, 10), estimated: true }
+  return { day: today, estimated: true }
 }
 
 export async function GET(req: Request) {
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
   const snap = await adminDb.collection(COLLECTIONS.companionClubMembers).limit(100000).get()
+  const today = utcDateKey(new Date())
   const byDay: Record<string, number> = {}
   let estimated = 0
   snap.docs.forEach((d) => {
-    const { day, estimated: usedEstimate } = joinDateForMember(d.data() as Record<string, unknown>)
+    const { day, estimated: usedEstimate } = joinDateForMember(d.data() as Record<string, unknown>, today)
     if (usedEstimate) estimated += 1
     byDay[day] = (byDay[day] || 0) + 1
   })
-  const days = Object.keys(byDay).sort()
+  const first = Object.keys(byDay).sort()[0]
+  if (!first) {
+    return NextResponse.json({ total: 0, estimatedJoinDates: 0, firstJoinDate: null, series: [] })
+  }
+  const series: { day: string; added: number; cumulative: number }[] = []
   let running = 0
-  const series = days.map((day) => {
-    running += byDay[day]
-    return { day, added: byDay[day], cumulative: running }
+  for (let day = first; day <= today; day = nextUtcDateKey(day)) {
+    running += byDay[day] || 0
+    series.push({ day, added: byDay[day] || 0, cumulative: running })
+  }
+  return NextResponse.json({
+    total: snap.size,
+    estimatedJoinDates: estimated,
+    firstJoinDate: first,
+    series,
   })
-  return NextResponse.json({ total: snap.size, estimatedJoinDates: estimated, series })
 }
 
 export async function POST(req: Request) {

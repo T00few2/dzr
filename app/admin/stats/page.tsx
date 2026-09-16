@@ -1,31 +1,221 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import AdminShell from '@/components/admin/AdminShell'
-import { SimpleGrid, Stat, StatLabel, StatNumber, Table, Tbody, Td, Th, Thead, Tr } from '@chakra-ui/react'
+import ChartCard from '@/components/admin/stats/ChartCard'
+import KpiCard from '@/components/admin/stats/KpiCard'
+import RankingTable from '@/components/admin/stats/RankingTable'
+import { ActivityChart, BreakdownDonut, GrowthChart, MembersChart } from '@/components/admin/stats/charts'
+import type { GrowthResponse, PeriodDays, StatsResponse } from '@/components/admin/stats/types'
+import { Box, Button, Flex, HStack, SimpleGrid, Text, useToast } from '@chakra-ui/react'
+
+function fmt(n: number | null | undefined) {
+  if (n == null || Number.isNaN(n)) return '—'
+  return Number(n).toLocaleString()
+}
+
+function fmtDay(iso: string | null | undefined) {
+  if (!iso) return '—'
+  const d = new Date(`${iso}T00:00:00.000Z`)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function PeriodToggle({ value, onChange }: { value: PeriodDays; onChange: (d: PeriodDays) => void }) {
+  return (
+    <HStack spacing={1}>
+      {([7, 30, 90] as const).map((d) => (
+        <Button
+          key={d}
+          size="xs"
+          colorScheme="red"
+          variant={value === d ? 'solid' : 'outline'}
+          onClick={() => onChange(d)}
+        >
+          {d}d
+        </Button>
+      ))}
+    </HStack>
+  )
+}
 
 export default function StatsAdminPage() {
-  const [data, setData] = useState<any>(null)
-  useEffect(() => {
-    fetch('/api/admin/stats').then((r) => r.json()).then(setData).catch(() => {})
+  const toast = useToast()
+  const [days, setDays] = useState<PeriodDays>(30)
+  const [growth, setGrowth] = useState<GrowthResponse | null>(null)
+  const [stats, setStats] = useState<StatsResponse | null>(null)
+  const [growthError, setGrowthError] = useState<string | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [loadingGrowth, setLoadingGrowth] = useState(true)
+  const [loadingStats, setLoadingStats] = useState(true)
+  const [busy, setBusy] = useState(false)
+
+  const loadGrowth = useCallback(async () => {
+    setLoadingGrowth(true)
+    setGrowthError(null)
+    try {
+      const res = await fetch('/api/admin/growth', { cache: 'no-store' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || 'Failed to load club growth')
+      setGrowth(body)
+    } catch (err: any) {
+      setGrowthError(err?.message || 'Failed to load club growth')
+    } finally {
+      setLoadingGrowth(false)
+    }
   }, [])
-  if (!data) return <AdminShell title="Discord stats">Loading…</AdminShell>
+
+  const loadStats = useCallback(async (windowDays: PeriodDays) => {
+    setLoadingStats(true)
+    setStatsError(null)
+    try {
+      const res = await fetch(`/api/admin/stats?days=${windowDays}`, { cache: 'no-store' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || 'Failed to load Discord stats')
+      setStats(body)
+    } catch (err: any) {
+      setStatsError(err?.message || 'Failed to load Discord stats')
+    } finally {
+      setLoadingStats(false)
+    }
+  }, [])
+
+  useEffect(() => { loadGrowth().catch(() => {}) }, [loadGrowth])
+  useEffect(() => { loadStats(days).catch(() => {}) }, [days, loadStats])
+
+  async function refresh(kind: 'zwift' | 'zwiftpower') {
+    setBusy(true)
+    const res = await fetch(`/api/admin/growth?kind=${kind}`, { method: 'POST' })
+    const body = await res.json().catch(() => ({}))
+    setBusy(false)
+    toast({ title: res.ok ? 'Refresh started' : (body.error || 'Failed'), status: res.ok ? 'success' : 'error' })
+    if (res.ok) loadGrowth()
+  }
+
+  const totals = stats?.totals
+  const hasActivity = (totals?.messages || 0) + (totals?.reactions || 0) + (totals?.voice || 0) + (totals?.interactions || 0) > 0
+  const memberSeries = stats?.members?.series || []
+  const latestMembers = stats?.members?.latest
+
   return (
-    <AdminShell title="Discord stats">
-      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mb={8}>
-        <Stat><StatLabel>Messages (window)</StatLabel><StatNumber>{data.total_messages}</StatNumber></Stat>
-        <Stat><StatLabel>Reactions</StatLabel><StatNumber>{data.total_reactions}</StatNumber></Stat>
-        <Stat><StatLabel>Voice events</StatLabel><StatNumber>{data.total_voice}</StatNumber></Stat>
-        <Stat><StatLabel>Unique users</StatLabel><StatNumber>{data.unique_users}</StatNumber></Stat>
+    <AdminShell title="Stats">
+      {(growthError || statsError) && (
+        <Text color="red.300" mb={4} fontSize="sm">
+          {[growthError, statsError].filter(Boolean).join(' · ')}
+        </Text>
+      )}
+
+      <SimpleGrid columns={{ base: 2, lg: 4 }} spacing={4} mb={4}>
+        <KpiCard
+          label="Club members"
+          value={fmt(growth?.total)}
+          helper={growth?.firstJoinDate
+            ? `First join ${fmtDay(growth.firstJoinDate)}${growth.estimatedJoinDates ? ` · ${fmt(growth.estimatedJoinDates)} estimated` : ''}`
+            : 'Companion club roster'}
+          loading={loadingGrowth && !growth}
+        />
+        <KpiCard
+          label="Discord members"
+          value={fmt(latestMembers?.members)}
+          helper={latestMembers?.presence != null
+            ? `${fmt(latestMembers.presence)} online`
+            : latestMembers?.date
+              ? `Snapshot ${fmtDay(latestMembers.date)}`
+              : 'Server member count'}
+          loading={loadingStats && !stats}
+        />
+        <KpiCard
+          label="Messages"
+          value={fmt(totals?.messages)}
+          helper={`${fmt(totals?.avgDailyMessages)} / day · last ${days} days`}
+          loading={loadingStats && !stats}
+        />
+        <KpiCard
+          label="Active users"
+          value={fmt(totals?.uniqueUsers)}
+          helper={`${fmt(totals?.uniqueChannels)} channels · ${fmt(totals?.interactions)} commands`}
+          loading={loadingStats && !stats}
+        />
       </SimpleGrid>
-      <Table size="sm">
-        <Thead><Tr><Th color="gray.400">Date</Th><Th color="gray.400">Activities</Th></Tr></Thead>
-        <Tbody>
-          {(data.recent || []).map((r: any, i: number) => (
-            <Tr key={i}><Td>{r.dateKey || String(r.timestamp || '').slice(0, 10)}</Td><Td>{r.totalActivities}</Td></Tr>
-          ))}
-        </Tbody>
-      </Table>
+
+      <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4} mb={4}>
+        <ChartCard
+          title="Club growth"
+          loading={loadingGrowth && !growth}
+          isEmpty={!growth?.series?.length}
+          empty="No companion club members yet. Refresh the Zwift roster to sync."
+          actions={(
+            <HStack>
+              <Button size="xs" colorScheme="red" onClick={() => refresh('zwift')} isLoading={busy}>Refresh Zwift</Button>
+              <Button size="xs" variant="outline" onClick={() => refresh('zwiftpower')} isLoading={busy}>Refresh ZwiftPower</Button>
+            </HStack>
+          )}
+        >
+          <GrowthChart data={growth?.series || []} />
+        </ChartCard>
+        <ChartCard
+          title="Discord members"
+          loading={loadingStats && !stats}
+          isEmpty={memberSeries.length < 1}
+          empty="No member snapshots yet. Open this page again later to start the series."
+        >
+          <MembersChart data={memberSeries} />
+        </ChartCard>
+      </SimpleGrid>
+
+      <Flex gap={4} direction={{ base: 'column', lg: 'row' }} mb={4}>
+        <Box flex="2">
+          <ChartCard
+            title="Discord activity"
+            loading={loadingStats && !stats}
+            isEmpty={!hasActivity}
+            empty="No activity in this window"
+            actions={<PeriodToggle value={days} onChange={setDays} />}
+          >
+            <ActivityChart data={stats?.daily || []} />
+          </ChartCard>
+        </Box>
+        <Box flex="1">
+          <ChartCard
+            title="Breakdown"
+            loading={loadingStats && !stats}
+            isEmpty={!hasActivity}
+            empty="No activity in this window"
+          >
+            <BreakdownDonut
+              messages={totals?.messages || 0}
+              reactions={totals?.reactions || 0}
+              voice={totals?.voice || 0}
+              interactions={totals?.interactions || 0}
+            />
+          </ChartCard>
+        </Box>
+      </Flex>
+
+      <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
+        <RankingTable
+          title="Top users"
+          loading={loadingStats && !stats}
+          empty="No active users in this window"
+          rows={(stats?.topUsers || []).map((u) => ({
+            id: u.user_id,
+            name: u.username || u.user_id,
+            total: u.total,
+            detail: `${fmt(u.messages)} msg · ${fmt(u.reactions)} rxn`,
+          }))}
+        />
+        <RankingTable
+          title="Top channels"
+          loading={loadingStats && !stats}
+          empty="No channel activity in this window"
+          rows={(stats?.topChannels || []).map((c) => ({
+            id: c.channel_id,
+            name: c.channel_name ? `#${c.channel_name}` : c.channel_id,
+            total: c.total,
+            detail: `${fmt(c.messages)} msg · ${fmt(c.reactions)} rxn`,
+          }))}
+        />
+      </SimpleGrid>
     </AdminShell>
   )
 }

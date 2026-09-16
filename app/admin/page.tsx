@@ -7,14 +7,13 @@ import NextLink from 'next/link'
 const CARDS = [
   { href: '/admin/membership', title: 'Membership', body: 'Settings, payments, CSV export, role reconcile' },
   { href: '/admin/members', title: 'Members', body: 'Discord members and Zwift ID linking' },
-  { href: '/admin/stats', title: 'Discord stats', body: 'Recent server activity from Firestore' },
+  { href: '/admin/stats', title: 'Stats', body: 'Club growth and Discord activity' },
   { href: '/admin/content', title: 'Content', body: 'Welcome, scheduled, and role messages' },
   { href: '/admin/roles', title: 'Role panels', body: 'selfRoles panels used by the Discord bot' },
   { href: '/admin/signups', title: 'Signup boards', body: 'Live Discord signups, remove riders, board templates' },
   { href: '/admin/knowledge', title: 'Bot knowledge', body: 'Snippets for the Discord AI assistant' },
   { href: '/admin/coach', title: 'DZR Coach', body: 'Strava sign-ups and coaching token usage' },
   { href: '/admin/outreach', title: 'Member outreach', body: 'DM members from a template' },
-  { href: '/admin/growth', title: 'Club growth', body: 'Companion club roster counts and refresh' },
 ]
 
 export default function AdminHome() {
