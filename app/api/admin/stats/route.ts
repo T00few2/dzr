@@ -71,8 +71,22 @@ function n(value: unknown): number {
   return Number.isFinite(x) ? x : 0
 }
 
-async function loadActivities(startKey: string, endKey: string): Promise<ActivityDoc[]> {
+async function loadActivities(startKey: string | null, endKey: string): Promise<ActivityDoc[]> {
   const col = adminDb.collection(COLLECTIONS.serverActivity)
+  if (!startKey) {
+    try {
+      const snap = await col.get()
+      return snap.docs
+        .map((d) => d.data() as ActivityDoc)
+        .filter((a) => {
+          const key = a.dateKey || String(a.timestamp || '').slice(0, 10)
+          return Boolean(key) && key <= endKey
+        })
+    } catch {
+      const snap = await col.limit(20000).get()
+      return snap.docs.map((d) => d.data() as ActivityDoc)
+    }
+  }
   try {
     const snap = await col
       .where('dateKey', '>=', startKey)
@@ -187,18 +201,25 @@ export async function GET(req: Request) {
   if (auth.error) return auth.error
 
   const url = new URL(req.url)
-  const requested = Number(url.searchParams.get('days') || 30)
-  const days = ALLOWED_DAYS.has(requested) ? requested : 30
+  const rawDays = url.searchParams.get('days') || '30'
+  const allTime = rawDays === 'all'
+  const requested = Number(rawDays)
+  const days: number | 'all' = allTime ? 'all' : (ALLOWED_DAYS.has(requested) ? requested : 30)
 
   const end = new Date()
   const endKey = utcDateKey(end)
-  const start = new Date(end.getTime() - (days - 1) * 24 * 60 * 60 * 1000)
-  const startKey = utcDateKey(start)
+  const rangedStartKey = allTime ? null : utcDateKey(new Date(end.getTime() - ((days as number) - 1) * 24 * 60 * 60 * 1000))
 
   const [activities, memberCounts] = await Promise.all([
-    loadActivities(startKey, endKey),
+    loadActivities(rangedStartKey, endKey),
     snapshotTodayMemberCount().then(() => loadMemberCounts()),
   ])
+
+  const activityDates = activities
+    .map((a) => a.dateKey || String(a.timestamp || '').slice(0, 10))
+    .filter(Boolean)
+    .sort()
+  const startKey = rangedStartKey || activityDates[0] || endKey
 
   const byDay: Record<string, DailyRow> = {}
   for (const day of eachDayInclusive(startKey, endKey)) {

@@ -52,7 +52,7 @@ export type MemberPoint = {
 }
 
 export type StatsResponse = {
-  period: { days: number; start: string; end: string }
+    period: { days: number | 'all'; start: string; end: string }
   totals: {
     messages: number
     reactions: number
@@ -72,4 +72,4 @@ export type StatsResponse = {
   }
 }
 
-export type PeriodDays = 7 | 30 | 90
+export type PeriodDays = 7 | 30 | 90 | 'all'

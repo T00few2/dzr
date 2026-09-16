@@ -82,11 +82,9 @@ function zwiftpowerCohortSeries(
   today: string,
 ) {
   const byDay: Record<string, number> = {}
-  let undated = 0
   zpIds.forEach((id) => {
-    const day = companionJoinById.get(id)
+    const day = companionJoinById.get(id) || companionJoinById.get(id.trim())
     if (day) byDay[day] = (byDay[day] || 0) + 1
-    else undated += 1
   })
   const filled = fillCumulative(byDay, today)
   if (!filled.series.length) {
@@ -95,11 +93,6 @@ function zwiftpowerCohortSeries(
       firstJoinDate: today,
       series: [{ day: today, added: zpIds.length, cumulative: zpIds.length }],
     }
-  }
-  if (undated > 0) {
-    const last = filled.series[filled.series.length - 1]
-    last.added += undated
-    last.cumulative += undated
   }
   return filled
 }
@@ -133,6 +126,12 @@ export async function GET(req: Request) {
     companionJoinById.set(d.id, day)
     if (data.profileId != null) companionJoinById.set(String(data.profileId), day)
     if (data.zwiftId != null) companionJoinById.set(String(data.zwiftId), day)
+    for (const key of [d.id, data.profileId, data.zwiftId]) {
+      if (key == null) continue
+      const raw = String(key).trim()
+      companionJoinById.set(raw, day)
+      if (/^\d+$/.test(raw)) companionJoinById.set(String(Number(raw)), day)
+    }
   })
   const { firstJoinDate, series } = fillCumulative(byDay, today)
   const zpCohort = zwiftpowerCohortSeries(
