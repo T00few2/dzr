@@ -24,6 +24,7 @@
     "clubStats": "club_stats",
     "companionClubMembers": "companion_club_members",
     "zwiftpowerClubMembers": "zwiftpower_club_members",
+    "zwiftpowerRosterCounts": "zwiftpower_roster_counts",
     "serverActivity": "server_activity",
     "serverMemberCounts": "server_member_counts",
     "stravaConnections": "strava_connections",

@@ -9,6 +9,10 @@ export type GrowthResponse = {
   estimatedJoinDates: number
   firstJoinDate: string | null
   series: GrowthSeriesPoint[]
+  zwiftpower: {
+    total: number
+    series: { day: string; cumulative: number }[]
+  }
 }
 
 export type DailyActivity = {
@@ -41,6 +45,7 @@ export type TopChannel = {
 export type MemberPoint = {
   date: string
   members: number
+  clubMembers: number | null
   presence: number | null
   estimated: boolean
 }

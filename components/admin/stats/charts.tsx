@@ -17,11 +17,19 @@ import {
   YAxis,
 } from 'recharts'
 import { CHART_HEIGHT } from './ChartCard'
-import type { DailyActivity, GrowthSeriesPoint, MemberPoint } from './types'
+import type { DailyActivity, MemberPoint } from './types'
+
+export type GrowthChartPoint = {
+  day: string
+  zwift: number | null
+  zwiftpower: number | null
+}
 
 export const CHART_COLORS = {
   club: '#FC8181',
+  zwiftpower: '#F6AD55',
   members: '#63B3ED',
+  clubRole: '#B794F4',
   messages: '#FC8181',
   reactions: '#F6AD55',
   voice: '#68D391',
@@ -50,7 +58,7 @@ function DarkTooltip({
   return (
     <Box bg="gray.800" borderWidth="1px" borderColor="gray.600" rounded="md" px={3} py={2} fontSize="sm">
       <Text color="gray.300" mb={1}>{label}{estimated ? ' · estimated' : ''}</Text>
-      {payload.map((p) => (
+      {payload.filter((p) => p.value != null).map((p) => (
         <Text key={p.name} color={p.color || 'white'}>
           {p.name}: {Number(p.value || 0).toLocaleString()}
         </Text>
@@ -64,32 +72,45 @@ const axis = {
   stroke: CHART_COLORS.grid,
 }
 
-export function GrowthChart({ data }: { data: GrowthSeriesPoint[] }) {
+export function GrowthChart({ data }: { data: GrowthChartPoint[] }) {
+  const hasZp = data.some((d) => d.zwiftpower != null)
   return (
     <Box h={`${CHART_HEIGHT}px`}>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
           <XAxis dataKey="day" tickFormatter={fmtTick} minTickGap={48} {...axis} />
           <YAxis width={44} tickFormatter={(v) => Number(v).toLocaleString()} {...axis} />
           <Tooltip content={<DarkTooltip />} />
-          <Area
+          {hasZp ? <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} /> : null}
+          <Line
             type="monotone"
-            dataKey="cumulative"
-            name="Members"
+            dataKey="zwift"
+            name="Zwift"
             stroke={CHART_COLORS.club}
-            fill={CHART_COLORS.club}
-            fillOpacity={0.25}
             strokeWidth={2}
             dot={false}
+            connectNulls
           />
-        </AreaChart>
+          {hasZp ? (
+            <Line
+              type="monotone"
+              dataKey="zwiftpower"
+              name="ZwiftPower"
+              stroke={CHART_COLORS.zwiftpower}
+              strokeWidth={2}
+              dot={{ r: 2 }}
+              connectNulls
+            />
+          ) : null}
+        </LineChart>
       </ResponsiveContainer>
     </Box>
   )
 }
 
 export function MembersChart({ data }: { data: MemberPoint[] }) {
+  const hasClubRole = data.some((d) => d.clubMembers != null)
   return (
     <Box h={`${CHART_HEIGHT}px`}>
       <ResponsiveContainer width="100%" height="100%">
@@ -98,14 +119,26 @@ export function MembersChart({ data }: { data: MemberPoint[] }) {
           <XAxis dataKey="date" tickFormatter={fmtTick} minTickGap={48} {...axis} />
           <YAxis width={44} tickFormatter={(v) => Number(v).toLocaleString()} {...axis} />
           <Tooltip content={<DarkTooltip />} />
+          {hasClubRole ? <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} /> : null}
           <Line
             type="monotone"
             dataKey="members"
-            name="Members"
+            name="Discord"
             stroke={CHART_COLORS.members}
             strokeWidth={2}
             dot={false}
           />
+          {hasClubRole ? (
+            <Line
+              type="monotone"
+              dataKey="clubMembers"
+              name="Club member role"
+              stroke={CHART_COLORS.clubRole}
+              strokeWidth={2}
+              dot={{ r: 2 }}
+              connectNulls
+            />
+          ) : null}
         </LineChart>
       </ResponsiveContainer>
     </Box>

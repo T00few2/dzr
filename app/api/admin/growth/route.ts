@@ -64,11 +64,57 @@ function joinDateForMember(data: Record<string, unknown>, today: string): { day:
   return { day: today, estimated: true }
 }
 
+function fillCumulative(byDay: Record<string, number>, today: string) {
+  const first = Object.keys(byDay).sort()[0]
+  if (!first) return { firstJoinDate: null as string | null, series: [] as { day: string; added: number; cumulative: number }[] }
+  const series: { day: string; added: number; cumulative: number }[] = []
+  let running = 0
+  for (let day = first; day <= today; day = nextUtcDateKey(day)) {
+    running += byDay[day] || 0
+    series.push({ day, added: byDay[day] || 0, cumulative: running })
+  }
+  return { firstJoinDate: first, series }
+}
+
+async function snapshotZwiftpowerCount(total: number, today: string) {
+  await adminDb.collection(COLLECTIONS.zwiftpowerRosterCounts).doc(today).set({
+    dateKey: today,
+    memberCount: total,
+    timestamp: new Date().toISOString(),
+  }, { merge: true })
+}
+
+async function loadZwiftpowerSeries(today: string, currentTotal: number) {
+  await snapshotZwiftpowerCount(currentTotal, today).catch(() => {})
+  try {
+    const snap = await adminDb.collection(COLLECTIONS.zwiftpowerRosterCounts).get()
+    const points = snap.docs
+      .map((d) => {
+        const data = d.data() as { dateKey?: string; memberCount?: number }
+        const day = data.dateKey || d.id
+        const count = Number(data.memberCount)
+        if (!day || !Number.isFinite(count)) return null
+        return { day, cumulative: count }
+      })
+      .filter((row): row is { day: string; cumulative: number } => Boolean(row))
+      .sort((a, b) => a.day.localeCompare(b.day))
+    if (!points.some((p) => p.day === today)) {
+      points.push({ day: today, cumulative: currentTotal })
+    }
+    return points
+  } catch {
+    return currentTotal > 0 ? [{ day: today, cumulative: currentTotal }] : []
+  }
+}
+
 export async function GET(req: Request) {
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
-  const snap = await adminDb.collection(COLLECTIONS.companionClubMembers).limit(100000).get()
   const today = utcDateKey(new Date())
+  const [snap, zpSnap] = await Promise.all([
+    adminDb.collection(COLLECTIONS.companionClubMembers).limit(100000).get(),
+    adminDb.collection(COLLECTIONS.zwiftpowerClubMembers).limit(100000).get(),
+  ])
   const byDay: Record<string, number> = {}
   let estimated = 0
   snap.docs.forEach((d) => {
@@ -76,21 +122,17 @@ export async function GET(req: Request) {
     if (usedEstimate) estimated += 1
     byDay[day] = (byDay[day] || 0) + 1
   })
-  const first = Object.keys(byDay).sort()[0]
-  if (!first) {
-    return NextResponse.json({ total: 0, estimatedJoinDates: 0, firstJoinDate: null, series: [] })
-  }
-  const series: { day: string; added: number; cumulative: number }[] = []
-  let running = 0
-  for (let day = first; day <= today; day = nextUtcDateKey(day)) {
-    running += byDay[day] || 0
-    series.push({ day, added: byDay[day] || 0, cumulative: running })
-  }
+  const { firstJoinDate, series } = fillCumulative(byDay, today)
+  const zwiftpowerSeries = await loadZwiftpowerSeries(today, zpSnap.size)
   return NextResponse.json({
     total: snap.size,
     estimatedJoinDates: estimated,
-    firstJoinDate: first,
+    firstJoinDate,
     series,
+    zwiftpower: {
+      total: zpSnap.size,
+      series: zwiftpowerSeries,
+    },
   })
 }
 

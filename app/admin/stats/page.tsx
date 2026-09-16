@@ -5,7 +5,7 @@ import AdminShell from '@/components/admin/AdminShell'
 import ChartCard from '@/components/admin/stats/ChartCard'
 import KpiCard from '@/components/admin/stats/KpiCard'
 import RankingTable from '@/components/admin/stats/RankingTable'
-import { ActivityChart, BreakdownDonut, GrowthChart, MembersChart } from '@/components/admin/stats/charts'
+import { ActivityChart, BreakdownDonut, GrowthChart, MembersChart, type GrowthChartPoint } from '@/components/admin/stats/charts'
 import type { GrowthResponse, PeriodDays, StatsResponse } from '@/components/admin/stats/types'
 import { Box, Button, Flex, HStack, SimpleGrid, Text, useToast } from '@chakra-ui/react'
 
@@ -21,6 +21,22 @@ function fmtDay(iso: string | null | undefined) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function mergeGrowthSeries(
+  zwift: { day: string; cumulative: number }[],
+  zwiftpower: { day: string; cumulative: number }[],
+): GrowthChartPoint[] {
+  const zpByDay = new Map(zwiftpower.map((p) => [p.day, p.cumulative]))
+  const days = [...new Set([...zwift.map((p) => p.day), ...zwiftpower.map((p) => p.day)])].sort()
+  const zwiftByDay = new Map(zwift.map((p) => [p.day, p.cumulative]))
+  let lastZp: number | null = null
+  let lastZwift: number | null = null
+  return days.map((day) => {
+    if (zwiftByDay.has(day)) lastZwift = zwiftByDay.get(day) ?? null
+    if (zpByDay.has(day)) lastZp = zpByDay.get(day) ?? null
+    return { day, zwift: lastZwift, zwiftpower: lastZp }
+  })
+}
+
 function PeriodToggle({ value, onChange }: { value: PeriodDays; onChange: (d: PeriodDays) => void }) {
   return (
     <HStack spacing={1}>
@@ -30,6 +46,9 @@ function PeriodToggle({ value, onChange }: { value: PeriodDays; onChange: (d: Pe
           size="xs"
           colorScheme="red"
           variant={value === d ? 'solid' : 'outline'}
+          borderColor="red.400"
+          color={value === d ? undefined : 'red.200'}
+          _hover={value === d ? undefined : { bg: 'whiteAlpha.100', borderColor: 'red.300', color: 'red.100' }}
           onClick={() => onChange(d)}
         >
           {d}d
@@ -96,6 +115,9 @@ export default function StatsAdminPage() {
   const hasActivity = (totals?.messages || 0) + (totals?.reactions || 0) + (totals?.voice || 0) + (totals?.interactions || 0) > 0
   const memberSeries = stats?.members?.series || []
   const latestMembers = stats?.members?.latest
+  const growthChart = mergeGrowthSeries(growth?.series || [], growth?.zwiftpower?.series || [])
+  const zpTotal = growth?.zwiftpower?.total
+  const clubRoleCount = latestMembers?.clubMembers
 
   return (
     <AdminShell title="Stats">
@@ -109,19 +131,19 @@ export default function StatsAdminPage() {
         <KpiCard
           label="Club members"
           value={fmt(growth?.total)}
-          helper={growth?.firstJoinDate
-            ? `First join ${fmtDay(growth.firstJoinDate)}${growth.estimatedJoinDates ? ` · ${fmt(growth.estimatedJoinDates)} estimated` : ''}`
-            : 'Companion club roster'}
+          helper={[
+            zpTotal != null ? `ZwiftPower ${fmt(zpTotal)}` : null,
+            growth?.firstJoinDate ? `First join ${fmtDay(growth.firstJoinDate)}` : null,
+          ].filter(Boolean).join(' · ') || 'Companion club roster'}
           loading={loadingGrowth && !growth}
         />
         <KpiCard
           label="Discord members"
           value={fmt(latestMembers?.members)}
-          helper={latestMembers?.presence != null
-            ? `${fmt(latestMembers.presence)} online`
-            : latestMembers?.date
-              ? `Snapshot ${fmtDay(latestMembers.date)}`
-              : 'Server member count'}
+          helper={[
+            latestMembers?.presence != null ? `${fmt(latestMembers.presence)} online` : null,
+            clubRoleCount != null ? `${fmt(clubRoleCount)} club member role` : null,
+          ].filter(Boolean).join(' · ') || (latestMembers?.date ? `Snapshot ${fmtDay(latestMembers.date)}` : 'Server member count')}
           loading={loadingStats && !stats}
         />
         <KpiCard
@@ -147,11 +169,22 @@ export default function StatsAdminPage() {
           actions={(
             <HStack>
               <Button size="xs" colorScheme="red" onClick={() => refresh('zwift')} isLoading={busy}>Refresh Zwift</Button>
-              <Button size="xs" variant="outline" onClick={() => refresh('zwiftpower')} isLoading={busy}>Refresh ZwiftPower</Button>
+              <Button
+                size="xs"
+                colorScheme="red"
+                variant="outline"
+                borderColor="red.400"
+                color="red.200"
+                _hover={{ bg: 'whiteAlpha.100', borderColor: 'red.300', color: 'red.100' }}
+                onClick={() => refresh('zwiftpower')}
+                isLoading={busy}
+              >
+                Refresh ZwiftPower
+              </Button>
             </HStack>
           )}
         >
-          <GrowthChart data={growth?.series || []} />
+          <GrowthChart data={growthChart} />
         </ChartCard>
         <ChartCard
           title="Discord members"

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/admin/_lib/auth'
-import { discordGet, guildId } from '@/app/api/admin/_lib/discord'
+import { discordGet, guildId, listGuildMembers } from '@/app/api/admin/_lib/discord'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { COLLECTIONS } from '@/app/lib/sharedConstants'
 
@@ -100,21 +100,39 @@ async function loadActivities(startKey: string, endKey: string): Promise<Activit
   }
 }
 
+async function clubMemberRoleId() {
+  const doc = await adminDb.collection(COLLECTIONS.systemSettings).doc('global').get()
+  return String(doc.data()?.membership?.clubMemberRoleId || '').trim()
+}
+
 async function snapshotTodayMemberCount() {
   try {
-    const { ok, body } = await discordGet(`/guilds/${guildId()}?with_counts=true`)
-    if (!ok) return
-    const memberCount = body?.approximate_member_count
-    const presenceCount = body?.approximate_presence_count
-    if (typeof memberCount !== 'number') return
     const dateKey = berlinDateKey()
+    const docRef = adminDb.collection(COLLECTIONS.serverMemberCounts).doc(dateKey)
+    const [guildRes, members, roleId, existing] = await Promise.all([
+      discordGet(`/guilds/${guildId()}?with_counts=true`),
+      listGuildMembers(4000).catch(() => [] as any[]),
+      clubMemberRoleId().catch(() => ''),
+      docRef.get().catch(() => null),
+    ])
+    const memberCount = guildRes.ok ? guildRes.body?.approximate_member_count : undefined
+    const presenceCount = guildRes.ok ? guildRes.body?.approximate_presence_count : undefined
     const snapshot: Record<string, unknown> = {
       dateKey,
       timestamp: new Date().toISOString(),
-      memberCount,
     }
+    if (typeof memberCount === 'number') snapshot.memberCount = memberCount
+    else if (members.length > 0) snapshot.memberCount = members.length
     if (typeof presenceCount === 'number') snapshot.presenceCount = presenceCount
-    await adminDb.collection(COLLECTIONS.serverMemberCounts).doc(dateKey).set(snapshot, { merge: true })
+    if (roleId) {
+      const clubCount = members.filter((m) => Array.isArray(m?.roles) && m.roles.includes(roleId)).length
+      const prevRoles = (existing && existing.exists ? existing.data()?.roleCounts : null) || {}
+      snapshot.roleCounts = { ...(typeof prevRoles === 'object' && prevRoles ? prevRoles : {}), [roleId]: clubCount }
+      snapshot.clubMemberRoleId = roleId
+      snapshot.clubMemberCount = clubCount
+    }
+    if (typeof snapshot.memberCount !== 'number' && typeof snapshot.clubMemberCount !== 'number') return
+    await docRef.set(snapshot, { merge: true })
   } catch {
     // Keep serving historical snapshots if Discord is unavailable.
   }
@@ -122,9 +140,12 @@ async function snapshotTodayMemberCount() {
 
 async function loadMemberCounts() {
   try {
-    const snap = await adminDb.collection(COLLECTIONS.serverMemberCounts).orderBy('dateKey').get().catch(async () => {
-      return adminDb.collection(COLLECTIONS.serverMemberCounts).get()
-    })
+    const [snap, roleId] = await Promise.all([
+      adminDb.collection(COLLECTIONS.serverMemberCounts).orderBy('dateKey').get().catch(async () => {
+        return adminDb.collection(COLLECTIONS.serverMemberCounts).get()
+      }),
+      clubMemberRoleId().catch(() => ''),
+    ])
     const series = snap.docs
       .map((d) => {
         const data = d.data() as {
@@ -132,23 +153,32 @@ async function loadMemberCounts() {
           memberCount?: number
           presenceCount?: number
           estimated?: boolean
+          clubMemberCount?: number
+          clubMemberRoleId?: string
+          roleCounts?: Record<string, number>
         }
         const date = data.dateKey || d.id
-        const members = n(data.memberCount)
-        if (!date || !Number.isFinite(members) || members < 0) return null
+        if (!date || typeof data.memberCount !== 'number' || data.memberCount < 0) return null
+        const members = data.memberCount
+        const fromField = typeof data.clubMemberCount === 'number' ? data.clubMemberCount : null
+        const fromMap = roleId && data.roleCounts && typeof data.roleCounts[roleId] === 'number'
+          ? data.roleCounts[roleId]
+          : null
+        const clubMembers = fromField ?? fromMap
         return {
           date,
           members,
+          clubMembers: typeof clubMembers === 'number' ? clubMembers : null,
           presence: typeof data.presenceCount === 'number' ? data.presenceCount : null,
           estimated: Boolean(data.estimated),
         }
       })
-      .filter((row): row is { date: string; members: number; presence: number | null; estimated: boolean } => Boolean(row))
+      .filter((row): row is { date: string; members: number; clubMembers: number | null; presence: number | null; estimated: boolean } => Boolean(row))
       .sort((a, b) => a.date.localeCompare(b.date))
     const latest = series.length ? series[series.length - 1] : null
     return { series, latest }
   } catch {
-    return { series: [] as { date: string; members: number; presence: number | null; estimated: boolean }[], latest: null }
+    return { series: [] as { date: string; members: number; clubMembers: number | null; presence: number | null; estimated: boolean }[], latest: null }
   }
 }
 
