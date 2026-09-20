@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import AdminShell from '@/components/admin/AdminShell'
-import { Box, Button, Heading, Input, Select, Table, Tbody, Td, Th, Thead, Tr, useToast, HStack } from '@chakra-ui/react'
+import { Box, Button, Input, Select, SimpleGrid, Stat, StatLabel, StatNumber, Table, Tbody, Td, Th, Thead, Tr, useToast, HStack } from '@chakra-ui/react'
 
 export default function MembersAdminPage() {
   const toast = useToast()
@@ -30,6 +30,13 @@ export default function MembersAdminPage() {
     )
   }, [members, q])
 
+  const counts = useMemo(() => ({
+    members: filtered.length,
+    community: filtered.filter((m) => m.has_member_role).length,
+    companion: filtered.filter((m) => m.in_companion).length,
+    zwiftpower: filtered.filter((m) => m.in_zwiftpower).length,
+  }), [filtered])
+
   async function assign(discordId: string) {
     const zwiftId = (zwiftDraft[discordId] || '').trim()
     if (!zwiftId) return
@@ -53,13 +60,18 @@ export default function MembersAdminPage() {
         <Input placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} bg="gray.900" />
         <Button onClick={() => load()} isLoading={loading}>Refresh</Button>
       </HStack>
-      <Heading size="sm" mb={3}>{filtered.length} members</Heading>
+      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mb={6}>
+        <Stat><StatLabel>Members</StatLabel><StatNumber>{counts.members}</StatNumber></Stat>
+        <Stat><StatLabel>Community</StatLabel><StatNumber>{counts.community}</StatNumber></Stat>
+        <Stat><StatLabel>Companion</StatLabel><StatNumber>{counts.companion}</StatNumber></Stat>
+        <Stat><StatLabel>ZP roster</StatLabel><StatNumber>{counts.zwiftpower}</StatNumber></Stat>
+      </SimpleGrid>
       <Box overflowX="auto">
         <Table size="sm">
           <Thead>
             <Tr>
               <Th color="gray.400">Discord</Th>
-              <Th color="gray.400">Zwift ID</Th>
+              <Th color="gray.400" w="220px" minW="220px">Zwift ID</Th>
               <Th color="gray.400">Community</Th>
               <Th color="gray.400">Companion</Th>
               <Th color="gray.400">ZP roster</Th>
@@ -70,7 +82,7 @@ export default function MembersAdminPage() {
             {filtered.slice(0, 400).map((m) => (
               <Tr key={m.discordID}>
                 <Td>{m.displayName || m.username}<Box as="span" color="gray.500" ml={2}>{m.discordID}</Box></Td>
-                <Td>
+                <Td w="220px" minW="220px">
                   <Input
                     size="sm"
                     defaultValue={m.zwiftId}
