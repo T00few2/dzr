@@ -2340,7 +2340,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
       }
       const connected = await intervals.isConnected(message.author.id);
       if (!connected) {
-        await safeReply(message, unconnectedCoachText(message.author.id));
+        await safeReplyChunks(message, unconnectedCoachText(message.author.id));
         return;
       }
 

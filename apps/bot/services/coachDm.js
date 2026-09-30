@@ -19,8 +19,29 @@ const USE_COACH_BOT_TEXT =
   "🚴 Coaching sker hos **DZR Coach**. Skriv `/coach` på serveren — så åbner jeg en privat chat med DZR Coach.\n\n" +
   "Skriv videre her, hvis det handler om klubben (stats, hold, quiz).";
 
+function splitDiscordContent(content, limit = 1900) {
+  const text = String(content || "").trim();
+  if (!text) return [];
+  if (text.length <= limit) return [text];
+  const chunks = [];
+  let remaining = text;
+  while (remaining.length > limit) {
+    let cut = remaining.lastIndexOf("\n\n", limit);
+    if (cut < limit * 0.5) cut = remaining.lastIndexOf("\n", limit);
+    if (cut < limit * 0.5) cut = limit;
+    chunks.push(remaining.slice(0, cut).trim());
+    remaining = remaining.slice(cut).trim();
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}
+
 function sendNoEmbeds(channel, content) {
-  return channel.send({ content, flags: MessageFlags.SuppressEmbeds });
+  const chunks = splitDiscordContent(content);
+  return chunks.reduce(
+    (prev, chunk) => prev.then(() => channel.send({ content: chunk, flags: MessageFlags.SuppressEmbeds })),
+    Promise.resolve()
+  );
 }
 
 function intervalsConnectText(discordId) {
@@ -42,7 +63,13 @@ function intervalsConnectText(discordId) {
 }
 
 function unconnectedCoachText(discordId) {
-  return `${coachHowItWorksText({ includeStartHint: false })}\n\n${intervalsConnectText(discordId)}`;
+  return (
+    "🚴 **DZR Coach**\n\n" +
+    "Den gamle træningsforbindelse bruges ikke længere. Jeg kan først læse dine pas, når intervals.icu er forbundet.\n\n" +
+    "Din coach-profil, dine noter og din kalender er der stadig.\n\n" +
+    intervalsConnectText(discordId) +
+    "\n\nHvis intervals.icu siger, at appen afventer godkendelse, virker linket først, når den er godkendt. Skriv til mig igen bagefter."
+  );
 }
 
 async function markHowItWorksSentSafe(discordId) {
