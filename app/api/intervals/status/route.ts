@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import { hasClubMemberRole, STRAVA_CONNECTIONS_COLLECTION, toIso } from '@/app/lib/stravaAuth'
-import { hasStravaRefreshToken } from '@/app/lib/tokenCrypto'
+import { hasClubMemberRole, INTERVALS_CONNECTIONS_COLLECTION, toIso } from '@/app/lib/intervalsAuth'
+import { hasStoredAccessToken } from '@/app/lib/tokenCrypto'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,18 +16,18 @@ export async function GET(req: Request) {
     }
 
     const eligible = await hasClubMemberRole(discordId)
-    const snap = await adminDb.collection(STRAVA_CONNECTIONS_COLLECTION).doc(discordId).get()
+    const snap = await adminDb.collection(INTERVALS_CONNECTIONS_COLLECTION).doc(discordId).get()
     if (!snap.exists) {
       return NextResponse.json({ connected: false, eligible })
     }
 
     const data = snap.data() || {}
-    if (!hasStravaRefreshToken(data)) {
+    if (!hasStoredAccessToken(data)) {
       return NextResponse.json({ connected: false, eligible })
     }
-    const first = String(data.athleteFirstname || '').trim()
-    const last = String(data.athleteLastname || '').trim()
-    const athleteName = [first, last].filter(Boolean).join(' ') || null
+    const athleteName = String(data.athleteName || '').trim()
+      || [data.athleteFirstname, data.athleteLastname].map((part) => String(part || '').trim()).filter(Boolean).join(' ')
+      || null
 
     return NextResponse.json({
       connected: true,
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       connectedAt: toIso(data.connectedAt),
     })
   } catch (err: any) {
-    console.error('strava status error:', err)
+    console.error('intervals status error:', err)
     return NextResponse.json({ error: err?.message || 'Status lookup failed' }, { status: 500 })
   }
 }

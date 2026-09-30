@@ -693,7 +693,7 @@ export default function CoachMemoryEditor() {
       <FormControl mb={4}>
         <FormLabel>Check-in fra coachen</FormLabel>
         <Text color="gray.400" fontSize="sm" mb={2}>
-          DZR Coach kan skrive først om morgenen (kl. 8), hvis du ikke har chattet i et stykke tid. Beskeden bruger dine seneste Strava-pas og sendes til OpenAI. Du kan slå det fra når som helst.
+          DZR Coach kan skrive først om morgenen (kl. 8), hvis du ikke har chattet i et stykke tid. Beskeden bruger dine seneste aktiviteter og sendes til OpenAI. Du kan slå det fra når som helst.
         </Text>
         <RadioGroup
           value={form.followUpEveryDays == null ? 'off' : String(form.followUpEveryDays)}

@@ -5,8 +5,8 @@ const assert = require("node:assert/strict");
 function loadWithKey(key) {
   delete require.cache[require.resolve("./tokenCrypto")];
   process.env.COACH_MEMORY_KEY = key ?? "";
-  process.env.STRAVA_CONNECT_SECRET = key ?? "";
-  process.env.STRAVA_TOKEN_KEY = "";
+  process.env.COACH_CONNECT_SECRET = key ?? "";
+  process.env.COACH_TOKEN_KEY = "";
   return require("./tokenCrypto");
 }
 

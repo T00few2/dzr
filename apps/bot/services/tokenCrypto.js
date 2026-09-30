@@ -15,20 +15,28 @@ function hashKey(material) {
   return crypto.createHash("sha256").update(material, "utf8").digest();
 }
 
+function connectSecret() {
+  return String(process.env.COACH_CONNECT_SECRET || "").trim();
+}
+
+function explicitTokenKey() {
+  return String(process.env.COACH_TOKEN_KEY || "").trim();
+}
+
 function tokenKeyMaterial() {
-  const explicit = String(process.env.STRAVA_TOKEN_KEY || "").trim();
+  const explicit = explicitTokenKey();
   if (explicit) return explicit;
-  const shared = String(process.env.STRAVA_CONNECT_SECRET || "").trim();
-  if (shared) return `dzr-strava-tokens:${shared}`;
+  const shared = connectSecret();
+  if (shared) return `dzr-coach-tokens:${shared}`;
   return "";
 }
 
 function coachKeyMaterial() {
   const explicit = String(process.env.COACH_MEMORY_KEY || "").trim();
   if (explicit) return explicit;
-  const shared = String(process.env.STRAVA_CONNECT_SECRET || "").trim();
+  const shared = connectSecret();
   if (shared) return `dzr-coach-memory:${shared}`;
-  const tokenKey = String(process.env.STRAVA_TOKEN_KEY || "").trim();
+  const tokenKey = explicitTokenKey();
   if (tokenKey) return `dzr-coach-memory:${tokenKey}`;
   return "";
 }
@@ -106,7 +114,7 @@ function toIso(value) {
 function requireKey(key, label) {
   if (!key) {
     throw new Error(
-      `Refusing to write ${label} unencrypted: set COACH_MEMORY_KEY (or STRAVA_CONNECT_SECRET). ` +
+      `Refusing to write ${label} unencrypted: set COACH_MEMORY_KEY (or COACH_CONNECT_SECRET). ` +
       `Both Vercel and Render must use the same value.`
     );
   }
@@ -118,8 +126,8 @@ function requireKey(key, label) {
  *
  * Stored alongside ciphertext so a decrypt failure can be diagnosed: without it, a document
  * encrypted under a rotated or mismatched key is indistinguishable from a corrupt one — exactly
- * the ambiguity hit by strava_connections/271709901724581888, which decrypted under no known key
- * and could not be explained.
+ * the ambiguity of a document encrypted under a rotated or mismatched key, which cannot be
+ * told apart from a corrupt ciphertext.
  *
  * Domain-separated from the key itself, and truncated, so it reveals nothing about the key.
  */
@@ -133,7 +141,7 @@ function coachKeyId() {
   return keyFingerprint(getCoachKey());
 }
 
-/** Fingerprint of the Strava token key currently configured, or null. */
+/** Fingerprint of the connection-token key currently configured, or null. */
 function tokenKeyId() {
   return keyFingerprint(getTokenKey());
 }
@@ -162,23 +170,23 @@ function canEncryptCoachMemory() {
 function encryptSecret(plaintext) {
   const text = String(plaintext || "");
   if (!text) return "";
-  return encryptWithKey(requireKey(getTokenKey(), "Strava tokens"), text);
+  return encryptWithKey(requireKey(getTokenKey(), "connection tokens"), text);
 }
 
 function decryptSecret(value) {
-  return decryptWithKey(getTokenKey(), value, "Strava token");
+  return decryptWithKey(getTokenKey(), value, "connection token");
 }
 
-function readStravaTokens(data) {
+function readConnectionTokens(data) {
   const src = data && typeof data === "object" ? data : {};
   const accessToken = decryptSecret(src.accessTokenEnc || src.accessToken || "");
   const refreshToken = decryptSecret(src.refreshTokenEnc || src.refreshToken || "");
   return { accessToken, refreshToken };
 }
 
-function hasStravaRefreshToken(data) {
+function hasStoredAccessToken(data) {
   const src = data && typeof data === "object" ? data : {};
-  return Boolean(src.refreshTokenEnc || src.refreshToken);
+  return Boolean(src.accessTokenEnc || src.accessToken);
 }
 
 function encryptedTokenFields(accessToken, refreshToken) {
@@ -399,8 +407,8 @@ module.exports = {
   canEncryptCoachMemory,
   encryptSecret,
   decryptSecret,
-  readStravaTokens,
-  hasStravaRefreshToken,
+  readConnectionTokens,
+  hasStoredAccessToken,
   encryptedTokenFields,
   needsTokenMigration,
   unwrapCoachMemoryDoc,

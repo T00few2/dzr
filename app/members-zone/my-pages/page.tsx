@@ -14,7 +14,7 @@ import {
 } from '@chakra-ui/react';
 import LoadingSpinnerMemb from '@/components/LoadingSpinnerMemb';
 import dynamic from 'next/dynamic';
-import StravaConnectedModal from './StravaConnectedModal';
+import IntervalsConnectedModal from './IntervalsConnectedModal';
 
 const Profile = dynamic(() => import('./profile/page'), { ssr: false });
 const Membership = dynamic(() => import('./membership/page'), { ssr: false });
@@ -40,7 +40,7 @@ function MyPagesPageContent() {
   const searchParams = useSearchParams();
   const [isClub, setIsClub] = useState<boolean | null>(null);
   const [tabIndex, setTabIndex] = useState(0);
-  const [stravaConnectedOpen, setStravaConnectedOpen] = useState(false);
+  const [intervalsConnectedOpen, setIntervalsConnectedOpen] = useState(false);
 
   React.useEffect(() => {
     if (status === 'unauthenticated') {
@@ -74,13 +74,13 @@ function MyPagesPageContent() {
   }, [isClub, searchParams]);
 
   React.useEffect(() => {
-    if (searchParams?.get('strava') === 'connected') setStravaConnectedOpen(true);
+    if (searchParams?.get('intervals') === 'connected') setIntervalsConnectedOpen(true);
   }, [searchParams]);
 
-  const closeStravaConnected = () => {
-    setStravaConnectedOpen(false);
+  const closeIntervalsConnected = () => {
+    setIntervalsConnectedOpen(false);
     const url = new URL(window.location.href);
-    url.searchParams.delete('strava');
+    url.searchParams.delete('intervals');
     window.history.replaceState({}, '', url);
   };
 
@@ -134,7 +134,7 @@ function MyPagesPageContent() {
           )}
         </TabPanels>
       </Tabs>
-      <StravaConnectedModal isOpen={stravaConnectedOpen} onClose={closeStravaConnected} />
+      <IntervalsConnectedModal isOpen={intervalsConnectedOpen} onClose={closeIntervalsConnected} />
     </Container>
   );
 }

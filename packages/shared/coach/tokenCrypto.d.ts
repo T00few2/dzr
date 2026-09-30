@@ -69,11 +69,11 @@ export function canEncryptCoachMemory(): boolean
 export function encryptSecret(plaintext: string): string
 export function decryptSecret(value: unknown): string
 
-export function readStravaTokens(data: Record<string, unknown> | null | undefined): {
+export function readConnectionTokens(data: Record<string, unknown> | null | undefined): {
   accessToken: string
   refreshToken: string
 }
-export function hasStravaRefreshToken(data: Record<string, unknown> | null | undefined): boolean
+export function hasStoredAccessToken(data: Record<string, unknown> | null | undefined): boolean
 export function encryptedTokenFields(
   accessToken: string,
   refreshToken: string

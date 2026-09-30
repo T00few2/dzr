@@ -389,7 +389,7 @@ Rules:
 - A passing race or date can be a standard plan/life note if useful. It is not a goal.
 - kind feeling = illness/fatigue/mood/soreness that is not a lasting injury they want obeyed every session.
 - Do NOT copy standing constraints already in Coach settings (rides/week, weekly slots, lasting injuries, reply style).
-- Do NOT invent facts. Do NOT store Strava numbers unless the athlete stated them in this exchange.
+- Do NOT invent facts. Do NOT store training numbers unless the athlete stated them in this exchange.
 - Do not note that they asked a question or that the coach listed workouts.
 - Deduplicate against recent notes; skip if already captured.
 - Write notes in the athlete's language.`;

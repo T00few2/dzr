@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import { hasClubMemberRole } from '@/app/lib/stravaAuth'
+import { hasClubMemberRole } from '@/app/lib/intervalsAuth'
 import {
   COACH_PROFILES_COLLECTION,
   defaultCoachProfile,
@@ -24,7 +24,7 @@ async function sessionMember(req: Request) {
 
 function warnIfPlaintext() {
   if (!canEncryptCoachMemory()) {
-    console.warn('COACH_MEMORY_KEY / STRAVA_CONNECT_SECRET missing; storing coach memory in plaintext')
+    console.warn('COACH_MEMORY_KEY / COACH_CONNECT_SECRET missing; storing coach memory in plaintext')
   }
 }
 

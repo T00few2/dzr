@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import { hasClubMemberRole } from '@/app/lib/stravaAuth'
+import { hasClubMemberRole } from '@/app/lib/intervalsAuth'
 import {
   MEMBER_CALENDAR_COLLECTION,
   MEMBER_CALENDAR_SUBCOLLECTION,

@@ -1,5 +1,5 @@
 const { MessageFlags } = require("discord.js");
-const strava = require("./stravaService");
+const intervals = require("./intervalsService");
 const { ensureDefaultCoachProfile, markCoachHowItWorksSent } = require("./firebase");
 const { MY_PAGES_COACH_URL, coachHowItWorksText, noEmbedUrl } = require("./coachHowItWorks");
 const { getCoachClient, isCoachBotConfigured } = require("./coachBot");
@@ -23,20 +23,26 @@ function sendNoEmbeds(channel, content) {
   return channel.send({ content, flags: MessageFlags.SuppressEmbeds });
 }
 
-function stravaConnectText(discordId) {
-  const url = strava.getConnectUrl(discordId);
+function intervalsConnectText(discordId) {
+  const url = intervals.getConnectUrl(discordId);
   return (
-    "**Strava**\n" +
-    "For at give dig træningsråd skal jeg have adgang til dine Strava-aktiviteter.\n\n" +
+    "**intervals.icu**\n" +
+    "For at give dig træningsråd skal jeg have adgang til dine aktiviteter på intervals.icu.\n\n" +
+    "Før du klikker:\n" +
+    "1. Opret en konto på intervals.icu\n" +
+    "2. Forbind **Zwift** direkte under Settings → Connections, og slå upload af planlagte workouts til\n" +
+    "3. Sæt den samme FTP på Zwift og på intervals.icu\n" +
+    "4. Udendørs ture: forbind Garmin, Wahoo, Polar eller Coros direkte\n\n" +
+    "Så:\n" +
     "1. Klik på linket (gyldigt 15 minutter)\n" +
-    "2. Læs samtykket og forbind Strava\n" +
-    "3. Kom tilbage til **DZR Coach** i DM og spørg fx: *Hvordan var min uge?*\n\n" +
-    (url ? noEmbedUrl(url) : "⚠️ Connect-link kunne ikke oprettes (STRAVA_CONNECT_SECRET mangler).")
+    "2. Læs samtykket og forbind intervals.icu\n" +
+    "3. Kom tilbage hertil og spørg fx: *Hvordan var min uge?*\n\n" +
+    (url ? noEmbedUrl(url) : "⚠️ Connect-link kunne ikke oprettes (COACH_CONNECT_SECRET mangler).")
   );
 }
 
 function unconnectedCoachText(discordId) {
-  return `${coachHowItWorksText({ includeStartHint: false })}\n\n${stravaConnectText(discordId)}`;
+  return `${coachHowItWorksText({ includeStartHint: false })}\n\n${intervalsConnectText(discordId)}`;
 }
 
 async function markHowItWorksSentSafe(discordId) {
@@ -52,7 +58,7 @@ async function sendCoachingIntroDm(user) {
     return { ok: false, reason: "coach_not_configured" };
   }
 
-  const eligible = await strava.hasClubMemberRole(user.id);
+  const eligible = await intervals.hasClubMemberRole(user.id);
   if (!eligible) {
     return { ok: false, reason: "not_club_member" };
   }
@@ -77,7 +83,7 @@ async function sendCoachingIntroDm(user) {
     console.warn("ensureDefaultCoachProfile failed:", err?.message || err);
   }
 
-  const connected = await strava.isStravaConnected(user.id);
+  const connected = await intervals.isConnected(user.id);
   const alreadyExplained = Boolean(profile?.howItWorksSentAt);
   try {
     if (!connected) {
@@ -95,7 +101,7 @@ async function sendCoachingIntroDm(user) {
       await sendNoEmbeds(
         dm,
         "🚴 **DZR Coach** — jeg er klar.\n\n" +
-          "Spørg om din træning, restitution, volume eller et specifikt pas. Jeg henter dine Strava-data bag kulissen.\n\n" +
+          "Spørg om din træning, restitution, volume eller et specifikt pas. Jeg henter dine intervals.icu-data bag kulissen.\n\n" +
           "Dine rammer retter du på Mine sider → Coach. Chat-noter slår du til samme sted, hvis du vil.\n" +
           noEmbedUrl(MY_PAGES_COACH_URL) +
           "\n\nFx: *Hvordan var min uge?* · *Var i går for hård?* · *Skal jeg hvile i morgen?*"
@@ -114,7 +120,7 @@ function replyForIntroResult(result) {
   if (!result?.ok && result?.reason === "not_club_member") return NOT_CLUB_MEMBER_TEXT;
   if (!result?.ok) return DM_CLOSED_TEXT;
   if (result.connected) return "✅ Tjek din DM med **DZR Coach** — coach-chatten er klar der.";
-  return "✅ Tjek din DM med **DZR Coach** — forbind Strava via linket, så kan vi chatte om din træning.";
+  return "✅ Tjek din DM med **DZR Coach** — forbind intervals.icu via linket, så kan vi chatte om din træning.";
 }
 
 async function handleCoach(interaction) {

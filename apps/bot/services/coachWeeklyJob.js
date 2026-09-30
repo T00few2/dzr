@@ -1,10 +1,10 @@
 const { listCoachProfiles, getBotState, setBotState } = require("./firebase");
-const strava = require("./stravaService");
+const intervals = require("./intervalsService");
 const { shouldRunFollowUpSweep } = require("./coachFollowUpSchedule");
 
 const STATE_KEY = "coach_weekly_load";
-// The whole club shares one Strava rate limit, so refresh a slice of athletes per night rather
-// than everyone at once. With a 26-week window each athlete costs one to two requests.
+// Refresh a slice of athletes per night rather than everyone at once. With a 26-week window
+// each athlete costs a handful of intervals.icu requests.
 const MAX_ATHLETES_PER_RUN = 8;
 const PAUSE_BETWEEN_ATHLETES_MS = 2000;
 const REFRESH_EVERY_MS = 3 * 86400000;
@@ -22,8 +22,8 @@ function staleness(profile, stored) {
  *
  * Reuses the follow-up window logic so it runs once per day on the first tick at or after 08:00
  * and never late in the evening. Athletes are processed oldest-rollup-first, a few per night, so
- * the initial backfill spreads over several days instead of hammering the shared Strava quota in
- * one burst — the plan's stated risk was the first run, not the steady state.
+ * the initial backfill spreads over several days instead of hammering the intervals.icu quota in
+ * one burst.
  */
 async function maybeRefreshWeeklyLoad(now = new Date()) {
   const existing = await getBotState(STATE_KEY);
@@ -37,7 +37,7 @@ async function maybeRefreshWeeklyLoad(now = new Date()) {
     for (const profile of profiles) {
       const discordId = String(profile.discordId || "").trim();
       if (!discordId) continue;
-      const stored = await strava.getWeeklyLoad(discordId);
+      const stored = await intervals.getWeeklyLoad(discordId);
       const age = staleness(profile, stored);
       if (age < REFRESH_EVERY_MS) continue;
       withStaleness.push({ discordId, age });
@@ -52,11 +52,11 @@ async function maybeRefreshWeeklyLoad(now = new Date()) {
   for (const { discordId } of candidates) {
     try {
       const [member, connected] = await Promise.all([
-        strava.hasClubMemberRole(discordId),
-        strava.isStravaConnected(discordId),
+        intervals.hasClubMemberRole(discordId),
+        intervals.isConnected(discordId),
       ]);
       if (!member || !connected) continue;
-      const result = await strava.refreshWeeklyLoad(discordId);
+      const result = await intervals.refreshWeeklyLoad(discordId);
       if (result?.success) refreshed += 1;
     } catch (err) {
       console.warn("weekly load refresh failed:", discordId, err?.message || err);

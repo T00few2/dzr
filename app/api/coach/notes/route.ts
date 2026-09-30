@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
-import { hasClubMemberRole } from '@/app/lib/stravaAuth'
+import { hasClubMemberRole } from '@/app/lib/intervalsAuth'
 import {
   COACH_CHAT_NOTES_COLLECTION,
   COACH_CHAT_NOTES_SUBCOLLECTION,
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ eligible: false, notes: [] })
     }
     if (!canEncryptCoachMemory()) {
-      console.warn('COACH_MEMORY_KEY / STRAVA_CONNECT_SECRET missing; reading coach chat notes without dedicated key')
+      console.warn('COACH_MEMORY_KEY / COACH_CONNECT_SECRET missing; reading coach chat notes without dedicated key')
     }
     const notes = await listNotes(discordId)
     return NextResponse.json({ eligible: true, notes })
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
     }
 
     if (!canEncryptCoachMemory()) {
-      console.warn('COACH_MEMORY_KEY / STRAVA_CONNECT_SECRET missing; storing coach chat notes in plaintext')
+      console.warn('COACH_MEMORY_KEY / COACH_CONNECT_SECRET missing; storing coach chat notes in plaintext')
     }
 
     const now = new Date()

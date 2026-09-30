@@ -1,6 +1,6 @@
 const OpenAI = require("openai");
 const config = require("../config/config");
-const strava = require("./stravaService");
+const intervals = require("./intervalsService");
 const { getCoachClient } = require("./coachBot");
 const { sendNoEmbeds } = require("./coachDm");
 const {
@@ -45,7 +45,7 @@ try {
 
 function formatActivitiesForPrompt(activities) {
   const list = Array.isArray(activities) ? activities.slice(0, 12) : [];
-  if (!list.length) return "(no recent Strava activities)";
+  if (!list.length) return "(no recent activities)";
   return list
     .map((a) => {
       const date = String(a.start_date || "").slice(0, 10) || "unknown date";
@@ -97,12 +97,12 @@ async function generateFollowUpText({ profile, activities, notesBlock, goalsBloc
 Rules:
 - Reply in ${language === "en" ? "English" : "Danish"}.
 - Discord-short: a few sentences, one question.
-- Cite a real recent session (date, duration, power/HR) only if it appears in the Strava list. Never invent numbers.
+- Cite a real recent session only if it appears in the activity list, and only the one number that makes the point. Never invent numbers. Do not reprint a full ride summary.
 - Weeks start Monday (Denmark / ISO). Sunday is the last day of the week.
 - If Active goals lists any, default the check-in toward the nearest dated goal. Injuries still override.
 - Use Coach settings and chat notes as hints. Do not say you saved a note or changed settings.
 - The Calendar is what the athlete planned to do. Lead with it: a race or event in the next days is the thing to write about, and a session under "Recently planned" is worth asking how it went. Following up on what was planned is the point of a check-in. If a coming race or event has a clock time, mention it. An evening race is that day's hard session — do not also push a hard morning.
-- A calendar row still marked planned does NOT mean it was skipped. Nothing marks these automatically and a ride can be missing from Strava for dull reasons, so check the Strava list and ask rather than assert. A missed session usually has a reason worth hearing — ask, do not accuse.
+- A calendar row still marked planned does NOT mean it was skipped. Nothing marks these automatically and a ride can be missing for dull reasons, so check the activity list and ask rather than assert. A missed session usually has a reason worth hearing — ask, do not accuse.
 - A chat note of kind "plan" records advice YOU gave, which is not the same as what they planned. Use it as context for the question, not as a record of their intentions.
 - Not medical advice. No doping or extreme restriction.
 - Do not mention tokens, Firestore, or this being a scheduled job.`,
@@ -125,7 +125,7 @@ ${calendarBlock || "(nothing planned)"}
 ## Chat notes
 ${notesBlock || "(none)"}
 
-## Recent Strava (last 14 days)
+## Recent activities (last 14 days)
 ${formatActivitiesForPrompt(activities)}
 
 Write the check-in now.`,
@@ -160,17 +160,17 @@ async function sendFollowUpDm(discordId, text) {
 async function sendOneFollowUp(profile) {
   const discordId = String(profile.discordId || "").trim();
   if (!discordId) return;
-  const eligible = await strava.hasClubMemberRole(discordId);
+  const eligible = await intervals.hasClubMemberRole(discordId);
   if (!eligible) return;
-  const connected = await strava.isStravaConnected(discordId);
+  const connected = await intervals.isConnected(discordId);
   if (!connected) return;
 
   let activities = [];
   try {
-    const result = await strava.getRecentActivities(discordId, { days: 14 });
+    const result = await intervals.getRecentActivities(discordId, { days: 14 });
     if (result?.success && Array.isArray(result.activities)) activities = result.activities;
   } catch (err) {
-    console.warn("coach follow-up Strava failed:", err?.message || err);
+    console.warn("coach follow-up activities failed:", err?.message || err);
   }
 
   // Read ungated, exactly as the chat path does: notesOptIn governs silent extraction from
@@ -233,8 +233,8 @@ async function maybeSendCoachFollowUps(now = new Date()) {
       if (!discordId) continue;
       try {
         const [member, connected] = await Promise.all([
-          strava.hasClubMemberRole(discordId),
-          strava.isStravaConnected(discordId),
+          intervals.hasClubMemberRole(discordId),
+          intervals.isConnected(discordId),
         ]);
         if (!member || !connected) continue;
       } catch (err) {

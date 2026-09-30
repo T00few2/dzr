@@ -2,7 +2,7 @@ import { COLLECTIONS } from '@/app/lib/sharedConstants'
 import { redactSecrets } from '@/app/lib/tokenCrypto'
 
 const BLOCKED = new Set([
-  COLLECTIONS.stravaConnections,
+  COLLECTIONS.intervalsConnections,
   COLLECTIONS.coachProfiles,
   COLLECTIONS.coachChatNotes,
   COLLECTIONS.payments,

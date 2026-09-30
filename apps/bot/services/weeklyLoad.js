@@ -50,6 +50,11 @@ function sessionLoad(activity, ftp) {
   const seconds = Number(activity?.moving_time) || 0;
   if (seconds <= 0) return { load: 0, estimated: true };
 
+  const intervalsLoad = Number(activity?.training_load);
+  if (Number.isFinite(intervalsLoad) && intervalsLoad > 0) {
+    return { load: Math.round(intervalsLoad), estimated: false };
+  }
+
   const watts = Number(activity?.weighted_average_watts) || Number(activity?.average_watts) || 0;
   if (watts > 0 && ftp > 0) {
     const intensity = watts / ftp;

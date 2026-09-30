@@ -174,7 +174,7 @@ async function addCoachChatNotes(discordId, incoming, { at, allowGoals = false, 
   const skipped = [];
   if (!id) return { saved: [], skipped };
   if (!canEncryptCoachMemory()) {
-    console.warn("COACH_MEMORY_KEY / STRAVA_CONNECT_SECRET missing; storing coach chat notes in plaintext");
+    console.warn("COACH_MEMORY_KEY / COACH_CONNECT_SECRET missing; storing coach chat notes in plaintext");
   }
   const existing = await listCoachChatNotes(id);
   const now = at instanceof Date ? at : new Date();
@@ -501,7 +501,7 @@ function toPlainProfile(data) {
 
 async function writeCoachProfileDoc(id, plain) {
   if (!canEncryptCoachMemory()) {
-    console.warn("COACH_MEMORY_KEY / STRAVA_CONNECT_SECRET missing; storing coach memory in plaintext");
+    console.warn("COACH_MEMORY_KEY / COACH_CONNECT_SECRET missing; storing coach memory in plaintext");
   }
   await coachProfileRef(id).set(persistCoachMemoryDoc({ discordId: id, ...plain }));
 }

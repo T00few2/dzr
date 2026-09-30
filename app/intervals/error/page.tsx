@@ -4,20 +4,20 @@ import { Suspense } from 'react'
 import { Container, Heading, Text } from '@chakra-ui/react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { StravaPrivacyLink } from '@/components/StravaPrivacyModal'
+import { IntervalsPrivacyLink } from '@/components/IntervalsPrivacyModal'
 
 const REASONS: Record<string, string> = {
   not_club_member:
     'DZR Coach er kun for betalende klubmedlemmer (indeværende år). Verified Member er ikke nok.',
-  denied: 'Du afviste Strava-adgang. Ingen data blev gemt.',
+  denied: 'Du afviste adgang. Ingen data blev gemt.',
   invalid_or_expired_link: 'Linket er ugyldigt eller udløbet. Brug /coach i Discord for at få et nyt.',
   not_logged_in: 'Log ind på members zone, eller start fra /coach i Discord.',
-  missing_strava_env: 'Strava er ikke konfigureret på serveren endnu.',
-  token_exchange_failed: 'Kunne ikke fuldføre Strava-login. Prøv igen.',
-  missing_code: 'Strava sendte ikke en autorisationskode. Prøv igen.',
-  connect_failed: 'Kunne ikke starte Strava-forbindelsen. Prøv igen.',
-  callback_failed: 'Noget gik galt efter Strava-login. Prøv igen.',
-  strava_error: 'Strava returnerede en fejl. Prøv igen.',
+  missing_intervals_env: 'intervals.icu er ikke konfigureret på serveren endnu.',
+  token_exchange_failed: 'Kunne ikke fuldføre login. Prøv igen.',
+  missing_code: 'Der kom ikke en autorisationskode. Prøv igen.',
+  connect_failed: 'Kunne ikke starte forbindelsen. Prøv igen.',
+  callback_failed: 'Noget gik galt efter login. Prøv igen.',
+  intervals_error: 'intervals.icu returnerede en fejl. Prøv igen.',
 }
 
 function ErrorBody() {
@@ -31,11 +31,11 @@ function ErrorBody() {
         {message}
       </Text>
       <Text fontSize="sm" color="gray.500">
-        <Link href="/strava/connect" style={{ textDecoration: 'underline' }}>
+        <Link href="/intervals/connect" style={{ textDecoration: 'underline' }}>
           Tilbage til connect
         </Link>
         {' · '}
-        <StravaPrivacyLink>Privatliv</StravaPrivacyLink>
+        <IntervalsPrivacyLink>Privatliv</IntervalsPrivacyLink>
         {' · '}
         <Link href="/join" style={{ textDecoration: 'underline' }}>
           Bliv klubmedlem
@@ -45,11 +45,11 @@ function ErrorBody() {
   )
 }
 
-export default function StravaErrorPage() {
+export default function IntervalsErrorPage() {
   return (
     <Container maxW="lg" py={{ base: 16, md: 24 }} color="white">
       <Heading size="lg" mb={4}>
-        Kunne ikke forbinde Strava
+        Kunne ikke forbinde intervals.icu
       </Heading>
       <Suspense fallback={<Text>Loading…</Text>}>
         <ErrorBody />

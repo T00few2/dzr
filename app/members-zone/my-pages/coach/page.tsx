@@ -16,13 +16,15 @@ import {
   Spinner,
   useToast,
   Link as ChakraLink,
+  ListItem,
+  OrderedList,
 } from '@chakra-ui/react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import CoachMemoryEditor from '../profile/CoachMemoryEditor'
-import ConnectWithStravaButton from '@/components/ConnectWithStravaButton'
-import { StravaPrivacyLink } from '@/components/StravaPrivacyModal'
-import { DZR_SUPPORT_EMAIL, STRAVA_APPS_URL } from '@/app/lib/stravaCoachLinks'
+import ConnectIntervalsButton from '@/components/ConnectIntervalsButton'
+import { IntervalsPrivacyLink } from '@/components/IntervalsPrivacyModal'
+import { DZR_SUPPORT_EMAIL, INTERVALS_SETTINGS_URL, INTERVALS_SETUP_STEPS } from '@/app/lib/intervalsCoachLinks'
 
 const secondaryButtonProps = {
   variant: 'outline' as const,
@@ -36,16 +38,16 @@ export default function CoachPage() {
   const { data: session, status } = useSession()
   const toast = useToast()
   const cancelDisconnectRef = useRef<HTMLButtonElement>(null)
-  const [strava, setStrava] = useState<{ connected: boolean; eligible?: boolean; athleteName?: string | null; connectedAt?: string | null } | null>(null)
-  const [stravaBusy, setStravaBusy] = useState(false)
-  const [stravaNotice, setStravaNotice] = useState<string | null>(null)
+  const [intervals, setIntervals] = useState<{ connected: boolean; eligible?: boolean; athleteName?: string | null; connectedAt?: string | null } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false)
 
-  async function loadStravaStatus() {
-    const res = await fetch('/api/strava/status', { cache: 'no-store' })
+  async function loadStatus() {
+    const res = await fetch('/api/intervals/status', { cache: 'no-store' })
     if (!res.ok) return
     const data = await res.json()
-    setStrava({
+    setIntervals({
       connected: !!data?.connected,
       eligible: data?.eligible !== false,
       athleteName: data?.athleteName ?? null,
@@ -57,44 +59,37 @@ export default function CoachPage() {
     let ignore = false
     async function load() {
       try {
-        await loadStravaStatus()
+        await loadStatus()
       } catch {
-        if (!ignore) setStrava({ connected: false, eligible: false })
+        if (!ignore) setIntervals({ connected: false, eligible: false })
       }
     }
     if (session) load()
     return () => { ignore = true }
   }, [session])
 
-  async function disconnectStrava() {
-    setStravaBusy(true)
-    setStravaNotice(null)
+  async function disconnect() {
+    setBusy(true)
+    setNotice(null)
     try {
-      const res = await fetch('/api/strava/disconnect', { method: 'POST' })
+      const res = await fetch('/api/intervals/disconnect', { method: 'POST' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         toast({ title: data?.error || 'Disconnect failed', status: 'error' })
         return false
       }
-      await loadStravaStatus()
-      if (data?.revokedOnStrava) {
-        toast({
-          title: 'Strava disconnected',
-          description: data?.deletionNotified
-            ? 'We sent a deletion confirmation to your Discord DM.'
-            : 'Tokens, profile, and notes were deleted.',
-          status: 'success',
-        })
-        setStravaNotice(null)
-      } else {
-        toast({ title: 'Disconnected in DZR', status: 'warning' })
-        setStravaNotice(
-          'DZR no longer has your tokens, but Strava may still list the app. Remove it under Strava → Settings → My Apps if it is still there.'
-        )
-      }
+      await loadStatus()
+      toast({
+        title: 'intervals.icu afbrudt',
+        description: data?.deletionNotified
+          ? 'Vi har sendt en bekræftelse i din Discord-DM.'
+          : 'Token, profil og noter er slettet.',
+        status: 'success',
+      })
+      setNotice('Fjern også appen under intervals.icu → Settings, hvis den stadig står der.')
       return true
     } finally {
-      setStravaBusy(false)
+      setBusy(false)
     }
   }
 
@@ -120,62 +115,75 @@ export default function CoachPage() {
     <Box px={{ base: 4, md: 8 }} py={{ base: 8, md: 8 }} color="white">
       <Heading size={{ base: 'md', md: 'lg' }} mb={4}>Coach</Heading>
       <Text mb={6} color="white">
-        Forbind Strava og sæt dine rammer til DZR Coach.
+        Forbind intervals.icu og sæt dine rammer til DZR Coach.
       </Text>
 
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
-        <Heading size="sm" mb={2}>Strava</Heading>
+        <Heading size="sm" mb={2}>intervals.icu</Heading>
         <Text color="gray.400" mb={4} fontSize="sm">
-          Connect Strava for personal training coaching in a private DM from DZR Coach. Type
-          /coach on the Discord server to open the chat. Disconnecting deletes
-          tokens, profile, and notes. We send a confirmation in a DM from DZR Coach.{' '}
-          <StravaPrivacyLink color="gray.400">Privacy</StravaPrivacyLink>
+          Forbind intervals.icu for personlig træning i en privat DM fra DZR Coach. Skriv /coach
+          på Discord-serveren for at åbne chatten. Afbrydelse sletter token, profil, noter og
+          gemte træningstal. Vi sender en bekræftelse i en DM.{' '}
+          <IntervalsPrivacyLink color="gray.400">Privatliv</IntervalsPrivacyLink>
           {' · '}
           <ChakraLink href={`mailto:${DZR_SUPPORT_EMAIL}`} textDecoration="underline">
             Support
           </ChakraLink>
           {' · '}
-          <ChakraLink href={STRAVA_APPS_URL} isExternal textDecoration="underline">
-            Strava apps
+          <ChakraLink href={INTERVALS_SETTINGS_URL} isExternal textDecoration="underline">
+            intervals.icu settings
           </ChakraLink>
         </Text>
-        {!strava ? (
+        {!intervals ? (
           <Spinner size="sm" />
-        ) : strava.connected ? (
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-            <Box>
-              <Text fontWeight="bold" mb={1}>Status</Text>
-              <Text>Connected{strava.athleteName ? ` as ${strava.athleteName}` : ''}</Text>
-            </Box>
-            <Box>
-              <Text fontWeight="bold" mb={1}>Connected</Text>
-              <Text>{strava.connectedAt ? new Date(strava.connectedAt).toLocaleString() : '—'}</Text>
-            </Box>
-            <Box>
-              <Button
-                onClick={() => setDisconnectConfirmOpen(true)}
-                isLoading={stravaBusy}
-                size="sm"
-                variant="outline"
-                colorScheme="red"
-                color="red.300"
-                borderColor="red.400"
-                _hover={{ bg: 'whiteAlpha.100' }}
-              >
-                Disconnect Strava
-              </Button>
-            </Box>
-          </SimpleGrid>
-        ) : strava.eligible === false ? (
-          <Text>Coaching is only for paying club members. Renew membership under Membership, or go to /join.</Text>
+        ) : intervals.connected ? (
+          <>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mb={4}>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Status</Text>
+                <Text>Forbundet{intervals.athleteName ? ` som ${intervals.athleteName}` : ''}</Text>
+              </Box>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Forbundet</Text>
+                <Text>{intervals.connectedAt ? new Date(intervals.connectedAt).toLocaleString() : '—'}</Text>
+              </Box>
+              <Box>
+                <Button
+                  onClick={() => setDisconnectConfirmOpen(true)}
+                  isLoading={busy}
+                  size="sm"
+                  variant="outline"
+                  colorScheme="red"
+                  color="red.300"
+                  borderColor="red.400"
+                  _hover={{ bg: 'whiteAlpha.100' }}
+                >
+                  Afbryd intervals.icu
+                </Button>
+              </Box>
+            </SimpleGrid>
+            <Text fontWeight="semibold" mb={2} fontSize="sm">Så coachen kan se ture og sende pas til Zwift</Text>
+            <OrderedList color="gray.300" spacing={1} pl={2} fontSize="sm">
+              {INTERVALS_SETUP_STEPS.slice(1, 5).map((step) => (
+                <ListItem key={step}>{step}</ListItem>
+              ))}
+            </OrderedList>
+          </>
+        ) : intervals.eligible === false ? (
+          <Text>Coaching er kun for betalende klubmedlemmer. Forny medlemskab under Membership, eller gå til /join.</Text>
         ) : (
           <>
-            <ConnectWithStravaButton href="/strava/connect?force=1" />
-            {stravaNotice && (
+            <OrderedList color="gray.300" spacing={2} pl={2} mb={4} fontSize="sm">
+              {INTERVALS_SETUP_STEPS.map((step) => (
+                <ListItem key={step}>{step}</ListItem>
+              ))}
+            </OrderedList>
+            <ConnectIntervalsButton href="/intervals/connect?force=1" />
+            {notice && (
               <Text mt={3} fontSize="sm" color="orange.200">
-                {stravaNotice}{' '}
-                <ChakraLink href="https://www.strava.com/settings/apps" isExternal textDecoration="underline">
-                  Open Strava apps
+                {notice}{' '}
+                <ChakraLink href={INTERVALS_SETTINGS_URL} isExternal textDecoration="underline">
+                  Åbn intervals.icu settings
                 </ChakraLink>
               </Text>
             )}
@@ -183,33 +191,33 @@ export default function CoachPage() {
         )}
       </Box>
 
-      {strava?.connected && <CoachMemoryEditor />}
+      {intervals?.connected && <CoachMemoryEditor />}
 
       <AlertDialog
         isOpen={disconnectConfirmOpen}
         leastDestructiveRef={cancelDisconnectRef}
         onClose={() => {
-          if (!stravaBusy) setDisconnectConfirmOpen(false)
+          if (!busy) setDisconnectConfirmOpen(false)
         }}
       >
         <AlertDialogOverlay>
           <AlertDialogContent bg="gray.800" color="gray.100" borderWidth="1px" borderColor="gray.600">
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Disconnect Strava?
+              Afbryd intervals.icu?
             </AlertDialogHeader>
             <AlertDialogBody>
-              This disconnects Strava. The Coach profile is reset, and all chat notes are deleted.
-              You will get a confirmation in a Discord DM. This cannot be undone.
+              Dette fjerner forbindelsen. Coach-profilen nulstilles, og chat-noter og gemte
+              træningstal slettes. Du får en bekræftelse i en Discord-DM. Det kan ikke fortrydes.
             </AlertDialogBody>
             <AlertDialogFooter>
               <Button
                 ref={cancelDisconnectRef}
                 onClick={() => setDisconnectConfirmOpen(false)}
-                isDisabled={stravaBusy}
+                isDisabled={busy}
                 {...secondaryButtonProps}
                 size="sm"
               >
-                Cancel
+                Annuller
               </Button>
               <Button
                 ml={3}
@@ -218,12 +226,12 @@ export default function CoachPage() {
                 color="white"
                 _hover={{ bg: '#8c1524' }}
                 onClick={async () => {
-                  const ok = await disconnectStrava()
+                  const ok = await disconnect()
                   if (ok) setDisconnectConfirmOpen(false)
                 }}
-                isLoading={stravaBusy}
+                isLoading={busy}
               >
-                Disconnect Strava
+                Afbryd
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

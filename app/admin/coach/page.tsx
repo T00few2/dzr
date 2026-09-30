@@ -116,7 +116,7 @@ export default function CoachAdminPage() {
   return (
     <AdminShell title="DZR Coach">
       <Text color="gray.300" mb={6}>
-        Strava sign-ups and OpenAI token usage for coaching DMs. Usage starts after the bot is redeployed with tracking.
+        intervals.icu connections and OpenAI token usage for coaching DMs. Usage starts after the bot is redeployed with tracking.
       </Text>
       {Number(data?.undecryptableProfiles || 0) > 0 && (
         <Box bg="red.900" borderWidth="1px" borderColor="red.500" borderRadius="md" p={4} mb={6}>
@@ -131,7 +131,7 @@ export default function CoachAdminPage() {
         </Box>
       )}
       <SimpleGrid columns={{ base: 2, md: 4, lg: 8 }} spacing={4} mb={8}>
-        <Stat><StatLabel>Strava connected</StatLabel><StatNumber>{fmt(totals.connected)}</StatNumber></Stat>
+        <Stat><StatLabel>intervals.icu connected</StatLabel><StatNumber>{fmt(totals.connected)}</StatNumber></Stat>
         <Stat><StatLabel>Notes on</StatLabel><StatNumber>{fmt(totals.notesOn)}</StatNumber></Stat>
         <Stat><StatLabel>Check-in on</StatLabel><StatNumber>{fmt(totals.checkInOn)}</StatNumber></Stat>
         <Stat><StatLabel>People</StatLabel><StatNumber>{fmt(totals.people)}</StatNumber></Stat>
@@ -156,7 +156,7 @@ export default function CoachAdminPage() {
           <Thead>
             <Tr>
               <Th color="gray.400">User</Th>
-              <Th color="gray.400">Strava</Th>
+              <Th color="gray.400">intervals.icu</Th>
               <Th color="gray.400">Notes</Th>
               <Th color="gray.400">Check-in</Th>
               <Th color="gray.400" isNumeric>Messages</Th>

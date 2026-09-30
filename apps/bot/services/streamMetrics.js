@@ -1,5 +1,5 @@
 /**
- * Derived metrics from Strava activity streams.
+ * Derived metrics from activity power and heart-rate streams.
  *
  * Pure functions, no I/O and no imports, so this can be unit tested — the numbers here end up in
  * coaching advice, and a silently wrong power curve is the fastest way to lose a strong rider's
@@ -15,7 +15,7 @@ const MMP_DURATIONS = [5, 15, 30, 60, 300, 480, 720, 1200, 3600];
 /**
  * Resample an irregularly-sampled stream onto a 1 Hz grid.
  *
- * Strava's "smart recording" does not sample every second — it records when values change, so
+ * Device recording does not always sample every second — it records when values change, so
  * gaps of several seconds are normal. Treating the raw array as 1 Hz (its index as its timestamp)
  * silently compresses time and inflates every rolling-window metric: a 20-minute power computed
  * over what is really 35 minutes of riding. The `time` stream carries the true offsets, so use it.
@@ -73,7 +73,7 @@ function rollingMean(series, window) {
 
 /**
  * Best average power sustained for each duration — the mean-maximal curve.
- * Strava has no endpoint for this; it is derived from the watts stream.
+ * Derived from the watts stream.
  */
 function meanMaxPower(watts1Hz, durations = MMP_DURATIONS) {
   const out = {};

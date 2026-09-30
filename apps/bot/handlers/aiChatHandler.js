@@ -28,7 +28,7 @@ const {
   handleSetZwiftId
 } = require("./commandHandlers");
 const { startQuizFromMessage } = require("../services/quizService");
-const strava = require("../services/stravaService");
+const intervals = require("../services/intervalsService");
 const { unconnectedCoachText, NOT_CLUB_MEMBER_TEXT, USE_COACH_BOT_TEXT } = require("../services/coachDm");
 const { formatCoachProfileForPrompt } = require("../services/coachProfile");
 const { MY_PAGES_COACH_URL, CALENDAR_URL, noEmbedUrl } = require("../services/coachHowItWorks");
@@ -590,7 +590,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_athlete_profile",
-      description: "Get the asking athlete's Strava profile (weight, FTP if present, clubs). Always the caller — never another member.",
+      description: "Get the asking athlete's intervals.icu profile (weight, FTP). Always the caller — never another member.",
       parameters: { type: "object", properties: {} }
     }
   },
@@ -598,7 +598,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_athlete_stats",
-      description: "Get the asking athlete's Strava totals (recent / YTD / all-time ride and run volume).",
+      description: "Get the asking athlete's ride totals for the last 28 days and the year, plus fitness (CTL, ATL, form) and a power curve when intervals.icu has one.",
       parameters: { type: "object", properties: {} }
     }
   },
@@ -606,7 +606,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_athlete_zones",
-      description: "Get the asking athlete's Strava heart-rate and power zones.",
+      description: "Get the asking athlete's heart-rate and power zones from intervals.icu sport settings.",
       parameters: { type: "object", properties: {} }
     }
   },
@@ -614,7 +614,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_recent_activities",
-      description: "List the asking athlete's recent Strava activities (summaries only). Use this first, then get_activity_details for one session they asked about.",
+      description: "List the asking athlete's recent intervals.icu activities (summaries only). Use this first, then get_activity_details for one session they asked about. Activities intervals.icu only holds from another platform may be omitted; say so if the message says that.",
       parameters: {
         type: "object",
         properties: {
@@ -630,13 +630,13 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_activity_details",
-      description: "Get details for one of the asking athlete's Strava activities by id from get_recent_activities.",
+      description: "Get details for one of the asking athlete's intervals.icu activities by id from get_recent_activities.",
       parameters: {
         type: "object",
         properties: {
           activity_id: {
             type: "string",
-            description: "Strava activity id"
+            description: "Activity id from get_recent_activities"
           }
         },
         required: ["activity_id"]
@@ -647,13 +647,39 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_activity_metrics",
-      description: "Power analysis for ONE of the asking athlete's activities: mean-maximal power curve, normalized power, intensity factor, TSS, aerobic decoupling and detected work intervals. Use when they ask how a specific session went, whether intervals were good, or how hard a ride actually was. Costs a Strava request, so call it for one activity at a time, not across a week.",
+      description: "Power analysis for ONE of the asking athlete's activities: mean-maximal power, normalized power, intensity factor, training load, aerobic decoupling and detected work intervals. Use when they ask how a specific session went. One activity at a time.",
       parameters: {
         type: "object",
         properties: {
-          activity_id: { type: "string", description: "Strava activity id from get_recent_activities" }
+          activity_id: { type: "string", description: "Activity id from get_recent_activities" }
         },
         required: ["activity_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_wellness",
+      description: "Recent wellness and fitness from intervals.icu: CTL, ATL, form, resting HR, HRV, sleep, soreness, fatigue, weight. Empty fields are unknown, not fine. Use for recovery and whether form is rising.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: { type: "number", description: "Lookback in days, 1-28. Default 14." }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_planned_workouts",
+      description: "Planned workouts already on the athlete's intervals.icu calendar, including ones that can sync to Zwift. Use before prescribing so you do not ignore what is already planned.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: { type: "number", description: "How many days ahead, 1-28. Default 14." }
+        }
       }
     }
   },
@@ -669,7 +695,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "search_past_notes",
-      description: "Search dated episode notes from earlier coach DMs (feelings, one-off plans). Use when the athlete refers to something discussed before that is not in the retrieved notes block. Not for Strava workouts, not for goals, and not for standing Coach settings.",
+      description: "Search dated episode notes from earlier coach DMs (feelings, one-off plans). Use when the athlete refers to something discussed before that is not in the retrieved notes block. Not for workouts, not for goals, and not for standing Coach settings.",
       parameters: {
         type: "object",
         properties: {
@@ -690,7 +716,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "save_chat_notes",
-      description: "Silently persist dated episode notes from this chat (feelings, one-off plans, life schedule). Not for goals. Not for standing Coach settings. Do not mention this save unless they asked if you remembered it. Saving notes must not skip Strava tools.",
+      description: "Silently persist dated episode notes from this chat (feelings, one-off plans, life schedule). Not for goals. Not for standing Coach settings. Do not mention this save unless they asked if you remembered it. Saving notes must not skip training-data tools.",
       parameters: {
         type: "object",
         properties: {
@@ -726,10 +752,11 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "send_workout_file",
-      description: "Build a Zwift workout (.zwo) and send it to the athlete as a file they can ride. Use when prescribing a specific structured session and they would benefit from executing it exactly. Power is set as a fraction of their FTP, so Zwift scales it for them. Do not use for general advice or an easy ride — only for a structured session worth following step by step.",
+      description: "Build a Zwift workout (.zwo), send it in Discord, and place the same file on the athlete's intervals.icu calendar so it can upload to Zwift. Use for a specific structured session. Power is a fraction of FTP. Do not use for general advice or an easy ride. Pass the date they should ride it.",
       parameters: {
         type: "object",
         properties: {
+          date: { type: "string", description: "Ride date YYYY-MM-DD in Denmark. Default is tomorrow if omitted." },
           name: { type: "string", description: "Short workout name, e.g. 'VO2 5x4' or 'Tærskel 2x20'." },
           description: { type: "string", description: "One or two sentences on the purpose of the session." },
           steps: {
@@ -1029,7 +1056,7 @@ function resolveUser(userString, message) {
  *
  * Membership and the coach profile used to be re-fetched inside every single tool call.
  * isPaidClubMember is a document read plus a payments collection query, and getCoachProfile
- * decrypts, so a turn with three parallel Strava tools spent roughly eight Firestore operations
+ * decrypts, so a turn with three parallel training tools spent roughly eight Firestore operations
  * on nothing but authorisation — all of it on the latency path in front of the athlete.
  */
 async function executeSingleToolCall(toolCall, message, turn) {
@@ -1383,32 +1410,49 @@ async function executeSingleToolCall(toolCall, message, turn) {
       case "get_recent_activities":
       case "get_activity_details":
       case "get_activity_metrics":
+      case "get_wellness":
+      case "get_planned_workouts":
       case "get_zwiftpower_context": {
-        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        const eligible = turn?.eligible ?? await intervals.hasClubMemberRole(message.author.id);
         if (!eligible) {
-          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+          return { tool_call_id: toolCall.id, ...intervals.notClubMemberResult() };
         }
         const discordId = message.author.id;
         let coachResult;
-        if (name === "get_athlete_profile") coachResult = await strava.getAthleteProfile(discordId);
-        else if (name === "get_athlete_stats") coachResult = await strava.getAthleteStats(discordId);
-        else if (name === "get_athlete_zones") coachResult = await strava.getAthleteZones(discordId);
-        else if (name === "get_recent_activities") coachResult = await strava.getRecentActivities(discordId, { days: args.days });
-        else if (name === "get_activity_details") coachResult = await strava.getActivityDetails(discordId, args.activity_id);
-        else if (name === "get_activity_metrics") coachResult = await strava.getActivityMetrics(discordId, args.activity_id);
-        else coachResult = await strava.getZwiftPowerContext(discordId);
+        if (name === "get_athlete_profile") coachResult = await intervals.getAthleteProfile(discordId);
+        else if (name === "get_athlete_stats") coachResult = await intervals.getAthleteStats(discordId);
+        else if (name === "get_athlete_zones") coachResult = await intervals.getAthleteZones(discordId);
+        else if (name === "get_recent_activities") coachResult = await intervals.getRecentActivities(discordId, { days: args.days });
+        else if (name === "get_activity_details") coachResult = await intervals.getActivityDetails(discordId, args.activity_id);
+        else if (name === "get_activity_metrics") coachResult = await intervals.getActivityMetrics(discordId, args.activity_id);
+        else if (name === "get_wellness") coachResult = await intervals.getWellness(discordId, { days: args.days });
+        else if (name === "get_planned_workouts") coachResult = await intervals.getPlannedWorkouts(discordId, { days: args.days });
+        else coachResult = await intervals.getZwiftPowerContext(discordId);
         return { tool_call_id: toolCall.id, ...(coachResult || { success: false, message: "No data" }) };
       }
 
       case "send_workout_file": {
-        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        const eligible = turn?.eligible ?? await intervals.hasClubMemberRole(message.author.id);
         if (!eligible) {
-          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+          return { tool_call_id: toolCall.id, ...intervals.notClubMemberResult() };
         }
         try {
           const built = buildZwo({ name: args.name, description: args.description, steps: args.steps });
           const outline = describeWorkout(args.steps);
           const minutes = Math.round(built.durationSeconds / 60);
+          let calendarNote = "intervals.icu er ikke forbundet, så filen er kun sendt her.";
+          try {
+            const placed = await intervals.upsertPlannedWorkout(message.author.id, {
+              name: args.name,
+              filename: built.filename,
+              xml: built.xml,
+              date: args.date,
+            });
+            calendarNote = placed?.message || calendarNote;
+          } catch (calendarErr) {
+            console.warn("intervals workout upsert failed:", calendarErr?.message || calendarErr);
+            calendarNote = "Kalenderen blev ikke opdateret. Filen er sendt her.";
+          }
 
           // Zwift only reads custom workouts from a local folder, and only on PC/Mac. Naming the
           // athlete's own folder removes most of the friction; saying the rest plainly stops
@@ -1454,7 +1498,7 @@ async function executeSingleToolCall(toolCall, message, turn) {
             tool_call_id: toolCall.id,
             success: true,
             sent: true,
-            message: "Workout file sent with its outline and install steps. Do not repeat the step list in your reply — say briefly why this session, and what to watch for while riding it.",
+            message: `Workout file sent in Discord. ${calendarNote} Do not repeat the step list. Say why this session, and whether it is on the way to Zwift.`,
           };
         } catch (err) {
           console.error("send_workout_file failed:", err?.message || err);
@@ -1467,9 +1511,9 @@ async function executeSingleToolCall(toolCall, message, turn) {
       }
 
       case "get_club_races": {
-        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        const eligible = turn?.eligible ?? await intervals.hasClubMemberRole(message.author.id);
         if (!eligible) {
-          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+          return { tool_call_id: toolCall.id, ...intervals.notClubMemberResult() };
         }
         try {
           const { teams } = await getDZRTeamsAndSeries();
@@ -1503,9 +1547,9 @@ async function executeSingleToolCall(toolCall, message, turn) {
       }
 
       case "search_past_notes": {
-        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        const eligible = turn?.eligible ?? await intervals.hasClubMemberRole(message.author.id);
         if (!eligible) {
-          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+          return { tool_call_id: toolCall.id, ...intervals.notClubMemberResult() };
         }
         try {
           const profile = turn?.profile ?? await getCoachProfile(message.author.id);
@@ -1546,9 +1590,9 @@ async function executeSingleToolCall(toolCall, message, turn) {
       }
 
       case "save_chat_notes": {
-        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        const eligible = turn?.eligible ?? await intervals.hasClubMemberRole(message.author.id);
         if (!eligible) {
-          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+          return { tool_call_id: toolCall.id, ...intervals.notClubMemberResult() };
         }
         try {
           const profile = turn?.profile ?? await getCoachProfile(message.author.id);
@@ -1612,9 +1656,9 @@ async function executeSingleToolCall(toolCall, message, turn) {
       }
 
       case "propose_coach_goal": {
-        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        const eligible = turn?.eligible ?? await intervals.hasClubMemberRole(message.author.id);
         if (!eligible) {
-          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+          return { tool_call_id: toolCall.id, ...intervals.notClubMemberResult() };
         }
         try {
           const profile = turn?.profile ?? await getCoachProfile(message.author.id);
@@ -1644,9 +1688,9 @@ async function executeSingleToolCall(toolCall, message, turn) {
       }
 
       case "save_planned_event": {
-        const eligible = turn?.eligible ?? await strava.hasClubMemberRole(message.author.id);
+        const eligible = turn?.eligible ?? await intervals.hasClubMemberRole(message.author.id);
         if (!eligible) {
-          return { tool_call_id: toolCall.id, ...strava.notClubMemberResult() };
+          return { tool_call_id: toolCall.id, ...intervals.notClubMemberResult() };
         }
         try {
           const profile = turn?.profile ?? await getCoachProfile(message.author.id);
@@ -1869,9 +1913,16 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
   let loadBlock = "No weekly history yet.";
   let athleteFacts = [];
   try {
-    const stored = await strava.getWeeklyLoad(message.author.id);
+    const stored = await intervals.getWeeklyLoad(message.author.id);
     if (stored?.weekly?.length) {
       loadBlock = formatWeeklyLoadForPrompt(stored.weekly, loadTrend(stored.weekly));
+    }
+    if (Array.isArray(stored?.fitness) && stored.fitness.length) {
+      const fitnessLines = stored.fitness.slice(-8).map((row) => {
+        const form = row.form == null ? "" : `, form ${row.form}`;
+        return `- ${row.week}: CTL ${row.ctl ?? "—"}, ATL ${row.atl ?? "—"}${form}`;
+      });
+      loadBlock += `\n\nFitness from intervals.icu (CTL is fitness, ATL is fatigue, form is CTL minus ATL):\n${fitnessLines.join("\n")}`;
     }
     // Captured nightly, so having these costs nothing on a chat turn — and it lets the coach
     // reason in W/kg from the first token instead of spending a tool call to learn a weight.
@@ -1998,14 +2049,14 @@ function fallbackCoachFromTools(toolResults) {
       return `• ${date} — ${name}${km ? `, ${km}` : ""}${min ? `, ${min}` : ""}`;
     });
     return (
-      "Jeg hentede dine seneste Strava-pas, men selve coaching-teksten blev tom (modellen brugte tokens på reasoning). Her er ugen kort:\n\n" +
+      "Jeg hentede dine seneste pas, men selve coaching-teksten blev tom (modellen brugte tokens på reasoning). Her er ugen kort:\n\n" +
       lines.join("\n") +
       "\n\nSpørg gerne igen, fx *hvordan var i går?*"
     );
   }
   const failed = (toolResults || []).find((r) => r && r.success === false && r.message);
   if (failed?.needs_reconnect && failed.connectUrl) {
-    return `🔗 Strava-forbindelsen skal fornys:\n${noEmbedUrl(failed.connectUrl)}`;
+    return `🔗 intervals.icu-forbindelsen skal fornys:\n${noEmbedUrl(failed.connectUrl)}`;
   }
   if (failed?.message) return String(failed.message).slice(0, 1500);
   return "Jeg hentede dine data, men kunne ikke skrive svaret færdigt. Prøv at spørge igen om lidt.";
@@ -2282,12 +2333,12 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     const turnContext = { eligible: false, profile: null };
 
     if (isCoachSession) {
-      turnContext.eligible = await strava.hasClubMemberRole(message.author.id);
+      turnContext.eligible = await intervals.hasClubMemberRole(message.author.id);
       if (!turnContext.eligible) {
         await safeReply(message, NOT_CLUB_MEMBER_TEXT);
         return;
       }
-      const connected = await strava.isStravaConnected(message.author.id);
+      const connected = await intervals.isConnected(message.author.id);
       if (!connected) {
         await safeReply(message, unconnectedCoachText(message.author.id));
         return;

@@ -1,5 +1,5 @@
 /**
- * Coach/Strava encryption for the Next.js site.
+ * Coach connection and memory encryption for the Next.js site.
  *
  * The crypto itself now lives in packages/shared/coach/tokenCrypto.js, which is the single source
  * of truth and is copied into apps/bot by `npm run sync:shared`. This file re-exports it so the
@@ -32,8 +32,8 @@ export {
   canEncryptCoachMemory,
   encryptSecret,
   decryptSecret,
-  readStravaTokens,
-  hasStravaRefreshToken,
+  readConnectionTokens,
+  hasStoredAccessToken,
   encryptedTokenFields,
   needsTokenMigration,
   unwrapCoachMemoryDoc,

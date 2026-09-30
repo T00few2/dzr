@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/admin/_lib/auth'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { COLLECTIONS } from '@/app/lib/sharedConstants'
-import { toIso } from '@/app/lib/stravaAuth'
-import { hasStravaRefreshToken, unwrapCoachMemoryDoc, coachKeyId, compareKeyId } from '@/app/lib/tokenCrypto'
+import { toIso } from '@/app/lib/intervalsAuth'
+import { hasStoredAccessToken, unwrapCoachMemoryDoc, coachKeyId, compareKeyId } from '@/app/lib/tokenCrypto'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   // every dashboard load just to map ids to names. Fetch only the ids actually referenced,
   // after the small scans have told us which those are.
   const [connectionsSnap, usageSnap, profilesSnap] = await Promise.all([
-    adminDb.collection(COLLECTIONS.stravaConnections).get(),
+    adminDb.collection(COLLECTIONS.intervalsConnections).get(),
     adminDb.collection(COLLECTIONS.coachUsage).get(),
     adminDb.collection(COLLECTIONS.coachProfiles).get(),
   ])
@@ -96,7 +96,7 @@ export async function GET(req: Request) {
       username: usage?.username || user.username || null,
       athleteName,
       athleteId: conn?.athleteId ?? null,
-      connected: hasStravaRefreshToken(conn),
+      connected: hasStoredAccessToken(conn),
       connectedAt: tsToIso(conn?.connectedAt),
       notesOptIn: notesOptInById.get(discordId) === true,
       followUpEveryDays: followUpEveryDaysById.get(discordId) ?? null,

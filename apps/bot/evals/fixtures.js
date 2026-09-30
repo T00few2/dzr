@@ -21,7 +21,7 @@ const base = {
     "Load has risen 3 weeks in a row.",
   ].join("\n"),
   athleteFacts: ["Weight: 72.0 kg", "FTP: 280 W (3.89 W/kg)", "ZwiftPower pace group: B"],
-  settingsBlock: "- Ride frequency: 3–4 per week. Obey this over a busy Strava week; do not infer a higher volume from recent activities.\n- Sports: cycling",
+  settingsBlock: "- Ride frequency: 3–4 per week. Obey this over a busy training week; do not infer a higher volume from recent activities.\n- Sports: cycling",
   goalsBlock: "No saved goals.",
   summariesBlock: "No earlier conversations recorded.",
   notesBlock: "None retrieved for this message.",
@@ -133,7 +133,7 @@ const fixtures = [
       ].join("\n"),
     },
     message: "Hvordan ser min uge ud?",
-    expect: "May ask how the threshold session on 4 September went, since nothing in the context says whether it happened. Must NOT state that the athlete skipped or missed it — no automatic process marks these, and the Strava context here does not settle it.",
+    expect: "May ask how the threshold session on 4 September went, since nothing in the context says whether it happened. Must NOT state that the athlete skipped or missed it — no automatic process marks these, and the activity list here does not settle it.",
     forbid: [/du (har )?(sprang|sprunget) .* over/i, /du missede/i, /du fik ikke (kørt|lavet)/i],
   },
   {

@@ -1,32 +1,32 @@
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import {
-  getStravaClientId,
-  getStravaRedirectUri,
+  getIntervalsClientId,
+  getIntervalsRedirectUri,
   hasClubMemberRole,
+  intervalsAuthorizeUrl,
   mintSignedToken,
   OAUTH_STATE_TTL_MS,
-  stravaAuthorizeUrl,
   verifySignedToken,
-} from '@/app/lib/stravaAuth'
+} from '@/app/lib/intervalsAuth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 function errorRedirect(req: Request, reason: string) {
-  const url = new URL('/strava/error', req.url)
+  const url = new URL('/intervals/error', req.url)
   url.searchParams.set('reason', reason)
   return NextResponse.redirect(url)
 }
 
 export async function GET(req: Request) {
   try {
-    const clientId = getStravaClientId()
-    if (!clientId) return errorRedirect(req, 'missing_strava_env')
+    const clientId = getIntervalsClientId()
+    if (!clientId) return errorRedirect(req, 'missing_intervals_env')
 
     const params = new URL(req.url).searchParams
     if (params.get('consent') !== '1') {
-      const landing = new URL('/strava/connect', req.url)
+      const landing = new URL('/intervals/connect', req.url)
       const token = params.get('token')
       if (token) landing.searchParams.set('token', token)
       return NextResponse.redirect(landing)
@@ -49,15 +49,14 @@ export async function GET(req: Request) {
     }
 
     const state = mintSignedToken(discordId, OAUTH_STATE_TTL_MS)
-    const authorizeUrl = stravaAuthorizeUrl({
+    const authorizeUrl = intervalsAuthorizeUrl({
       clientId,
-      redirectUri: getStravaRedirectUri(req),
+      redirectUri: getIntervalsRedirectUri(req),
       state,
-      force: params.get('force') === '1',
     })
     return NextResponse.redirect(authorizeUrl)
   } catch (err: any) {
-    console.error('strava connect error:', err)
+    console.error('intervals connect error:', err)
     return errorRedirect(req, 'connect_failed')
   }
 }

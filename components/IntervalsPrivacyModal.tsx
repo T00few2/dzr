@@ -12,23 +12,17 @@ import {
   useDisclosure,
 } from '@chakra-ui/react'
 import type { ReactNode } from 'react'
-import StravaPrivacyContent from '@/components/StravaPrivacyContent'
+import IntervalsPrivacyContent from '@/components/IntervalsPrivacyContent'
 
-export function StravaPrivacyModal({
-  isOpen,
-  onClose,
-}: {
-  isOpen: boolean
-  onClose: () => void
-}) {
+export function IntervalsPrivacyModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} isCentered scrollBehavior="inside" size="lg">
       <ModalOverlay bg="blackAlpha.700" backdropFilter="blur(2px)" />
       <ModalContent bg="gray.900" color="white" borderWidth="1px" borderColor="gray.700" mx={4}>
-        <ModalHeader>Privatliv — DZR Coach og Strava</ModalHeader>
+        <ModalHeader>Privatliv — DZR Coach og intervals.icu</ModalHeader>
         <ModalCloseButton _hover={{ bg: 'whiteAlpha.200' }} />
         <ModalBody pb={4}>
-          <StravaPrivacyContent />
+          <IntervalsPrivacyContent />
         </ModalBody>
         <ModalFooter>
           <Button size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }} onClick={onClose}>
@@ -40,7 +34,7 @@ export function StravaPrivacyModal({
   )
 }
 
-export function StravaPrivacyLink({
+export function IntervalsPrivacyLink({
   children = 'Privatliv',
   color = 'gray.500',
 }: {
@@ -64,7 +58,7 @@ export function StravaPrivacyLink({
       >
         {children}
       </Button>
-      <StravaPrivacyModal isOpen={isOpen} onClose={onClose} />
+      <IntervalsPrivacyModal isOpen={isOpen} onClose={onClose} />
     </>
   )
 }

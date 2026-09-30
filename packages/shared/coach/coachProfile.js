@@ -294,7 +294,7 @@ function formatCoachProfileForPrompt(profile) {
   const data = publicFields(profile);
   const lines = [];
   const rides = formatRidesPerWeek(data.ridesPerWeek);
-  if (rides) lines.push(`- Ride frequency: ${rides}. Obey this over a busy Strava week; do not infer a higher volume from recent activities.`);
+  if (rides) lines.push(`- Ride frequency: ${rides}. Obey this over a busy training week; do not infer a higher volume from recent activities.`);
   if (data.sports.length) lines.push(`- Sports: ${data.sports.join(", ")}`);
   if (data.weekly.length) {
     const weekly = data.weekly

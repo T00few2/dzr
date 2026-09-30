@@ -23,7 +23,7 @@ service cloud.firestore {
     // Coaching / membership — client SDK must not read these.
     // Admin SDK (Next API + Discord bot) bypasses rules.
     // Unmatched collections are already denied by default; these are explicit.
-    match /strava_connections/{id} {
+    match /intervals_connections/{id} {
       allow read, write: if false;
     }
     match /coach_profiles/{id} {

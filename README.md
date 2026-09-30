@@ -27,7 +27,7 @@ Open http://localhost:3000
 | Join / onboarding | `/join` | Public flow (Discord → Zwift ID → Vipps) |
 | Members zone | `/members-zone` | Discord **Verified member** via NextAuth |
 | Admin | `/admin` | Discord **Admin** role |
-| Strava OAuth | `/strava/connect` | Logged-in members |
+| intervals.icu | `/intervals/connect` | Logged-in members |
 
 Site reads `packages/shared/constants.json` through `app/lib/sharedConstants.ts`. Next webpack ignores `apps/**` so bot/API edits do not reload the site.
 
@@ -42,11 +42,10 @@ Root is a standard Next.js app. No `vercel.json` is required.
 Required site env names (set in the Vercel project; never commit values):
 
 - Auth: `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_REQUIRED_ROLE_ID`
-- Coach (optional): `COACH_BOT_TOKEN`, `COACH_BOT_CLIENT_ID`, `COACH_MEMORY_KEY`
+- Coach (optional): `COACH_BOT_TOKEN`, `COACH_BOT_CLIENT_ID`, `COACH_CONNECT_SECRET`, `COACH_TOKEN_KEY`, `COACH_MEMORY_KEY`
+- intervals.icu: `INTERVALS_CLIENT_ID`, `INTERVALS_CLIENT_SECRET`, optional `INTERVALS_REDIRECT_URI` (`https://www.dzrracingseries.com/api/intervals/callback`)
 - Firebase client: `NEXT_PUBLIC_FIREBASE_*`
 - Firebase admin: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
-- Strava: `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_CONNECT_SECRET`, `STRAVA_REDIRECT_URI`
-- Strava webhook (optional): `STRAVA_WEBHOOK_VERIFY_TOKEN` — only if you register a push subscription; the callback fails closed without it
 - Jobs API: `CONTENT_API_BASE_URL`, `CONTENT_API_KEY`
 - Payments: `VIPPS_*` (only if membership checkout is enabled)
 
@@ -89,7 +88,9 @@ Render service **`bot`** (Oregon) deploys this folder from this repo:
 
 Optional second bot **DZR Coach** (silent in channels; coaching DMs only). Create a Discord application named DZR Coach, enable Message Content, invite it to the guild with scope `bot` only, then set `COACH_BOT_TOKEN` and `COACH_BOT_CLIENT_ID` on Render and Vercel. `/coach` stays on the club bot and opens a DM from DZR Coach. Without those env vars the club bot starts and skips Coach.
 
-Required bot env names: `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`, `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`. Also set `CONTENT_API_*`, `OPENAI_API_KEY`, and `STRAVA_*` for the features that use them.
+Required bot env names: `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`, `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`. Also set `CONTENT_API_*`, `OPENAI_API_KEY`, and `COACH_CONNECT_SECRET` for the features that use them.
+
+DZR Coach reads training from intervals.icu. Register an OAuth app on your intervals.icu account (Settings, then the app’s Manage page). Redirect URI: `https://www.dzrracingseries.com/api/intervals/callback`. The site requests `ACTIVITY:READ,WELLNESS:READ,SETTINGS:READ,CALENDAR:WRITE`. Set `INTERVALS_CLIENT_ID` and `INTERVALS_CLIENT_SECRET` on Vercel. Set `COACH_CONNECT_SECRET` to the same value on Vercel and Render (it signs connect links and encrypts tokens). If coach profiles were encrypted before this change, copy the previous connect-secret value into `COACH_CONNECT_SECRET`, and copy any dedicated token key into `COACH_TOKEN_KEY`. Optional `COACH_MEMORY_KEY` still encrypts coach memory when set. Optional `INTERVALS_REDIRECT_URI` overrides the callback URL.
 
 Optional: `COACH_DAILY_TOKEN_BUDGET` caps each athlete's coaching tokens per day (default 300000, `0` disables).
 

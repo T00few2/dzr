@@ -27,7 +27,7 @@
     "zwiftpowerRosterCounts": "zwiftpower_roster_counts",
     "serverActivity": "server_activity",
     "serverMemberCounts": "server_member_counts",
-    "stravaConnections": "strava_connections",
+    "intervalsConnections": "intervals_connections",
     "coachUsage": "coach_usage",
     "coachUsageEvents": "coach_usage_events",
     "coachProfiles": "coach_profiles",

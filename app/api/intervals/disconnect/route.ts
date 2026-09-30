@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
-import { wipeCoachStravaForDiscordId } from '@/app/lib/wipeCoachStrava'
-import { STRAVA_APPS_URL } from '@/app/lib/stravaCoachLinks'
+import { wipeCoachIntervalsForDiscordId } from '@/app/lib/wipeCoachIntervals'
+import { INTERVALS_SETTINGS_URL } from '@/app/lib/intervalsCoachLinks'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -14,19 +14,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Not logged in' }, { status: 401 })
     }
 
-    const result = await wipeCoachStravaForDiscordId(discordId, {
-      revokeOnStrava: true,
-      notifyUser: true,
-    })
-
+    const result = await wipeCoachIntervalsForDiscordId(discordId, { notifyUser: true })
     return NextResponse.json({
       connected: false,
-      revokedOnStrava: result.revokedOnStrava,
       deletionNotified: result.notified,
-      stravaAppsUrl: STRAVA_APPS_URL,
+      intervalsSettingsUrl: INTERVALS_SETTINGS_URL,
     })
   } catch (err: any) {
-    console.error('strava disconnect error:', err)
+    console.error('intervals disconnect error:', err)
     return NextResponse.json({ error: err?.message || 'Disconnect failed' }, { status: 500 })
   }
 }
