@@ -6,7 +6,6 @@ const { getBotState, setBotState } = require("./firebase");
 const { syncZpRolesForGuild } = require("./zpRoleSync");
 const { maybePostScheduledQuiz } = require("./quizService");
 const { maybeSendCoachFollowUps } = require("./coachFollowUp");
-const { maybeRefreshWeeklyLoad } = require("./coachWeeklyJob");
 
 /**
  * Check for and send scheduled messages (both time-based and probability-based)
@@ -39,9 +38,6 @@ async function checkScheduledMessages(client) {
     await maybePostScheduledQuiz(client);
 
     await maybeSendCoachFollowUps();
-
-    // Rebuild weekly training-load rollups for a few athletes per night.
-    await maybeRefreshWeeklyLoad();
     
   } catch (error) {
     console.error("❌ Error checking scheduled messages:", error);

@@ -9,8 +9,6 @@
  * @param {object} input
  * @param {string} input.username
  * @param {{line: string}} input.today      from formatCoachToday
- * @param {string} input.loadBlock          from formatWeeklyLoadForPrompt
- * @param {string[]} input.athleteFacts     weight / FTP / category lines, may be empty
  * @param {string} input.settingsBlock      from formatCoachProfileForPrompt
  * @param {string} input.goalsBlock
  * @param {string} input.calendarBlock    from formatCalendarForPrompt
@@ -23,8 +21,6 @@
 function buildCoachPromptText({
   username,
   today,
-  loadBlock,
-  athleteFacts = [],
   settingsBlock,
   goalsBlock,
   calendarBlock,
@@ -69,7 +65,7 @@ What that changes:
 
 ## Data
 You may only use tools to read THIS athlete's intervals.icu data (the Discord user talking to you). Never request or invent another rider's activities.
-Typical flow: get_recent_activities first, then get_activity_details for a specific session. Use get_wellness for recovery and whether form is rising (CTL, ATL, form). Use get_planned_workouts before you prescribe. Profile, stats and zones as needed. get_zwiftpower_context is optional (category/phenotype).
+Typical flow: get_recent_activities first, then get_activity_details for a specific session. Use get_training_trend when the question is about load over months, whether they are building, or whether a rest week is due. Use get_wellness for recovery over the last couple of weeks. Use get_planned_workouts before you prescribe. Call get_athlete_profile for weight, height or FTP, and get_zwiftpower_context for category.
 If a tool message says some activities cannot be read, tell the athlete to connect Zwift directly in intervals.icu, and a head unit for outdoor rides. Do not invent the missing rides.
 For "how was that session" or "were my intervals any good", call get_activity_metrics on that one activity. It returns normalized power, training load, mean-max power, aerobic decoupling and detected intervals. One activity at a time.
 When you prescribe a specific structured session worth following step by step, call
@@ -82,13 +78,12 @@ If an activity has garmin true, say the numbers may include data from a Garmin d
 get_recent_activities returns averages only. Do not judge interval quality from an average; either fetch metrics or say you only have the summary. If metrics come back null because the ride has no power meter, say so and talk about duration, heart rate and feel instead.
 Saving a chat note must not skip training tools when they asked about training.
 
-## Training load (last weeks)
-${loadBlock}
-
-Use this for trend, which recent activities cannot show: whether they are building or flat, how
-this week compares to the last month, and how long since a genuine rest week. Prefer it over
-counting sessions when judging whether to add or back off. It is rebuilt nightly, so the current
-week is partial — do not read a low number mid-week as a drop in training.
+## Training load
+There is no stored training history in this prompt. When they ask whether to add or back off,
+how this week compares with recent months, or how long since an easy week, call get_training_trend
+before you answer. It covers about six months. The current week only includes days already ridden,
+so a low number mid-week is not a drop. get_recent_activities cannot show that trend. Do not invent
+a ramp, a rest-week gap, or weekly totals.
 
 ## Coach settings (standing)
 ${settingsBlock}
@@ -194,8 +189,8 @@ differently:
   qualified professional. Do not offer a training workaround. You are not a medical service.
 
 ## Current context
-- Athlete: ${username}${athleteFacts.length ? "\n- " + athleteFacts.join("\n- ") : ""}
-${athleteFacts.length ? "These are from the nightly refresh, so they may lag a very recent change. Reason in W/kg when it helps — Zwift racing is decided on it." : "No stored profile numbers yet; fetch them with get_athlete_profile if you need weight or FTP."}`;
+- Athlete: ${username}
+Weight, height and FTP are not in this prompt. Call get_athlete_profile when you need them. Reason in W/kg when it helps — Zwift racing is decided on it.`;
 }
 
 module.exports = { buildCoachPromptText };

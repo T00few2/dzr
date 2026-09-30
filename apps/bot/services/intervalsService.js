@@ -16,7 +16,6 @@ const COLLECTION = shared.firestore.intervalsConnections || "intervals_connectio
 const API = "https://intervals.icu/api/v1";
 const CONNECT_TOKEN_TTL_MS = 15 * 60 * 1000;
 const STREAM_CACHE_COLLECTION = "coach_activity_metrics";
-const WEEKLY_LOAD_COLLECTION = "coach_weekly_load";
 const USER_AGENT = "DZR-Coach/1.0";
 
 function notClubMemberResult() {
@@ -705,24 +704,6 @@ async function fetchActivityHistory(discordId, { days = 182 } = {}) {
   });
 }
 
-async function getWeeklyLoad(discordId) {
-  try {
-    const snap = await db.collection(WEEKLY_LOAD_COLLECTION).doc(String(discordId)).get();
-    if (!snap.exists) return null;
-    const data = snap.data() || {};
-    return {
-      weekly: Array.isArray(data.weekly) ? data.weekly : [],
-      fitness: Array.isArray(data.fitness) ? data.fitness : [],
-      athlete: data.athlete || null,
-      zwiftpower: data.zwiftpower || null,
-      updatedAt: data.updatedAt || null,
-    };
-  } catch (err) {
-    console.warn("getWeeklyLoad failed:", err?.message || err);
-    return null;
-  }
-}
-
 function weeklyFitness(rows) {
   const byWeek = new Map();
   for (const row of rows) {
@@ -734,63 +715,40 @@ function weeklyFitness(rows) {
   return Array.from(byWeek.values()).slice(-12);
 }
 
-async function refreshWeeklyLoad(discordId, { days = 182 } = {}) {
-  const history = await fetchActivityHistory(discordId, { days });
-  if (!history?.success) return history;
-
-  let ftp = null;
-  let athlete = null;
-  try {
-    const profile = await getAthleteProfile(discordId);
-    ftp = Number(profile?.athlete?.ftp) || null;
-    athlete = profile?.athlete
-      ? {
-          weightKg: profile.athlete.weight_kg ?? null,
-          weightDate: profile.athlete.weight_date ?? null,
-          heightCm: profile.athlete.height_cm ?? null,
-          ftp,
-          sex: profile.athlete.sex || null,
-        }
-      : null;
-  } catch {
-    ftp = null;
-  }
-
-  let fitness = [];
-  try {
+async function getTrainingTrend(discordId, { days = 182 } = {}) {
+  const clampedDays = Math.min(Math.max(Number(days) || 182, 28), 182);
+  return wrapCall(discordId, async () => {
     const newest = copenhagenDate(0);
-    const oldest = copenhagenDate(-days);
-    const { data } = await intervalsFetch(discordId, `/athlete/0/wellness?oldest=${oldest}&newest=${newest}`);
-    fitness = weeklyFitness((Array.isArray(data) ? data : []).map(compactWellness).filter(Boolean));
-  } catch (err) {
-    console.warn("wellness refresh failed:", err?.message || err);
-  }
-
-  let zwiftpower = null;
-  try {
-    const zp = await getZwiftPowerContext(discordId);
-    if (zp?.success && zp.zwiftpower?.linked) {
-      zwiftpower = {
-        paceGroup: zp.zwiftpower.paceGroup ?? null,
-        veloCategory: zp.zwiftpower.veloCategory ?? null,
-        phenotype: zp.zwiftpower.phenotype ?? null,
-      };
-    }
-  } catch {
-    zwiftpower = null;
-  }
-
-  const weekly = weeklyLoad.rollupWeeks(history.activities, { ftp, weeks: 26 });
-  await db.collection(WEEKLY_LOAD_COLLECTION).doc(String(discordId)).set({
-    discordId: String(discordId),
-    weekly,
-    fitness,
-    ftpUsed: ftp,
-    athlete,
-    zwiftpower,
-    updatedAt: new Date(),
+    const oldest = copenhagenDate(-clampedDays);
+    const [listed, settingsRes, wellnessRes] = await Promise.all([
+      listActivities(discordId, oldest, newest),
+      intervalsFetch(discordId, "/athlete/0/sport-settings").catch((err) => {
+        if (err?.code === "needs_reconnect" || err?.code === "not_connected") throw err;
+        return { data: [] };
+      }),
+      intervalsFetch(discordId, `/athlete/0/wellness?oldest=${oldest}&newest=${newest}`).catch((err) => {
+        if (err?.code === "needs_reconnect" || err?.code === "not_connected") throw err;
+        return { data: [] };
+      }),
+    ]);
+    const sport = pickSportSettings(settingsRes.data);
+    const ftp = num(sport?.indoor_ftp) || num(sport?.ftp);
+    const weekly = weeklyLoad.rollupWeeks(listed.activities, { ftp, weeks: 26 });
+    const trend = weeklyLoad.loadTrend(weekly);
+    const fitness = weeklyFitness(
+      (Array.isArray(wellnessRes.data) ? wellnessRes.data : []).map(compactWellness).filter(Boolean)
+    );
+    const unread = unreadableSourceMessage(listed.skippedUnreadable);
+    return {
+      success: true,
+      weeks: weekly.length,
+      summary: weeklyLoad.formatWeeklyLoadForPrompt(weekly, trend),
+      fitness: fitness.slice(-12),
+      message:
+        "Fetched for this question and not stored. The current week only includes days already ridden, so a low number mid-week is not a drop in training." +
+        (unread ? ` ${unread}` : ""),
+    };
   });
-  return { success: true, weeks: weekly.length };
 }
 
 function workoutExternalId(date, name) {
@@ -854,8 +812,7 @@ module.exports = {
   getWellness,
   getPlannedWorkouts,
   fetchActivityHistory,
-  getWeeklyLoad,
-  refreshWeeklyLoad,
+  getTrainingTrend,
   upsertPlannedWorkout,
   copenhagenDate,
 };

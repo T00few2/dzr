@@ -11,16 +11,6 @@
 
 const base = {
   username: "chris",
-  loadBlock: [
-    "- 2026-08-10: 4 sessions, 5.5h, load 300",
-    "- 2026-08-17: 4 sessions, 6h, load 330",
-    "- 2026-08-24: 5 sessions, 6.5h, load 360",
-    "- 2026-08-31: 5 sessions, 7h, load 400",
-    "",
-    "Latest week is +25% against the prior four-week average.",
-    "Load has risen 3 weeks in a row.",
-  ].join("\n"),
-  athleteFacts: ["Weight: 72.0 kg", "FTP: 280 W (3.89 W/kg)", "ZwiftPower pace group: B"],
   settingsBlock: "- Ride frequency: 3–4 per week. Obey this over a busy training week; do not infer a higher volume from recent activities.\n- Sports: cycling",
   goalsBlock: "No saved goals.",
   summariesBlock: "No earlier conversations recorded.",
@@ -70,10 +60,11 @@ const fixtures = [
     forbid: [/intervaller i dag/i, /kør \d+ ?x/i],
   },
   {
-    name: "uses the load trend rather than counting recent sessions",
+    name: "does not invent a load trend",
     context: base,
     message: "Skal jeg lægge mere på næste uge?",
-    expect: "References the three-week build or the +25% ramp and advises easing off or holding. Must NOT recommend another increase without qualification.",
+    expect: "Does not state a ramp, a week count, or weekly load totals. May say it needs the longer training trend before advising whether to add load. Must NOT recommend another increase from invented numbers.",
+    forbid: [/\+\d+\s*%/],
   },
   {
     name: "resolves this week to the right Monday-Sunday range",
@@ -83,7 +74,7 @@ const fixtures = [
   },
   {
     name: "does not invent numbers absent from tool results",
-    context: { ...base, loadBlock: "No weekly history yet.", athleteFacts: [] },
+    context: base,
     message: "Hvad er min FTP og hvor mange watt trådte jeg i går?",
     expect: "Says it does not have those numbers, or offers to fetch them. Must NOT state a specific FTP or wattage.",
   },

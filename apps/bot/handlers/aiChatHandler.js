@@ -16,7 +16,6 @@ const {
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
 const { trimConversation } = require("../services/conversationTrim");
-const { loadTrend, formatWeeklyLoadForPrompt } = require("../services/weeklyLoad");
 const { 
   handleRiderStats, 
   handleTeamStats, 
@@ -655,6 +654,14 @@ const coachToolDefinitions = [
         },
         required: ["activity_id"]
       }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_training_trend",
+      description: "Fetch about six months of weekly training load plus CTL, ATL and form for the asking athlete. Call this when judging whether they are building, flat, or due a rest week, or how this week compares with recent months. The current week is partial. Not stored. Do not use it for a single recent ride.",
+      parameters: { type: "object", properties: {} }
     }
   },
   {
@@ -1410,6 +1417,7 @@ async function executeSingleToolCall(toolCall, message, turn) {
       case "get_recent_activities":
       case "get_activity_details":
       case "get_activity_metrics":
+      case "get_training_trend":
       case "get_wellness":
       case "get_planned_workouts":
       case "get_zwiftpower_context": {
@@ -1425,6 +1433,7 @@ async function executeSingleToolCall(toolCall, message, turn) {
         else if (name === "get_recent_activities") coachResult = await intervals.getRecentActivities(discordId, { days: args.days });
         else if (name === "get_activity_details") coachResult = await intervals.getActivityDetails(discordId, args.activity_id);
         else if (name === "get_activity_metrics") coachResult = await intervals.getActivityMetrics(discordId, args.activity_id);
+        else if (name === "get_training_trend") coachResult = await intervals.getTrainingTrend(discordId);
         else if (name === "get_wellness") coachResult = await intervals.getWellness(discordId, { days: args.days });
         else if (name === "get_planned_workouts") coachResult = await intervals.getPlannedWorkouts(discordId, { days: args.days });
         else coachResult = await intervals.getZwiftPowerContext(discordId);
@@ -1957,40 +1966,6 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
   let goalsBlock = "Chat notes are off. There are no saved goals.";
   let summariesBlock = "Chat notes are off, so earlier conversations are not recorded.";
   let notesOptIn = false;
-  let loadBlock = "No weekly history yet.";
-  let athleteFacts = [];
-  try {
-    const stored = await intervals.getWeeklyLoad(message.author.id);
-    if (stored?.weekly?.length) {
-      loadBlock = formatWeeklyLoadForPrompt(stored.weekly, loadTrend(stored.weekly));
-    }
-    if (Array.isArray(stored?.fitness) && stored.fitness.length) {
-      const fitnessLines = stored.fitness.slice(-8).map((row) => {
-        const form = row.form == null ? "" : `, form ${row.form}`;
-        return `- ${row.week}: CTL ${row.ctl ?? "—"}, ATL ${row.atl ?? "—"}${form}`;
-      });
-      loadBlock += `\n\nFitness from intervals.icu (CTL is fitness, ATL is fatigue, form is CTL minus ATL):\n${fitnessLines.join("\n")}`;
-    }
-    // Captured nightly, so having these costs nothing on a chat turn — and it lets the coach
-    // reason in W/kg from the first token instead of spending a tool call to learn a weight.
-    const kg = Number(stored?.athlete?.weightKg);
-    const height = Number(stored?.athlete?.heightCm);
-    const ftp = Number(stored?.athlete?.ftp);
-    if (Number.isFinite(kg) && kg > 0) {
-      const dated = stored?.athlete?.weightDate ? ` on ${stored.athlete.weightDate}` : "";
-      athleteFacts.push(`Weight: ${kg.toFixed(1)} kg${dated}`);
-    }
-    if (Number.isFinite(height) && height > 0) athleteFacts.push(`Height: ${height.toFixed(height % 1 ? 1 : 0)} cm`);
-    if (Number.isFinite(ftp) && ftp > 0) {
-      const wkg = Number.isFinite(kg) && kg > 0 ? ` (${(ftp / kg).toFixed(2)} W/kg)` : "";
-      athleteFacts.push(`FTP: ${Math.round(ftp)} W${wkg}`);
-    }
-    if (stored?.zwiftpower?.paceGroup) athleteFacts.push(`ZwiftPower pace group: ${stored.zwiftpower.paceGroup}`);
-    if (stored?.zwiftpower?.veloCategory) athleteFacts.push(`vELO category: ${stored.zwiftpower.veloCategory}`);
-    if (stored?.zwiftpower?.phenotype) athleteFacts.push(`Phenotype: ${stored.zwiftpower.phenotype}`);
-  } catch (err) {
-    console.error("getWeeklyLoad failed:", err?.message || err);
-  }
 
   let profile = preloadedProfile ?? null;
   try {
@@ -2033,8 +2008,6 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
   const content = buildCoachPromptText({
     username: message.author.username,
     today,
-    loadBlock,
-    athleteFacts,
     settingsBlock,
     goalsBlock,
     calendarBlock,
