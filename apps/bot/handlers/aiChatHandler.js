@@ -590,7 +590,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_athlete_profile",
-      description: "Get the asking athlete's intervals.icu profile (weight, FTP). Always the caller — never another member.",
+      description: "Get the asking athlete's intervals.icu profile: height from basic settings, the latest weight (including a scale import on the wellness calendar), and FTP. Always the caller — never another member.",
       parameters: { type: "object", properties: {} }
     }
   },
@@ -1974,8 +1974,13 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
     // Captured nightly, so having these costs nothing on a chat turn — and it lets the coach
     // reason in W/kg from the first token instead of spending a tool call to learn a weight.
     const kg = Number(stored?.athlete?.weightKg);
+    const height = Number(stored?.athlete?.heightCm);
     const ftp = Number(stored?.athlete?.ftp);
-    if (Number.isFinite(kg) && kg > 0) athleteFacts.push(`Weight: ${kg.toFixed(1)} kg`);
+    if (Number.isFinite(kg) && kg > 0) {
+      const dated = stored?.athlete?.weightDate ? ` on ${stored.athlete.weightDate}` : "";
+      athleteFacts.push(`Weight: ${kg.toFixed(1)} kg${dated}`);
+    }
+    if (Number.isFinite(height) && height > 0) athleteFacts.push(`Height: ${height.toFixed(height % 1 ? 1 : 0)} cm`);
     if (Number.isFinite(ftp) && ftp > 0) {
       const wkg = Number.isFinite(kg) && kg > 0 ? ` (${(ftp / kg).toFixed(2)} W/kg)` : "";
       athleteFacts.push(`FTP: ${Math.round(ftp)} W${wkg}`);

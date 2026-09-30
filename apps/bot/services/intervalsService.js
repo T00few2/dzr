@@ -263,18 +263,46 @@ function splitName(name) {
   return { firstname: parts[0] || null, lastname: parts.slice(1).join(" ") || null };
 }
 
+function heightCm(athlete) {
+  const height = num(athlete?.height);
+  if (height == null || height <= 0) return null;
+  const units = String(athlete?.height_units || "").toUpperCase();
+  if (units.includes("METER") || units === "M" || height < 3) return Math.round(height * 1000) / 10;
+  if (units.includes("FEET") || units === "FT") return Math.round(height * 30.48 * 10) / 10;
+  return Math.round(height * 10) / 10;
+}
+
+async function latestWellnessWeight(discordId) {
+  const newest = copenhagenDate(0);
+  const oldest = copenhagenDate(-90);
+  const { data } = await intervalsFetch(
+    discordId,
+    `/athlete/0/wellness?oldest=${oldest}&newest=${newest}`
+  );
+  const rows = (Array.isArray(data) ? data : [])
+    .map((row) => ({ date: String(row.id || row.date || ""), weight: num(row.weight) }))
+    .filter((row) => row.date && row.weight != null && row.weight > 0)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return rows[0] || null;
+}
+
 async function getAthleteProfile(discordId) {
   return wrapCall(discordId, async () => {
-    const [{ data: athlete }, settingsRes] = await Promise.all([
+    const [{ data: athlete }, settingsRes, scale] = await Promise.all([
       intervalsFetch(discordId, "/athlete/0"),
       intervalsFetch(discordId, "/athlete/0/sport-settings").catch((err) => {
         if (err?.code === "needs_reconnect" || err?.code === "not_connected") throw err;
         return { data: [] };
       }),
+      latestWellnessWeight(discordId).catch((err) => {
+        if (err?.code === "needs_reconnect" || err?.code === "not_connected") throw err;
+        return null;
+      }),
     ]);
     const sport = pickSportSettings(settingsRes.data);
     const names = splitName(athlete?.name);
     const ftp = num(sport?.indoor_ftp) || num(sport?.ftp) || num(athlete?.icu_ftp);
+    const profileWeight = num(athlete?.icu_weight) || num(athlete?.weight) || num(sport?.weight);
     return {
       success: true,
       athlete: {
@@ -284,7 +312,9 @@ async function getAthleteProfile(discordId) {
         city: null,
         country: null,
         sex: athlete?.sex || null,
-        weight_kg: num(sport?.weight) || num(athlete?.weight),
+        weight_kg: scale?.weight || profileWeight,
+        weight_date: scale?.weight ? scale.date : null,
+        height_cm: heightCm(athlete),
         ftp,
         clubs: [],
       },
@@ -714,7 +744,13 @@ async function refreshWeeklyLoad(discordId, { days = 182 } = {}) {
     const profile = await getAthleteProfile(discordId);
     ftp = Number(profile?.athlete?.ftp) || null;
     athlete = profile?.athlete
-      ? { weightKg: profile.athlete.weight_kg ?? null, ftp, sex: profile.athlete.sex || null }
+      ? {
+          weightKg: profile.athlete.weight_kg ?? null,
+          weightDate: profile.athlete.weight_date ?? null,
+          heightCm: profile.athlete.height_cm ?? null,
+          ftp,
+          sex: profile.athlete.sex || null,
+        }
       : null;
   } catch {
     ftp = null;

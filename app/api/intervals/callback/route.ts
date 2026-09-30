@@ -99,7 +99,7 @@ export async function GET(req: Request) {
       console.warn('intervals callback: could not DM user', discordId, dmErr)
     }
 
-    return NextResponse.redirect(new URL('/members-zone/my-pages?tab=2&intervals=connected', req.url))
+    return NextResponse.redirect(new URL('/intervals/connected', req.url))
   } catch (err: any) {
     console.error('intervals callback error:', err)
     return errorRedirect(req, 'callback_failed')
