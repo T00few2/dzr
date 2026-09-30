@@ -752,7 +752,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "send_workout_file",
-      description: "Build a Zwift workout (.zwo), send it in Discord, and place the same file on the athlete's intervals.icu calendar so it can upload to Zwift. Use for a specific structured session. Power is a fraction of FTP. Do not use for general advice or an easy ride. Pass the date they should ride it.",
+      description: "Put a structured Zwift workout on the athlete's intervals.icu calendar (it syncs to Zwift from there) and post a short card in Discord. Only if the calendar write fails is a .zwo file sent for manual install. Use for a specific structured session. Power is a fraction of FTP. Do not use for general advice. Pass the date they should ride it.",
       parameters: {
         type: "object",
         properties: {
@@ -1440,23 +1440,68 @@ async function executeSingleToolCall(toolCall, message, turn) {
           const built = buildZwo({ name: args.name, description: args.description, steps: args.steps });
           const outline = describeWorkout(args.steps);
           const minutes = Math.round(built.durationSeconds / 60);
-          let calendarNote = "intervals.icu er ikke forbundet, så filen er kun sendt her.";
+          let placed = null;
           try {
-            const placed = await intervals.upsertPlannedWorkout(message.author.id, {
+            placed = await intervals.upsertPlannedWorkout(message.author.id, {
               name: args.name,
               filename: built.filename,
               xml: built.xml,
               date: args.date,
             });
-            calendarNote = placed?.message || calendarNote;
           } catch (calendarErr) {
             console.warn("intervals workout upsert failed:", calendarErr?.message || calendarErr);
-            calendarNote = "Kalenderen blev ikke opdateret. Filen er sendt her.";
+          }
+          const onCalendar = Boolean(placed?.success && placed?.calendar);
+
+          const chart = renderWorkoutChart(args.steps, { name: args.name });
+          const chartName = built.filename.replace(/\.zwo$/, ".png");
+
+          if (onCalendar) {
+            // intervals.icu syncs planned workouts to Zwift itself, so the .zwo and the
+            // manual install steps would only tell the athlete to do the same job twice.
+            const dayLabel = new Date(`${placed.date}T12:00:00Z`).toLocaleDateString("da-DK", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              timeZone: "UTC",
+            });
+            const body = [
+              `🚴 **${args.name}** — ca. ${minutes} min`,
+              outline,
+              "",
+              `📅 Lagt i din intervals.icu-kalender ${dayLabel}.`,
+              "I Zwift: Workouts → Custom Workouts → Intervals.icu.",
+              "",
+              "Ser du den ikke? Forbind Zwift i intervals.icu (Settings → Connections) og slå upload af planlagte workouts til. FTP skal være den samme i Zwift og intervals.icu.",
+            ].join("\n");
+
+            await message.channel.send({
+              content: body,
+              files: chart ? [new AttachmentBuilder(chart, { name: chartName })] : [],
+              flags: MessageFlags.SuppressEmbeds,
+            });
+
+            return {
+              tool_call_id: toolCall.id,
+              success: true,
+              sent: true,
+              calendar: true,
+              date: placed.date,
+              message:
+                `Workout is on the athlete's intervals.icu calendar for ${placed.date} and will sync to Zwift (Workouts → Custom Workouts → Intervals.icu). ` +
+                "A card with the steps and where to find it in Zwift is already posted. No file was sent, so do not mention saving or installing a file. " +
+                "Do not repeat the steps or the Zwift instructions, and do not offer to add it to the calendar — it is already there. Say briefly why this session.",
+            };
           }
 
+          // Fallback: the calendar write failed, so the .zwo is the deliverable.
           // Zwift only reads custom workouts from a local folder, and only on PC/Mac. Naming the
           // athlete's own folder removes most of the friction; saying the rest plainly stops
           // iPad and Apple TV riders assuming the file is broken.
+          const calendarNote =
+            placed?.message && placed?.success === false
+              ? `The intervals.icu calendar was not updated: ${placed.message}`
+              : "The intervals.icu calendar was not updated.";
           let folder = "Documents/Zwift/Workouts/<dit Zwift-ID>/";
           try {
             const zwiftId = await getUserZwiftId(message.author.id);
@@ -1468,6 +1513,8 @@ async function executeSingleToolCall(toolCall, message, turn) {
           const body = [
             `🚴 **${args.name}** — ca. ${minutes} min`,
             outline,
+            "",
+            "Jeg kunne ikke lægge den i din intervals.icu-kalender, så her er filen i stedet.",
             "",
             "**Sådan bruger du filen**",
             `1. Gem den i \`${folder}\``,
@@ -1482,9 +1529,8 @@ async function executeSingleToolCall(toolCall, message, turn) {
           // The profile picture is a convenience; the .zwo is the deliverable. renderWorkoutChart
           // returns null rather than throwing if canvas is unavailable, so a missing image never
           // costs the athlete their workout.
-          const chart = renderWorkoutChart(args.steps, { name: args.name });
           if (chart) {
-            files.push(new AttachmentBuilder(chart, { name: built.filename.replace(/\.zwo$/, ".png") }));
+            files.push(new AttachmentBuilder(chart, { name: chartName }));
           }
 
           await message.channel.send({
@@ -1498,7 +1544,8 @@ async function executeSingleToolCall(toolCall, message, turn) {
             tool_call_id: toolCall.id,
             success: true,
             sent: true,
-            message: `Workout file sent in Discord. ${calendarNote} Do not repeat the step list. Say why this session, and whether it is on the way to Zwift.`,
+            calendar: false,
+            message: `Workout file sent in Discord for manual install. ${calendarNote} Do not repeat the step list or the install steps. Say why this session, and say plainly it is not on the intervals.icu calendar, so it will not sync to Zwift by itself.`,
           };
         } catch (err) {
           console.error("send_workout_file failed:", err?.message || err);
