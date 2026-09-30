@@ -13,6 +13,7 @@ const {
   getCoachDailyTokens,
   listCalendarEntries,
   addCalendarEntry,
+  deleteCalendarEntry,
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
 const { trimConversation } = require("../services/conversationTrim");
@@ -76,6 +77,7 @@ const COACH_NOTE_TOOLS = new Set([
   // Reading the calendar is ungated, but writing to it is not: a coach-written row derived
   // from a conversation is persisted conversation content, so it follows the same consent.
   "save_planned_event",
+  "delete_planned_event",
 ]);
 
 // Configuration
@@ -859,6 +861,23 @@ const coachToolDefinitions = [
           }
         },
         required: ["text", "eventDate"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_planned_event",
+      description: "Remove one row from the DZR calendar when the athlete asks to delete that row. Pass the id shown on the calendar line. This does not remove a planned workout from intervals.icu or from Zwift. Do not call it unless they asked to remove that specific row.",
+      parameters: {
+        type: "object",
+        properties: {
+          entryId: {
+            type: "string",
+            description: "The id: value on the DZR calendar line to remove."
+          }
+        },
+        required: ["entryId"]
       }
     }
   }
@@ -1834,6 +1853,44 @@ async function executeSingleToolCall(toolCall, message, turn) {
         } catch (err) {
           console.error("save_planned_event failed:", err?.message || err);
           return { tool_call_id: toolCall.id, success: false, message: "Could not add it to their calendar." };
+        }
+      }
+
+      case "delete_planned_event": {
+        const eligible = turn?.eligible ?? await intervals.hasClubMemberRole(message.author.id);
+        if (!eligible) {
+          return { tool_call_id: toolCall.id, ...intervals.notClubMemberResult() };
+        }
+        try {
+          const profile = turn?.profile ?? await getCoachProfile(message.author.id);
+          if (profile?.notesOptIn !== true) {
+            return {
+              tool_call_id: toolCall.id,
+              success: false,
+              message: `Chat notes are off, so you cannot remove a DZR calendar row. They can delete it on the Kalender page: ${CALENDAR_URL}. This does not affect intervals.icu.`,
+            };
+          }
+          const result = await deleteCalendarEntry(message.author.id, args.entryId);
+          if (result.ok) {
+            const label = result.entry?.text ? `"${result.entry.text}" on ${result.entry.eventDate}` : "that row";
+            return {
+              tool_call_id: toolCall.id,
+              success: true,
+              message: `Removed ${label} from the DZR calendar. A planned workout on intervals.icu is unchanged. Say what you removed in one short clause. Do not say it was removed from Zwift or intervals.icu.`,
+            };
+          }
+          const reasons = {
+            invalid: "Not removed: that id is not a DZR calendar row.",
+            not_found: "Not removed: no DZR calendar row with that id. Do not claim it is gone.",
+          };
+          return {
+            tool_call_id: toolCall.id,
+            success: false,
+            message: reasons[result.reason] || "Could not remove that DZR calendar row.",
+          };
+        } catch (err) {
+          console.error("delete_planned_event failed:", err?.message || err);
+          return { tool_call_id: toolCall.id, success: false, message: "Could not remove that DZR calendar row." };
         }
       }
 

@@ -170,7 +170,8 @@ function formatEntryLine(entry, now) {
   // commitment, and does not treat something it proposed as something they decided.
   const who = entry.source === "coach" ? " [added by coach]" : "";
   const status = entry.status && entry.status !== "planned" ? ` [${entry.status}]` : "";
-  return `- ${when}${time} — ${entry.text} (${entry.kind})${who}${status}`;
+  const id = entry.id ? `id:${entry.id} ` : "";
+  return `- ${id}${when}${time} — ${entry.text} (${entry.kind})${who}${status}`;
 }
 
 /**

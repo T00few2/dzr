@@ -158,6 +158,11 @@ test("formatCalendarForPrompt renders dates, times and coach attribution", () =>
   const block = formatCalendarForPrompt(entries, NOW);
 
   assert.match(block, /2026-09-10 \(in 3 days\) at 15:17 — After Party \(C\) \(race\)$/m);
+  const withId = formatCalendarForPrompt(
+    [{ id: "abc12345", eventDate: "2026-09-10", text: "After Party (C)", kind: "race", source: "member", status: "planned" }],
+    NOW
+  );
+  assert.match(withId, /id:abc12345 2026-09-10/);
   assert.match(block, /easy 90 min \(session\) \[added by coach\]/);
   assert.doesNotMatch(block, /easy 90 min \(session\).*at /, "untimed rows must not invent a clock time");
   assert.doesNotMatch(

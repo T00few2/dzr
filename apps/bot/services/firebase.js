@@ -159,6 +159,18 @@ async function addCalendarEntry(discordId, incoming, { source = "coach" } = {}) 
   return { ok: true, entry };
 }
 
+async function deleteCalendarEntry(discordId, entryId) {
+  const id = String(discordId || "").trim();
+  const entryIdClean = String(entryId || "").trim();
+  if (!id || !/^[A-Za-z0-9]{8,128}$/.test(entryIdClean)) return { ok: false, reason: "invalid" };
+  const ref = memberCalendarCol(id).doc(entryIdClean);
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, reason: "not_found" };
+  const entry = unwrapCalendarDocSafe(snap);
+  await ref.delete();
+  return { ok: true, entry };
+}
+
 function noteSkip(raw, reason, extra = {}) {
   const text = String(raw?.text || extra.text || "").trim().slice(0, 80);
   return {
@@ -766,4 +778,5 @@ module.exports = {
   addCoachChatNotes,
   listCalendarEntries,
   addCalendarEntry,
+  deleteCalendarEntry,
 }; 
