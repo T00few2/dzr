@@ -681,7 +681,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_planned_workouts",
-      description: "Planned workouts already on the athlete's intervals.icu calendar, including ones that can sync to Zwift. Use before prescribing so you do not ignore what is already planned.",
+      description: "Workouts already queued for Zwift via intervals.icu. This is not the athlete's calendar and does not answer what is coming up — that is the DZR calendar block already in the prompt. Use only to see whether a structured workout is already waiting to sync to Zwift.",
       parameters: {
         type: "object",
         properties: {
@@ -759,7 +759,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "send_workout_file",
-      description: "Put a structured Zwift workout on the athlete's intervals.icu calendar (it syncs to Zwift from there) and post a short card in Discord. Only if the calendar write fails is a .zwo file sent for manual install. Use for a specific structured session. Power is a fraction of FTP. Do not use for general advice. Pass the date they should ride it.",
+      description: "Add one structured workout to the DZR calendar and push the same workout through intervals.icu so Zwift can pick it up. Posts a short card in Discord. A .zwo file is sent only if the Zwift push fails. Use for a specific structured session, not for a race or a ride they are merely committing to (that is save_planned_event, DZR calendar only). Power is a fraction of FTP. Do not also call save_planned_event for this session. Pass the date they should ride it.",
       parameters: {
         type: "object",
         properties: {
@@ -836,7 +836,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "save_planned_event",
-      description: "Put something the athlete intends to DO on their calendar: a race, an event, or a session they are committing to. This is not the same as a chat note, which records advice YOU gave — the calendar records what THEY are going to do. Use it when they say they are riding or racing on a date, or when they accept a session you suggested for a specific day. Do not use it to write out a training plan they did not ask for, and do not use it for a dated aim they call their goal — that is propose_coach_goal.",
+      description: "Put a race, an event, or a ride the athlete is committing to on the DZR calendar only. Nothing is sent to Zwift. Use when they say they are riding or racing on a date. A structured workout with steps is send_workout_file, which writes the DZR calendar and pushes to Zwift — do not also call this for that session. Do not use it to write out a training plan they did not ask for, and do not use it for a dated aim they call their goal — that is propose_coach_goal.",
       parameters: {
         type: "object",
         properties: {
@@ -1066,6 +1066,35 @@ function resolveUser(userString, message) {
  * decrypts, so a turn with three parallel training tools spent roughly eight Firestore operations
  * on nothing but authorisation — all of it on the latency path in front of the athlete.
  */
+function dzrCalendarNote(dzr) {
+  if (dzr?.onDzr && dzr.already) return "That session is already on the DZR calendar for this date.";
+  if (dzr?.onDzr) return "The session is on the DZR calendar.";
+  if (dzr?.reason === "notes_off") {
+    return `It was NOT added to the DZR calendar because chat notes are off. Say that plainly. They can add it at ${CALENDAR_URL}.`;
+  }
+  if (dzr?.reason === "coach_weekly_cap") {
+    return `It was NOT added to the DZR calendar: you have already added ${MAX_COACH_ENTRIES_PER_WEEK} entries this week.`;
+  }
+  if (dzr?.reason === "full") return "It was NOT added to the DZR calendar because it is full.";
+  if (dzr?.reason === "invalid") return "It was NOT added to the DZR calendar because the date was not a valid future date.";
+  return "It was NOT added to the DZR calendar.";
+}
+
+async function addWorkoutToDzrCalendar(discordId, profile, { name, minutes, date }) {
+  try {
+    const stored = profile ?? await getCoachProfile(discordId);
+    if (stored?.notesOptIn !== true) return { onDzr: false, reason: "notes_off" };
+    const text = `${String(name || "Træningspas").trim()} (ca. ${minutes} min)`.slice(0, 280);
+    const saved = await addCalendarEntry(discordId, { text, eventDate: date, kind: "session" });
+    if (saved.ok) return { onDzr: true };
+    if (saved.reason === "duplicate") return { onDzr: true, already: true };
+    return { onDzr: false, reason: saved.reason || "failed" };
+  } catch (err) {
+    console.warn("DZR calendar workout entry failed:", err?.message || err);
+    return { onDzr: false, reason: "failed" };
+  }
+}
+
 async function executeSingleToolCall(toolCall, message, turn) {
   const { name, arguments: argsString } = toolCall.function;
   let args;
@@ -1460,28 +1489,38 @@ async function executeSingleToolCall(toolCall, message, turn) {
           } catch (calendarErr) {
             console.warn("intervals workout upsert failed:", calendarErr?.message || calendarErr);
           }
-          const onCalendar = Boolean(placed?.success && placed?.calendar);
+          const onZwift = Boolean(placed?.success && placed?.calendar);
+          const rideDate = placed?.date
+            || (/^\d{4}-\d{2}-\d{2}$/.test(String(args.date || "")) ? String(args.date) : intervals.copenhagenDate(1));
+          const dzr = await addWorkoutToDzrCalendar(message.author.id, turn?.profile, {
+            name: args.name,
+            minutes,
+            date: rideDate,
+          });
 
           const chart = renderWorkoutChart(args.steps, { name: args.name });
           const chartName = built.filename.replace(/\.zwo$/, ".png");
+          const dayLabel = new Date(`${rideDate}T12:00:00Z`).toLocaleDateString("da-DK", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            timeZone: "UTC",
+          });
 
-          if (onCalendar) {
+          if (onZwift) {
             // intervals.icu syncs planned workouts to Zwift itself, so the .zwo and the
             // manual install steps would only tell the athlete to do the same job twice.
-            const dayLabel = new Date(`${placed.date}T12:00:00Z`).toLocaleDateString("da-DK", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              timeZone: "UTC",
-            });
+            const where = dzr.onDzr
+              ? `📅 På din DZR-kalender ${dayLabel}, og sendt til Zwift via intervals.icu.`
+              : `📅 Sendt til Zwift via intervals.icu ${dayLabel}. Den ligger ikke på din DZR-kalender.`;
             const body = [
               `🚴 **${args.name}** — ca. ${minutes} min`,
               outline,
               "",
-              `📅 Lagt i din intervals.icu-kalender ${dayLabel}.`,
+              where,
               "I Zwift: Workouts → Custom Workouts → Intervals.icu.",
               "",
-              "Ser du den ikke? Forbind Zwift i intervals.icu (Settings → Connections) og slå upload af planlagte workouts til. FTP skal være den samme i Zwift og intervals.icu.",
+              "Ser du den ikke i Zwift? Forbind Zwift i intervals.icu (Settings → Connections) og slå upload af planlagte workouts til. FTP skal være den samme i Zwift og intervals.icu.",
             ].join("\n");
 
             await message.channel.send({
@@ -1494,12 +1533,16 @@ async function executeSingleToolCall(toolCall, message, turn) {
               tool_call_id: toolCall.id,
               success: true,
               sent: true,
-              calendar: true,
-              date: placed.date,
+              calendar: dzr.onDzr,
+              zwift: true,
+              date: rideDate,
               message:
-                `Workout is on the athlete's intervals.icu calendar for ${placed.date} and will sync to Zwift (Workouts → Custom Workouts → Intervals.icu). ` +
+                `The workout was pushed through intervals.icu for ${rideDate} and can sync to Zwift (Workouts → Custom Workouts → Intervals.icu). ${dzrCalendarNote(dzr)} ` +
                 "A card with the steps and where to find it in Zwift is already posted. No file was sent, so do not mention saving or installing a file. " +
-                "Do not repeat the steps or the Zwift instructions, and do not offer to add it to the calendar — it is already there. Say briefly why this session.",
+                "Do not repeat the steps or the Zwift instructions. Say briefly why this session. " +
+                (dzr.onDzr
+                  ? "Do not offer to add it to the DZR calendar."
+                  : "Do not say it is on the DZR calendar."),
             };
           }
 
@@ -1519,11 +1562,15 @@ async function executeSingleToolCall(toolCall, message, turn) {
             /* fall back to the generic path */
           }
 
+          const dzrLine = dzr.onDzr
+            ? `Den ligger på din DZR-kalender ${dayLabel}.`
+            : "Den ligger ikke på din DZR-kalender.";
           const body = [
             `🚴 **${args.name}** — ca. ${minutes} min`,
             outline,
             "",
-            "Jeg kunne ikke lægge den i din intervals.icu-kalender, så her er filen i stedet.",
+            "Jeg kunne ikke sende den til Zwift via intervals.icu, så her er filen i stedet.",
+            dzrLine,
             "",
             "**Sådan bruger du filen**",
             `1. Gem den i \`${folder}\``,
@@ -1554,7 +1601,7 @@ async function executeSingleToolCall(toolCall, message, turn) {
             success: true,
             sent: true,
             calendar: false,
-            message: `Workout file sent in Discord for manual install. ${calendarNote} Do not repeat the step list or the install steps. Say why this session, and say plainly it is not on the intervals.icu calendar, so it will not sync to Zwift by itself.`,
+            message: `Workout file sent in Discord for manual install. ${calendarNote} ${dzrCalendarNote(dzr)} Do not repeat the step list or the install steps. Say why this session, and say plainly it will not sync to Zwift by itself.`,
           };
         } catch (err) {
           console.error("send_workout_file failed:", err?.message || err);
@@ -1768,7 +1815,7 @@ async function executeSingleToolCall(toolCall, message, turn) {
               tool_call_id: toolCall.id,
               success: true,
               entry: result.entry,
-              message: "Added to their calendar. Mention it in one short clause; do not list the calendar back to them.",
+              message: "Added to the DZR calendar only. Nothing was sent to Zwift. Mention it in one short clause; do not list the calendar back to them.",
             };
           }
           // Every failure is reported with a reason the model can act on, rather than a generic
