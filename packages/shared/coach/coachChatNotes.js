@@ -145,8 +145,8 @@ function sanitizeEventDate(value, now = new Date()) {
   return iso;
 }
 
-function eventDateFromNote(note) {
-  return note ? sanitizeEventDate(note.eventDate) : null;
+function eventDateFromNote(note, now = new Date()) {
+  return note ? sanitizeEventDate(note.eventDate, now) : null;
 }
 
 function formatDaysUntil(eventDate, now = new Date()) {
@@ -172,7 +172,7 @@ function activeGoalNotes(notes, now = new Date()) {
   const out = [];
   for (const note of Array.isArray(notes) ? notes : []) {
     if (note?.kind !== "goal" || !note.text) continue;
-    const eventDate = eventDateFromNote(note);
+    const eventDate = eventDateFromNote(note, now);
     if (!eventDate || eventDate < today) continue;
     out.push({ ...note, eventDate });
   }
@@ -321,7 +321,7 @@ const NOTE_KIND_LABELS = {
 };
 
 function formatGoalLine(note, now = new Date()) {
-  const eventDate = note.eventDate || eventDateFromNote(note);
+  const eventDate = note.eventDate || eventDateFromNote(note, now);
   const until = eventDate ? formatDaysUntil(eventDate, now) : "";
   const when = eventDate ? (until ? `${eventDate} (${until})` : eventDate) : "";
   return when ? `- Goal ${when}: ${note.text}` : `- Goal: ${note.text}`;
