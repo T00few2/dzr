@@ -684,7 +684,7 @@ async function getWellness(discordId, { days = 14 } = {}) {
     if (!rows.length) message = "No wellness rows in this window.";
     else if (!hasRecovery) {
       message =
-        "intervals.icu returned no sleep, HRV, resting HR or readiness for this window. That data may come from a synced device (Oura, Garmin, Whoop) that intervals.icu does not share with connected apps, or the sync may be behind. Do not tell the athlete they have not logged it; say DZR Coach cannot see it, and do not treat it as fine.";
+        "intervals.icu has no sleep, HRV, resting HR or readiness for this window. It may come from a device sync (Oura, Garmin, Whoop) that has not run yet, so do not tell the athlete they forgot to log it, and do not treat it as fine.";
     } else {
       message = "Null fields are unknown for that day, not fine.";
     }
