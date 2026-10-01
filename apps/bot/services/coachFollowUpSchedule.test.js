@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  followUpClockWindow,
   shouldRunFollowUpSweep,
   isFollowUpDue,
   FOLLOW_UP_HOUR,
@@ -9,6 +10,20 @@ const {
 
 // Copenhagen is UTC+2 in September, so 06:00Z is 08:00 local.
 const utc = (iso) => new Date(iso);
+
+test("the clock window does not need lastRunDate", () => {
+  const early = followUpClockWindow(utc("2026-09-07T05:00:00Z"));
+  assert.equal(early.open, false);
+  assert.equal(early.reason, "not_time");
+
+  const open = followUpClockWindow(utc("2026-09-07T06:43:00Z"));
+  assert.equal(open.open, true);
+  assert.equal(open.todayKey, "2026-09-07");
+
+  const evening = followUpClockWindow(utc("2026-09-07T21:00:00Z"));
+  assert.equal(evening.open, false);
+  assert.equal(evening.reason, "too_late");
+});
 
 test("does not run before the check-in hour", () => {
   const r = shouldRunFollowUpSweep({ now: utc("2026-09-07T05:00:00Z"), lastRunDate: null });

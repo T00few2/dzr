@@ -233,127 +233,145 @@ def _commit_in_batches(write_ops, batch_size: int = 450):
     return committed
 
 
-def overwrite_companion_club_members_in_firestore(members: list[dict]) -> dict:
-    """
-    Store the current club roster in Firestore as an "official membership list",
-    overwriting any previous data.
+COMPANION_COMPARE_FIELDS = (
+    "firstName",
+    "lastName",
+    "gender",
+    "countryCode",
+    "profileId",
+    "createdOn",
+    "membershipCreatedOn",
+)
+ZWIFTPOWER_COMPARE_FIELDS = ("zwid", "name", "rank", "rankRaw")
 
-    Layout:
-      - companion_club_members/{profileId} (per-member docs)
 
-    Each member doc gets:
-      - rosterSyncedAt: datetime
+def _roster_values_equal(stored, incoming) -> bool:
+    """Firestore null and Python None are the same. Do not coerce other types."""
+    if stored is None and incoming is None:
+        return True
+    return stored == incoming
+
+
+def _roster_row_unchanged(existing: dict, incoming: dict, fields: tuple) -> bool:
+    for field in fields:
+        if not _roster_values_equal((existing or {}).get(field), (incoming or {}).get(field)):
+            return False
+    return True
+
+
+def _empty_roster_sync_result() -> dict:
+    return {
+        "memberCount": 0,
+        "syncedAt": None,
+        "deleted": 0,
+        "upserted": 0,
+        "unchanged": 0,
+        "aborted": "empty_fetch",
+        "error": "Roster fetch was empty; stored roster was left unchanged.",
+    }
+
+
+def _sync_roster_collection(col_ref, members: list[dict], id_field: str, compare_fields: tuple, stamp_profile_id: bool) -> dict:
     """
+    Delete members who left and write rows whose compared fields changed.
+    An empty or id-less fetch does not delete the stored roster.
+    """
+    valid = []
+    seen = set()
+    for member in members or []:
+        raw_id = (member or {}).get(id_field)
+        if raw_id is None or str(raw_id).strip() == "":
+            continue
+        doc_id = str(raw_id)
+        if doc_id in seen:
+            continue
+        seen.add(doc_id)
+        valid.append((doc_id, member))
+
+    if not valid:
+        return _empty_roster_sync_result()
+
     sync_ts = datetime.utcnow()
+    existing = {}
+    for doc in col_ref.stream():
+        existing[doc.id] = doc.to_dict() or {}
 
-    members_col_ref = firebase.db.collection("companion_club_members")
+    def make_set_op(doc_id: str, data: dict):
+        payload = {
+            **(data or {}),
+            "rosterSyncedAt": sync_ts,
+            "updatedAt": sync_ts,
+        }
+        if stamp_profile_id:
+            payload["profileId"] = doc_id
 
-    # 1) Delete all existing docs (full overwrite)
-    existing_stream = members_col_ref.stream()
-
-    def make_delete_op(doc_ref):
         def _op(batch):
-            batch.delete(doc_ref)
+            batch.set(col_ref.document(doc_id), payload, merge=False)
+
         return _op
 
-    delete_ops = [make_delete_op(doc.reference) for doc in existing_stream]
-    deleted_count = _commit_in_batches(delete_ops)
-
-    # Upsert members
-    def make_set_op(profile_id: str, data: dict):
-        doc_ref = members_col_ref.document(str(profile_id))
-
+    def make_delete_op(doc_id: str):
         def _op(batch):
-            batch.set(
-                doc_ref,
-                {
-                    **(data or {}),
-                    "profileId": str(profile_id),
-                    "rosterSyncedAt": sync_ts,
-                    "updatedAt": sync_ts,
-                },
-                merge=False,
-            )
+            batch.delete(col_ref.document(doc_id))
 
         return _op
 
     upsert_ops = []
-    for m in members or []:
-        pid = (m or {}).get("profileId")
-        if pid is None:
+    unchanged = 0
+    for doc_id, data in valid:
+        current = existing.get(doc_id)
+        comparable = dict(data or {})
+        if stamp_profile_id:
+            # The write stores the document id, same as the previous full overwrite.
+            comparable["profileId"] = doc_id
+        if current is not None and _roster_row_unchanged(current, comparable, compare_fields):
+            unchanged += 1
             continue
-        upsert_ops.append(make_set_op(str(pid), m))
+        upsert_ops.append(make_set_op(doc_id, data))
 
+    delete_ops = [make_delete_op(doc_id) for doc_id in existing if doc_id not in seen]
     upserted_count = _commit_in_batches(upsert_ops)
+    deleted_count = _commit_in_batches(delete_ops)
 
     return {
-        "memberCount": len(members or []),
+        "memberCount": len(valid),
         "syncedAt": sync_ts.isoformat() + "Z",
         "deleted": deleted_count,
         "upserted": upserted_count,
+        "unchanged": unchanged,
+        "aborted": None,
     }
+
+
+def overwrite_companion_club_members_in_firestore(members: list[dict]) -> dict:
+    """
+    Store the current club roster in Firestore as companion_club_members/{profileId}.
+
+    Unchanged rows are left in place, including rosterSyncedAt. An empty fetch does not
+    delete the stored roster.
+    """
+    return _sync_roster_collection(
+        firebase.db.collection("companion_club_members"),
+        members,
+        "profileId",
+        COMPANION_COMPARE_FIELDS,
+        stamp_profile_id=True,
+    )
 
 
 def overwrite_zwiftpower_club_members_in_firestore(members: list[dict]) -> dict:
     """
-    Store ZwiftPower team_riders roster in Firestore, overwriting any previous data.
+    Store the ZwiftPower roster in zwiftpower_club_members/{zwid}.
 
-    Collection:
-      - zwiftpower_club_members/{zwid}
-
-    Fields stored per doc:
-      - zwid (Zwift ID)
-      - name
-      - rank (numeric when possible)
-      - rankRaw (original rank value)
-      - rosterSyncedAt, updatedAt
+    Unchanged rows are left in place. An empty fetch does not delete the stored roster.
     """
-    sync_ts = datetime.utcnow()
-    col_ref = firebase.db.collection("zwiftpower_club_members")
-
-    # 1) Delete all existing docs (full overwrite)
-    existing_stream = col_ref.stream()
-
-    def make_delete_op(doc_ref):
-        def _op(batch):
-            batch.delete(doc_ref)
-        return _op
-
-    delete_ops = [make_delete_op(doc.reference) for doc in existing_stream]
-    deleted_count = _commit_in_batches(delete_ops)
-
-    # 2) Write fresh docs keyed by zwid
-    def make_set_op(doc_id: str, data: dict):
-        doc_ref = col_ref.document(str(doc_id))
-
-        def _op(batch):
-            batch.set(
-                doc_ref,
-                {
-                    **(data or {}),
-                    "rosterSyncedAt": sync_ts,
-                    "updatedAt": sync_ts,
-                },
-                merge=False,
-            )
-
-        return _op
-
-    upsert_ops = []
-    for m in members or []:
-        zwid = (m or {}).get("zwid")
-        if zwid is None:
-            continue
-        upsert_ops.append(make_set_op(str(zwid), m))
-
-    upserted_count = _commit_in_batches(upsert_ops)
-
-    return {
-        "memberCount": len(members or []),
-        "syncedAt": sync_ts.isoformat() + "Z",
-        "deleted": deleted_count,
-        "upserted": upserted_count,
-    }
+    return _sync_roster_collection(
+        firebase.db.collection("zwiftpower_club_members"),
+        members,
+        "zwid",
+        ZWIFTPOWER_COMPARE_FIELDS,
+        stamp_profile_id=False,
+    )
 
 
 def _refresh_companion_club_roster(club_id: str, limit: int = 100, paginate: bool = True) -> dict:
@@ -365,15 +383,20 @@ def _refresh_companion_club_roster(club_id: str, limit: int = 100, paginate: boo
     simplified = ZwiftAPI.simplify_club_roster(roster or [])
 
     result = overwrite_companion_club_members_in_firestore(simplified)
-    return {
-        "status": "success",
+    payload = {
+        "status": "aborted" if result.get("aborted") else "success",
         "clubId": str(club_id),
         "fetched": len(roster or []),
         "stored": result["memberCount"],
         "deleted": result["deleted"],
         "upserted": result["upserted"],
+        "unchanged": result.get("unchanged", 0),
         "syncedAt": result["syncedAt"],
     }
+    if result.get("aborted"):
+        payload["aborted"] = result["aborted"]
+        payload["error"] = result.get("error")
+    return payload
 
 
 def _parse_roster_timestamp(v) -> Optional[datetime]:
@@ -1555,8 +1578,19 @@ def get_due_scheduled_messages():
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
-        # Get all active schedules with document IDs
-        schedules = firebase.get_collection('scheduled_messages', limit=100, include_id=True)
+        # Time-based schedules only. Probability messages keep next_run null and are
+        # chosen by check_probability_and_select, so they must not be loaded here.
+        now_utc = datetime.now(timezone.utc)
+        due_query = (
+            firebase.db.collection("scheduled_messages")
+            .where("active", "==", True)
+            .where("next_run", "<=", now_utc)
+        )
+        schedules = []
+        for doc in due_query.stream():
+            schedule = doc.to_dict() or {}
+            schedule["id"] = doc.id
+            schedules.append(schedule)
         
         due_messages = []
         # Get current time as datetime
@@ -4327,6 +4361,8 @@ def refresh_default_zwift_club_roster():
         paginate = paginate_raw not in ("0", "false", "no", "off")
 
         payload = _refresh_companion_club_roster(str(ZWIFT_CLUB_ID), limit=limit, paginate=paginate)
+        if payload.get("aborted"):
+            return jsonify(payload), 409
         return jsonify(payload)
 
     except Exception as e:
@@ -4403,17 +4439,21 @@ def refresh_zwiftpower_club_roster():
             )
 
         result = overwrite_zwiftpower_club_members_in_firestore(simplified)
-        return jsonify(
-            {
-                "status": "success",
-                "clubId": club_id,
-                "fetched": len(rows),
-                "stored": result["memberCount"],
-                "deleted": result["deleted"],
-                "upserted": result["upserted"],
-                "syncedAt": result["syncedAt"],
-            }
-        )
+        payload = {
+            "status": "aborted" if result.get("aborted") else "success",
+            "clubId": club_id,
+            "fetched": len(rows),
+            "stored": result["memberCount"],
+            "deleted": result["deleted"],
+            "upserted": result["upserted"],
+            "unchanged": result.get("unchanged", 0),
+            "syncedAt": result["syncedAt"],
+        }
+        if result.get("aborted"):
+            payload["aborted"] = result["aborted"]
+            payload["error"] = result.get("error")
+            return jsonify(payload), 409
+        return jsonify(payload)
 
     except Exception as e:
         print(f"Error refreshing ZwiftPower club roster: {str(e)}")

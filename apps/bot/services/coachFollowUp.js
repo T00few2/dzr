@@ -24,11 +24,14 @@ const { formatCalendarForPrompt } = require("./memberCalendar");
 const {
   FOLLOW_UP_TZ,
   FOLLOW_UP_HOUR,
+  followUpClockWindow,
   shouldRunFollowUpSweep,
   isFollowUpDue,
 } = require("./coachFollowUpSchedule");
 
 const FOLLOW_UP_STATE_KEY = "coach_follow_up";
+/** Set only after Firestore says today's sweep already finished. Never cache "not yet run". */
+let cachedFollowUpRunDate = null;
 const MAX_FOLLOW_UPS_PER_RUN = 25;
 const MODEL = "gpt-5-mini";
 const FALLBACK_DA = "Hvordan går træningen? Skriv hvis du vil have et kig på ugen.";
@@ -219,9 +222,18 @@ async function sendOneFollowUp(profile) {
 }
 
 async function maybeSendCoachFollowUps(now = new Date()) {
+  const window = followUpClockWindow(now);
+  if (!window.open) return { skipped: window.reason };
+  if (cachedFollowUpRunDate === window.todayKey) return { skipped: "already_ran" };
+
   const existing = await getBotState(FOLLOW_UP_STATE_KEY);
   const decision = shouldRunFollowUpSweep({ now, lastRunDate: existing?.lastRunDate || null });
-  if (!decision.run) return { skipped: decision.reason };
+  if (!decision.run) {
+    if (decision.reason === "already_ran" && decision.todayKey) {
+      cachedFollowUpRunDate = decision.todayKey;
+    }
+    return { skipped: decision.reason };
+  }
   const todayKey = decision.todayKey;
 
   const due = [];
@@ -270,6 +282,7 @@ async function maybeSendCoachFollowUps(now = new Date()) {
     considered: due.length,
     updatedAt: now.toISOString(),
   });
+  cachedFollowUpRunDate = todayKey;
   console.log(`🚴 Coach follow-ups: ${sent}/${due.length} on ${todayKey}`);
   return { sent, considered: due.length };
 }

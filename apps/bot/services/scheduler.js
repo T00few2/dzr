@@ -201,6 +201,27 @@ async function checkTimeBasedMessages(client) {
 }
 
 let lastNewMemberSweepHour = null;
+/** messageId for the KMS status post. Cleared when an edit fails so the next attempt re-reads bot_state. */
+let cachedKmsMessage = null;
+
+async function readKmsMessageId(stateKey) {
+  const existing = await getBotState(stateKey);
+  const messageId = existing?.messageId || null;
+  if (messageId) cachedKmsMessage = { stateKey, messageId };
+  return messageId;
+}
+
+function rememberKmsMessageId(stateKey, messageId) {
+  if (messageId) cachedKmsMessage = { stateKey, messageId };
+}
+
+async function currentKmsMessageId(stateKey) {
+  if (cachedKmsMessage?.stateKey === stateKey && cachedKmsMessage.messageId) {
+    return cachedKmsMessage.messageId;
+  }
+  return readKmsMessageId(stateKey);
+}
+
 async function checkNewMemberSweeps(client) {
   try {
     const now = new Date();
@@ -269,10 +290,10 @@ async function updateKmsStatus(client) {
 
     // No extra embeds needed; show masked link in content
 
-    // Retrieve existing status message ID
+    // Retrieve existing status message ID. The countdown still edits every minute;
+    // Firestore is only needed to find that message.
     const stateKey = `kms_status_${channel.guild.id}_${channel.id}`;
-    const existing = await getBotState(stateKey);
-    let messageId = existing?.messageId;
+    let messageId = await currentKmsMessageId(stateKey);
 
     try {
       if (messageId) {
@@ -282,14 +303,29 @@ async function updateKmsStatus(client) {
         const sent = await channel.send({ content, components: [row1] });
         messageId = sent.id;
         await setBotState(stateKey, { messageId });
+        rememberKmsMessageId(stateKey, messageId);
       }
     } catch (e) {
-      // If edit failed (deleted?), send a new message
+      // The cached id may be stale. Re-read before posting a replacement, and keep merge
+      // writes so unrelated fields such as linkMessageId stay on the doc.
+      cachedKmsMessage = null;
+      const refreshed = await readKmsMessageId(stateKey);
+      if (refreshed && refreshed !== messageId) {
+        try {
+          const msg = await channel.messages.fetch(refreshed);
+          await msg.edit({ content, components: [row1] });
+          return;
+        } catch {
+          cachedKmsMessage = null;
+        }
+      }
       try {
         const sent = await channel.send({ content, components: [row1] });
         messageId = sent.id;
         await setBotState(stateKey, { messageId });
+        rememberKmsMessageId(stateKey, messageId);
       } catch (sendErr) {
+        cachedKmsMessage = null;
         console.error("❌ Failed to send KMS status message:", sendErr.message);
       }
     }

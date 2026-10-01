@@ -34,6 +34,18 @@ function localClock(now = new Date(), tz = FOLLOW_UP_TZ) {
 }
 
 /**
+ * Is this tick inside the morning window? This does not look at lastRunDate, so the caller can
+ * skip Firestore outside 08:00–11:00 local.
+ */
+function followUpClockWindow(now = new Date()) {
+  const { hour } = localClock(now);
+  if (!Number.isFinite(hour)) return { open: false, reason: "no_clock" };
+  if (hour < FOLLOW_UP_HOUR) return { open: false, reason: "not_time" };
+  if (hour >= FOLLOW_UP_LATEST_HOUR) return { open: false, reason: "too_late" };
+  return { open: true, todayKey: calendarDateInTz(now) };
+}
+
+/**
  * Should the sweep run on this tick?
  *
  * Previously this required hour === 8 && minute === 0 exactly, so a single missed or slow tick
@@ -42,14 +54,10 @@ function localClock(now = new Date(), tz = FOLLOW_UP_TZ) {
  * run on the first tick at or after 08:00 local, and at most once per calendar day.
  */
 function shouldRunFollowUpSweep({ now = new Date(), lastRunDate = null } = {}) {
-  const { hour } = localClock(now);
-  if (!Number.isFinite(hour)) return { run: false, reason: "no_clock" };
-  if (hour < FOLLOW_UP_HOUR) return { run: false, reason: "not_time" };
-  if (hour >= FOLLOW_UP_LATEST_HOUR) return { run: false, reason: "too_late" };
-
-  const todayKey = calendarDateInTz(now);
-  if (lastRunDate === todayKey) return { run: false, reason: "already_ran", todayKey };
-  return { run: true, todayKey };
+  const window = followUpClockWindow(now);
+  if (!window.open) return { run: false, reason: window.reason };
+  if (lastRunDate === window.todayKey) return { run: false, reason: "already_ran", todayKey: window.todayKey };
+  return { run: true, todayKey: window.todayKey };
 }
 
 function parseStamp(value) {
@@ -83,6 +91,7 @@ module.exports = {
   FOLLOW_UP_INTERVALS,
   calendarDateInTz,
   localClock,
+  followUpClockWindow,
   shouldRunFollowUpSweep,
   isFollowUpDue,
   lastContactMs,

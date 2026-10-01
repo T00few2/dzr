@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "scheduled_messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "active", "order": "ASCENDING" },
+        { "fieldPath": "next_run", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
