@@ -594,7 +594,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_athlete_profile",
-      description: "Get the asking athlete's intervals.icu profile: height from basic settings, the latest weight (including a scale import on the wellness calendar), and FTP. Always the caller — never another member.",
+      description: "Holds weight, height, and FTP for the asking athlete, including a scale weight from the wellness calendar. Call when the answer needs those facts. Always the caller — never another member.",
       parameters: { type: "object", properties: {} }
     }
   },
@@ -602,7 +602,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_athlete_stats",
-      description: "Get the asking athlete's ride totals for the last 28 days and the year, plus fitness (CTL, ATL, form) and a power curve when intervals.icu has one.",
+      description: "Holds year and recent ride totals, plus a power curve when intervals.icu has one. Call when the answer needs those totals or the curve. Weekly load and whether to rest are get_training_trend, not this.",
       parameters: { type: "object", properties: {} }
     }
   },
@@ -610,7 +610,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_athlete_zones",
-      description: "Get the asking athlete's heart-rate and power zones from intervals.icu sport settings.",
+      description: "Holds the asking athlete's heart-rate and power zones. Call when the answer needs zone targets.",
       parameters: { type: "object", properties: {} }
     }
   },
@@ -618,7 +618,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_recent_activities",
-      description: "List the asking athlete's recent intervals.icu activities (summaries only). Use this first, then get_activity_details for one session they asked about. Activities intervals.icu only holds from another platform may be omitted; say so if the message says that.",
+      description: "Holds ride summaries for the last 28 days: averages only, not interval quality. Call when the answer needs those rides or an activity id. Not the six-month load trend. Activities intervals.icu only holds from another platform may be omitted; say so if the message says that.",
       parameters: {
         type: "object",
         properties: {
@@ -634,7 +634,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_activity_details",
-      description: "Get details for one of the asking athlete's intervals.icu activities by id from get_recent_activities.",
+      description: "Holds one ride's summary (time, distance, average power, heart rate) by id from get_recent_activities. Call when the answer needs that ride and not its interval metrics.",
       parameters: {
         type: "object",
         properties: {
@@ -651,7 +651,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_activity_metrics",
-      description: "Power analysis for ONE of the asking athlete's activities: mean-maximal power, normalized power, intensity factor, training load, aerobic decoupling and detected work intervals. Use when they ask how a specific session went. One activity at a time.",
+      description: "Holds one ride's intervals, normalized power, and aerobic decoupling. Needs an activity id from get_recent_activities. Call when the answer needs interval quality. One activity at a time.",
       parameters: {
         type: "object",
         properties: {
@@ -665,7 +665,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_training_trend",
-      description: "Fetch about six months of weekly training load plus CTL, ATL and form for the asking athlete. Call this when judging whether they are building, flat, or due a rest week, or how this week compares with recent months. The current week is partial. Not stored. Do not use it for a single recent ride.",
+      description: "Holds about six months of weekly load, whether load is rising, how long since an easy week, plus CTL, ATL, and form. Not a list of rides. The current week is partial. Not stored. Call when the answer needs that trend.",
       parameters: { type: "object", properties: {} }
     }
   },
@@ -673,7 +673,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_wellness",
-      description: "Recent wellness and fitness from intervals.icu: CTL, ATL, form, resting HR, HRV, sleep, soreness, fatigue, weight. Empty fields are unknown, not fine. Use for recovery and whether form is rising.",
+      description: "Holds the last couple of weeks of sleep, HRV, soreness, fatigue, resting HR, and daily form. Empty fields are unknown, not fine. Call when the answer needs how they feel right now. Not the six-month load trend.",
       parameters: {
         type: "object",
         properties: {
@@ -686,7 +686,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_planned_workouts",
-      description: "Workouts already queued for Zwift via intervals.icu. This is not the athlete's calendar and does not answer what is coming up — that is the DZR calendar block already in the prompt. Use only to see whether a structured workout is already waiting to sync to Zwift.",
+      description: "Holds workouts queued for Zwift via intervals.icu. Not the athlete's plan. Call only when the answer needs to know whether a structured workout is already waiting to sync. Do not use it for what is coming up.",
       parameters: {
         type: "object",
         properties: {
@@ -699,7 +699,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_zwiftpower_context",
-      description: "Optional ZwiftPower snapshot for the asking athlete (category, phenotype, FTP) if they have a linked Zwift ID.",
+      description: "Holds ZwiftPower category and phenotype for the asking athlete, if they have a linked Zwift ID. Call when the answer needs category or phenotype.",
       parameters: { type: "object", properties: {} }
     }
   },
