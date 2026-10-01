@@ -17,6 +17,8 @@ const API = "https://intervals.icu/api/v1";
 const CONNECT_TOKEN_TTL_MS = 15 * 60 * 1000;
 const STREAM_CACHE_COLLECTION = "coach_activity_metrics";
 const USER_AGENT = "DZR-Coach/1.0";
+// Bump when activity metrics change shape or meaning, so stale cache rows are recomputed.
+const METRICS_CACHE_VERSION = 2;
 
 function notClubMemberResult() {
   return {
@@ -188,6 +190,8 @@ function isUnreadableSource(activity) {
 }
 
 function num(value) {
+  // Number(null) and Number("") are 0, which would turn a missing reading into a real zero.
+  if (value == null || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
@@ -216,7 +220,7 @@ function compactActivity(activity) {
     elevation_gain_m: activity.total_elevation_gain ?? null,
     average_heartrate: activity.average_heartrate ?? null,
     max_heartrate: activity.max_heartrate ?? null,
-    average_watts: activity.average_watts ?? null,
+    average_watts: activity.icu_average_watts ?? activity.average_watts ?? null,
     weighted_average_watts: activity.icu_weighted_avg_watts ?? activity.weighted_average_watts ?? null,
     max_watts: activity.max_watts ?? null,
     kilojoules: activity.icu_joules != null ? Math.round(Number(activity.icu_joules) / 1000) : activity.kilojoules ?? null,
@@ -343,7 +347,11 @@ function compactCurve(data) {
     const w = num(watts);
     if (s && w) points.push({ seconds: s, watts: Math.round(w) });
   };
-  if (Array.isArray(data)) {
+  const curve = Array.isArray(data?.list) ? data.list[0] : null;
+  if (curve && Array.isArray(curve.secs)) {
+    const watts = Array.isArray(curve.values) ? curve.values : curve.watts || [];
+    curve.secs.forEach((seconds, i) => push(seconds, watts[i]));
+  } else if (Array.isArray(data)) {
     for (const row of data) push(row?.secs ?? row?.seconds ?? row?.duration, row?.watts ?? row?.power);
   } else if (data && Array.isArray(data.secs) && Array.isArray(data.watts)) {
     data.secs.forEach((seconds, i) => push(seconds, data.watts[i]));
@@ -381,7 +389,7 @@ async function getAthleteStats(discordId) {
     try {
       const curve = await intervalsFetch(
         discordId,
-        `/athlete/0/power-curves?oldest=${recentStart}&newest=${newest}`
+        `/athlete/0/power-curves?type=Ride&curves=28d&newest=${newest}`
       );
       powerCurve = compactCurve(curve.data);
     } catch (err) {
@@ -402,8 +410,8 @@ async function getAthleteStats(discordId) {
 
 async function getAthleteZones(discordId) {
   return wrapCall(discordId, async () => {
-    const { data } = await intervalsFetch(discordId, "/athlete/0/sport-settings");
-    const sport = pickSportSettings(data);
+    const { data: athlete } = await intervalsFetch(discordId, "/athlete/0");
+    const sport = pickSportSettings(athlete?.sportSettings);
     if (!sport) return { success: true, zones: { heart_rate: null, power: null } };
     return {
       success: true,
@@ -411,7 +419,7 @@ async function getAthleteZones(discordId) {
         heart_rate: {
           lthr: sport.lthr ?? null,
           max_hr: sport.max_hr ?? null,
-          resting_hr: sport.resting_hr ?? null,
+          resting_hr: num(athlete?.icu_resting_hr),
           zones: sport.hr_zones || null,
         },
         power: {
@@ -493,7 +501,8 @@ async function getActivityDetails(discordId, activityId) {
 
 function streamArray(streams, names) {
   for (const name of names) {
-    const value = streams?.[name];
+    // intervals.icu returns streams as [{ type, data }]; older callers passed an object keyed by type.
+    const value = Array.isArray(streams) ? streams.find((s) => s?.type === name) : streams?.[name];
     if (Array.isArray(value)) return value;
     if (Array.isArray(value?.data)) return value.data;
   }
@@ -509,7 +518,7 @@ async function getActivityMetrics(discordId, activityId) {
     const cached = await cacheRef.get();
     if (cached.exists) {
       const data = cached.data() || {};
-      if (String(data.discordId) === String(discordId)) {
+      if (String(data.discordId) === String(discordId) && data.version === METRICS_CACHE_VERSION) {
         return { success: true, cached: true, metrics: data.metrics || null, message: data.message || null };
       }
     }
@@ -570,7 +579,7 @@ async function getActivityMetrics(discordId, activityId) {
       const np = num(activity.icu_weighted_avg_watts);
       summary = {
         durationSeconds: num(activity.moving_time),
-        averageWatts: num(activity.average_watts),
+        averageWatts: num(activity.icu_average_watts ?? activity.average_watts),
         normalizedPower: np,
         intensityFactor: metrics.intensityFactor(np, ftp),
         trainingStressScore: num(activity.icu_training_load),
@@ -591,6 +600,7 @@ async function getActivityMetrics(discordId, activityId) {
         activityId: id,
         metrics: summary,
         message: null,
+        version: METRICS_CACHE_VERSION,
         cachedAt: new Date(),
       });
     } catch (err) {
@@ -614,11 +624,18 @@ async function getZwiftPowerContext(discordId) {
         linked: true,
         zwiftId,
         inClubStats: true,
+        // club_stats rows are ZwiftRacing riders (see app/utils/fetchZPdata.ts).
         name: rider.name || null,
-        paceGroup: rider.paceGroup ?? rider.category ?? null,
-        veloCategory: rider.veloCategory ?? null,
-        phenotype: rider.phenotype ?? null,
-        ftp: rider.ftp ?? null,
+        paceGroup: rider.zpCategory ?? null,
+        veloCategory: rider.race?.current?.mixed?.category ?? null,
+        veloRating: num(rider.race?.current?.rating),
+        racingScore: num(rider.racingScore ?? rider.zrs?.score),
+        phenotype: rider.phenotype?.value ?? null,
+        ftp: num(rider.zpFTP),
+        weight_kg: num(rider.weight),
+        races: rider.race?.finishes != null
+          ? { finishes: num(rider.race.finishes), wins: num(rider.race.wins), podiums: num(rider.race.podiums), dnfs: num(rider.race.dnfs) }
+          : null,
       },
     };
   } catch (err) {
@@ -631,13 +648,18 @@ function compactWellness(row) {
   if (!row || typeof row !== "object") return null;
   const ctl = num(row.ctl);
   const atl = num(row.atl);
+  const sleepSecs = num(row.sleepSecs);
   return {
     date: row.id || row.date || null,
     weight_kg: num(row.weight),
-    resting_hr: num(row.restingHR ?? row.resting_hr),
-    hrv: num(row.hrv ?? row.hrvSDNN),
-    sleep_hours: num(row.sleepSecs) != null ? Math.round((Number(row.sleepSecs) / 3600) * 10) / 10 : num(row.sleepHours),
+    resting_hr: num(row.restingHR),
+    hrv_rmssd: num(row.hrv),
+    hrv_sdnn: num(row.hrvSDNN),
+    sleep_hours: sleepSecs != null ? Math.round((sleepSecs / 3600) * 10) / 10 : null,
     sleep_score: num(row.sleepScore),
+    sleep_quality: num(row.sleepQuality),
+    avg_sleeping_hr: num(row.avgSleepingHR),
+    readiness: num(row.readiness),
     soreness: num(row.soreness),
     fatigue: num(row.fatigue),
     stress: num(row.stress),
@@ -650,6 +672,11 @@ function compactWellness(row) {
   };
 }
 
+const RECOVERY_FIELDS = [
+  "resting_hr", "hrv_rmssd", "hrv_sdnn", "sleep_hours", "sleep_score",
+  "sleep_quality", "avg_sleeping_hr", "readiness",
+];
+
 async function getWellness(discordId, { days = 14 } = {}) {
   const clampedDays = Math.min(Math.max(Number(days) || 14, 1), 28);
   return wrapCall(discordId, async () => {
@@ -659,17 +686,24 @@ async function getWellness(discordId, { days = 14 } = {}) {
       discordId,
       `/athlete/0/wellness?oldest=${oldest}&newest=${newest}`
     );
-    const rows = (Array.isArray(data) ? data : [])
-      .map(compactWellness)
-      .filter((row) => row && row.date);
-    return {
-      success: true,
-      days: clampedDays,
-      wellness: rows,
-      message: rows.length
-        ? "Empty wellness fields mean the athlete has not logged them. Do not treat missing HRV, sleep or soreness as fine."
-        : "No wellness rows in this window.",
-    };
+    const raw = Array.isArray(data) ? data : [];
+    const rows = raw.map(compactWellness).filter((row) => row && row.date);
+    const hasRecovery = rows.some((row) => RECOVERY_FIELDS.some((key) => row[key] != null));
+    if (rows.length && !hasRecovery) {
+      // Log which raw keys intervals.icu actually sent, so a missing sync can be told apart from a mapping bug.
+      const keys = new Set();
+      for (const r of raw) for (const [k, v] of Object.entries(r || {})) if (v != null) keys.add(k);
+      console.warn(`getWellness: no recovery fields for ${discordId}; non-null keys: ${[...keys].sort().join(",")}`);
+    }
+    let message;
+    if (!rows.length) message = "No wellness rows in this window.";
+    else if (!hasRecovery) {
+      message =
+        "intervals.icu has no sleep, HRV, resting HR or readiness for this window. It may come from a device sync (Oura, Garmin, Whoop) that has not run yet, so do not tell the athlete they forgot to log it, and do not treat it as fine.";
+    } else {
+      message = "Null fields are unknown for that day, not fine.";
+    }
+    return { success: true, days: clampedDays, wellness: rows, message };
   });
 }
 
