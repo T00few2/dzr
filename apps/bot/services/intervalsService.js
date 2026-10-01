@@ -624,11 +624,18 @@ async function getZwiftPowerContext(discordId) {
         linked: true,
         zwiftId,
         inClubStats: true,
+        // club_stats rows are ZwiftRacing riders (see app/utils/fetchZPdata.ts).
         name: rider.name || null,
-        paceGroup: rider.paceGroup ?? rider.category ?? null,
-        veloCategory: rider.veloCategory ?? null,
-        phenotype: rider.phenotype ?? null,
-        ftp: rider.ftp ?? null,
+        paceGroup: rider.zpCategory ?? null,
+        veloCategory: rider.race?.current?.mixed?.category ?? null,
+        veloRating: num(rider.race?.current?.rating),
+        racingScore: num(rider.racingScore ?? rider.zrs?.score),
+        phenotype: rider.phenotype?.value ?? null,
+        ftp: num(rider.zpFTP),
+        weight_kg: num(rider.weight),
+        races: rider.race?.finishes != null
+          ? { finishes: num(rider.race.finishes), wins: num(rider.race.wins), podiums: num(rider.race.podiums), dnfs: num(rider.race.dnfs) }
+          : null,
       },
     };
   } catch (err) {
