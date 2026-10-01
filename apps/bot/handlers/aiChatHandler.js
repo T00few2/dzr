@@ -199,6 +199,9 @@ function compactToolResult(result) {
   if (Array.isArray(result.activities)) base.activities = result.activities.slice(0, 40);
   if (result.activity) base.activity = result.activity;
   if (result.metrics) base.metrics = result.metrics;
+  if (Array.isArray(result.wellness)) base.wellness = result.wellness.slice(0, 28);
+  if (Array.isArray(result.fitness)) base.fitness = result.fitness.slice(0, 12);
+  if (Array.isArray(result.workouts)) base.workouts = result.workouts.slice(0, 20);
   if (typeof result.days === "number") base.days = result.days;
   if (result.needs_reconnect) base.needs_reconnect = true;
   if (result.not_club_member) base.not_club_member = true;
