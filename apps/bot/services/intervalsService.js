@@ -188,6 +188,8 @@ function isUnreadableSource(activity) {
 }
 
 function num(value) {
+  // Number(null) and Number("") are 0, which would turn a missing reading into a real zero.
+  if (value == null || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
@@ -631,13 +633,18 @@ function compactWellness(row) {
   if (!row || typeof row !== "object") return null;
   const ctl = num(row.ctl);
   const atl = num(row.atl);
+  const sleepSecs = num(row.sleepSecs);
   return {
     date: row.id || row.date || null,
     weight_kg: num(row.weight),
-    resting_hr: num(row.restingHR ?? row.resting_hr),
-    hrv: num(row.hrv ?? row.hrvSDNN),
-    sleep_hours: num(row.sleepSecs) != null ? Math.round((Number(row.sleepSecs) / 3600) * 10) / 10 : num(row.sleepHours),
+    resting_hr: num(row.restingHR),
+    hrv_rmssd: num(row.hrv),
+    hrv_sdnn: num(row.hrvSDNN),
+    sleep_hours: sleepSecs != null ? Math.round((sleepSecs / 3600) * 10) / 10 : null,
     sleep_score: num(row.sleepScore),
+    sleep_quality: num(row.sleepQuality),
+    avg_sleeping_hr: num(row.avgSleepingHR),
+    readiness: num(row.readiness),
     soreness: num(row.soreness),
     fatigue: num(row.fatigue),
     stress: num(row.stress),
@@ -650,6 +657,11 @@ function compactWellness(row) {
   };
 }
 
+const RECOVERY_FIELDS = [
+  "resting_hr", "hrv_rmssd", "hrv_sdnn", "sleep_hours", "sleep_score",
+  "sleep_quality", "avg_sleeping_hr", "readiness",
+];
+
 async function getWellness(discordId, { days = 14 } = {}) {
   const clampedDays = Math.min(Math.max(Number(days) || 14, 1), 28);
   return wrapCall(discordId, async () => {
@@ -659,17 +671,24 @@ async function getWellness(discordId, { days = 14 } = {}) {
       discordId,
       `/athlete/0/wellness?oldest=${oldest}&newest=${newest}`
     );
-    const rows = (Array.isArray(data) ? data : [])
-      .map(compactWellness)
-      .filter((row) => row && row.date);
-    return {
-      success: true,
-      days: clampedDays,
-      wellness: rows,
-      message: rows.length
-        ? "Empty wellness fields mean the athlete has not logged them. Do not treat missing HRV, sleep or soreness as fine."
-        : "No wellness rows in this window.",
-    };
+    const raw = Array.isArray(data) ? data : [];
+    const rows = raw.map(compactWellness).filter((row) => row && row.date);
+    const hasRecovery = rows.some((row) => RECOVERY_FIELDS.some((key) => row[key] != null));
+    if (rows.length && !hasRecovery) {
+      // Log which raw keys intervals.icu actually sent, so a missing sync can be told apart from a mapping bug.
+      const keys = new Set();
+      for (const r of raw) for (const [k, v] of Object.entries(r || {})) if (v != null) keys.add(k);
+      console.warn(`getWellness: no recovery fields for ${discordId}; non-null keys: ${[...keys].sort().join(",")}`);
+    }
+    let message;
+    if (!rows.length) message = "No wellness rows in this window.";
+    else if (!hasRecovery) {
+      message =
+        "intervals.icu returned no sleep, HRV, resting HR or readiness for this window. That data may come from a synced device (Oura, Garmin, Whoop) that intervals.icu does not share with connected apps, or the sync may be behind. Do not tell the athlete they have not logged it; say DZR Coach cannot see it, and do not treat it as fine.";
+    } else {
+      message = "Null fields are unknown for that day, not fine.";
+    }
+    return { success: true, days: clampedDays, wellness: rows, message };
   });
 }
 
