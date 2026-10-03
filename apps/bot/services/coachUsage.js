@@ -29,4 +29,11 @@ function budgetTokens({ totalTokens = 0, cachedPromptTokens = 0 } = {}) {
   return Math.round(total - cached * (1 - CACHED_PROMPT_WEIGHT));
 }
 
-module.exports = { CACHED_PROMPT_WEIGHT, extractTokenUsage, budgetTokens };
+/** Does the reply close by asking the athlete something? Only the last paragraph counts. */
+function endsWithQuestion(text) {
+  const paragraphs = String(text || "").trim().split(/\n\s*\n/);
+  const last = paragraphs[paragraphs.length - 1] || "";
+  return last.includes("?");
+}
+
+module.exports = { CACHED_PROMPT_WEIGHT, extractTokenUsage, budgetTokens, endsWithQuestion };

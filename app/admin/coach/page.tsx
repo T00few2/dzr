@@ -46,6 +46,12 @@ type FeedbackByToolsRow = {
   down: number
 }
 
+type ReplyStatsRow = {
+  day: string
+  replies: number
+  repliesWithQuestion: number
+}
+
 type EventRow = {
   id: string
   discordId: string | null
@@ -75,7 +81,7 @@ function fmtTime(iso: string | null) {
 }
 
 export default function CoachAdminPage() {
-  const [data, setData] = useState<{ totals: any; people: Person[]; events: EventRow[]; undecryptableProfiles?: number; feedback?: { up: number; down: number }; feedbackByTools?: FeedbackByToolsRow[] } | null>(null)
+  const [data, setData] = useState<{ totals: any; people: Person[]; events: EventRow[]; undecryptableProfiles?: number; feedback?: { up: number; down: number }; feedbackByTools?: FeedbackByToolsRow[]; replyStats?: ReplyStatsRow[] } | null>(null)
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -227,6 +233,37 @@ export default function CoachAdminPage() {
                   <Td isNumeric>{fmt(row.up)}</Td>
                   <Td isNumeric>{fmt(row.down)}</Td>
                   <Td isNumeric>{Math.round((100 * row.down) / Math.max(1, row.up + row.down))}%</Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        )}
+      </Box>
+
+      <Heading size="sm" mb={1}>Replies ending with a question</Heading>
+      <Text color="gray.500" fontSize="sm" mb={3}>
+        Anonymous daily counts across all athletes, last 30 days. A question is fine when the coach needs the answer; a high share means it is asking out of habit.
+      </Text>
+      <Box overflowX="auto" mb={10}>
+        {(data?.replyStats || []).length === 0 ? (
+          <Text color="gray.500" fontSize="sm">No replies counted yet.</Text>
+        ) : (
+          <Table size="sm">
+            <Thead>
+              <Tr>
+                <Th color="gray.400">Day</Th>
+                <Th color="gray.400" isNumeric>Replies</Th>
+                <Th color="gray.400" isNumeric>With question</Th>
+                <Th color="gray.400" isNumeric>Share</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {(data?.replyStats || []).map((row) => (
+                <Tr key={row.day}>
+                  <Td>{row.day}</Td>
+                  <Td isNumeric>{fmt(row.replies)}</Td>
+                  <Td isNumeric>{fmt(row.repliesWithQuestion)}</Td>
+                  <Td isNumeric>{Math.round((100 * row.repliesWithQuestion) / Math.max(1, row.replies))}%</Td>
                 </Tr>
               ))}
             </Tbody>

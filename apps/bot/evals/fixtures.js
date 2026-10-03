@@ -258,6 +258,71 @@ const fixtures = [
     forbidTools: ["read_recent_dm"],
     expect: "Gives a recommendation or asks one clarifying question. Must NOT claim to know specifics it was not given.",
   },
+
+  // Questions and repetition. Judged on behaviour, not wording, so they hold across phrasings.
+  {
+    name: "does not ask a question when nothing is missing",
+    context: {
+      ...base,
+      calendarBlock: [
+        "Coming up:",
+        "- 2026-09-10 (in 4 days) at 17:17 — DZR After Party (C) (race)",
+      ].join("\n"),
+    },
+    message: "Hvad skal jeg køre i morgen?",
+    toolResults: {
+      get_training_trend: {
+        weeks: [{ week: "2026-08-24", load: 380 }, { week: "2026-08-31", load: 120, partial: true }],
+        rising: false,
+        weeksSinceEasyWeek: 2,
+        fitness: { ctl: 58, atl: 60, form: -2 },
+      },
+      get_wellness: { days: [{ date: "2026-09-05", sleepHours: 7.5, fatigue: 2, soreness: 2 }] },
+    },
+    expect: "Recommends a session for tomorrow. Must NOT end with a question — no check on whether that sounds good, no offer to make a plan or more, no question about how they feel. Nothing essential is missing here.",
+  },
+  {
+    name: "a follow-up does not repeat what the answer was based on",
+    context: base,
+    history: [
+      { role: "user", content: "Er jeg ved at blive overtrænet?" },
+      { role: "assistant", content: "Ud fra din træningsbelastning de sidste seks uger og din wellness: nej. Belastningen er steget roligt, formen er -4, og søvnen ligger stabilt omkring 7,5 timer. Hold kursen, men læg en let uge ind efter weekenden." },
+    ],
+    message: "Kan jeg så køre ZRL på tirsdag?",
+    toolResults: {
+      get_training_trend: {
+        weeks: [{ week: "2026-08-24", load: 390 }, { week: "2026-08-31", load: 210, partial: true }],
+        rising: true,
+        weeksSinceEasyWeek: 4,
+        fitness: { ctl: 61, atl: 65, form: -4 },
+      },
+    },
+    expect: "Answers whether to race ZRL on Tuesday. Must NOT restate what its answer is based on (training load, wellness, sleep), and must NOT repeat the form -4 or 7,5 hours from its previous reply. Must NOT end with a question unless something essential is missing.",
+  },
+  {
+    name: "does not follow an answered question with another",
+    context: base,
+    history: [
+      { role: "user", content: "Skal jeg træne i aften?" },
+      { role: "assistant", content: "Det afhænger af benene efter gårsdagens løb. Er de friske eller tunge?" },
+    ],
+    message: "Lidt tunge faktisk",
+    expect: "Gives a clear recommendation built on heavy legs (easy spin or rest). Must NOT ask another question — it already has the answer it needed.",
+  },
+  {
+    name: "still asks when two calendar rows could match",
+    context: {
+      ...base,
+      calendarBlock: [
+        "Coming up:",
+        "- id:a1 2026-09-08 (in 2 days) — Rolig tur (session)",
+        "- id:b2 2026-09-09 (in 3 days) — Rolig tur (session)",
+      ].join("\n"),
+    },
+    message: "Slet den rolige tur fra kalenderen",
+    forbidTools: ["delete_planned_event"],
+    expect: "Asks which of the two easy rides (8 or 9 September) to remove. Must NOT delete either without asking.",
+  },
 ];
 
 module.exports = { base, fixtures };

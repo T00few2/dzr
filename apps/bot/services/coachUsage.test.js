@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { extractTokenUsage, budgetTokens } = require("./coachUsage");
+const { extractTokenUsage, budgetTokens, endsWithQuestion } = require("./coachUsage");
 
 test("reads cached prompt tokens from chat completions usage", () => {
   const usage = extractTokenUsage({
@@ -18,6 +18,16 @@ test("treats missing usage and missing cache details as zero", () => {
 test("never reports more cached tokens than prompt tokens", () => {
   const usage = extractTokenUsage({ usage: { prompt_tokens: 100, completion_tokens: 0, prompt_tokens_details: { cached_tokens: 500 } } });
   assert.equal(usage.cachedPromptTokens, 100);
+});
+
+test("a question in the closing paragraph counts as ending with a question", () => {
+  assert.equal(endsWithQuestion("Kør roligt i morgen.\n\nHvordan har benene det?"), true);
+  assert.equal(endsWithQuestion("Kør roligt i morgen. Hvordan har benene det? Skriv endelig."), true);
+});
+
+test("a question earlier in the reply does not count", () => {
+  assert.equal(endsWithQuestion("Hvorfor var den tung? Du sov kun 5 timer.\n\nKør roligt i morgen."), false);
+  assert.equal(endsWithQuestion(""), false);
 });
 
 test("cached prompt tokens count at a tenth against the budget", () => {

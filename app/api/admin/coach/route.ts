@@ -183,6 +183,22 @@ export async function GET(req: Request) {
     (a, b) => b.down / Math.max(1, b.up + b.down) - a.down / Math.max(1, a.up + a.down) || b.down - a.down
   )
 
+  // Anonymous per-day counts of coach replies that close with a question.
+  let replyStats: { day: string; replies: number; repliesWithQuestion: number }[] = []
+  try {
+    const statsSnap = await adminDb.collection('coach_reply_stats').orderBy('day', 'desc').limit(30).get()
+    replyStats = statsSnap.docs.map((doc) => {
+      const data = doc.data() || {}
+      return {
+        day: String(data.day || doc.id),
+        replies: Number(data.replies || 0),
+        repliesWithQuestion: Number(data.repliesWithQuestion || 0),
+      }
+    })
+  } catch (err) {
+    console.warn('admin/coach: could not read reply stats', err)
+  }
+
   const totals = people.reduce(
     (acc, p) => {
       acc.connected += p.connected ? 1 : 0
@@ -207,6 +223,7 @@ export async function GET(req: Request) {
     // or COACH_MEMORY_KEY was rotated. keyIdStatus below distinguishes those two.
     feedback,
     feedbackByTools,
+    replyStats,
     undecryptableProfiles: undecryptable.length,
     // Diagnostic for the above: a mismatch says the key changed, an unknown says the document
     // simply predates fingerprinting. Without this the two look identical from a failed decrypt.

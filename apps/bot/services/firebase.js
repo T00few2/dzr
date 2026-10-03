@@ -485,13 +485,35 @@ const COACH_USAGE_EVENTS_COLLECTION = shared.firestore?.coachUsageEvents || "coa
 const COACH_PROFILES_COLLECTION = shared.firestore?.coachProfiles || "coach_profiles";
 
 const COACH_USAGE_DAILY_COLLECTION = "coach_usage_daily";
+const COACH_REPLY_STATS_COLLECTION = "coach_reply_stats";
 const PENDING_GOALS_COLLECTION = "coach_pending_goals";
 
-function usageDayKey(discordId, now = new Date()) {
-  const day = new Intl.DateTimeFormat("en-CA", {
+function copenhagenDay(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
     year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Europe/Copenhagen",
   }).format(now);
-  return `${discordId}_${day}`;
+}
+
+function usageDayKey(discordId, now = new Date()) {
+  return `${discordId}_${copenhagenDay(now)}`;
+}
+
+/**
+ * Count one coach reply in today's anonymous totals. No athlete id and no text, so it applies to
+ * every athlete regardless of chat notes and needs no deletion on disconnect. Never throws.
+ */
+async function recordCoachReplyStats({ askedQuestion }, now = new Date()) {
+  const day = copenhagenDay(now);
+  try {
+    await db.collection(COACH_REPLY_STATS_COLLECTION).doc(day).set({
+      day,
+      replies: admin.firestore.FieldValue.increment(1),
+      repliesWithQuestion: admin.firestore.FieldValue.increment(askedQuestion ? 1 : 0),
+      updatedAt: now,
+    }, { merge: true });
+  } catch (err) {
+    console.warn("recordCoachReplyStats failed:", err?.message || err);
+  }
 }
 
 
@@ -778,6 +800,7 @@ module.exports = {
   getSignupBoardConfigs,
   isPaidClubMember,
   recordCoachUsage,
+  recordCoachReplyStats,
   getCoachProfile,
   ensureDefaultCoachProfile,
   markCoachHowItWorksSent,

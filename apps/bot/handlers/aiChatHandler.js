@@ -11,6 +11,7 @@ const {
   addCoachChatNotes,
   markCoachAthleteMessage,
   getCoachDailyTokens,
+  recordCoachReplyStats,
   listCalendarEntries,
   addCalendarEntry,
   deleteCalendarEntry,
@@ -21,7 +22,7 @@ const { fromDiscordMessage, dmRecordsToHistory, DM_READBACK_MAX_AGE_MS } = requi
 const { createTurnQueue } = require("../services/turnQueue");
 const { coachToolsFor, reasoningEffortAfterTools } = require("../services/coachTools");
 const { rememberCoachTurn } = require("../services/coachFeedback");
-const { extractTokenUsage } = require("../services/coachUsage");
+const { extractTokenUsage, endsWithQuestion } = require("../services/coachUsage");
 const { 
   handleRiderStats, 
   handleTeamStats, 
@@ -2301,10 +2302,13 @@ async function runChatTurn(message, client, { coachOnly }) {
     const replyFn = isCoachSession ? safeReplyChunks : safeReply;
     const calledToolNames = [];
     let answerEffort = isCoachSession ? COACH_REASONING_EFFORT : null;
-    const replyAndTag = async (text) => {
+    const replyAndTag = async (text, { fromModel = true } = {}) => {
       const sent = await replyFn(message, text);
       if (isCoachSession && notesOptIn) {
         rememberCoachTurn(sent, { tools: calledToolNames, reasoningEffort: answerEffort, model: AI_CONFIG.model });
+      }
+      if (isCoachSession && fromModel) {
+        recordCoachReplyStats({ askedQuestion: endsWithQuestion(text) });
       }
       return sent;
     };
@@ -2543,7 +2547,7 @@ async function runChatTurn(message, client, { coachOnly }) {
           } else if (isCoachSession) {
             const fallback = fallbackCoachFromTools(toolResults);
             conversation.push({ role: "assistant", content: fallback });
-            await replyAndTag(fallback);
+            await replyAndTag(fallback, { fromModel: false });
           } else if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0) {
             // Hit the iteration cap and the model only offered more tool calls, no text.
             await safeReply(message, "⚠️ I wasn't able to finish that request after a few tool calls. Please try rephrasing or breaking it into a simpler question.");
@@ -2554,7 +2558,8 @@ async function runChatTurn(message, client, { coachOnly }) {
       }
     } else {
       // Model responded conversationally (no tool calls)
-      let text = getMessageText(responseMessage);
+      const modelText = getMessageText(responseMessage);
+      let text = modelText;
       if (!text && isCoachSession) {
         text = "Jeg er klar som DZR Coach, men fik et tomt modelsvar. Prøv at spørge igen, fx *Hvordan var min uge?*";
       }
@@ -2564,7 +2569,7 @@ async function runChatTurn(message, client, { coachOnly }) {
       });
       
       if (text) {
-        await replyAndTag(text);
+        await replyAndTag(text, { fromModel: Boolean(modelText) });
       }
     }
     
