@@ -1,7 +1,7 @@
 const { MessageFlags } = require("discord.js");
 const intervals = require("./intervalsService");
 const { ensureDefaultCoachProfile, markCoachHowItWorksSent } = require("./firebase");
-const { MY_PAGES_COACH_URL, coachHowItWorksText, noEmbedUrl } = require("./coachHowItWorks");
+const { MY_PAGES_COACH_URL, EXAMPLE_QUESTIONS, coachHowItWorksText, noEmbedUrl } = require("./coachHowItWorks");
 const { getCoachClient, isCoachBotConfigured } = require("./coachBot");
 
 const NOT_CLUB_MEMBER_TEXT =
@@ -65,8 +65,8 @@ function intervalsConnectText(discordId) {
 function unconnectedCoachText(discordId) {
   return (
     "🚴 **DZR Coach**\n\n" +
-    "Den gamle træningsforbindelse bruges ikke længere. Jeg kan først læse dine pas, når intervals.icu er forbundet.\n\n" +
-    "Din coach-profil, dine noter og din kalender er der stadig.\n\n" +
+    "Jeg er din træningscoach her i DM. Jeg kan læse dine pas og give råd, når intervals.icu er forbundet. Når det er gjort, får du en kort besked om, hvordan det hele virker.\n\n" +
+    "Har du brugt coachen før, er din profil, dine noter og din kalender der stadig.\n\n" +
     intervalsConnectText(discordId) +
     "\n\nHvis intervals.icu siger, at appen afventer godkendelse, virker linket først, når den er godkendt. Skriv til mig igen bagefter."
   );
@@ -113,28 +113,25 @@ async function sendCoachingIntroDm(user) {
   const connected = await intervals.isConnected(user.id);
   const alreadyExplained = Boolean(profile?.howItWorksSentAt);
   try {
+    // Not stamped as explained here: this message is about connecting, and the how-it-works DM
+    // follows once they have (sent by the site's intervals.icu callback).
     if (!connected) {
       await sendNoEmbeds(dm, unconnectedCoachText(user.id));
-      await markHowItWorksSentSafe(user.id);
       return { ok: true, connected: false, dmChannelId: dm.id };
     }
 
     if (!alreadyExplained) {
-      await sendNoEmbeds(dm, coachHowItWorksText({ includeStartHint: false }));
+      await sendNoEmbeds(dm, coachHowItWorksText());
       await markHowItWorksSentSafe(user.id);
-    }
-
-    if (alreadyExplained) {
+    } else {
       await sendNoEmbeds(
         dm,
         "🚴 **DZR Coach** — jeg er klar.\n\n" +
           "Spørg om din træning, restitution, volume eller et specifikt pas. Jeg henter dine intervals.icu-data bag kulissen.\n\n" +
           "Dine rammer retter du på Mine sider → Coach. Chat-noter slår du til samme sted, hvis du vil.\n" +
           noEmbedUrl(MY_PAGES_COACH_URL) +
-          "\n\nFx: *Hvordan var min uge?* · *Var i går for hård?* · *Skal jeg hvile i morgen?*"
+          "\n\n" + EXAMPLE_QUESTIONS
       );
-    } else {
-      await sendNoEmbeds(dm, "Jeg er klar. Spørg fx: *Hvordan var min uge?* · *Var i går for hård?* · *Skal jeg hvile i morgen?*");
     }
     return { ok: true, connected: true, dmChannelId: dm.id };
   } catch {

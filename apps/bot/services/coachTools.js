@@ -314,6 +314,19 @@ const coachToolDefinitions = [
         }
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_coach_info",
+      description: "The official description of how DZR Coach works: what data it reads, what is and is not stored, chat notes, the calendar, check-ins, feedback, settings, and intervals.icu setup. Use whenever they ask how you work, what you can do, or what you save about them. Answer only what they asked, from this text. Set send_full only when they want the whole overview again.",
+      parameters: {
+        type: "object",
+        properties: {
+          send_full: { type: "boolean", description: "Post the complete overview in the chat. Only when they ask for all of it (\"send infoen igen\")." }
+        }
+      }
+    }
   }
 ];
 

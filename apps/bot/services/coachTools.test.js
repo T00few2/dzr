@@ -29,6 +29,11 @@ test("note tools are only offered with chat notes on", () => {
   assert.ok(off.includes("get_training_trend"));
 });
 
+test("coach info is offered regardless of chat notes", () => {
+  assert.ok(names(coachToolsFor(false)).includes("get_coach_info"));
+  assert.ok(names(coachToolsFor(true)).includes("get_coach_info"));
+});
+
 test("analysis tools raise the reasoning effort for the answer", () => {
   assert.equal(reasoningEffortAfterTools(["get_recent_activities"]), "low");
   assert.equal(reasoningEffortAfterTools(["get_recent_activities", "get_activity_metrics"]), "medium");

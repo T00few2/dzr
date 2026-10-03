@@ -11,6 +11,9 @@ import {
 } from '@/app/lib/intervalsAuth'
 import { INTERVALS_SETTINGS_URL } from '@/app/lib/intervalsCoachLinks'
 import { canEncryptTokens, encryptedTokenFields } from '@/app/lib/tokenCrypto'
+import { ensureDefaultCoachProfile } from '@/app/lib/ensureCoachProfile'
+import { COACH_PROFILES_COLLECTION } from '@/app/lib/coachProfile'
+import { EXAMPLE_QUESTIONS, coachHowItWorksText } from '@/packages/shared/coach/coachHowItWorks'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -81,20 +84,27 @@ export async function GET(req: Request) {
     }
     await adminDb.collection(INTERVALS_CONNECTIONS_COLLECTION).doc(discordId).set(doc)
 
+    // First connection gets the full how-it-works DM — this is the moment they are paying
+    // attention. A reconnect only needs the confirmation and the intervals.icu checklist.
     try {
-      await sendCoachDm(
-        discordId,
-        '✅ **intervals.icu er forbundet.**\n\n' +
-          'For at coachen kan se dine ture og lægge pas ind i Zwift:\n' +
-          '1. Settings → Connections: forbind **Zwift** direkte, og slå upload af planlagte workouts til.\n' +
-          '2. Sæt den **samme FTP** på Zwift og på intervals.icu.\n' +
-          '3. Udendørs ture: forbind Garmin, Wahoo, Polar eller Coros direkte. Ture, der kun kommer fra Strava-API\'en, kan ikke læses.\n' +
-          `Indstillinger: <${INTERVALS_SETTINGS_URL}>\n\n` +
-          'Spørg **DZR Coach** her i DM — fx:\n' +
-          '• Hvordan var min uge?\n' +
-          '• Var i går for hård?\n' +
-          '• Skal jeg hvile i morgen?'
-      )
+      const profile = await ensureDefaultCoachProfile(discordId)
+      if (!profile?.howItWorksSentAt) {
+        const sent = await sendCoachDm(discordId, '✅ **intervals.icu er forbundet.**\n\n' + coachHowItWorksText())
+        if (sent) {
+          await adminDb
+            .collection(COACH_PROFILES_COLLECTION)
+            .doc(discordId)
+            .update({ howItWorksSentAt: new Date().toISOString() })
+        }
+      } else {
+        await sendCoachDm(
+          discordId,
+          '✅ **intervals.icu er forbundet igen.**\n\n' +
+            'Tjek at Zwift er forbundet direkte, at upload af planlagte workouts er slået til, og at FTP er den samme på Zwift og intervals.icu:\n' +
+            `<${INTERVALS_SETTINGS_URL}>\n\n` +
+            EXAMPLE_QUESTIONS
+        )
+      }
     } catch (dmErr) {
       console.warn('intervals callback: could not DM user', discordId, dmErr)
     }

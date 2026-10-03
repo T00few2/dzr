@@ -424,12 +424,30 @@ export async function sendDm(userId: string, content: string, opts?: { token?: s
   })
   if (!ch.ok) return false
   const channel = await ch.json()
-  const msg = await fetch(`https://discord.com/api/v10/channels/${channel.id}/messages`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ content, flags: 4 }),
-  })
-  return msg.ok
+  for (const chunk of splitDiscordContent(content)) {
+    const msg = await fetch(`https://discord.com/api/v10/channels/${channel.id}/messages`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ content: chunk, flags: 4 }),
+    })
+    if (!msg.ok) return false
+  }
+  return true
+}
+
+/** Discord rejects messages over 2000 characters; split on paragraph, then line, boundaries. */
+export function splitDiscordContent(content: string, limit = 1900) {
+  const chunks: string[] = []
+  let remaining = String(content || '').trim()
+  while (remaining.length > limit) {
+    let cut = remaining.lastIndexOf('\n\n', limit)
+    if (cut < limit * 0.5) cut = remaining.lastIndexOf('\n', limit)
+    if (cut < limit * 0.5) cut = limit
+    chunks.push(remaining.slice(0, cut).trim())
+    remaining = remaining.slice(cut).trim()
+  }
+  if (remaining) chunks.push(remaining)
+  return chunks
 }
 
 /** Coach lifecycle DMs (connect / disconnect) must land in the DZR Coach thread. */

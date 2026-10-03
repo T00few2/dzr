@@ -323,6 +323,30 @@ const fixtures = [
     forbidTools: ["delete_planned_event"],
     expect: "Asks which of the two easy rides (8 or 9 September) to remove. Must NOT delete either without asking.",
   },
+
+  // Questions about the coach itself are answered from the official text, not from memory.
+  {
+    name: "answers a privacy question from the official coach info",
+    context: { ...base, notesOptIn: false },
+    message: "Gemmer du vores samtaler?",
+    expectTools: ["get_coach_info"],
+    toolResults: {
+      get_coach_info: {
+        coach_info: "**Chat-noter**\nChatten er privat. Selve samtalen gemmes ikke. For at forstå sammenhængen kan jeg læse det seneste døgn af vores DM igen. Det bliver ikke gemt. Med chat-noter slået til gemmer jeg et kort resumé, når en samtale slutter.",
+      },
+    },
+    expect: "Says the conversation itself is not stored, and that a short summary is only kept if chat notes are turned on. Answers only this question — must NOT paste the whole overview or describe unrelated features.",
+  },
+  {
+    name: "posts the full overview when asked for all of it",
+    context: base,
+    message: "Kan du sende mig hele infoen om hvordan du virker igen?",
+    expectTools: ["get_coach_info"],
+    toolResults: {
+      get_coach_info: { sent_full: true, message: "The full overview is now posted in the chat. Do not repeat or summarise it." },
+    },
+    expect: "Does not repeat or summarise the overview, since it has already been posted. At most a short sentence.",
+  },
 ];
 
 module.exports = { base, fixtures };

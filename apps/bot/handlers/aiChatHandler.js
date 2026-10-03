@@ -35,9 +35,9 @@ const {
 } = require("./commandHandlers");
 const { startQuizFromMessage } = require("../services/quizService");
 const intervals = require("../services/intervalsService");
-const { unconnectedCoachText, NOT_CLUB_MEMBER_TEXT, USE_COACH_BOT_TEXT } = require("../services/coachDm");
+const { unconnectedCoachText, sendNoEmbeds, NOT_CLUB_MEMBER_TEXT, USE_COACH_BOT_TEXT } = require("../services/coachDm");
 const { formatCoachProfileForPrompt } = require("../services/coachProfile");
-const { MY_PAGES_COACH_URL, CALENDAR_URL, noEmbedUrl } = require("../services/coachHowItWorks");
+const { MY_PAGES_COACH_URL, CALENDAR_URL, noEmbedUrl, coachHowItWorksText } = require("../services/coachHowItWorks");
 const { proposeCoachGoal } = require("../services/coachGoalConfirm");
 const { buildZwo, describeWorkout } = require("../services/zwoBuilder");
 const { renderWorkoutChart } = require("../services/workoutChart");
@@ -209,6 +209,8 @@ function compactToolResult(result) {
   if (Array.isArray(result.races)) base.races = result.races.slice(0, 12);
   if (result.zrl) base.zrl = result.zrl;
   if (typeof result.summary === "string") base.summary = result.summary.slice(0, 500);
+  if (typeof result.coach_info === "string") base.coach_info = result.coach_info.slice(0, 4000);
+  if (result.sent_full) base.sent_full = true;
   if (typeof result.confirmMessageDa === "string") base.confirmMessageDa = result.confirmMessageDa.slice(0, 1500);
   if (typeof result.confirmMessageEn === "string") base.confirmMessageEn = result.confirmMessageEn.slice(0, 1500);
   if (typeof result.instruction === "string") base.instruction = result.instruction.slice(0, 800);
@@ -1382,6 +1384,24 @@ async function executeSingleToolCall(toolCall, message, turn) {
         }
       }
 
+      case "get_coach_info": {
+        const info = coachHowItWorksText();
+        if (args.send_full === true) {
+          try {
+            await sendNoEmbeds(message.channel, info);
+            return {
+              tool_call_id: toolCall.id,
+              success: true,
+              sent_full: true,
+              message: "The full overview is now posted in the chat. Do not repeat or summarise it; reply with at most one short sentence, or nothing more is needed.",
+            };
+          } catch (err) {
+            console.warn("get_coach_info send failed:", err?.message || err);
+          }
+        }
+        return { tool_call_id: toolCall.id, success: true, coach_info: info };
+      }
+
       case "read_recent_dm": {
         const profile = turn?.profile ?? await getCoachProfile(message.author.id);
         if (profile?.notesOptIn !== true) {
@@ -2402,7 +2422,10 @@ async function runChatTurn(message, client, { coachOnly }) {
 
         // If the tools already handled user-visible output, don't force an extra LLM "result summary".
         // Exception: we still do the playful stats commentary below.
-        const shouldSkipGenericAnswer = currentToolCalls.every(tc => TOOLS_THAT_REPLY_DIRECTLY.has(tc.function.name));
+        // A posted coach overview is the whole reply; anything after it would only repeat it.
+        const shouldSkipGenericAnswer =
+          currentToolCalls.every(tc => TOOLS_THAT_REPLY_DIRECTLY.has(tc.function.name)) ||
+          (toolResults.length > 0 && toolResults.every(r => r.sent_full));
 
         // Check if we should generate a follow-up commentary for stats
         const hasStatsCall = currentToolCalls.some(
