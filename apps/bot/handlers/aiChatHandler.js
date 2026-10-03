@@ -21,6 +21,7 @@ const { fromDiscordMessage, dmRecordsToHistory, DM_READBACK_MAX_AGE_MS } = requi
 const { createTurnQueue } = require("../services/turnQueue");
 const { coachToolsFor, reasoningEffortAfterTools } = require("../services/coachTools");
 const { rememberCoachTurn } = require("../services/coachFeedback");
+const { extractTokenUsage } = require("../services/coachUsage");
 const { 
   handleRiderStats, 
   handleTeamStats, 
@@ -83,7 +84,7 @@ const COACH_MAX_TOOL_ITERATIONS = 4;
 const COACH_MAX_TOKENS = 16000;
 // Per-athlete daily ceiling. Usage was recorded but never enforced, so a runaway loop or a very
 // chatty day had no backstop. Generous by design: this is a safety net, not a rationing device.
-const COACH_DAILY_TOKEN_BUDGET = Number.parseInt(process.env.COACH_DAILY_TOKEN_BUDGET || "300000", 10);
+const COACH_DAILY_TOKEN_BUDGET = Number.parseInt(process.env.COACH_DAILY_TOKEN_BUDGET || "600000", 10);
 const COACH_REASONING_EFFORT = "low";
 
 // AI Model Configuration - can be changed to test different models
@@ -1916,14 +1917,6 @@ function getOpenAIErrorInfo(error) {
   return { code, type, message, status, looksLikeQuota, looksLikeRateLimit };
 }
 
-function extractTokenUsage(response) {
-  const u = response?.usage || {};
-  const promptTokens = Number(u.prompt_tokens ?? u.input_tokens ?? 0) || 0;
-  const completionTokens = Number(u.completion_tokens ?? u.output_tokens ?? 0) || 0;
-  const totalTokens = Number(u.total_tokens ?? 0) || promptTokens + completionTokens;
-  return { promptTokens, completionTokens, totalTokens };
-}
-
 function getMessageText(message) {
   const content = message?.content;
   if (typeof content === "string") return content.trim();
@@ -1970,6 +1963,7 @@ function addTokenUsage(tally, response) {
   tally.promptTokens += u.promptTokens;
   tally.completionTokens += u.completionTokens;
   tally.totalTokens += u.totalTokens;
+  tally.cachedPromptTokens += u.cachedPromptTokens;
   tally.calls += 1;
 }
 
@@ -1983,6 +1977,7 @@ async function flushCoachUsage(tally, message) {
       promptTokens: tally.promptTokens,
       completionTokens: tally.completionTokens,
       totalTokens: tally.totalTokens,
+      cachedPromptTokens: tally.cachedPromptTokens,
       openaiCalls: tally.calls,
     });
   } catch (err) {
@@ -2091,6 +2086,7 @@ async function extractCoachChatNotes({ discordId, username, turns }) {
         promptTokens: usage.promptTokens,
         completionTokens: usage.completionTokens,
         totalTokens: usage.totalTokens,
+        cachedPromptTokens: usage.cachedPromptTokens,
         openaiCalls: 1,
       });
     } catch (err) {
@@ -2313,7 +2309,7 @@ async function runChatTurn(message, client, { coachOnly }) {
       return sent;
     };
     coachUsageTally = isCoachSession
-      ? { promptTokens: 0, completionTokens: 0, totalTokens: 0, calls: 0 }
+      ? { promptTokens: 0, completionTokens: 0, totalTokens: 0, cachedPromptTokens: 0, calls: 0 }
       : null;
     const callAndTrack = async (params) => {
       const response = await callOpenAIWithRetry(params);

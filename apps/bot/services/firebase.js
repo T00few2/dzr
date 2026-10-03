@@ -2,6 +2,7 @@ const admin = require("firebase-admin");
 const config = require("../config/config");
 const shared = require("../constants.json");
 const { isPaidClubMember: sharedIsPaidClubMember } = require("./membership");
+const { budgetTokens } = require("./coachUsage");
 const {
   emptyProfile,
   defaultProfile,
@@ -599,12 +600,14 @@ async function getCoachProfile(discordId) {
 /**
  * Increment coaching LLM usage for a Discord user. Never throws to the caller.
  */
-async function recordCoachUsage({ discordId, username, model, promptTokens, completionTokens, totalTokens, openaiCalls }) {
+async function recordCoachUsage({ discordId, username, model, promptTokens, completionTokens, totalTokens, cachedPromptTokens, openaiCalls }) {
   const id = String(discordId || "").trim();
   if (!id) return;
   const prompt = Math.max(0, Number(promptTokens) || 0);
   const completion = Math.max(0, Number(completionTokens) || 0);
   const total = Math.max(0, Number(totalTokens) || prompt + completion);
+  const cached = Math.min(prompt, Math.max(0, Number(cachedPromptTokens) || 0));
+  const budget = budgetTokens({ totalTokens: total, cachedPromptTokens: cached });
   const calls = Math.max(1, Number(openaiCalls) || 1);
   if (total <= 0 && calls <= 0) return;
 
@@ -620,6 +623,7 @@ async function recordCoachUsage({ discordId, username, model, promptTokens, comp
         promptTokens: Number(prev.promptTokens || 0) + prompt,
         completionTokens: Number(prev.completionTokens || 0) + completion,
         totalTokens: Number(prev.totalTokens || 0) + total,
+        cachedPromptTokens: Number(prev.cachedPromptTokens || 0) + cached,
         openaiCalls: Number(prev.openaiCalls || 0) + calls,
         messageCount: Number(prev.messageCount || 0) + 1,
         lastModel: model || prev.lastModel || null,
@@ -634,6 +638,8 @@ async function recordCoachUsage({ discordId, username, model, promptTokens, comp
       discordId: id,
       day: usageDayKey(id, now).split("_")[1],
       totalTokens: admin.firestore.FieldValue.increment(total),
+      // What the daily budget counts: cached prompt tokens at a discount (see coachUsage.js).
+      budgetTokens: admin.firestore.FieldValue.increment(budget),
       openaiCalls: admin.firestore.FieldValue.increment(calls),
       updatedAt: now,
     }, { merge: true });
@@ -645,6 +651,8 @@ async function recordCoachUsage({ discordId, username, model, promptTokens, comp
       promptTokens: prompt,
       completionTokens: completion,
       totalTokens: total,
+      cachedPromptTokens: cached,
+      budgetTokens: budget,
       openaiCalls: calls,
       at: now,
     });
@@ -691,7 +699,7 @@ async function checkCoachKeyCanary() {
 }
 
 /**
- * Tokens this athlete has used today.
+ * Budget tokens this athlete has used today (cached prompt tokens discounted).
  *
  * coach_usage is cumulative — it only ever increments and carries no per-day breakdown — so it
  * cannot back a daily cap. This is a separate per-day counter.
@@ -701,7 +709,9 @@ async function getCoachDailyTokens(discordId, now = new Date()) {
   if (!id) return 0;
   try {
     const snap = await db.collection(COACH_USAGE_DAILY_COLLECTION).doc(usageDayKey(id, now)).get();
-    return snap.exists ? Number(snap.data()?.totalTokens || 0) : 0;
+    if (!snap.exists) return 0;
+    const data = snap.data() || {};
+    return Number(data.budgetTokens ?? data.totalTokens ?? 0) || 0;
   } catch (err) {
     // Fail open: a Firestore blip must not lock an athlete out of coaching.
     console.warn("getCoachDailyTokens failed:", err?.message || err);

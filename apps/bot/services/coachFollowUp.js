@@ -20,6 +20,7 @@ const {
   formatCoachToday,
 } = require("./coachChatNotes");
 const { formatCalendarForPrompt } = require("./memberCalendar");
+const { extractTokenUsage } = require("./coachUsage");
 
 const {
   FOLLOW_UP_TZ,
@@ -32,7 +33,12 @@ const {
 const FOLLOW_UP_STATE_KEY = "coach_follow_up";
 /** Set only after Firestore says today's sweep already finished. Never cache "not yet run". */
 let cachedFollowUpRunDate = null;
-const MAX_FOLLOW_UPS_PER_RUN = 25;
+// Per sweep, not per day: if more athletes are due, the next scheduler tick continues until the
+// morning window closes. Sends run one after another, so this mainly bounds one sweep's length.
+const MAX_FOLLOW_UPS_PER_RUN = Number.parseInt(process.env.COACH_FOLLOW_UPS_PER_RUN || "100", 10) || 100;
+// The scheduler ticks every minute and a sweep can take longer, so two must never overlap —
+// both would build the same due list and DM the same athletes twice.
+let sweepInFlight = false;
 const MODEL = "gpt-5-mini";
 const FALLBACK_DA = "Hvordan går træningen? Skriv hvis du vil have et kig på ugen.";
 const FALLBACK_EN = "How is training going? Write if you want a look at the week.";
@@ -72,14 +78,6 @@ function getMessageText(message) {
       .trim();
   }
   return "";
-}
-
-function extractTokenUsage(response) {
-  const u = response?.usage || {};
-  const promptTokens = Number(u.prompt_tokens ?? u.input_tokens ?? 0) || 0;
-  const completionTokens = Number(u.completion_tokens ?? u.output_tokens ?? 0) || 0;
-  const totalTokens = Number(u.total_tokens ?? 0) || promptTokens + completionTokens;
-  return { promptTokens, completionTokens, totalTokens };
 }
 
 async function generateFollowUpText({ profile, activities, notesBlock, goalsBlock, calendarBlock, username }) {
@@ -145,6 +143,7 @@ Write the check-in now.`,
       promptTokens: usage.promptTokens,
       completionTokens: usage.completionTokens,
       totalTokens: usage.totalTokens,
+      cachedPromptTokens: usage.cachedPromptTokens,
       openaiCalls: 1,
     });
   }
@@ -225,7 +224,17 @@ async function maybeSendCoachFollowUps(now = new Date()) {
   const window = followUpClockWindow(now);
   if (!window.open) return { skipped: window.reason };
   if (cachedFollowUpRunDate === window.todayKey) return { skipped: "already_ran" };
+  if (sweepInFlight) return { skipped: "in_flight" };
 
+  sweepInFlight = true;
+  try {
+    return await runFollowUpSweep(now);
+  } finally {
+    sweepInFlight = false;
+  }
+}
+
+async function runFollowUpSweep(now) {
   const existing = await getBotState(FOLLOW_UP_STATE_KEY);
   const decision = shouldRunFollowUpSweep({ now, lastRunDate: existing?.lastRunDate || null });
   if (!decision.run) {
@@ -237,12 +246,17 @@ async function maybeSendCoachFollowUps(now = new Date()) {
   const todayKey = decision.todayKey;
 
   const due = [];
+  let moreDue = false;
   try {
     const profiles = await listCoachProfiles();
     for (const profile of profiles) {
       if (!isFollowUpDue(profile, now)) continue;
       const discordId = String(profile.discordId || "").trim();
       if (!discordId) continue;
+      if (due.length >= MAX_FOLLOW_UPS_PER_RUN) {
+        moreDue = true;
+        break;
+      }
       try {
         const [member, connected] = await Promise.all([
           intervals.hasClubMemberRole(discordId),
@@ -254,7 +268,6 @@ async function maybeSendCoachFollowUps(now = new Date()) {
         continue;
       }
       due.push(profile);
-      if (due.length >= MAX_FOLLOW_UPS_PER_RUN) break;
     }
   } catch (err) {
     console.error("listCoachProfiles failed:", err?.message || err);
@@ -274,6 +287,13 @@ async function maybeSendCoachFollowUps(now = new Date()) {
         /* ignore */
       }
     }
+  }
+
+  // Every athlete in `due` is now marked as contacted, so the next tick's due list starts where
+  // this one stopped.
+  if (moreDue) {
+    console.log(`🚴 Coach follow-ups: ${sent}/${due.length} on ${todayKey}, more due — continuing next tick`);
+    return { sent, considered: due.length, moreDue: true };
   }
 
   await setBotState(FOLLOW_UP_STATE_KEY, {

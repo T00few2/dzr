@@ -92,7 +92,8 @@ Required bot env names: `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`, `FIREBASE_PROJ
 
 DZR Coach reads training from intervals.icu. Register an OAuth app on your intervals.icu account (Settings, then the app’s Manage page). Redirect URI: `https://www.dzrracingseries.com/api/intervals/callback`. The site requests `ACTIVITY:READ,WELLNESS:READ,SETTINGS:READ,CALENDAR:WRITE`. Set `INTERVALS_CLIENT_ID` and `INTERVALS_CLIENT_SECRET` on Vercel. Set `COACH_CONNECT_SECRET` to the same value on Vercel and Render (it signs connect links and encrypts tokens). If coach profiles were encrypted before this change, copy the previous connect-secret value into `COACH_CONNECT_SECRET`, and copy any dedicated token key into `COACH_TOKEN_KEY`. Optional `COACH_MEMORY_KEY` still encrypts coach memory when set. Optional `INTERVALS_REDIRECT_URI` overrides the callback URL.
 
-Optional: `COACH_DAILY_TOKEN_BUDGET` caps each athlete's coaching tokens per day (default 300000, `0` disables).
+Optional: `COACH_DAILY_TOKEN_BUDGET` caps each athlete's coaching tokens per day (default 600000, `0` disables). Cached prompt tokens count at 10%, matching what OpenAI charges for them.
+Optional: `COACH_FOLLOW_UPS_PER_RUN` is how many check-ins one scheduler sweep sends (default 100); any remaining are sent on the next tick, until 11:00 Copenhagen time.
 
 ## Shared constants
 
