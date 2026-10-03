@@ -35,7 +35,7 @@ function coachHowItWorksText({ includeStartHint = false } = {}) {
     "Det er der, du sætter hvor ofte du kører, andre sportsgrene, faste træningsdage, skader og hvordan jeg skal svare. Under samme side kan du slå et valgfrit check-in til, så jeg skriver først om morgenen, hvis vi ikke har snakket i et par dage.",
     "",
     "**Feedback**",
-    "Reagér med 👍 eller 👎 på mine svar, hvis du vil. Det er anonymt over for de andre og hjælper med at gøre coachingen bedre.",
+    "Reagér med 👍 eller 👎 på mine svar, hvis du vil. Det er anonymt over for de andre og hjælper med at gøre coachingen bedre. Med chat-noter slået til gemmer jeg også, hvilke slags data jeg slog op til svaret — aldrig selve teksten.",
     "",
     "**Kalender**",
     "Du kan planlægge din egen træning og dine løb i kalenderen:",
@@ -44,7 +44,7 @@ function coachHowItWorksText({ includeStartHint = false } = {}) {
     "Den er din — kun du kan se den, og den bliver ikke slettet, selvom du slår coachen fra. Jeg kan altid se den, så jeg kan tage højde for dine løb og planer. Jeg tilføjer kun selv noget, hvis chat-noter er slået til, og det står tydeligt, hvad jeg har lagt ind.",
     "",
     "**Chat-noter**",
-    "Chatten er privat. Selve samtalen gemmes ikke — men når en samtale slutter, gemmer jeg et kort resumé af den, så jeg kan huske tråden næste gang. Når chat-noter er slået til, gemmer jeg stille korte notater (fx at du var syg, eller en engangsplan) — uden at spørge dig. Datobundne mål (et løb, tabe vægt inden en dato) sætter du under Mine sider, eller jeg foreslår dem i chatten og gemmer først, når du trykker Ja. Så styrer jeg træningen efter dem. Faste rammer (ture om ugen, skader, svartone) retter du selv under Mine sider. Du kan altid se og slette noterne der.",
+    "Chatten er privat. Selve samtalen gemmes ikke. For at forstå sammenhængen kan jeg læse det seneste døgn af vores DM igen — med chat-noter slået til op til 14 dage tilbage, når du henviser til noget tidligere. Det bliver ikke gemt. Med chat-noter slået til gemmer jeg et kort resumé, når en samtale slutter, så jeg kan huske tråden næste gang. Jeg gemmer også stille korte notater (fx at du var syg, eller en engangsplan) — uden at spørge dig. Datobundne mål (et løb, tabe vægt inden en dato) sætter du under Mine sider, eller jeg foreslår dem i chatten og gemmer først, når du trykker Ja. Så styrer jeg træningen efter dem. Faste rammer (ture om ugen, skader, svartone) retter du selv under Mine sider. Du kan altid se og slette noterne der.",
   ];
   if (includeStartHint) {
     lines.push("", "Skriv **/coach** på Discord-serveren, når du vil i gang. **DZR Coach** skriver til dig i en privat besked.");

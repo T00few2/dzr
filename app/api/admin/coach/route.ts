@@ -157,16 +157,31 @@ export async function GET(req: Request) {
   // 👍/👎 on coach replies. Automated evals catch regressions; this catches advice that is
   // technically correct and still unhelpful, which no assertion can see.
   let feedback = { up: 0, down: 0 }
+  // Ratings carry tools/reasoning metadata only for athletes with chat notes on; the rest are
+  // counted above but cannot be grouped.
+  const byTools = new Map<string, { tools: string; reasoningEffort: string | null; up: number; down: number }>()
   try {
     const feedbackSnap = await adminDb.collection('coach_feedback').orderBy('at', 'desc').limit(500).get()
     feedbackSnap.forEach((doc) => {
-      const rating = Number((doc.data() || {}).rating)
+      const data = doc.data() || {}
+      const rating = Number(data.rating)
       if (rating > 0) feedback.up += 1
       else if (rating < 0) feedback.down += 1
+      if (!Array.isArray(data.tools)) return
+      const tools = data.tools.length ? data.tools.join(' + ') : '(no tools)'
+      const reasoningEffort = typeof data.reasoningEffort === 'string' ? data.reasoningEffort : null
+      const key = `${tools}|${reasoningEffort || ''}`
+      const row = byTools.get(key) || { tools, reasoningEffort, up: 0, down: 0 }
+      if (rating > 0) row.up += 1
+      else if (rating < 0) row.down += 1
+      byTools.set(key, row)
     })
   } catch (err) {
     console.warn('admin/coach: could not read feedback', err)
   }
+  const feedbackByTools = Array.from(byTools.values()).sort(
+    (a, b) => b.down / Math.max(1, b.up + b.down) - a.down / Math.max(1, a.up + a.down) || b.down - a.down
+  )
 
   const totals = people.reduce(
     (acc, p) => {
@@ -191,6 +206,7 @@ export async function GET(req: Request) {
     // cannot be decrypted with the key this runtime holds — Vercel and Render have drifted apart,
     // or COACH_MEMORY_KEY was rotated. keyIdStatus below distinguishes those two.
     feedback,
+    feedbackByTools,
     undecryptableProfiles: undecryptable.length,
     // Diagnostic for the above: a mismatch says the key changed, an unknown says the document
     // simply predates fingerprinting. Without this the two look identical from a failed decrypt.

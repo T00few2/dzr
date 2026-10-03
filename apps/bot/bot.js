@@ -15,7 +15,7 @@ const {
   forceSaveStats 
 } = require("./handlers/statsHandler");
 const { handleZwiftIdMessage, handleZwiftIdConfirmation } = require("./handlers/zwiftIdMessageHandler");
-const { handleAIChatMessage } = require("./handlers/aiChatHandler");
+const { handleAIChatMessage, flushAllCoachSessions } = require("./handlers/aiChatHandler");
 const { startCoachBot } = require("./services/coachBot");
 const { checkCoachKeyCanary } = require("./services/firebase");
 
@@ -154,24 +154,33 @@ client.once("ready", () => {
   startScheduler(client);
 });
 
-// Graceful shutdown handling
-process.on('SIGINT', () => {
-  console.log('🔄 Graceful shutdown initiated...');
-  forceSaveStats();
-  setTimeout(() => {
-    console.log('👋 Bot shutting down');
-    process.exit(0);
-  }, 2000); // Give 2 seconds for stats to save
-});
+// Graceful shutdown handling.
+// Render allows 30 seconds between SIGTERM and SIGKILL by default. Open coach conversations are
+// summarised with an OpenAI call each, which takes far longer than the old 2-second exit.
+const SHUTDOWN_STATS_MS = 2000;
+const SHUTDOWN_MAX_MS = 20000;
+let shuttingDown = false;
 
-process.on('SIGTERM', () => {
+async function gracefulShutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log('🔄 Graceful shutdown initiated...');
   forceSaveStats();
-  setTimeout(() => {
-    console.log('👋 Bot shutting down');
-    process.exit(0);
-  }, 2000);
-});
+  const statsGrace = new Promise((resolve) => setTimeout(resolve, SHUTDOWN_STATS_MS));
+  const flush = flushAllCoachSessions()
+    .then((count) => { if (count) console.log(`🚴 Flushed ${count} coach conversation(s)`); })
+    .catch((err) => console.error('Coach session flush failed:', err?.message || err));
+  const cap = new Promise((resolve) => setTimeout(() => {
+    console.warn('⏱️ Shutdown cap reached before coach sessions finished flushing');
+    resolve();
+  }, SHUTDOWN_MAX_MS));
+  await Promise.race([Promise.all([statsGrace, flush]), cap]);
+  console.log('👋 Bot shutting down');
+  process.exit(0);
+}
+
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
 
 // Start the club bot. DZR Coach is a second client (DMs only; no slash commands).
 /**

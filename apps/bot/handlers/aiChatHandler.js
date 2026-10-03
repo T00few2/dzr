@@ -17,6 +17,10 @@ const {
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
 const { trimConversation } = require("../services/conversationTrim");
+const { fromDiscordMessage, dmRecordsToHistory, DM_READBACK_MAX_AGE_MS } = require("../services/dmHistory");
+const { createTurnQueue } = require("../services/turnQueue");
+const { coachToolsFor, reasoningEffortAfterTools } = require("../services/coachTools");
+const { rememberCoachTurn } = require("../services/coachFeedback");
 const { 
   handleRiderStats, 
   handleTeamStats, 
@@ -41,7 +45,6 @@ const {
   MAX_COACH_ENTRIES_PER_WEEK,
 } = require("../services/memberCalendar");
 const {
-  EPISODE_NOTE_KINDS,
   shouldSkipExtract,
   buildExtractMessages,
   parseExtractedNotes,
@@ -70,15 +73,8 @@ try {
 // Store conversations per user
 const userConversations = new Map();
 const conversationTimers = new Map();
-const COACH_NOTE_TOOLS = new Set([
-  "search_past_notes",
-  "save_chat_notes",
-  "propose_coach_goal",
-  // Reading the calendar is ungated, but writing to it is not: a coach-written row derived
-  // from a conversation is persisted conversation content, so it follows the same consent.
-  "save_planned_event",
-  "delete_planned_event",
-]);
+const chatTurnQueue = createTurnQueue({ maxWaiting: 3 });
+const TYPING_REFRESH_MS = 8000;
 
 // Configuration
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
@@ -229,6 +225,7 @@ function compactToolResult(result) {
   }
   if (result.profile && typeof result.profile === "object") base.profile = result.profile;
   if (Array.isArray(result.matches)) base.matches = result.matches.slice(0, 3);
+  if (Array.isArray(result.dm_messages)) base.dm_messages = result.dm_messages.slice(-30);
   if (Array.isArray(result.available)) base.available = result.available.slice(0, 20);
   if (typeof result.error === "string") base.error = result.error.slice(0, 300);
 
@@ -589,302 +586,6 @@ const toolDefinitions = [
   }
 ];
 
-const coachToolDefinitions = [
-  {
-    type: "function",
-    function: {
-      name: "get_athlete_profile",
-      description: "Holds weight, height, and FTP for the asking athlete, including a scale weight from the wellness calendar. Call when the answer needs those facts. Always the caller — never another member.",
-      parameters: { type: "object", properties: {} }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_athlete_stats",
-      description: "Holds year and recent ride totals, plus a power curve when intervals.icu has one. Call when the answer needs those totals or the curve. Weekly load and whether to rest are get_training_trend, not this.",
-      parameters: { type: "object", properties: {} }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_athlete_zones",
-      description: "Holds the asking athlete's heart-rate and power zones. Call when the answer needs zone targets.",
-      parameters: { type: "object", properties: {} }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_recent_activities",
-      description: "Holds ride summaries for the last 28 days: averages only, not interval quality. Call when the answer needs those rides or an activity id. Not the six-month load trend. Activities intervals.icu only holds from another platform may be omitted; say so if the message says that.",
-      parameters: {
-        type: "object",
-        properties: {
-          days: {
-            type: "number",
-            description: "Lookback window in days (1-28). Default 14. For 'this week' (Monday–Sunday, Denmark), fetch enough days to cover from this Monday."
-          }
-        }
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_activity_details",
-      description: "Holds one ride's summary (time, distance, average power, heart rate) by id from get_recent_activities. Call when the answer needs that ride and not its interval metrics.",
-      parameters: {
-        type: "object",
-        properties: {
-          activity_id: {
-            type: "string",
-            description: "Activity id from get_recent_activities"
-          }
-        },
-        required: ["activity_id"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_activity_metrics",
-      description: "Holds one ride's intervals, normalized power, and aerobic decoupling. Needs an activity id from get_recent_activities. Call when the answer needs interval quality. One activity at a time.",
-      parameters: {
-        type: "object",
-        properties: {
-          activity_id: { type: "string", description: "Activity id from get_recent_activities" }
-        },
-        required: ["activity_id"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_training_trend",
-      description: "Holds about six months of weekly load, whether load is rising, how long since an easy week, plus CTL, ATL, and form. Not a list of rides. The current week is partial. Not stored. Call when the answer needs that trend.",
-      parameters: { type: "object", properties: {} }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_wellness",
-      description: "Holds the last couple of weeks of sleep, HRV, soreness, fatigue, resting HR, and daily form. Empty fields are unknown, not fine. Call when the answer needs how they feel right now. Not the six-month load trend.",
-      parameters: {
-        type: "object",
-        properties: {
-          days: { type: "number", description: "Lookback in days, 1-28. Default 14." }
-        }
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_planned_workouts",
-      description: "Holds workouts queued for Zwift via intervals.icu. Not the athlete's plan. Call only when the answer needs to know whether a structured workout is already waiting to sync. Do not use it for what is coming up.",
-      parameters: {
-        type: "object",
-        properties: {
-          days: { type: "number", description: "How many days ahead, 1-28. Default 14." }
-        }
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_zwiftpower_context",
-      description: "Holds ZwiftPower category and phenotype for the asking athlete, if they have a linked Zwift ID. Call when the answer needs category or phenotype.",
-      parameters: { type: "object", properties: {} }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "search_past_notes",
-      description: "Search dated episode notes from earlier coach DMs (feelings, one-off plans). Use when the athlete refers to something discussed before that is not in the retrieved notes block. Not for workouts, not for goals, and not for standing Coach settings.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: {
-            type: "string",
-            description: "What to look for, e.g. easy week, knee, felt ill"
-          },
-          sinceDays: {
-            type: "number",
-            description: "Only notes from the last N days (1-365). Omit to search all stored notes."
-          }
-        },
-        required: ["query"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "save_chat_notes",
-      description: "Silently persist dated episode notes from this chat (feelings, one-off plans, life schedule). Not for goals. Not for standing Coach settings. Do not mention this save unless they asked if you remembered it. Saving notes must not skip training-data tools.",
-      parameters: {
-        type: "object",
-        properties: {
-          notes: {
-            type: "array",
-            description: "Episode notes to save. Quality over quantity. Prefer none over noise. Max 8. Never include kind goal.",
-            items: {
-              type: "object",
-              properties: {
-                text: {
-                  type: "string",
-                  description: "One or two sentences in the athlete's language."
-                },
-                kind: {
-                  type: "string",
-                  enum: EPISODE_NOTE_KINDS,
-                  description: "feeling | plan | preference_transient | life"
-                },
-                eventDate: {
-                  type: "string",
-                  description: "YYYY-MM-DD if they named a date. Optional. Does not make this a goal."
-                }
-              },
-              required: ["text", "kind"]
-            }
-          }
-        },
-        required: ["notes"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "send_workout_file",
-      description: "Add one structured workout to the DZR calendar and push the same workout through intervals.icu so Zwift can pick it up. Posts a short card in Discord. A .zwo file is sent only if the Zwift push fails. Use for a specific structured session, not for a race or a ride they are merely committing to (that is save_planned_event, DZR calendar only). Power is a fraction of FTP. Do not also call save_planned_event for this session. Pass the date they should ride it.",
-      parameters: {
-        type: "object",
-        properties: {
-          date: { type: "string", description: "Ride date YYYY-MM-DD in Denmark. Default is tomorrow if omitted." },
-          name: { type: "string", description: "Short workout name, e.g. 'VO2 5x4' or 'Tærskel 2x20'." },
-          description: { type: "string", description: "One or two sentences on the purpose of the session." },
-          steps: {
-            type: "array",
-            description: "Ordered steps. Start with a warmup and end with a cooldown.",
-            items: {
-              type: "object",
-              properties: {
-                type: { type: "string", enum: ["warmup", "steady", "intervals", "freeride", "cooldown"] },
-                duration: { type: "number", description: "Seconds. For warmup, steady, freeride and cooldown." },
-                power: { type: "number", description: "Fraction of FTP for a steady step, e.g. 0.65." },
-                powerFrom: { type: "number", description: "Warmup/cooldown start, fraction of FTP." },
-                powerTo: { type: "number", description: "Warmup/cooldown end, fraction of FTP." },
-                repeat: { type: "number", description: "Interval repetitions." },
-                onDuration: { type: "number", description: "Work seconds per repetition." },
-                offDuration: { type: "number", description: "Recovery seconds per repetition." },
-                onPower: { type: "number", description: "Work power, fraction of FTP, e.g. 1.05." },
-                offPower: { type: "number", description: "Recovery power, fraction of FTP, e.g. 0.55." }
-              },
-              required: ["type"]
-            }
-          }
-        },
-        required: ["name", "steps"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_club_races",
-      description: "DZR club race series and their usual weekly ride times (ZRL, WTRL TTT, DRS, Club Ladder, DZR After Party). Use when planning the athlete's week around racing, or when they mention a club race and you need to know when it runs.",
-      parameters: {
-        type: "object",
-        properties: {
-          series: {
-            type: "string",
-            description: "Optional filter, e.g. 'WTRL ZRL' or 'DRS'. Omit for all series."
-          }
-        }
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "propose_coach_goal",
-      description: "Propose a dated goal and send Ja/Nej buttons. The only way to save a goal from chat. Use when they explicitly call something their goal or ask you to remember a dated aim. Do not use for a casual upcoming ride. Do not say it is saved until they press Ja.",
-      parameters: {
-        type: "object",
-        properties: {
-          text: {
-            type: "string",
-            description: "Short goal in the athlete's language, e.g. tabe 3 kg or ZRL-finalen."
-          },
-          eventDate: {
-            type: "string",
-            description: "Future date YYYY-MM-DD. Resolve relative dates from Today. Weeks start Monday."
-          },
-          replaceNoteId: {
-            type: "string",
-            description: "If they already have 3 active goals, the id of the goal to replace."
-          }
-        },
-        required: ["text", "eventDate"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "save_planned_event",
-      description: "Put a race, an event, or a ride the athlete is committing to on the DZR calendar only. Nothing is sent to Zwift. Use when they say they are riding or racing on a date. A structured workout with steps is send_workout_file, which writes the DZR calendar and pushes to Zwift — do not also call this for that session. Do not use it to write out a training plan they did not ask for, and do not use it for a dated aim they call their goal — that is propose_coach_goal.",
-      parameters: {
-        type: "object",
-        properties: {
-          text: {
-            type: "string",
-            description: "Short description in the athlete's language, e.g. 'DZR After Party (C)' or '2 timer roligt'."
-          },
-          eventDate: {
-            type: "string",
-            description: "Future date YYYY-MM-DD. Resolve relative dates from Today. Weeks start Monday."
-          },
-          kind: {
-            type: "string",
-            enum: ["session", "race", "event", "other"],
-            description: "race and event have a start time someone else set; session is training they can move."
-          },
-          startTime: {
-            type: "string",
-            description: "Optional Europe/Copenhagen wall-clock HH:MM. Set it when they name a time (\"kl. 19\", a DZR subgroup start). Omit it when they do not — an untimed session may float around that day's fixtures. Never guess a race start."
-          }
-        },
-        required: ["text", "eventDate"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "delete_planned_event",
-      description: "Remove one row from the DZR calendar when the athlete asks to delete that row. Pass the id shown on the calendar line. This does not remove a planned workout from intervals.icu or from Zwift. Do not call it unless they asked to remove that specific row.",
-      parameters: {
-        type: "object",
-        properties: {
-          entryId: {
-            type: "string",
-            description: "The id: value on the DZR calendar line to remove."
-          }
-        },
-        required: ["entryId"]
-      }
-    }
-  }
-];
 
 /**
  * Reply to a message, falling back to a plain channel message if the reply itself
@@ -934,14 +635,22 @@ async function safeReplyChunks(message, content) {
   }
   if (remaining) chunks.push(remaining);
   let first = true;
+  // Every sent part is returned, so a reaction on any of them can be traced to this reply.
+  const sent = [];
   for (const chunk of chunks) {
     if (first) {
-      await safeReply(message, chunk);
+      const reply = await safeReply(message, chunk);
+      if (reply) sent.push(reply);
       first = false;
     } else {
-      await message.channel.send({ content: chunk, flags: MessageFlags.SuppressEmbeds });
+      try {
+        sent.push(await message.channel.send({ content: chunk, flags: MessageFlags.SuppressEmbeds }));
+      } catch (error) {
+        console.error("⚠️ safeReplyChunks send failed:", error?.message || error);
+      }
     }
   }
+  return sent;
 }
 
 /**
@@ -1671,6 +1380,31 @@ async function executeSingleToolCall(toolCall, message, turn) {
         }
       }
 
+      case "read_recent_dm": {
+        const profile = turn?.profile ?? await getCoachProfile(message.author.id);
+        if (profile?.notesOptIn !== true) {
+          return { tool_call_id: toolCall.id, success: false, message: "Chat notes are off, so earlier DMs cannot be read." };
+        }
+        const days = Math.min(14, Math.max(1, Math.round(Number(args.days) || 7)));
+        const limit = Math.min(30, Math.max(1, Math.round(Number(args.limit) || 20)));
+        const history = await readRecentDm(message, {
+          maxAgeMs: days * 24 * 60 * 60 * 1000,
+          limit,
+          fetchLimit: 100,
+          includeTime: true,
+        });
+        return {
+          tool_call_id: toolCall.id,
+          success: true,
+          days,
+          dm_messages: history.map((m) => ({
+            author: m.role === "assistant" ? "coach" : "athlete",
+            at: m.at,
+            text: m.content,
+          })),
+        };
+      }
+
       case "search_past_notes": {
         const eligible = turn?.eligible ?? await intervals.hasClubMemberRole(message.author.id);
         if (!eligible) {
@@ -1921,6 +1655,33 @@ async function executeToolCalls(toolCalls, message, turn) {
 }
 
 /**
+ * Recent messages from this coach DM as chat history. Reads Discord only; nothing is stored.
+ * Never throws: without history the coach still answers, just with less context.
+ */
+async function readRecentDm(message, {
+  maxAgeMs = DM_READBACK_MAX_AGE_MS,
+  limit = 10,
+  fetchLimit = 10,
+  includeTime = false,
+} = {}) {
+  try {
+    const fetched = await message.channel.messages.fetch({ limit: fetchLimit, before: message.id });
+    const records = Array.from(fetched.values()).map(fromDiscordMessage);
+    return dmRecordsToHistory(records, {
+      botId: message.client?.user?.id,
+      athleteId: message.author.id,
+      now: Date.now(),
+      maxAgeMs,
+      limit,
+      includeTime,
+    });
+  } catch (err) {
+    console.warn("readRecentDm failed:", err?.message || err);
+    return [];
+  }
+}
+
+/**
  * Clear conversation for a user
  */
 function clearConversation(userId) {
@@ -2071,23 +1832,31 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
   let settingsBlock = "No Coach settings stored yet.";
   let notesBlock = "Chat notes are off.";
   let goalsBlock = "Chat notes are off. There are no saved goals.";
-  let summariesBlock = "Chat notes are off, so earlier conversations are not recorded.";
+  let summariesBlock = "Chat notes are off. Only the last day of this DM is visible; nothing older is remembered.";
   let notesOptIn = false;
 
-  let profile = preloadedProfile ?? null;
-  try {
-    if (!profile) profile = await getCoachProfile(message.author.id);
+  // The three reads are independent, so they run together.
+  const [profileRead, calendarRead, notesRead] = await Promise.allSettled([
+    preloadedProfile ? Promise.resolve(preloadedProfile) : getCoachProfile(message.author.id),
+    listCalendarEntries(message.author.id),
+    listCoachChatNotes(message.author.id),
+  ]);
+
+  let profile = null;
+  if (profileRead.status === "fulfilled") {
+    profile = profileRead.value ?? null;
     settingsBlock = formatCoachProfileForPrompt(profile);
     notesOptIn = profile?.notesOptIn === true;
-  } catch (err) {
-    console.error("getCoachProfile failed:", err?.message || err);
+  } else {
+    console.error("getCoachProfile failed:", profileRead.reason?.message || profileRead.reason);
   }
   // The calendar is read for everyone, whatever notesOptIn says. That setting governs silent
   // extraction from conversation; the calendar is what the athlete deliberately typed into a form,
   // so the coach seeing it is the point. Writing to it is still gated — see save_planned_event.
   let calendarBlock = "";
   try {
-    calendarBlock = formatCalendarForPrompt(await listCalendarEntries(message.author.id), now);
+    if (calendarRead.status === "rejected") throw calendarRead.reason;
+    calendarBlock = formatCalendarForPrompt(calendarRead.value, now);
   } catch (err) {
     console.error("listCalendarEntries failed:", err?.message || err);
   }
@@ -2099,7 +1868,8 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
   goalsBlock = "No saved goals.";
   if (notesOptIn) notesBlock = "None retrieved for this message.";
   try {
-    const notes = await listCoachChatNotes(message.author.id);
+    if (notesRead.status === "rejected") throw notesRead.reason;
+    const notes = notesRead.value;
     goalsBlock = formatActiveGoalsForPrompt(notes, now);
     if (notesOptIn) {
       summariesBlock = formatSessionSummariesForPrompt(notes, now);
@@ -2252,14 +2022,23 @@ function bufferCoachTurn(key, { discordId, username, userMessage, assistantText 
   return buffer;
 }
 
-/** Flush a buffered conversation into notes plus one summary. Never throws to the caller. */
+/**
+ * Flush a buffered conversation into notes plus one summary. Never rejects. Callers on the idle
+ * path ignore the promise; shutdown awaits it.
+ */
 function flushCoachSession(key) {
   const buffer = coachSessionBuffers.get(key);
   coachSessionBuffers.delete(key);
-  if (!buffer || !buffer.turns.length) return;
-  Promise.resolve()
+  if (!buffer || !buffer.turns.length) return Promise.resolve();
+  return Promise.resolve()
     .then(() => extractCoachChatNotes(buffer))
     .catch((err) => console.error("extractCoachChatNotes failed:", err?.message || err));
+}
+
+/** Flush every open coach conversation, e.g. before a deploy stops the process. */
+function flushAllCoachSessions() {
+  const keys = Array.from(coachSessionBuffers.keys());
+  return Promise.allSettled(keys.map((key) => flushCoachSession(key))).then(() => keys.length);
 }
 
 async function extractCoachChatNotes({ discordId, username, turns }) {
@@ -2391,17 +2170,35 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     const repliedToMe = await isReplyToBot(message, client);
     if (!mentioned && !repliedToMe) return;
   }
-  
+
+  const queueKey = getConversationKey(message);
+  const queued = chatTurnQueue.tryEnqueue(queueKey, () => runChatTurn(message, client, { coachOnly }));
+  if (!queued) {
+    console.warn("Chat turn queue full, message not answered", { key: queueKey });
+    if (coachOnly) {
+      await safeReply(message, "⏳ Jeg er stadig i gang med dine tidligere beskeder. Send den her igen om lidt.");
+    }
+    return;
+  }
+  return queued;
+}
+
+async function runChatTurn(message, client, { coachOnly }) {
   // Declared outside the try because the catch block flushes it. It was previously scoped to the
   // try, so every errored coach turn threw a ReferenceError from its own error handler after
   // replying — losing the token accounting and burying the real OpenAI error in the logs.
   let coachUsageTally = null;
+  let coachLanguage = "da";
+  let typingTimer = null;
 
   try {
     let notesSavedThisTurn = false;
 
-    // Show typing indicator
+    // Discord drops the indicator after about 10 seconds; a coach turn often runs longer.
     await message.channel.sendTyping();
+    typingTimer = setInterval(() => {
+      message.channel.sendTyping().catch(() => undefined);
+    }, TYPING_REFRESH_MS);
 
     // Clean the message (remove only the bot mention, preserve user mentions)
     const botMentionPattern = new RegExp(`<@!?${client.user.id}>`, 'g');
@@ -2465,19 +2262,22 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     const turnContext = { eligible: false, profile: null };
 
     if (isCoachSession) {
-      turnContext.eligible = await intervals.hasClubMemberRole(message.author.id);
+      const [eligible, connected, usedToday] = await Promise.all([
+        intervals.hasClubMemberRole(message.author.id),
+        intervals.isConnected(message.author.id),
+        COACH_DAILY_TOKEN_BUDGET > 0 ? getCoachDailyTokens(message.author.id) : Promise.resolve(0),
+      ]);
+      turnContext.eligible = eligible;
       if (!turnContext.eligible) {
         await safeReply(message, NOT_CLUB_MEMBER_TEXT);
         return;
       }
-      const connected = await intervals.isConnected(message.author.id);
       if (!connected) {
         await safeReplyChunks(message, unconnectedCoachText(message.author.id));
         return;
       }
 
       if (COACH_DAILY_TOKEN_BUDGET > 0) {
-        const usedToday = await getCoachDailyTokens(message.author.id);
         if (usedToday >= COACH_DAILY_TOKEN_BUDGET) {
           await safeReply(
             message,
@@ -2494,16 +2294,24 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
       : null;
     // buildCoachSystemPrompt already fetched and decrypted the profile; reuse it.
     turnContext.profile = coachPrompt?.profile ?? null;
+    if (turnContext.profile?.style?.language === "en") coachLanguage = "en";
     const systemPrompt = isCoachSession
       ? coachPrompt.content
       : buildSystemPrompt(message, knowledgeCatalog);
     const notesOptIn = Boolean(coachPrompt?.notesOptIn);
-    const activeTools = isCoachSession
-      ? (notesOptIn ? coachToolDefinitions : coachToolDefinitions.filter((t) => !COACH_NOTE_TOOLS.has(t.function?.name)))
-      : toolDefinitions;
+    const activeTools = isCoachSession ? coachToolsFor(notesOptIn) : toolDefinitions;
     const maxTokens = isCoachSession ? COACH_MAX_TOKENS : AI_CONFIG.maxTokens;
     const maxIters = isCoachSession ? COACH_MAX_TOOL_ITERATIONS : MAX_TOOL_ITERATIONS;
     const replyFn = isCoachSession ? safeReplyChunks : safeReply;
+    const calledToolNames = [];
+    let answerEffort = isCoachSession ? COACH_REASONING_EFFORT : null;
+    const replyAndTag = async (text) => {
+      const sent = await replyFn(message, text);
+      if (isCoachSession && notesOptIn) {
+        rememberCoachTurn(sent, { tools: calledToolNames, reasoningEffort: answerEffort, model: AI_CONFIG.model });
+      }
+      return sent;
+    };
     coachUsageTally = isCoachSession
       ? { promptTokens: 0, completionTokens: 0, totalTokens: 0, calls: 0 }
       : null;
@@ -2523,6 +2331,11 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
           content: systemPrompt
         }
       ];
+      // After an idle timeout or a restart, the check-in and the last replies are still in the
+      // DM. Reading them back gives the coach that context without DZR storing anything.
+      if (isCoachSession) {
+        conversation.push(...(await readRecentDm(message)));
+      }
     } else {
       conversation[0] = {
         role: "system",
@@ -2570,6 +2383,10 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
       while (currentToolCalls && currentToolCalls.length > 0 && iteration < maxIters) {
         // Execute all tool calls (parallel if multiple)
         toolResults = await executeToolCalls(currentToolCalls, message, turnContext);
+        calledToolNames.push(...currentToolCalls.map((tc) => tc.function.name));
+        const postToolEffort = isCoachSession
+          ? reasoningEffortAfterTools(calledToolNames, COACH_REASONING_EFFORT)
+          : undefined;
         if (toolResults.some((r) => Array.isArray(r.saved) && r.saved.length > 0)) {
           notesSavedThisTurn = true;
         }
@@ -2673,15 +2490,17 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
               tools: activeTools,
               toolChoice: "auto",
               maxTokens,
-              reasoningEffort: isCoachSession ? COACH_REASONING_EFFORT : undefined,
+              reasoningEffort: postToolEffort,
             })
           );
+          if (postToolEffort) answerEffort = postToolEffort;
 
           const postToolMsg = postTool.choices[0]?.message;
           if (!postToolMsg) break;
 
           console.log("🤖 Post-tool model reply", {
             finish_reason: postTool.choices[0]?.finish_reason,
+            reasoningEffort: postToolEffort,
             contentLen: getMessageText(postToolMsg).length,
             toolCalls: postToolMsg.tool_calls?.length || 0,
             usage: postTool.usage,
@@ -2719,15 +2538,16 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
               })
             );
             text = getMessageText(retry.choices[0]?.message);
+            answerEffort = COACH_REASONING_EFFORT;
           }
 
           if (text) {
             conversation.push({ role: "assistant", content: text });
-            await replyFn(message, text);
+            await replyAndTag(text);
           } else if (isCoachSession) {
             const fallback = fallbackCoachFromTools(toolResults);
             conversation.push({ role: "assistant", content: fallback });
-            await replyFn(message, fallback);
+            await replyAndTag(fallback);
           } else if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0) {
             // Hit the iteration cap and the model only offered more tool calls, no text.
             await safeReply(message, "⚠️ I wasn't able to finish that request after a few tool calls. Please try rephrasing or breaking it into a simpler question.");
@@ -2748,7 +2568,7 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
       });
       
       if (text) {
-        await replyFn(message, text);
+        await replyAndTag(text);
       }
     }
     
@@ -2783,8 +2603,18 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
       message: info.message,
       raw: error,
     });
-    
-    if (info.looksLikeQuota) {
+
+    // A turn that failed mid tool-loop can leave unanswered tool_calls in the stored history,
+    // which OpenAI rejects on every later turn. The coach rebuilds from the DM on the next message.
+    userConversations.delete(getConversationKey(message));
+
+    if (coachOnly) {
+      const en = coachLanguage === "en";
+      const text = info.looksLikeRateLimit
+        ? (en ? "⚠️ I'm busy right now. Try again in a moment." : "⚠️ Der er travlt lige nu. Prøv igen om et øjeblik.")
+        : (en ? "⚠️ I couldn't answer right now. Please try again in a little while." : "⚠️ Jeg kunne ikke svare lige nu. Prøv igen om lidt.");
+      await safeReply(message, text);
+    } else if (info.looksLikeQuota) {
       await safeReply(message, "⚠️ OpenAI API quota/billing issue. Check platform.openai.com billing and credits, then restart the bot.");
     } else if (info.code === "invalid_api_key" || info.status === 401) {
       await safeReply(message, "⚠️ OpenAI API key is invalid or missing. Update OPENAI_API_KEY in the host env (e.g. Render) and restart.");
@@ -2794,12 +2624,15 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
       await safeReply(message, "⚠️ An error occurred while processing your message. Please try again.");
     }
     await flushCoachUsage(coachUsageTally, message);
+  } finally {
+    if (typingTimer) clearInterval(typingTimer);
   }
 }
 
 module.exports = {
   handleAIChatMessage,
   handleCoachChatMessage,
+  flushAllCoachSessions,
   clearConversation, // Export for testing/admin commands
   AI_CONFIG // Export for external configuration if needed
 };

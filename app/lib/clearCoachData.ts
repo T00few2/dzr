@@ -28,6 +28,33 @@ export async function deleteAllCoachChatNotes(discordId: string) {
   await adminDb.collection(COACH_CHAT_NOTES_COLLECTION).doc(id).delete().catch(() => undefined)
 }
 
+const COACH_FEEDBACK_COLLECTION = 'coach_feedback'
+const COACH_USAGE_COLLECTION = 'coach_usage'
+const COACH_USAGE_DAILY_COLLECTION = 'coach_usage_daily'
+const COACH_USAGE_EVENTS_COLLECTION = 'coach_usage_events'
+
+async function deleteWhereDiscordId(collection: string, discordId: string) {
+  const col = adminDb.collection(collection)
+  while (true) {
+    const snap = await col.where('discordId', '==', discordId).limit(400).get()
+    if (snap.empty) break
+    const batch = adminDb.batch()
+    snap.docs.forEach((doc) => batch.delete(doc.ref))
+    await batch.commit()
+    if (snap.size < 400) break
+  }
+}
+
+/** 👍/👎 ratings and token usage are keyed by Discord id, so they go with the rest on disconnect. */
+export async function deleteCoachFeedbackAndUsage(discordId: string) {
+  const id = String(discordId || '').trim()
+  if (!id) return
+  await deleteWhereDiscordId(COACH_FEEDBACK_COLLECTION, id)
+  await deleteWhereDiscordId(COACH_USAGE_DAILY_COLLECTION, id)
+  await deleteWhereDiscordId(COACH_USAGE_EVENTS_COLLECTION, id)
+  await adminDb.collection(COACH_USAGE_COLLECTION).doc(id).delete().catch(() => undefined)
+}
+
 export async function resetCoachProfileToDefault(discordId: string) {
   const id = String(discordId || '').trim()
   if (!id) return
@@ -49,7 +76,7 @@ export async function resetCoachProfileToDefault(discordId: string) {
 }
 
 /**
- * Wipe coach memory: chat notes and the profile.
+ * Wipe coach memory: chat notes, the profile, feedback ratings and token usage.
  *
  * Deliberately does NOT touch member_calendar. The calendar is the member's own — every verified
  * member has one, including those who never open the coach — and turning the coach off or
@@ -61,4 +88,5 @@ export async function clearCoachProfileAndNotes(discordId: string) {
   if (!id) return
   await deleteAllCoachChatNotes(id)
   await resetCoachProfileToDefault(id)
+  await deleteCoachFeedbackAndUsage(id)
 }

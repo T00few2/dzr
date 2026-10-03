@@ -39,6 +39,13 @@ type Person = {
   lastUsedAt: string | null
 }
 
+type FeedbackByToolsRow = {
+  tools: string
+  reasoningEffort: string | null
+  up: number
+  down: number
+}
+
 type EventRow = {
   id: string
   discordId: string | null
@@ -68,7 +75,7 @@ function fmtTime(iso: string | null) {
 }
 
 export default function CoachAdminPage() {
-  const [data, setData] = useState<{ totals: any; people: Person[]; events: EventRow[]; undecryptableProfiles?: number; feedback?: { up: number; down: number } } | null>(null)
+  const [data, setData] = useState<{ totals: any; people: Person[]; events: EventRow[]; undecryptableProfiles?: number; feedback?: { up: number; down: number }; feedbackByTools?: FeedbackByToolsRow[] } | null>(null)
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -192,6 +199,39 @@ export default function CoachAdminPage() {
             ))}
           </Tbody>
         </Table>
+      </Box>
+
+      <Heading size="sm" mb={1}>Feedback by tools used</Heading>
+      <Text color="gray.500" fontSize="sm" mb={3}>
+        Only ratings from athletes with chat notes on carry this. Highest 👎 share first; add eval fixtures for the top rows.
+      </Text>
+      <Box overflowX="auto" mb={10}>
+        {(data?.feedbackByTools || []).length === 0 ? (
+          <Text color="gray.500" fontSize="sm">No ratings with tool data yet.</Text>
+        ) : (
+          <Table size="sm">
+            <Thead>
+              <Tr>
+                <Th color="gray.400">Tools</Th>
+                <Th color="gray.400">Reasoning</Th>
+                <Th color="gray.400" isNumeric>👍</Th>
+                <Th color="gray.400" isNumeric>👎</Th>
+                <Th color="gray.400" isNumeric>👎 share</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {(data?.feedbackByTools || []).map((row) => (
+                <Tr key={`${row.tools}|${row.reasoningEffort || ''}`}>
+                  <Td>{row.tools}</Td>
+                  <Td>{row.reasoningEffort || '—'}</Td>
+                  <Td isNumeric>{fmt(row.up)}</Td>
+                  <Td isNumeric>{fmt(row.down)}</Td>
+                  <Td isNumeric>{Math.round((100 * row.down) / Math.max(1, row.up + row.down))}%</Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        )}
       </Box>
 
       <Heading size="sm" mb={3}>Recent coaching calls</Heading>

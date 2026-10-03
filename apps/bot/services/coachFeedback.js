@@ -1,7 +1,26 @@
 const { db } = require("./firebase");
+const { createTurnMetadataStore } = require("./turnMetadata");
 
 const COLLECTION = "coach_feedback";
 const UP = ["👍", "👎"];
+
+// Only filled for athletes with chat notes on; see rememberCoachTurn.
+const turnMetadata = createTurnMetadataStore();
+
+/**
+ * Remember how a coach reply was made, so a later 👍/👎 on it can say which tools and settings
+ * produced it. Call only for athletes with chat notes on — everyone else keeps a rating-only
+ * record. Never includes reply text.
+ */
+function rememberCoachTurn(sentMessages, { tools = [], reasoningEffort = null, model = null } = {}) {
+  const list = Array.isArray(sentMessages) ? sentMessages : [sentMessages];
+  const ids = list.map((m) => m?.id).filter(Boolean);
+  turnMetadata.remember(ids, {
+    tools: Array.from(new Set(tools)).sort(),
+    reasoningEffort,
+    model,
+  });
+}
 
 /**
  * Record 👍/👎 on a coach reply.
@@ -34,11 +53,15 @@ async function recordCoachFeedback(reaction, user) {
     // The counts are what the signal is for. To read *what* was rated, open the DM: messageId
     // identifies it. If richer context is ever needed for eval fixtures, store the exchange
     // deliberately — encrypted, deletable and disclosed — rather than keeping half a copy here.
+    // Which tools and settings produced the reply — no content. Present only when the athlete
+    // has chat notes on and the reply is from this process's lifetime.
+    const meta = turnMetadata.lookup(message.id);
     await db.collection(COLLECTION).add({
       discordId: String(user.id),
       messageId: String(message.id),
       rating: emoji === "👍" ? 1 : -1,
       at: new Date(),
+      ...(meta ? { tools: meta.tools, reasoningEffort: meta.reasoningEffort, model: meta.model } : {}),
     });
     return true;
   } catch (err) {
@@ -47,4 +70,4 @@ async function recordCoachFeedback(reaction, user) {
   }
 }
 
-module.exports = { recordCoachFeedback, COACH_FEEDBACK_COLLECTION: COLLECTION };
+module.exports = { recordCoachFeedback, rememberCoachTurn, COACH_FEEDBACK_COLLECTION: COLLECTION };
