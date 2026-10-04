@@ -386,6 +386,27 @@ const fixtures = [
     expect: "Uses the per-interval heart rate: power held steady around 262 W while average heart rate rose from about 158 to 170 across the four intervals. Must NOT say it cannot get heart-rate or power detail, and must NOT blame intervals.icu or Zwift for missing data.",
     forbid: [/kan ikke (hente|se|få)[^.]*(puls|watt|data)/i],
   },
+  {
+    name: "does not ask for a file upload or offer what its tools cannot do",
+    context: base,
+    message: "Kan du se de detaljerede data fra min tur i dag nu?",
+    expectTools: ["get_activity_metrics"],
+    toolResults: {
+      get_recent_activities: {
+        activities: [{ id: "i193318616", start_date_local: "2026-09-06T18:00:00", name: "Zwift - Group Ride", moving_time: 4681, source: "ZWIFT" }],
+      },
+      get_activity_metrics: {
+        metrics: {
+          durationSeconds: 4681, averageWatts: 208, normalizedPower: 248, intensityFactor: 0.821, ftpUsed: 302,
+          averageHeartRate: 135, maxHeartRate: 167, averageCadence: 89, aerobicDecouplingPercent: 13.2,
+          powerZoneSeconds: { Z1: 1365, Z2: 566, Z3: 1713, Z4: 574, Z5: 383, Z6: 67, Z7: 0, SS: 627 },
+          intervals: [{ startSeconds: 3127, durationSeconds: 328, averageWatts: 320, peakWatts: 386, averageHeartRate: 155, maxHeartRate: 161 }],
+        },
+      },
+    },
+    expect: "Confirms it can see the ride's detail and gives a few relevant numbers. Must NOT ask for a .fit, TCX or other file, must NOT say it lacks the raw stream, and must NOT end with a menu of options.",
+    forbid: [/\.fit\b/i, /tcx/i, /upload/i],
+  },
 ];
 
 module.exports = { base, fixtures };
