@@ -1196,7 +1196,10 @@ async function executeSingleToolCall(toolCall, message, turn) {
         else if (name === "get_athlete_zones") coachResult = await intervals.getAthleteZones(discordId);
         else if (name === "get_recent_activities") coachResult = await intervals.getRecentActivities(discordId, { days: args.days });
         else if (name === "get_activity_details") coachResult = await intervals.getActivityDetails(discordId, args.activity_id);
-        else if (name === "get_activity_metrics") coachResult = await intervals.getActivityMetrics(discordId, args.activity_id);
+        else if (name === "get_activity_metrics") coachResult = await intervals.getActivityMetrics(discordId, args.activity_id, {
+          fromMinute: args.from_minute,
+          toMinute: args.to_minute,
+        });
         else if (name === "get_training_trend") coachResult = await intervals.getTrainingTrend(discordId);
         else if (name === "get_wellness") coachResult = await intervals.getWellness(discordId, { days: args.days });
         else if (name === "get_planned_workouts") coachResult = await intervals.getPlannedWorkouts(discordId, { days: args.days });

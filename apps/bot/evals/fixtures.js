@@ -359,6 +359,33 @@ const fixtures = [
     },
     expect: "Does not repeat or summarise the overview, since it has already been posted. At most a short sentence.",
   },
+
+  // Ride detail comes from the coach's own tools; a gap is the coach's, not intervals.icu's.
+  {
+    name: "uses heart rate per interval from the ride metrics",
+    context: base,
+    message: "Hvordan gik mine intervaller i går? Steg pulsen meget?",
+    expectTools: ["get_activity_metrics"],
+    toolResults: {
+      get_recent_activities: {
+        activities: [{ id: "i193318616", start_date_local: "2026-09-05T18:00:00", name: "Zwift - 4x8 min", moving_time: 4680, source: "ZWIFT" }],
+      },
+      get_activity_metrics: {
+        metrics: {
+          durationSeconds: 4680, normalizedPower: 248, averageHeartRate: 148, maxHeartRate: 176,
+          averageCadence: 91, ftpUsed: 265,
+          intervals: [
+            { startSeconds: 900, durationSeconds: 480, averageWatts: 262, averageHeartRate: 158, maxHeartRate: 166 },
+            { startSeconds: 1680, durationSeconds: 480, averageWatts: 263, averageHeartRate: 163, maxHeartRate: 170 },
+            { startSeconds: 2460, durationSeconds: 480, averageWatts: 261, averageHeartRate: 167, maxHeartRate: 173 },
+            { startSeconds: 3240, durationSeconds: 480, averageWatts: 262, averageHeartRate: 170, maxHeartRate: 176 },
+          ],
+        },
+      },
+    },
+    expect: "Uses the per-interval heart rate: power held steady around 262 W while average heart rate rose from about 158 to 170 across the four intervals. Must NOT say it cannot get heart-rate or power detail, and must NOT blame intervals.icu or Zwift for missing data.",
+    forbid: [/kan ikke (hente|se|få)[^.]*(puls|watt|data)/i],
+  },
 ];
 
 module.exports = { base, fixtures };

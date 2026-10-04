@@ -205,6 +205,81 @@ function detectIntervals(watts1Hz, { thresholdWatts, minSeconds = 30, bridgeSeco
     });
 }
 
+/**
+ * Average and maximum of the positive samples. Zero heart rate is a strap dropout and zero cadence
+ * is coasting, so neither belongs in the average.
+ */
+function positiveStats(series) {
+  if (!Array.isArray(series)) return null;
+  let sum = 0;
+  let count = 0;
+  let max = 0;
+  for (const raw of series) {
+    const v = Number(raw);
+    if (!Number.isFinite(v) || v <= 0) continue;
+    sum += v;
+    count += 1;
+    if (v > max) max = v;
+  }
+  return count ? { average: Math.round(sum / count), max: Math.round(max) } : null;
+}
+
+/** Heart rate and cadence for each detected interval, read from the same 1 Hz grid. */
+function enrichIntervals(intervals, { heartrate = [], cadence = [] } = {}) {
+  if (!Array.isArray(intervals)) return [];
+  return intervals.map((interval) => {
+    const from = interval.startSeconds;
+    const to = from + interval.durationSeconds;
+    const hr = positiveStats(heartrate.slice(from, to));
+    const cad = positiveStats(cadence.slice(from, to));
+    return {
+      ...interval,
+      averageHeartRate: hr?.average ?? null,
+      maxHeartRate: hr?.max ?? null,
+      averageCadence: cad?.average ?? null,
+    };
+  });
+}
+
+/**
+ * Metrics for one stretch of a ride, `fromSeconds` inclusive to `toSeconds` exclusive.
+ * Returns null when the window is under 30 seconds or outside the ride.
+ */
+function segmentSummary({ watts = [], heartrate = [], cadence = [] } = {}, fromSeconds, toSeconds, { ftp } = {}) {
+  const length = Math.max(watts.length, heartrate.length);
+  const from = Math.max(0, Math.floor(Number(fromSeconds) || 0));
+  const to = Math.min(length, Math.floor(Number.isFinite(Number(toSeconds)) ? Number(toSeconds) : length));
+  if (!(to - from >= 30)) return null;
+
+  const w = watts.slice(from, to).map((x) => Number(x) || 0);
+  const h = heartrate.slice(from, to);
+  const hr = positiveStats(h);
+  const cad = positiveStats(cadence.slice(from, to));
+  const np = w.length >= 30 ? normalizedPower(w) : null;
+  const intervals = ftp && w.length
+    ? enrichIntervals(
+        detectIntervals(w, { thresholdWatts: Math.round(ftp * 0.95) }).slice(0, 12),
+        { heartrate: h, cadence: cadence.slice(from, to) }
+      ).map((interval) => ({ ...interval, startSeconds: interval.startSeconds + from }))
+    : [];
+
+  return {
+    fromSeconds: from,
+    toSeconds: to,
+    durationSeconds: to - from,
+    averageWatts: w.length ? Math.round(w.reduce((a, b) => a + b, 0) / w.length) : null,
+    normalizedPower: np,
+    intensityFactor: intensityFactor(np, ftp),
+    peakWatts: w.length ? Math.round(Math.max(...w)) : null,
+    meanMaxPower: w.length ? meanMaxPower(w, MMP_DURATIONS.filter((d) => d <= w.length)) : null,
+    averageHeartRate: hr?.average ?? null,
+    maxHeartRate: hr?.max ?? null,
+    averageCadence: cad?.average ?? null,
+    aerobicDecouplingPercent: aerobicDecoupling(w, h),
+    intervals,
+  };
+}
+
 module.exports = {
   MMP_DURATIONS,
   resampleTo1Hz,
@@ -216,4 +291,7 @@ module.exports = {
   aerobicDecoupling,
   timeInZones,
   detectIntervals,
+  positiveStats,
+  enrichIntervals,
+  segmentSummary,
 };

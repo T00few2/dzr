@@ -1593,8 +1593,6 @@ def get_due_scheduled_messages():
             schedules.append(schedule)
         
         due_messages = []
-        # Get current time as datetime
-        from datetime import datetime, timezone
         import pytz
         
         # Use Central European Time for consistency

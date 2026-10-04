@@ -18,7 +18,7 @@ const CONNECT_TOKEN_TTL_MS = 15 * 60 * 1000;
 const STREAM_CACHE_COLLECTION = "coach_activity_metrics";
 const USER_AGENT = "DZR-Coach/1.0";
 // Bump when activity metrics change shape or meaning, so stale cache rows are recomputed.
-const METRICS_CACHE_VERSION = 2;
+const METRICS_CACHE_VERSION = 3;
 
 function notClubMemberResult() {
   return {
@@ -509,21 +509,58 @@ function streamArray(streams, names) {
   return [];
 }
 
-async function getActivityMetrics(discordId, activityId) {
+/**
+ * Seconds per zone as intervals.icu computed them, keyed by zone name. Power zone times arrive as
+ * [{ id: "Z1", secs }] (including a sweet-spot "SS" entry that overlaps Z3/Z4); HR zone times as a
+ * plain array of seconds.
+ */
+function zoneSeconds(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const out = {};
+  raw.forEach((entry, i) => {
+    const isObject = entry && typeof entry === "object";
+    const seconds = num(isObject ? entry.secs ?? entry.seconds : entry);
+    if (seconds == null) return;
+    const name = isObject && entry.id ? String(entry.id) : `Z${i + 1}`;
+    out[name] = Math.round(seconds);
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+/** Minutes from the tool call to a [from, to) window in seconds, or null for the whole ride. */
+function parseMinuteRange(fromMinute, toMinute) {
+  const from = fromMinute == null || fromMinute === "" ? null : Number(fromMinute);
+  const to = toMinute == null || toMinute === "" ? null : Number(toMinute);
+  if (from == null && to == null) return null;
+  if ((from != null && (!Number.isFinite(from) || from < 0)) || (to != null && !Number.isFinite(to))) {
+    return { error: "from_minute and to_minute must be minutes from the start of the ride." };
+  }
+  const fromSeconds = Math.round((from ?? 0) * 60);
+  const toSeconds = to == null ? Infinity : Math.round(to * 60);
+  if (toSeconds - fromSeconds < 30) return { error: "The time range must be at least 30 seconds long." };
+  return { fromSeconds, toSeconds };
+}
+
+async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute } = {}) {
   const id = String(activityId || "").trim();
   if (!/^[A-Za-z0-9]+$/.test(id)) return { success: false, message: "Invalid activity id." };
+  const range = parseMinuteRange(fromMinute, toMinute);
+  if (range?.error) return { success: false, message: range.error };
 
   const cacheRef = db.collection(STREAM_CACHE_COLLECTION).doc(id);
-  try {
-    const cached = await cacheRef.get();
-    if (cached.exists) {
-      const data = cached.data() || {};
-      if (String(data.discordId) === String(discordId) && data.version === METRICS_CACHE_VERSION) {
-        return { success: true, cached: true, metrics: data.metrics || null, message: data.message || null };
+  // A time range needs the streams themselves; the cache only holds the whole-ride summary.
+  if (!range) {
+    try {
+      const cached = await cacheRef.get();
+      if (cached.exists) {
+        const data = cached.data() || {};
+        if (String(data.discordId) === String(discordId) && data.version === METRICS_CACHE_VERSION) {
+          return { success: true, cached: true, metrics: data.metrics || null, message: data.message || null };
+        }
       }
+    } catch (err) {
+      console.warn("activity metrics cache read failed:", err?.message || err);
     }
-  } catch (err) {
-    console.warn("activity metrics cache read failed:", err?.message || err);
   }
 
   return wrapCall(discordId, async () => {
@@ -534,19 +571,13 @@ async function getActivityMetrics(discordId, activityId) {
     if (isUnreadableSource(activity)) {
       return { success: true, metrics: null, message: unreadableSourceMessage(1) };
     }
-    if (activity?.icu_ignore_power === true) {
-      return {
-        success: true,
-        metrics: null,
-        message: "This ride has no usable power data. Comment on duration, heart rate and how it felt instead.",
-      };
-    }
+    const powerUsable = activity?.icu_ignore_power !== true;
 
     let streams = null;
     try {
       const streamRes = await intervalsFetch(
         discordId,
-        `/activity/${encodeURIComponent(id)}/streams.json?types=time,watts,heartrate`
+        `/activity/${encodeURIComponent(id)}/streams.json?types=time,watts,heartrate,cadence`
       );
       streams = streamRes.data;
     } catch (err) {
@@ -554,9 +585,22 @@ async function getActivityMetrics(discordId, activityId) {
     }
 
     const time = streamArray(streams, ["time"]);
-    const watts = metrics.resampleTo1Hz(time, streamArray(streams, ["watts", "fixed_watts"]), "zero");
+    const watts = powerUsable
+      ? metrics.resampleTo1Hz(time, streamArray(streams, ["watts", "fixed_watts"]), "zero")
+      : [];
     const heartrate = metrics.resampleTo1Hz(time, streamArray(streams, ["heartrate", "heart_rate", "fixed_heartrate"]), "hold");
+    const cadence = metrics.resampleTo1Hz(time, streamArray(streams, ["cadence"]), "zero");
     const ftp = num(activity?.icu_ftp) || num(conn.ftp) || null;
+
+    const hr = metrics.positiveStats(heartrate);
+    const cad = metrics.positiveStats(cadence);
+    const common = {
+      averageHeartRate: hr?.average ?? num(activity?.average_heartrate),
+      maxHeartRate: hr?.max ?? num(activity?.max_heartrate),
+      averageCadence: cad?.average ?? num(activity?.average_cadence),
+      powerZoneSeconds: powerUsable ? zoneSeconds(activity?.icu_zone_times) : null,
+      heartRateZoneSeconds: zoneSeconds(activity?.icu_hr_zone_times),
+    };
 
     let summary = null;
     if (watts.length) {
@@ -570,12 +614,16 @@ async function getActivityMetrics(discordId, activityId) {
         trainingStressScore: num(activity?.icu_training_load) || metrics.trainingStressScore(np, ftp, durationSeconds),
         meanMaxPower: metrics.meanMaxPower(watts),
         aerobicDecouplingPercent: metrics.aerobicDecoupling(watts, heartrate),
+        ...common,
         intervals: ftp
-          ? metrics.detectIntervals(watts, { thresholdWatts: Math.round(ftp * 0.95) }).slice(0, 12)
+          ? metrics.enrichIntervals(
+              metrics.detectIntervals(watts, { thresholdWatts: Math.round(ftp * 0.95) }).slice(0, 12),
+              { heartrate, cadence }
+            )
           : compactIntervals(activity).slice(0, 12),
         ftpUsed: ftp,
       };
-    } else if (activity?.icu_weighted_avg_watts || activity?.icu_training_load) {
+    } else if (powerUsable && (activity?.icu_weighted_avg_watts || activity?.icu_training_load)) {
       const np = num(activity.icu_weighted_avg_watts);
       summary = {
         durationSeconds: num(activity.moving_time),
@@ -585,28 +633,51 @@ async function getActivityMetrics(discordId, activityId) {
         trainingStressScore: num(activity.icu_training_load),
         meanMaxPower: null,
         aerobicDecouplingPercent: null,
+        ...common,
         intervals: compactIntervals(activity).slice(0, 12),
         ftpUsed: ftp,
+      };
+    } else if (common.averageHeartRate != null) {
+      summary = {
+        durationSeconds: heartrate.length || num(activity?.moving_time),
+        powerAvailable: false,
+        ...common,
+        intervals: compactIntervals(activity).slice(0, 12),
       };
     }
 
     if (!summary) {
-      return { success: true, metrics: null, message: "No power stream on this activity." };
+      return { success: true, metrics: null, message: "No power or heart-rate data on this activity." };
     }
+    const message = summary.powerAvailable === false
+      ? "This ride has no usable power data, only heart rate. Comment on duration, heart rate and how it felt."
+      : null;
 
     try {
       await cacheRef.set({
         discordId: String(discordId),
         activityId: id,
         metrics: summary,
-        message: null,
+        message,
         version: METRICS_CACHE_VERSION,
         cachedAt: new Date(),
       });
     } catch (err) {
       console.warn("activity metrics cache write failed:", err?.message || err);
     }
-    return { success: true, metrics: summary };
+
+    if (range) {
+      const segment = metrics.segmentSummary({ watts, heartrate, cadence }, range.fromSeconds, range.toSeconds, { ftp });
+      if (!segment) {
+        return {
+          success: true,
+          metrics: summary,
+          message: `That time range is outside this ride, which lasted ${Math.round((summary.durationSeconds || 0) / 60)} minutes. Whole-ride metrics are included instead.`,
+        };
+      }
+      return { success: true, metrics: { ...summary, segment }, message };
+    }
+    return { success: true, metrics: summary, message };
   });
 }
 

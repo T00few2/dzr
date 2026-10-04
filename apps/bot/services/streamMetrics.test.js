@@ -10,6 +10,9 @@ const {
   aerobicDecoupling,
   timeInZones,
   detectIntervals,
+  positiveStats,
+  enrichIntervals,
+  segmentSummary,
 } = require("./streamMetrics");
 
 test("irregular sampling is placed on a real time grid, not by array index", () => {
@@ -99,6 +102,53 @@ test("intervals are detected, and a brief dip does not split one in two", () => 
 test("short surges are not reported as intervals", () => {
   const watts = [...Array(60).fill(100), ...Array(10).fill(400), ...Array(60).fill(100)];
   assert.equal(detectIntervals(watts, { thresholdWatts: 250, minSeconds: 30 }).length, 0);
+});
+
+test("heart-rate and cadence stats ignore dropouts and coasting", () => {
+  assert.deepEqual(positiveStats([0, 140, 150, null, 160, 0]), { average: 150, max: 160 });
+  assert.equal(positiveStats([0, 0]), null);
+  assert.equal(positiveStats(null), null);
+});
+
+test("each interval gets its own heart rate and cadence", () => {
+  const heartrate = [...Array(60).fill(120), ...Array(60).fill(170), ...Array(60).fill(130)];
+  const cadence = [...Array(60).fill(80), ...Array(60).fill(95), ...Array(60).fill(0)];
+  const [interval] = enrichIntervals(
+    [{ startSeconds: 60, durationSeconds: 60, averageWatts: 300, peakWatts: 320 }],
+    { heartrate, cadence }
+  );
+  assert.equal(interval.averageHeartRate, 170);
+  assert.equal(interval.maxHeartRate, 170);
+  assert.equal(interval.averageCadence, 95);
+  assert.equal(interval.averageWatts, 300, "power fields are kept");
+});
+
+test("a segment summarises only its window and reports intervals in ride time", () => {
+  // 10 min easy, 5 min hard, 10 min easy.
+  const watts = [...Array(600).fill(150), ...Array(300).fill(300), ...Array(600).fill(150)];
+  const heartrate = [...Array(600).fill(130), ...Array(300).fill(170), ...Array(600).fill(135)];
+  const cadence = Array(1500).fill(90);
+  const seg = segmentSummary({ watts, heartrate, cadence }, 600, 900, { ftp: 280 });
+  assert.equal(seg.durationSeconds, 300);
+  assert.equal(seg.averageWatts, 300);
+  assert.equal(seg.averageHeartRate, 170);
+  assert.equal(seg.averageCadence, 90);
+  assert.equal(seg.meanMaxPower[3600], undefined, "durations longer than the window are left out");
+  assert.equal(seg.intervals.length, 1);
+  assert.equal(seg.intervals[0].startSeconds, 600, "start is from the ride start, not the window");
+});
+
+test("a segment outside the ride or too short is null", () => {
+  const watts = Array(600).fill(200);
+  assert.equal(segmentSummary({ watts }, 700, 900), null);
+  assert.equal(segmentSummary({ watts }, 100, 110), null);
+  assert.equal(segmentSummary({ watts }, 300, Infinity).durationSeconds, 300, "open end runs to the ride end");
+});
+
+test("a heart-rate-only segment still reports heart rate", () => {
+  const seg = segmentSummary({ heartrate: Array(600).fill(140) }, 0, 300);
+  assert.equal(seg.averageWatts, null);
+  assert.equal(seg.averageHeartRate, 140);
 });
 
 test("empty and malformed input never throws", () => {
