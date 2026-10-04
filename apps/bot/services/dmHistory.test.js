@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { fromDiscordMessage, dmRecordsToHistory, DM_READBACK_MAX_AGE_MS } = require("./dmHistory");
+const { fromDiscordMessage, dmRecordsToHistory, stripSentStamp, DM_READBACK_MAX_AGE_MS } = require("./dmHistory");
 
 const BOT = "bot1";
 const ATHLETE = "athlete1";
@@ -101,6 +101,24 @@ test("can include the time of the first message in each group", () => {
   assert.deepEqual(out, [
     { role: "assistant", content: "del 1\ndel 2", at: new Date(NOW - 2 * HOUR).toISOString() },
   ]);
+});
+
+test("can stamp each message with its Copenhagen send time", () => {
+  const history = dmRecordsToHistory(
+    [rec(BOT, "Kør roligt 60 min i morgen", 15), rec(ATHLETE, "Hvad skulle jeg i dag?", 1)],
+    { ...opts, stampContent: true }
+  );
+  // 15 h before 12:00 UTC on Sat 3 Oct is 21:00 UTC on Fri 2 Oct: 23:00 in Copenhagen (CEST).
+  assert.equal(history[0].content, "[sent Fri 2 Oct, 23:00] Kør roligt 60 min i morgen");
+  assert.equal(history[1].content, "[sent Sat 3 Oct, 13:00] Hvad skulle jeg i dag?");
+  assert.equal(history[0].at, undefined);
+});
+
+test("strips a sent-stamp copied onto the start of a reply, and nothing else", () => {
+  assert.equal(stripSentStamp("[sent Sat 3 Oct, 13:00] Kør roligt i dag."), "Kør roligt i dag.");
+  assert.equal(stripSentStamp("Kør roligt i dag. [sent Sat 3 Oct, 13:00]"), "Kør roligt i dag. [sent Sat 3 Oct, 13:00]");
+  assert.equal(stripSentStamp("[Workout card] VO2 5x4"), "[Workout card] VO2 5x4");
+  assert.equal(stripSentStamp(""), "");
 });
 
 test("handles empty and malformed input", () => {

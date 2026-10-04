@@ -147,6 +147,9 @@ The Previous conversations block summarises earlier conversations when chat note
 After a pause, the messages before the athlete's latest one may be the last day of this DM, read
 back from Discord. Treat them as this conversation: if your last message asked something, their
 reply probably answers it. A line starting "[Workout card]" is a workout you sent.
+Read-back messages start with "[sent ...]", the Copenhagen time they were sent. Words like
+"i dag", "i morgen" or "i aften" in them are relative to that time, not to Today: a "tomorrow"
+sent last night means today. Never start your own reply with a "[sent ...]" stamp.
 
 ## Using chat notes
 ${notesOptIn

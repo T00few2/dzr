@@ -29,6 +29,26 @@ function truncate(text, maxChars) {
   return `${value.slice(0, maxChars - 1).trimEnd()}…`;
 }
 
+const SENT_TZ = "Europe/Copenhagen";
+const SENT_STAMP_PATTERN = /^\[sent [^\]\n]{1,40}\]\s*/i;
+
+/** "[sent Sat 3 Oct, 21:04]" in Copenhagen time. */
+function sentStamp(ms) {
+  const date = new Date(ms);
+  const day = new Intl.DateTimeFormat("en-GB", {
+    weekday: "short", day: "numeric", month: "short", timeZone: SENT_TZ,
+  }).format(date).replace(/,/g, "");
+  const time = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: SENT_TZ,
+  }).format(date);
+  return `[sent ${day}, ${time}]`;
+}
+
+/** Remove a sent-stamp the model copied from read-back history onto the start of its reply. */
+function stripSentStamp(text) {
+  return String(text || "").replace(SENT_STAMP_PATTERN, "");
+}
+
 function firstLine(text) {
   return String(text || "").split("\n").find((line) => line.trim())?.replace(/\*\*/g, "").trim() || "";
 }
@@ -50,6 +70,7 @@ function dmRecordsToHistory(records, {
   maxChars = DM_MESSAGE_MAX_CHARS,
   limit = 10,
   includeTime = false,
+  stampContent = false,
 } = {}) {
   const nowMs = now instanceof Date ? now.getTime() : Number(now);
   const rows = (Array.isArray(records) ? records : [])
@@ -92,7 +113,10 @@ function dmRecordsToHistory(records, {
   return merged
     .slice(-Math.max(1, limit))
     .map((m) => {
-      const out = { role: m.role, content: truncate(m.content, maxChars) };
+      // Chat messages have no timestamp field, so the time goes in the text. Without it, a
+      // "tomorrow" written last night reads as tomorrow from now.
+      const content = truncate(m.content, maxChars);
+      const out = { role: m.role, content: stampContent ? `${sentStamp(m.createdAt)} ${content}` : content };
       if (includeTime) out.at = new Date(m.createdAt).toISOString();
       return out;
     });
@@ -103,4 +127,6 @@ module.exports = {
   DM_MESSAGE_MAX_CHARS,
   fromDiscordMessage,
   dmRecordsToHistory,
+  sentStamp,
+  stripSentStamp,
 };

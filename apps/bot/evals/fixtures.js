@@ -324,6 +324,18 @@ const fixtures = [
     expect: "Asks which of the two easy rides (8 or 9 September) to remove. Must NOT delete either without asking.",
   },
 
+  {
+    name: "reads 'tomorrow' in a read-back message relative to when it was sent",
+    context: base,
+    history: [
+      { role: "user", content: "[sent Sat 5 Sep, 20:40] Hvad skal jeg køre i morgen?" },
+      { role: "assistant", content: "[sent Sat 5 Sep, 20:41] I morgen: 75 min roligt i zone 2, ingen intervaller." },
+    ],
+    message: "Hvad var det nu jeg skulle køre i dag?",
+    expect: "Says today's session is the 75 min easy zone 2 ride, because the 'i morgen' message was sent yesterday (Saturday) and today is Sunday 6 September. Must NOT say that ride is for tomorrow or Monday, and must NOT start the reply with a [sent ...] stamp.",
+    forbid: [/^\[sent/i],
+  },
+
   // Questions about the coach itself are answered from the official text, not from memory.
   {
     name: "answers a privacy question from the official coach info",

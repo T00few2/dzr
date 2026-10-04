@@ -18,7 +18,7 @@ const {
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
 const { trimConversation } = require("../services/conversationTrim");
-const { fromDiscordMessage, dmRecordsToHistory, DM_READBACK_MAX_AGE_MS } = require("../services/dmHistory");
+const { fromDiscordMessage, dmRecordsToHistory, stripSentStamp, DM_READBACK_MAX_AGE_MS } = require("../services/dmHistory");
 const { createTurnQueue } = require("../services/turnQueue");
 const { coachToolsFor, reasoningEffortAfterTools } = require("../services/coachTools");
 const { rememberCoachTurn } = require("../services/coachFeedback");
@@ -1685,6 +1685,7 @@ async function readRecentDm(message, {
   limit = 10,
   fetchLimit = 10,
   includeTime = false,
+  stampContent = false,
 } = {}) {
   try {
     const fetched = await message.channel.messages.fetch({ limit: fetchLimit, before: message.id });
@@ -1696,6 +1697,7 @@ async function readRecentDm(message, {
       maxAgeMs,
       limit,
       includeTime,
+      stampContent,
     });
   } catch (err) {
     console.warn("readRecentDm failed:", err?.message || err);
@@ -2354,7 +2356,7 @@ async function runChatTurn(message, client, { coachOnly }) {
       // After an idle timeout or a restart, the check-in and the last replies are still in the
       // DM. Reading them back gives the coach that context without DZR storing anything.
       if (isCoachSession) {
-        conversation.push(...(await readRecentDm(message)));
+        conversation.push(...(await readRecentDm(message, { stampContent: true })));
       }
     } else {
       conversation[0] = {
@@ -2563,6 +2565,7 @@ async function runChatTurn(message, client, { coachOnly }) {
             text = getMessageText(retry.choices[0]?.message);
             answerEffort = COACH_REASONING_EFFORT;
           }
+          text = stripSentStamp(text);
 
           if (text) {
             conversation.push({ role: "assistant", content: text });
@@ -2581,7 +2584,7 @@ async function runChatTurn(message, client, { coachOnly }) {
       }
     } else {
       // Model responded conversationally (no tool calls)
-      const modelText = getMessageText(responseMessage);
+      const modelText = stripSentStamp(getMessageText(responseMessage));
       let text = modelText;
       if (!text && isCoachSession) {
         text = "Jeg er klar som DZR Coach, men fik et tomt modelsvar. Prøv at spørge igen, fx *Hvordan var min uge?*";
