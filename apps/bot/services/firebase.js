@@ -622,13 +622,28 @@ async function getCoachProfile(discordId) {
 /**
  * Increment coaching LLM usage for a Discord user. Never throws to the caller.
  */
-async function recordCoachUsage({ discordId, username, model, promptTokens, completionTokens, totalTokens, cachedPromptTokens, openaiCalls }) {
+async function recordCoachUsage({
+  discordId,
+  username,
+  model,
+  promptTokens,
+  completionTokens,
+  totalTokens,
+  cachedPromptTokens,
+  cacheWriteTokens,
+  reasoningTokens,
+  latencyMs,
+  openaiCalls,
+}) {
   const id = String(discordId || "").trim();
   if (!id) return;
   const prompt = Math.max(0, Number(promptTokens) || 0);
   const completion = Math.max(0, Number(completionTokens) || 0);
   const total = Math.max(0, Number(totalTokens) || prompt + completion);
   const cached = Math.min(prompt, Math.max(0, Number(cachedPromptTokens) || 0));
+  const cacheWrites = Math.min(prompt, Math.max(0, Number(cacheWriteTokens) || 0));
+  const reasoning = Math.min(completion, Math.max(0, Number(reasoningTokens) || 0));
+  const latency = Math.max(0, Number(latencyMs) || 0);
   const budget = budgetTokens({ totalTokens: total, cachedPromptTokens: cached });
   const calls = Math.max(1, Number(openaiCalls) || 1);
   if (total <= 0 && calls <= 0) return;
@@ -646,6 +661,9 @@ async function recordCoachUsage({ discordId, username, model, promptTokens, comp
         completionTokens: Number(prev.completionTokens || 0) + completion,
         totalTokens: Number(prev.totalTokens || 0) + total,
         cachedPromptTokens: Number(prev.cachedPromptTokens || 0) + cached,
+        cacheWriteTokens: Number(prev.cacheWriteTokens || 0) + cacheWrites,
+        reasoningTokens: Number(prev.reasoningTokens || 0) + reasoning,
+        latencyMs: Number(prev.latencyMs || 0) + latency,
         openaiCalls: Number(prev.openaiCalls || 0) + calls,
         messageCount: Number(prev.messageCount || 0) + 1,
         lastModel: model || prev.lastModel || null,
@@ -662,6 +680,9 @@ async function recordCoachUsage({ discordId, username, model, promptTokens, comp
       totalTokens: admin.firestore.FieldValue.increment(total),
       // What the daily budget counts: cached prompt tokens at a discount (see coachUsage.js).
       budgetTokens: admin.firestore.FieldValue.increment(budget),
+      cacheWriteTokens: admin.firestore.FieldValue.increment(cacheWrites),
+      reasoningTokens: admin.firestore.FieldValue.increment(reasoning),
+      latencyMs: admin.firestore.FieldValue.increment(latency),
       openaiCalls: admin.firestore.FieldValue.increment(calls),
       updatedAt: now,
     }, { merge: true });
@@ -674,6 +695,9 @@ async function recordCoachUsage({ discordId, username, model, promptTokens, comp
       completionTokens: completion,
       totalTokens: total,
       cachedPromptTokens: cached,
+      cacheWriteTokens: cacheWrites,
+      reasoningTokens: reasoning,
+      latencyMs: latency,
       budgetTokens: budget,
       openaiCalls: calls,
       at: now,

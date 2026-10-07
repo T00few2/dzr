@@ -20,9 +20,19 @@ const { lookupZrlCategory } = require("../services/zrlCategory");
 const { trimConversation } = require("../services/conversationTrim");
 const { fromDiscordMessage, dmRecordsToHistory, stripSentStamp, DM_READBACK_MAX_AGE_MS } = require("../services/dmHistory");
 const { createTurnQueue } = require("../services/turnQueue");
-const { coachToolsFor, reasoningEffortAfterTools } = require("../services/coachTools");
+const { coachToolsForTurn, reasoningEffortAfterTools } = require("../services/coachTools");
 const { rememberCoachTurn } = require("../services/coachFeedback");
 const { extractTokenUsage, endsWithQuestion } = require("../services/coachUsage");
+const {
+  COACH_MODEL,
+  COACH_BASE_EFFORT,
+  COACH_ANALYSIS_EFFORT,
+  createCoachResponse,
+  visibleMessagesToInput,
+  repetitionGuardForVisibleHistory,
+  configurationUpdate,
+  functionCallOutputs,
+} = require("../services/coachLlm");
 const { 
   handleRiderStats, 
   handleTeamStats, 
@@ -86,7 +96,7 @@ const COACH_MAX_TOKENS = 16000;
 // Per-athlete daily ceiling. Usage was recorded but never enforced, so a runaway loop or a very
 // chatty day had no backstop. Generous by design: this is a safety net, not a rationing device.
 const COACH_DAILY_TOKEN_BUDGET = Number.parseInt(process.env.COACH_DAILY_TOKEN_BUDGET || "600000", 10);
-const COACH_REASONING_EFFORT = "low";
+const COACH_REASONING_EFFORT = COACH_BASE_EFFORT;
 
 // AI Model Configuration - can be changed to test different models
 const AI_CONFIG = {
@@ -1922,7 +1932,7 @@ async function buildCoachSystemPrompt(message, userText, preloadedProfile) {
     CALENDAR_URL,
   });
 
-  return { content, notesOptIn, profile };
+  return { content, notesOptIn, profile, calendarBlock };
 }
 
 /**
@@ -1990,6 +2000,9 @@ function addTokenUsage(tally, response) {
   tally.completionTokens += u.completionTokens;
   tally.totalTokens += u.totalTokens;
   tally.cachedPromptTokens += u.cachedPromptTokens;
+  tally.cacheWriteTokens += u.cacheWriteTokens;
+  tally.reasoningTokens += u.reasoningTokens;
+  tally.latencyMs += Math.max(0, Number(response?.latencyMs) || 0);
   tally.calls += 1;
 }
 
@@ -1999,11 +2012,14 @@ async function flushCoachUsage(tally, message) {
     await recordCoachUsage({
       discordId: message.author.id,
       username: message.author.username,
-      model: AI_CONFIG.model,
+      model: COACH_MODEL,
       promptTokens: tally.promptTokens,
       completionTokens: tally.completionTokens,
       totalTokens: tally.totalTokens,
       cachedPromptTokens: tally.cachedPromptTokens,
+      cacheWriteTokens: tally.cacheWriteTokens,
+      reasoningTokens: tally.reasoningTokens,
+      latencyMs: tally.latencyMs,
       openaiCalls: tally.calls,
     });
   } catch (err) {
@@ -2094,32 +2110,37 @@ async function extractCoachChatNotes({ discordId, username, turns }) {
     recentNotes,
     timestamp: now.toISOString(),
   });
-  const response = await callOpenAIWithRetry(
-    buildChatCompletionParams({
-      messages,
-      // A whole conversation plus a summary needs more room than a single exchange did.
-      maxTokens: 900,
-      reasoningEffort: "low",
-    })
-  );
+  const response = await createCoachResponse(openai, {
+    instructions: messages.find((message) => message.role === "system")?.content || "",
+    input: visibleMessagesToInput(messages),
+    allowTools: false,
+    model: COACH_MODEL,
+    // A whole conversation plus a summary needs more room than a single exchange did.
+    maxOutputTokens: 900,
+    reasoningEffort: COACH_REASONING_EFFORT,
+    cacheKey: "dzr-coach:note-extraction",
+  });
   const usage = extractTokenUsage(response);
   if (usage.totalTokens > 0 || usage.promptTokens > 0) {
     try {
       await recordCoachUsage({
         discordId,
         username,
-        model: AI_CONFIG.model,
+        model: COACH_MODEL,
         promptTokens: usage.promptTokens,
         completionTokens: usage.completionTokens,
         totalTokens: usage.totalTokens,
         cachedPromptTokens: usage.cachedPromptTokens,
+        cacheWriteTokens: usage.cacheWriteTokens,
+        reasoningTokens: usage.reasoningTokens,
+        latencyMs: response.latencyMs,
         openaiCalls: 1,
       });
     } catch (err) {
       console.error("extract recordCoachUsage failed:", err?.message || err);
     }
   }
-  const raw = getMessageText(response.choices[0]?.message);
+  const raw = response.text;
   const parsed = parseExtractedNotes(raw, now.toISOString());
   const summary = parseExtractedSummary(raw);
   if (summary) {
@@ -2203,6 +2224,150 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     return;
   }
   return queued;
+}
+
+/**
+ * Run one Coach turn on the stateless Responses API.
+ *
+ * `input` contains the visible transcript plus transient response items for this turn only.
+ * Encrypted reasoning is replayed across tool rounds, then discarded when this function returns.
+ */
+async function runCoachResponsesTurn({
+  conversation,
+  instructions,
+  activeTools,
+  message,
+  turnContext,
+  maxIters,
+  calledToolNames,
+  onResponse,
+}) {
+  const input = visibleMessagesToInput(conversation);
+  const turnInstructions = instructions + repetitionGuardForVisibleHistory(conversation);
+  const cacheKey = `dzr-coach:${turnContext.profile?.notesOptIn === true ? "notes-on" : "notes-off"}`;
+  let effort = COACH_REASONING_EFFORT;
+  let requestEffort = COACH_REASONING_EFFORT;
+  let notesSaved = false;
+  let lastToolResults = [];
+
+  const call = async ({ allowTools = true, maxOutputTokens = COACH_MAX_TOKENS } = {}) => {
+    const response = await createCoachResponse(openai, {
+      instructions: turnInstructions,
+      input,
+      tools: activeTools,
+      allowTools,
+      model: COACH_MODEL,
+      maxOutputTokens,
+      reasoningEffort: requestEffort,
+      cacheKey,
+    });
+    if (onResponse) onResponse(response);
+    input.push(...response.outputItems);
+    return response;
+  };
+
+  let response = await call();
+  if (!response.toolCalls.length) {
+    return {
+      text: response.text,
+      fromModel: Boolean(response.text),
+      handledExternally: false,
+      notesSaved,
+      effort,
+      toolResults: lastToolResults,
+    };
+  }
+
+  let currentToolCalls = response.toolCalls;
+  for (let iteration = 0; currentToolCalls.length && iteration < maxIters; iteration++) {
+    lastToolResults = await executeToolCalls(currentToolCalls, message, turnContext);
+    calledToolNames.push(...currentToolCalls.map((call) => call.name));
+    if (lastToolResults.some((result) => Array.isArray(result.saved) && result.saved.length > 0)) {
+      notesSaved = true;
+    }
+
+    const routedEffort = reasoningEffortAfterTools(calledToolNames, COACH_REASONING_EFFORT);
+    const postToolEffort =
+      routedEffort === COACH_REASONING_EFFORT ? COACH_REASONING_EFFORT : COACH_ANALYSIS_EFFORT;
+    if (postToolEffort !== effort) {
+      if (COACH_MODEL.startsWith("gpt-6")) {
+        // GPT-6 can change effort without changing the cacheable request prefix.
+        input.push(configurationUpdate(postToolEffort));
+      } else {
+        // GPT-5 supports Responses but predates configuration_update.
+        requestEffort = postToolEffort;
+      }
+      effort = postToolEffort;
+    }
+    input.push(...functionCallOutputs(lastToolResults.map((result) => ({
+      tool_call_id: result.tool_call_id,
+      output: safeStringify(compactToolResult(result)),
+    }))));
+
+    const handledExternally =
+      currentToolCalls.every((call) => TOOLS_THAT_REPLY_DIRECTLY.has(call.name)) ||
+      (lastToolResults.length > 0 && lastToolResults.every((result) => result.sent_full));
+    if (handledExternally) {
+      return { text: "", fromModel: false, handledExternally: true, notesSaved, effort, toolResults: lastToolResults };
+    }
+
+    response = await call();
+    console.log("🤖 Coach Responses reply", {
+      status: response.status,
+      incompleteReason: response.incompleteReason,
+      reasoningEffort: effort,
+      contentLen: response.text.length,
+      toolCalls: response.toolCalls.length,
+      usage: response.usage,
+      latencyMs: response.latencyMs,
+    });
+
+    if (response.toolCalls.length && iteration + 1 < maxIters) {
+      currentToolCalls = response.toolCalls;
+      continue;
+    }
+
+    if (response.text) {
+      return {
+        text: response.text,
+        fromModel: true,
+        handledExternally: false,
+        notesSaved,
+        effort,
+        toolResults: lastToolResults,
+      };
+    }
+
+    // A reasoning model can exhaust its output allowance before emitting visible text. Preserve
+    // this turn's reasoning, ask explicitly for the final answer, and disable further tools.
+    if (COACH_MODEL.startsWith("gpt-6") && effort !== COACH_REASONING_EFFORT) {
+      input.push(configurationUpdate(COACH_REASONING_EFFORT));
+    }
+    input.push({
+      role: "user",
+      content: "Skriv nu coaching-svaret til atleten ud fra tool-resultaterne. Ingen flere tool calls. Kort og konkret.",
+    });
+    effort = COACH_REASONING_EFFORT;
+    requestEffort = COACH_REASONING_EFFORT;
+    const retry = await call({ allowTools: false });
+    return {
+      text: retry.text,
+      fromModel: Boolean(retry.text),
+      handledExternally: false,
+      notesSaved,
+      effort,
+      toolResults: lastToolResults,
+    };
+  }
+
+  return {
+    text: "",
+    fromModel: false,
+    handledExternally: false,
+    notesSaved,
+    effort,
+    toolResults: lastToolResults,
+  };
 }
 
 async function runChatTurn(message, client, { coachOnly }) {
@@ -2321,7 +2486,12 @@ async function runChatTurn(message, client, { coachOnly }) {
       ? coachPrompt.content
       : buildSystemPrompt(message, knowledgeCatalog);
     const notesOptIn = Boolean(coachPrompt?.notesOptIn);
-    const activeTools = isCoachSession ? coachToolsFor(notesOptIn) : toolDefinitions;
+    const activeTools = isCoachSession
+      ? coachToolsForTurn(notesOptIn, {
+          calendarBlock: coachPrompt?.calendarBlock,
+          userText: cleanedMessage,
+        })
+      : toolDefinitions;
     const maxTokens = isCoachSession ? COACH_MAX_TOKENS : AI_CONFIG.maxTokens;
     const maxIters = isCoachSession ? COACH_MAX_TOOL_ITERATIONS : MAX_TOOL_ITERATIONS;
     const replyFn = isCoachSession ? safeReplyChunks : safeReply;
@@ -2330,7 +2500,7 @@ async function runChatTurn(message, client, { coachOnly }) {
     const replyAndTag = async (text, { fromModel = true } = {}) => {
       const sent = await replyFn(message, text);
       if (isCoachSession && notesOptIn) {
-        rememberCoachTurn(sent, { tools: calledToolNames, reasoningEffort: answerEffort, model: AI_CONFIG.model });
+        rememberCoachTurn(sent, { tools: calledToolNames, reasoningEffort: answerEffort, model: COACH_MODEL });
       }
       if (isCoachSession && fromModel) {
         recordCoachReplyStats({ askedQuestion: endsWithQuestion(text) });
@@ -2338,7 +2508,16 @@ async function runChatTurn(message, client, { coachOnly }) {
       return sent;
     };
     coachUsageTally = isCoachSession
-      ? { promptTokens: 0, completionTokens: 0, totalTokens: 0, cachedPromptTokens: 0, calls: 0 }
+      ? {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          cachedPromptTokens: 0,
+          cacheWriteTokens: 0,
+          reasoningTokens: 0,
+          latencyMs: 0,
+          calls: 0,
+        }
       : null;
     const callAndTrack = async (params) => {
       const response = await callOpenAIWithRetry(params);
@@ -2377,7 +2556,30 @@ async function runChatTurn(message, client, { coachOnly }) {
     // Trim conversation if too long (keep system message)
     conversation = trimConversation(conversation);
     
-    // Call OpenAI with retry logic
+    if (isCoachSession) {
+      const coachTurn = await runCoachResponsesTurn({
+        conversation,
+        instructions: systemPrompt,
+        activeTools,
+        message,
+        turnContext,
+        maxIters,
+        calledToolNames,
+        onResponse: (response) => addTokenUsage(coachUsageTally, response),
+      });
+      notesSavedThisTurn = coachTurn.notesSaved;
+      answerEffort = coachTurn.effort;
+
+      let text = stripSentStamp(coachTurn.text);
+      if (!text && !coachTurn.handledExternally) {
+        text = fallbackCoachFromTools(coachTurn.toolResults);
+      }
+      if (text) {
+        conversation.push({ role: "assistant", content: text });
+        await replyAndTag(text, { fromModel: coachTurn.fromModel });
+      }
+    } else {
+    // Club assistant remains on Chat Completions. DZR Coach uses the Responses branch above.
     const response = await callAndTrack(
       buildChatCompletionParams({
         messages: conversation,
@@ -2600,6 +2802,7 @@ async function runChatTurn(message, client, { coachOnly }) {
       if (text) {
         await replyAndTag(text, { fromModel: Boolean(modelText) });
       }
+    }
     }
     
     // Trim conversation if it has grown too long after processing

@@ -20,13 +20,24 @@
  */
 const { buildCoachPromptText } = require("../services/coachPrompt");
 const { formatCoachToday } = require("../services/coachChatNotes");
-const { coachToolsFor, reasoningEffortAfterTools } = require("../services/coachTools");
+const { coachToolsFor, coachToolsForTurn, reasoningEffortAfterTools } = require("../services/coachTools");
+const { extractTokenUsage } = require("../services/coachUsage");
+const {
+  COACH_ANALYSIS_EFFORT,
+  createCoachResponse,
+  visibleMessagesToInput,
+  repetitionGuardForVisibleHistory,
+  configurationUpdate,
+  functionCallOutputs,
+} = require("../services/coachLlm");
 const { fixtures } = require("./fixtures");
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").slice("--only=".length);
 const MODEL = process.env.COACH_EVAL_MODEL || "gpt-5-mini";
+const JUDGE_MODEL = process.env.COACH_EVAL_JUDGE_MODEL || "gpt-6.1-sol";
 const BASE_EFFORT = process.env.COACH_EVAL_EFFORT || "low";
+const REPEATS = Math.min(5, Math.max(1, Number.parseInt(process.env.COACH_EVAL_REPEATS || "1", 10) || 1));
 // Set COACH_EVAL_ROUTING=off to compare against the old flat effort.
 const ROUTING = process.env.COACH_EVAL_ROUTING !== "off";
 const MAX_TOOL_ROUNDS = 4;
@@ -80,66 +91,90 @@ function cannedToolResult(fixture, name) {
 
 /** Run one coach turn against canned tool results. Returns the reply and the tools it called. */
 async function runTurn(openai, fixture, prompt) {
-  const tools = coachToolsFor(Boolean(fixture.context.notesOptIn));
-  const messages = [
+  const tools = coachToolsForTurn(Boolean(fixture.context.notesOptIn), {
+    calendarBlock: fixture.context.calendarBlock,
+    userText: fixture.message,
+  });
+  const visibleMessages = [
     { role: "system", content: prompt },
     ...(fixture.history || []),
     { role: "user", content: fixture.message },
   ];
+  const input = visibleMessagesToInput(visibleMessages);
+  const instructions = prompt + repetitionGuardForVisibleHistory(visibleMessages);
   const called = [];
   let effort = BASE_EFFORT;
+  let requestEffort = BASE_EFFORT;
+  const metrics = { input: 0, output: 0, cached: 0, reasoning: 0, latencyMs: 0, calls: 0 };
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-    const response = await openai.chat.completions.create({
+    const response = await createCoachResponse(openai, {
+      instructions,
+      input,
+      tools,
       model: MODEL,
-      max_completion_tokens: 8000,
-      reasoning_effort: effort,
-      messages,
-      ...(round < MAX_TOOL_ROUNDS ? { tools, tool_choice: "auto" } : {}),
+      maxOutputTokens: 16000,
+      reasoningEffort: requestEffort,
+      cacheKey: `dzr-coach-eval:${fixture.context.notesOptIn ? "notes-on" : "notes-off"}`,
+      allowTools: round < MAX_TOOL_ROUNDS,
     });
-    const msg = response.choices[0]?.message || {};
-    if (!msg.tool_calls?.length) return { reply: msg.content || "", called };
+    const usage = extractTokenUsage(response);
+    metrics.input += usage.promptTokens;
+    metrics.output += usage.completionTokens;
+    metrics.cached += usage.cachedPromptTokens;
+    metrics.reasoning += usage.reasoningTokens;
+    metrics.latencyMs += response.latencyMs;
+    metrics.calls += 1;
+    input.push(...response.outputItems);
+    if (!response.toolCalls.length) return { reply: response.text || "", called, metrics };
+    if (round >= MAX_TOOL_ROUNDS) return { reply: response.text || "", called, metrics };
 
-    messages.push({ role: "assistant", content: msg.content || null, tool_calls: msg.tool_calls });
-    for (const call of msg.tool_calls) {
-      called.push(call.function.name);
-      messages.push({
-        role: "tool",
-        tool_call_id: call.id,
-        content: JSON.stringify(cannedToolResult(fixture, call.function.name)),
+    const outputs = [];
+    for (const call of response.toolCalls) {
+      called.push(call.name);
+      outputs.push({
+        tool_call_id: call.call_id,
+        output: cannedToolResult(fixture, call.name),
       });
     }
-    if (ROUTING) effort = reasoningEffortAfterTools(called, BASE_EFFORT);
+    if (ROUTING) {
+      const routed = reasoningEffortAfterTools(called, BASE_EFFORT);
+      const nextEffort = routed === BASE_EFFORT ? BASE_EFFORT : COACH_ANALYSIS_EFFORT;
+      if (nextEffort !== effort) {
+        if (MODEL.startsWith("gpt-6")) input.push(configurationUpdate(nextEffort));
+        else requestEffort = nextEffort;
+        effort = nextEffort;
+      }
+    }
+    input.push(...functionCallOutputs(outputs));
   }
-  return { reply: "", called };
+  return { reply: "", called, metrics };
 }
 
 async function judge(openai, fixture, reply, called) {
   const history = (fixture.history || []).map((m) => `${m.role}: ${m.content}`).join("\n");
-  const response = await openai.chat.completions.create({
-    model: MODEL,
-    max_completion_tokens: 300,
-    reasoning_effort: "low",
-    messages: [
-      {
-        role: "system",
-        content:
-          'You grade one coaching reply against a stated expectation. Reply with JSON only: ' +
-          '{"pass":true|false,"why":"one sentence"}. Judge only the expectation, not style or ' +
-          "language. Be strict about anything the expectation says the reply must NOT do.",
-      },
-      {
-        role: "user",
-        content:
-          `## Expectation\n${fixture.expect}\n\n` +
-          (history ? `## Earlier in the conversation\n${history}\n\n` : "") +
-          `## Athlete asked\n${fixture.message}\n\n` +
-          `## Tools the coach called\n${called.join(", ") || "none"}\n\n` +
-          `## Coach replied\n${reply}`,
-      },
-    ],
+  const instructions =
+    'You grade one coaching reply against a stated expectation. Reply with JSON only: ' +
+    '{"pass":true|false,"why":"one sentence"}. Judge only the expectation, not style or ' +
+    "language. Be strict about anything the expectation says the reply must NOT do.";
+  const response = await createCoachResponse(openai, {
+    instructions,
+    input: [{
+      role: "user",
+      content:
+        `## Expectation\n${fixture.expect}\n\n` +
+        (history ? `## Earlier in the conversation\n${history}\n\n` : "") +
+        `## Athlete asked\n${fixture.message}\n\n` +
+        `## Tools the coach called\n${called.join(", ") || "none"}\n\n` +
+        `## Coach replied\n${reply}`,
+    }],
+    model: JUDGE_MODEL,
+    maxOutputTokens: 1000,
+    reasoningEffort: "low",
+    allowTools: false,
+    cacheKey: "dzr-coach-eval:judge",
   });
-  const text = response.choices[0]?.message?.content || "";
+  const text = response.text || "";
   try {
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
@@ -156,6 +191,7 @@ function fail(name, ...lines) {
 
 async function main() {
   let failures = 0;
+  const totals = { input: 0, output: 0, cached: 0, reasoning: 0, latencyMs: 0, calls: 0 };
 
   let openai = null;
   if (!DRY_RUN) {
@@ -168,67 +204,83 @@ async function main() {
   }
 
   const selected = ONLY ? fixtures.filter((f) => f.name.includes(ONLY)) : fixtures;
+  const repeats = DRY_RUN ? 1 : REPEATS;
 
-  for (const fixture of selected) {
-    const prompt = buildPrompt(fixture);
-    const structural = checkPromptStructure(prompt, fixture);
-    if (structural.length) {
-      failures += 1;
-      fail(fixture.name, ...structural.map((p) => `prompt: ${p}`));
-      continue;
-    }
+  for (let repeat = 1; repeat <= repeats; repeat++) {
+    if (repeats > 1) console.log(`\n--- repeat ${repeat}/${repeats}: ${MODEL}, judge ${JUDGE_MODEL} ---`);
+    for (const fixture of selected) {
+      const label = repeats > 1 ? `${fixture.name} [${repeat}]` : fixture.name;
+      const prompt = buildPrompt(fixture);
+      const structural = checkPromptStructure(prompt, fixture);
+      if (structural.length) {
+        failures += 1;
+        fail(label, ...structural.map((p) => `prompt: ${p}`));
+        continue;
+      }
 
-    if (DRY_RUN) {
-      console.log(`ok    ${fixture.name} (prompt ${prompt.length} chars)`);
-      continue;
-    }
+      if (DRY_RUN) {
+        console.log(`ok    ${label} (prompt ${prompt.length} chars)`);
+        continue;
+      }
 
-    const { reply, called } = await runTurn(openai, fixture, prompt);
-    const toolsLine = `tools: ${called.join(", ") || "none"}`;
+      const { reply, called, metrics } = await runTurn(openai, fixture, prompt);
+      for (const key of Object.keys(totals)) totals[key] += metrics[key] || 0;
+      const toolsLine = `tools: ${called.join(", ") || "none"}`;
 
-    if (!reply.trim()) {
-      failures += 1;
-      fail(fixture.name, "empty reply", toolsLine);
-      continue;
-    }
+      if (!reply.trim()) {
+        failures += 1;
+        fail(label, "empty reply", toolsLine);
+        continue;
+      }
 
-    const missing = (fixture.expectTools || []).filter((name) => !called.includes(name));
-    const unwanted = (fixture.forbidTools || []).filter((name) => called.includes(name));
-    if (missing.length || unwanted.length) {
-      failures += 1;
-      fail(
-        fixture.name,
-        ...(missing.length ? [`expected tool(s) not called: ${missing.join(", ")}`] : []),
-        ...(unwanted.length ? [`forbidden tool(s) called: ${unwanted.join(", ")}`] : []),
-        toolsLine
-      );
-      continue;
-    }
+      const missing = (fixture.expectTools || []).filter((name) => !called.includes(name));
+      const unwanted = (fixture.forbidTools || []).filter((name) => called.includes(name));
+      if (missing.length || unwanted.length) {
+        failures += 1;
+        fail(
+          label,
+          ...(missing.length ? [`expected tool(s) not called: ${missing.join(", ")}`] : []),
+          ...(unwanted.length ? [`forbidden tool(s) called: ${unwanted.join(", ")}`] : []),
+          toolsLine
+        );
+        continue;
+      }
 
-    // Cheap deterministic guards run before the judge, so an obvious violation is never
-    // argued away by a lenient grader.
-    const forbidden = (fixture.forbid || []).filter((pattern) => pattern.test(reply));
-    if (forbidden.length) {
-      failures += 1;
-      fail(fixture.name, `matched forbidden pattern: ${forbidden[0]}`, `reply: ${reply.slice(0, 200)}`);
-      continue;
-    }
+      // Cheap deterministic guards run before the judge, so an obvious violation is never
+      // argued away by a lenient grader.
+      const forbidden = (fixture.forbid || []).filter((pattern) => pattern.test(reply));
+      if (forbidden.length) {
+        failures += 1;
+        fail(label, `matched forbidden pattern: ${forbidden[0]}`, `reply: ${reply.slice(0, 200)}`);
+        continue;
+      }
 
-    if (!fixture.expect) {
-      console.log(`ok    ${fixture.name} (${toolsLine})`);
-      continue;
-    }
+      if (!fixture.expect) {
+        console.log(`ok    ${label} (${toolsLine})`);
+        continue;
+      }
 
-    const verdict = await judge(openai, fixture, reply, called);
-    if (verdict.pass) {
-      console.log(`ok    ${fixture.name} (${toolsLine})`);
-    } else {
-      failures += 1;
-      fail(fixture.name, verdict.why, toolsLine, `reply: ${reply.slice(0, 300)}`);
+      const verdict = await judge(openai, fixture, reply, called);
+      if (verdict.pass) {
+        console.log(`ok    ${label} (${toolsLine})`);
+      } else {
+        failures += 1;
+        fail(label, verdict.why, toolsLine, `reply: ${reply.slice(0, 300)}`);
+      }
     }
   }
 
-  console.log(`\n${selected.length - failures}/${selected.length} passed${DRY_RUN ? " (dry run: prompt structure only)" : ""}`);
+  const attempts = selected.length * repeats;
+  console.log(`\n${attempts - failures}/${attempts} passed${DRY_RUN ? " (dry run: prompt structure only)" : ""}`);
+  if (!DRY_RUN) {
+    console.log(JSON.stringify({
+      candidate: MODEL,
+      judge: JUDGE_MODEL,
+      repeats,
+      ...totals,
+      averageLatencyMsPerCall: totals.calls ? Math.round(totals.latencyMs / totals.calls) : 0,
+    }));
+  }
   process.exit(failures ? 1 : 0);
 }
 

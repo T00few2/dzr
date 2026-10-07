@@ -21,6 +21,11 @@ const {
 } = require("./coachChatNotes");
 const { formatCalendarForPrompt } = require("./memberCalendar");
 const { extractTokenUsage } = require("./coachUsage");
+const {
+  COACH_MODEL,
+  COACH_BASE_EFFORT,
+  createCoachResponse,
+} = require("./coachLlm");
 
 const {
   FOLLOW_UP_TZ,
@@ -39,7 +44,6 @@ const MAX_FOLLOW_UPS_PER_RUN = Number.parseInt(process.env.COACH_FOLLOW_UPS_PER_
 // The scheduler ticks every minute and a sweep can take longer, so two must never overlap —
 // both would build the same due list and DM the same athletes twice.
 let sweepInFlight = false;
-const MODEL = "gpt-5-mini";
 const FALLBACK_DA = "Hvordan går træningen? Skriv hvis du vil have et kig på ugen.";
 const FALLBACK_EN = "How is training going? Write if you want a look at the week.";
 
@@ -68,18 +72,6 @@ function formatActivitiesForPrompt(activities) {
     .join("\n");
 }
 
-function getMessageText(message) {
-  const content = message?.content;
-  if (typeof content === "string") return content.trim();
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => (typeof part === "string" ? part : part?.text || ""))
-      .join("")
-      .trim();
-  }
-  return "";
-}
-
 async function generateFollowUpText({ profile, activities, notesBlock, goalsBlock, calendarBlock, username }) {
   const language = profile?.style?.language === "en" ? "en" : "da";
   const fallback = language === "en" ? FALLBACK_EN : FALLBACK_DA;
@@ -87,14 +79,7 @@ async function generateFollowUpText({ profile, activities, notesBlock, goalsBloc
 
   const today = formatCoachToday();
   const settings = formatCoachProfileForPrompt(profile);
-  const response = await openai.chat.completions.create({
-    model: MODEL,
-    max_completion_tokens: 220,
-    reasoning_effort: "low",
-    messages: [
-      {
-        role: "system",
-        content: `You write one short proactive check-in from DZR Coach to an athlete in a Discord DM.
+  const instructions = `You write one short proactive check-in from DZR Coach to an athlete in a Discord DM.
 Rules:
 - Reply in ${language === "en" ? "English" : "Danish"}.
 - Discord-short: a few sentences, one question.
@@ -106,11 +91,10 @@ Rules:
 - A calendar row still marked planned does NOT mean it was skipped. Nothing marks these automatically and a ride can be missing for dull reasons, so check the activity list and ask rather than assert. A missed session usually has a reason worth hearing — ask, do not accuse.
 - A chat note of kind "plan" records advice YOU gave, which is not the same as what they planned. Use it as context for the question, not as a record of their intentions.
 - Not medical advice. No doping or extreme restriction.
-- Do not mention tokens, Firestore, or this being a scheduled job.`,
-      },
-      {
-        role: "user",
-        content: `${today.line}
+- Do not mention tokens, Firestore, or this being a scheduled job.`;
+  const input = [{
+    role: "user",
+    content: `${today.line}
 
 Athlete: ${username || "athlete"}
 
@@ -130,8 +114,15 @@ ${notesBlock || "(none)"}
 ${formatActivitiesForPrompt(activities)}
 
 Write the check-in now.`,
-      },
-    ],
+  }];
+  const response = await createCoachResponse(openai, {
+    instructions,
+    input,
+    allowTools: false,
+    model: COACH_MODEL,
+    maxOutputTokens: 220,
+    reasoningEffort: COACH_BASE_EFFORT,
+    cacheKey: "dzr-coach:follow-up",
   });
 
   const usage = extractTokenUsage(response);
@@ -139,16 +130,19 @@ Write the check-in now.`,
     await recordCoachUsage({
       discordId: profile.discordId,
       username: username || null,
-      model: MODEL,
+      model: COACH_MODEL,
       promptTokens: usage.promptTokens,
       completionTokens: usage.completionTokens,
       totalTokens: usage.totalTokens,
       cachedPromptTokens: usage.cachedPromptTokens,
+      cacheWriteTokens: usage.cacheWriteTokens,
+      reasoningTokens: usage.reasoningTokens,
+      latencyMs: response.latencyMs,
       openaiCalls: 1,
     });
   }
 
-  return getMessageText(response.choices[0]?.message) || fallback;
+  return response.text || fallback;
 }
 
 async function sendFollowUpDm(discordId, text) {

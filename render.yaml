@@ -48,6 +48,12 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: COACH_MODEL
+        value: gpt-6-luna
+      - key: COACH_REASONING_EFFORT
+        value: low
+      - key: COACH_ANALYSIS_REASONING_EFFORT
+        value: medium
       - key: COACH_CONNECT_SECRET
         sync: false
       - key: COACH_MEMORY_KEY

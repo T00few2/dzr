@@ -59,6 +59,10 @@ type EventRow = {
   model: string | null
   promptTokens: number
   completionTokens: number
+  cachedPromptTokens: number
+  cacheWriteTokens: number
+  reasoningTokens: number
+  latencyMs: number
   totalTokens: number
   openaiCalls: number
   at: string | null
@@ -280,7 +284,10 @@ export default function CoachAdminPage() {
               <Th color="gray.400">User</Th>
               <Th color="gray.400">Model</Th>
               <Th color="gray.400" isNumeric>Prompt</Th>
+              <Th color="gray.400" isNumeric>Cached</Th>
               <Th color="gray.400" isNumeric>Completion</Th>
+              <Th color="gray.400" isNumeric>Reasoning</Th>
+              <Th color="gray.400" isNumeric>Latency</Th>
               <Th color="gray.400" isNumeric>Total</Th>
             </Tr>
           </Thead>
@@ -294,7 +301,10 @@ export default function CoachAdminPage() {
                 </Td>
                 <Td>{e.model || '—'}</Td>
                 <Td isNumeric>{fmt(e.promptTokens)}</Td>
+                <Td isNumeric>{fmt(e.cachedPromptTokens)}</Td>
                 <Td isNumeric>{fmt(e.completionTokens)}</Td>
+                <Td isNumeric>{fmt(e.reasoningTokens)}</Td>
+                <Td isNumeric>{e.latencyMs ? `${(e.latencyMs / 1000).toFixed(1)}s` : '—'}</Td>
                 <Td isNumeric>{fmt(e.totalTokens)}</Td>
               </Tr>
             ))}

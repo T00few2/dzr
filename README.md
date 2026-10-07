@@ -95,6 +95,23 @@ DZR Coach reads training from intervals.icu. Register an OAuth app on your inter
 Optional: `COACH_DAILY_TOKEN_BUDGET` caps each athlete's coaching tokens per day (default 600000, `0` disables). Cached prompt tokens count at 10%, matching what OpenAI charges for them.
 Optional: `COACH_FOLLOW_UPS_PER_RUN` is how many check-ins one scheduler sweep sends (default 100); any remaining are sent on the next tick, until 11:00 Copenhagen time.
 
+DZR Coach uses OpenAI's Responses API with `store: false`: encrypted reasoning is replayed only
+inside the current tool sequence and is discarded after the visible reply. The default model is
+`gpt-6-luna`; `COACH_MODEL` is the rollback switch. Routing starts at
+`COACH_REASONING_EFFORT=low` and analysis tools raise the answer to
+`COACH_ANALYSIS_REASONING_EFFORT=medium`. The non-Coach club assistant remains on Chat
+Completions.
+
+Before changing Coach models, run `npm run eval:dry`, then a repeated live comparison from
+`apps/bot`. Keep the judge fixed so candidates do not grade themselves:
+
+```powershell
+$env:COACH_EVAL_MODEL="gpt-6-luna"
+$env:COACH_EVAL_JUDGE_MODEL="gpt-6.1-sol"
+$env:COACH_EVAL_REPEATS="3"
+npm run eval
+```
+
 ## Shared constants
 
 `packages/shared/constants.json` is the source of truth for `siteOrigin`, Discord guild/role IDs, and Firestore collection names.

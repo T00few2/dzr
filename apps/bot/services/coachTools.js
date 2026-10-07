@@ -352,6 +352,31 @@ function coachToolsFor(notesOptIn) {
     : coachToolDefinitions.filter((t) => !COACH_NOTE_TOOLS.has(t.function?.name));
 }
 
+/**
+ * Never expose the destructive calendar tool when a vague request could match duplicate rows.
+ * The prompt tells the model to ask, but hiding the tool makes that safety boundary deterministic.
+ */
+function coachToolsForTurn(notesOptIn, { calendarBlock = "", userText = "" } = {}) {
+  const tools = coachToolsFor(notesOptIn);
+  if (!notesOptIn || !/\b(slet|fjern|delete|remove)\b/i.test(String(userText))) return tools;
+
+  const rows = String(calendarBlock)
+    .split("\n")
+    .map((line) => {
+      const match = line.match(/^\s*-\s+id:([^\s]+)\s+(\d{4}-\d{2}-\d{2}).*?—\s+(.+?)(?:\s+\([^)]*\))?\s*$/);
+      return match ? { id: match[1], date: match[2], title: match[3].trim().toLowerCase() } : null;
+    })
+    .filter(Boolean);
+  if (rows.some((row) => String(userText).includes(row.id) || String(userText).includes(row.date))) return tools;
+
+  const titleCounts = new Map();
+  for (const row of rows) titleCounts.set(row.title, (titleCounts.get(row.title) || 0) + 1);
+  const hasDuplicate = Array.from(titleCounts.values()).some((count) => count > 1);
+  return hasDuplicate
+    ? tools.filter((tool) => tool.function?.name !== "delete_planned_event")
+    : tools;
+}
+
 // Answers built on these are where the athlete judges the coach, so they get more reasoning.
 const ANALYSIS_TOOLS = new Set(["get_training_trend", "get_activity_metrics", "get_wellness"]);
 
@@ -369,5 +394,6 @@ module.exports = {
   COACH_NOTE_TOOLS,
   ANALYSIS_TOOLS,
   coachToolsFor,
+  coachToolsForTurn,
   reasoningEffortAfterTools,
 };

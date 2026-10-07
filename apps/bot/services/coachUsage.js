@@ -19,7 +19,13 @@ function extractTokenUsage(response) {
     u.prompt_tokens_details?.cached_tokens ?? u.input_tokens_details?.cached_tokens ?? 0
   ) || 0;
   const cachedPromptTokens = Math.min(Math.max(0, cachedRaw), promptTokens);
-  return { promptTokens, completionTokens, totalTokens, cachedPromptTokens };
+  const cacheWriteTokens = Math.min(promptTokens, Math.max(0, Number(
+    u.input_tokens_details?.cache_write_tokens ?? 0
+  ) || 0));
+  const reasoningTokens = Math.min(completionTokens, Math.max(0, Number(
+    u.output_tokens_details?.reasoning_tokens ?? u.completion_tokens_details?.reasoning_tokens ?? 0
+  ) || 0));
+  return { promptTokens, completionTokens, totalTokens, cachedPromptTokens, cacheWriteTokens, reasoningTokens };
 }
 
 /** Tokens charged to the daily budget: total, with cached prompt tokens at a discount. */

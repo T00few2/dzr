@@ -5,6 +5,7 @@ const {
   coachToolDefinitions,
   COACH_NOTE_TOOLS,
   coachToolsFor,
+  coachToolsForTurn,
   reasoningEffortAfterTools,
 } = require("./coachTools");
 
@@ -39,4 +40,20 @@ test("analysis tools raise the reasoning effort for the answer", () => {
   assert.equal(reasoningEffortAfterTools(["get_recent_activities", "get_activity_metrics"]), "medium");
   assert.equal(reasoningEffortAfterTools(new Set(["get_wellness"])), "medium");
   assert.equal(reasoningEffortAfterTools([], "minimal"), "minimal");
+});
+
+test("a vague delete cannot call the destructive tool when calendar rows are duplicates", () => {
+  const calendarBlock = [
+    "Coming up:",
+    "- id:a1 2026-09-08 (in 2 days) — Rolig tur (session)",
+    "- id:b2 2026-09-09 (in 3 days) — Rolig tur (session)",
+  ].join("\n");
+  assert.ok(!names(coachToolsForTurn(true, {
+    calendarBlock,
+    userText: "Slet den rolige tur fra kalenderen",
+  })).includes("delete_planned_event"));
+  assert.ok(names(coachToolsForTurn(true, {
+    calendarBlock,
+    userText: "Slet turen id:a1 den 2026-09-08",
+  })).includes("delete_planned_event"));
 });
