@@ -101,8 +101,8 @@ inside the current tool sequence and is discarded after the visible reply. The d
 `COACH_REASONING_EFFORT=low` and analysis tools raise the answer to
 `COACH_ANALYSIS_REASONING_EFFORT=medium`.
 
-The non-Coach club assistant uses the same stateless Responses architecture and keeps
-`gpt-5-mini` as its cost-effective default. Configure it independently with
+The non-Coach club assistant uses the same stateless Responses architecture and defaults to
+`gpt-6-luna`. Configure it independently with
 `CLUB_ASSISTANT_MODEL`, `CLUB_ASSISTANT_REASONING_EFFORT` and
 `CLUB_ASSISTANT_MAX_OUTPUT_TOKENS`; changing those settings does not affect Coach.
 

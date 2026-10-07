@@ -102,7 +102,7 @@ const COACH_REASONING_EFFORT = COACH_BASE_EFFORT;
 // The club assistant shares the stateless Responses architecture with Coach, but keeps its own
 // inexpensive model and small output allowance because most turns are transactional tool routing.
 const AI_CONFIG = {
-  model: process.env.CLUB_ASSISTANT_MODEL || "gpt-5-mini",
+  model: process.env.CLUB_ASSISTANT_MODEL || "gpt-6-luna",
   maxTokens: Number.parseInt(process.env.CLUB_ASSISTANT_MAX_OUTPUT_TOKENS || "1200", 10),
   reasoningEffort: process.env.CLUB_ASSISTANT_REASONING_EFFORT || "low",
 };
