@@ -27,6 +27,7 @@ const {
   COACH_MODEL,
   COACH_BASE_EFFORT,
   COACH_ANALYSIS_EFFORT,
+  createStatelessResponse,
   createCoachResponse,
   visibleMessagesToInput,
   repetitionGuardForVisibleHistory,
@@ -98,50 +99,13 @@ const COACH_MAX_TOKENS = 16000;
 const COACH_DAILY_TOKEN_BUDGET = Number.parseInt(process.env.COACH_DAILY_TOKEN_BUDGET || "600000", 10);
 const COACH_REASONING_EFFORT = COACH_BASE_EFFORT;
 
-// AI Model Configuration - can be changed to test different models
+// The club assistant shares the stateless Responses architecture with Coach, but keeps its own
+// inexpensive model and small output allowance because most turns are transactional tool routing.
 const AI_CONFIG = {
-  model: "gpt-5-mini",    // Options: "gpt-5-mini", "gpt-4.1-mini", "gpt-5-nano", "gpt-4.1-nano"
-  temperature: 0.3,       // Used only by models that support sampling (not gpt-5-mini/nano)
-  maxTokens: 800,         // Max completion tokens for replies
-  maxRetries: 2,          // Retry attempts for rate limits
-  retryDelayMs: 2000,     // Base delay between retries
-  // gpt-5* defaults to medium reasoning (slower/costlier). low keeps Discord snappy for tool routing.
-  reasoningEffort: "low",
+  model: process.env.CLUB_ASSISTANT_MODEL || "gpt-5-mini",
+  maxTokens: Number.parseInt(process.env.CLUB_ASSISTANT_MAX_OUTPUT_TOKENS || "1200", 10),
+  reasoningEffort: process.env.CLUB_ASSISTANT_REASONING_EFFORT || "low",
 };
-
-function isGpt5Family(model = AI_CONFIG.model) {
-  return typeof model === "string" && model.startsWith("gpt-5");
-}
-
-/**
- * Build chat.completions params compatible with both 4.x and 5.x models.
- * gpt-5-mini/nano reject custom temperature and require max_completion_tokens.
- */
-function buildChatCompletionParams({ messages, tools, toolChoice, maxTokens, temperature, reasoningEffort }) {
-  const model = AI_CONFIG.model;
-  const params = {
-    model,
-    messages,
-  };
-
-  if (tools) {
-    params.tools = tools;
-    params.tool_choice = toolChoice || "auto";
-  }
-
-  if (isGpt5Family(model)) {
-    params.max_completion_tokens = maxTokens ?? AI_CONFIG.maxTokens;
-    const effort = reasoningEffort || AI_CONFIG.reasoningEffort;
-    if (effort) {
-      params.reasoning_effort = effort;
-    }
-  } else {
-    params.max_tokens = maxTokens ?? AI_CONFIG.maxTokens;
-    params.temperature = temperature ?? AI_CONFIG.temperature;
-  }
-
-  return params;
-}
 
 // Tool-calling safety (club assistant). Coaching uses COACH_MAX_TOOL_ITERATIONS.
 
@@ -297,82 +261,6 @@ async function isReplyToBot(message, client) {
   } catch {
     return false;
   }
-}
-
-/**
- * Build a short, human-friendly rider commentary from summarized stats
- */
-function buildRiderComment(rider) {
-  if (!rider || typeof rider !== 'object') return null;
-
-  const name = rider.name || 'This rider';
-  const ftpWkg = rider?.ftp?.wkg;
-  const w5 = rider?.power?.w300?.wkg;   // 5m
-  const w20 = rider?.power?.w1200?.wkg; // 20m
-  const phenotype = rider?.phenotype || rider?.phenotype?.value;
-  const veloCat = rider?.velo?.category;
-
-  const parts = [];
-
-  if (ftpWkg && ftpWkg > 4.0) {
-    parts.push(`${name} is packing a serious diesel engine`);
-  } else if (ftpWkg && ftpWkg > 3.2) {
-    parts.push(`${name} shows solid endurance legs`);
-  }
-
-  if (w5 && (!w20 || w5 - w20 > 0.5)) {
-    parts.push('short‑burst power pops');
-  } else if (w20 && (!w5 || w20 - w5 > 0.2)) {
-    parts.push('all‑day power stands out');
-  }
-
-  if (phenotype) {
-    parts.push(`phenotype: ${phenotype}`);
-  }
-
-  if (veloCat) {
-    parts.push(`vELO category: ${veloCat}`);
-  }
-
-  if (parts.length === 0) {
-    return `${name} looks balanced with both snap and staying power.`;
-  }
-
-  return parts.join(' • ') + '.';
-}
-
-/**
- * Build a short, human-friendly team commentary from summarized team stats
- */
-function buildTeamComment(team) {
-  if (!Array.isArray(team) || team.length === 0) return null;
-
-  const by = (selector) => team
-    .map(r => ({ r, val: selector(r) }))
-    .filter(x => typeof x.val === 'number' && Number.isFinite(x.val));
-
-  const ftp = by(r => r?.ftp?.wkg).sort((a,b) => b.val - a.val);
-  const w5 = by(r => r?.power?.w300?.wkg).sort((a,b) => b.val - a.val);
-  const w20 = by(r => r?.power?.w1200?.wkg).sort((a,b) => b.val - a.val);
-
-  const parts = [];
-  if (ftp.length > 0) {
-    const top = ftp[0];
-    parts.push(`${top.r.name} is the diesel up the climbs`);
-  }
-  if (w5.length > 0) {
-    const top = w5[0];
-    parts.push(`${top.r.name} brings the mid‑range punch`);
-  }
-  if (w20.length > 0) {
-    const top = w20[0];
-    parts.push(`${top.r.name} holds the line on long efforts`);
-  }
-
-  if (parts.length === 0) {
-    return `This lineup looks balanced across short and sustained power.`;
-  }
-  return parts.slice(0, 2).join(' • ') + '.';
 }
 
 /**
@@ -1953,22 +1841,6 @@ function getOpenAIErrorInfo(error) {
   return { code, type, message, status, looksLikeQuota, looksLikeRateLimit };
 }
 
-function getMessageText(message) {
-  const content = message?.content;
-  if (typeof content === "string") return content.trim();
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (typeof part === "string") return part;
-        if (part && typeof part.text === "string") return part.text;
-        return "";
-      })
-      .join("")
-      .trim();
-  }
-  return "";
-}
-
 function fallbackCoachFromTools(toolResults) {
   const withActivities = (toolResults || []).find((r) => Array.isArray(r.activities) && r.activities.length);
   if (withActivities) {
@@ -2153,32 +2025,6 @@ async function extractCoachChatNotes({ discordId, username, turns }) {
 }
 
 /**
- * Call OpenAI API with retry logic for transient rate limits (not quota/billing)
- */
-async function callOpenAIWithRetry(params) {
-  const { maxRetries, retryDelayMs } = AI_CONFIG;
-  
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await openai.chat.completions.create(params);
-    } catch (error) {
-      const info = getOpenAIErrorInfo(error);
-      const isLastAttempt = attempt === maxRetries;
-      
-      // Only retry transient rate limits — quota/billing 429s will never succeed
-      if (info.looksLikeRateLimit && !info.looksLikeQuota && !isLastAttempt) {
-        const delay = retryDelayMs * Math.pow(2, attempt); // Exponential backoff
-        console.log(`⏳ Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
-        await new Promise(r => setTimeout(r, delay));
-        continue;
-      }
-      
-      throw error;
-    }
-  }
-}
-
-/**
  * Club-bot AI chat. Never coaches — DZR Coach owns that DM.
  */
 async function handleAIChatMessage(message, client) {
@@ -2224,6 +2070,123 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     return;
   }
   return queued;
+}
+
+/**
+ * Run one club-assistant turn on the same stateless Responses architecture as Coach.
+ * Tool and reasoning items exist only inside this function; callers retain visible text only.
+ */
+async function runClubResponsesTurn({
+  conversation,
+  instructions,
+  activeTools,
+  message,
+  turnContext,
+  maxIters,
+  calledToolNames,
+}) {
+  const input = visibleMessagesToInput(conversation);
+  let lastToolResults = [];
+
+  const call = async ({ allowTools = true, maxOutputTokens = AI_CONFIG.maxTokens } = {}) => {
+    const response = await createStatelessResponse(openai, {
+      instructions,
+      input,
+      tools: activeTools,
+      allowTools,
+      model: AI_CONFIG.model,
+      maxOutputTokens,
+      reasoningEffort: AI_CONFIG.reasoningEffort,
+      cacheKey: "dzr-club-assistant:v1",
+    });
+    input.push(...response.outputItems);
+    return response;
+  };
+
+  let response = await call();
+  if (!response.toolCalls.length) {
+    return { text: response.text, fromModel: Boolean(response.text), handledExternally: false };
+  }
+
+  let currentToolCalls = response.toolCalls;
+  for (let iteration = 0; currentToolCalls.length && iteration < maxIters; iteration++) {
+    lastToolResults = await executeToolCalls(currentToolCalls, message, turnContext);
+    calledToolNames.push(...currentToolCalls.map((toolCall) => toolCall.name));
+    input.push(...functionCallOutputs(lastToolResults.map((result) => ({
+      tool_call_id: result.tool_call_id,
+      output: safeStringify(compactToolResult(result)),
+    }))));
+
+    const handledExternally =
+      currentToolCalls.every((toolCall) => TOOLS_THAT_REPLY_DIRECTLY.has(toolCall.name)) ||
+      (lastToolResults.length > 0 && lastToolResults.every((result) => result.sent_full));
+    const hasStatsCall = currentToolCalls.some(
+      (toolCall) => toolCall.name === "rider_stats" || toolCall.name === "team_stats"
+    );
+    const allSuccessful = lastToolResults.every((result) => result.success);
+
+    // Stats handlers post their table directly, but users also expect the short playful comment
+    // the old Chat Completions path added afterwards.
+    if (handledExternally && hasStatsCall && allSuccessful) {
+      try {
+        const isTeamStats = currentToolCalls.some((toolCall) => toolCall.name === "team_stats");
+        input.push({
+          role: "user",
+          content: isTeamStats
+            ? "Give a playful 1-3 sentence commentary comparing these riders. A light lyrical or pop-culture vibe is welcome. Do not include raw numbers, W/kg, bullets or lists."
+            : "Give a playful 1-3 sentence commentary about the rider. A light lyrical or pop-culture vibe is welcome. Do not include raw numbers, W/kg, bullets or lists.",
+        });
+        const commentary = await call({ allowTools: false, maxOutputTokens: 300 });
+        return {
+          text: commentary.text,
+          fromModel: Boolean(commentary.text),
+          handledExternally: true,
+        };
+      } catch (error) {
+        console.warn("Club stats commentary failed:", error?.message || error);
+        return { text: "", fromModel: false, handledExternally: true };
+      }
+    }
+
+    if (handledExternally) {
+      return { text: "", fromModel: false, handledExternally: true };
+    }
+
+    response = await call();
+    console.log("🤖 Club Responses reply", {
+      model: response.model,
+      status: response.status,
+      incompleteReason: response.incompleteReason,
+      contentLen: response.text.length,
+      toolCalls: response.toolCalls.length,
+      usage: response.usage,
+      latencyMs: response.latencyMs,
+    });
+
+    if (response.toolCalls.length && iteration + 1 < maxIters) {
+      currentToolCalls = response.toolCalls;
+      continue;
+    }
+    if (response.text) {
+      return { text: response.text, fromModel: true, handledExternally: false };
+    }
+    if (response.toolCalls.length) {
+      return {
+        text: "⚠️ I wasn't able to finish that request after a few tool calls. Please try rephrasing or breaking it into a simpler question.",
+        fromModel: false,
+        handledExternally: false,
+      };
+    }
+
+    input.push({
+      role: "user",
+      content: "Answer the user's request now from the tool results. Do not call more tools. Keep it concise.",
+    });
+    const retry = await call({ allowTools: false });
+    return { text: retry.text, fromModel: Boolean(retry.text), handledExternally: false };
+  }
+
+  return { text: "", fromModel: false, handledExternally: false };
 }
 
 /**
@@ -2492,7 +2455,6 @@ async function runChatTurn(message, client, { coachOnly }) {
           userText: cleanedMessage,
         })
       : toolDefinitions;
-    const maxTokens = isCoachSession ? COACH_MAX_TOKENS : AI_CONFIG.maxTokens;
     const maxIters = isCoachSession ? COACH_MAX_TOOL_ITERATIONS : MAX_TOOL_ITERATIONS;
     const replyFn = isCoachSession ? safeReplyChunks : safeReply;
     const calledToolNames = [];
@@ -2519,12 +2481,6 @@ async function runChatTurn(message, client, { coachOnly }) {
           calls: 0,
         }
       : null;
-    const callAndTrack = async (params) => {
-      const response = await callOpenAIWithRetry(params);
-      if (coachUsageTally) addTokenUsage(coachUsageTally, response);
-      return response;
-    };
-    
     // Get or create conversation history
     let conversation = userConversations.get(conversationKey);
 
@@ -2579,230 +2535,22 @@ async function runChatTurn(message, client, { coachOnly }) {
         await replyAndTag(text, { fromModel: coachTurn.fromModel });
       }
     } else {
-    // Club assistant remains on Chat Completions. DZR Coach uses the Responses branch above.
-    const response = await callAndTrack(
-      buildChatCompletionParams({
-        messages: conversation,
-        tools: activeTools,
-        toolChoice: "auto",
-        maxTokens,
-        reasoningEffort: isCoachSession ? COACH_REASONING_EFFORT : undefined,
-      })
-    );
-    
-    const responseMessage = response.choices[0].message;
-    
-    // Check if the model wants to call tools
-    if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
-      // Add assistant's message with tool calls to conversation
-      conversation.push({
-        role: "assistant",
-        content: responseMessage.content || null,
-        tool_calls: responseMessage.tool_calls
+      const clubTurn = await runClubResponsesTurn({
+        conversation,
+        instructions: systemPrompt,
+        activeTools,
+        message,
+        turnContext,
+        maxIters,
+        calledToolNames,
       });
-
-      // Tool calling loop: execute tools, append results, then let the model produce a user-facing answer.
-      // (Bounded to avoid infinite tool loops.)
-      let currentToolCalls = responseMessage.tool_calls;
-      let toolResults = [];
-      let iteration = 0;
-
-      while (currentToolCalls && currentToolCalls.length > 0 && iteration < maxIters) {
-        // Execute all tool calls (parallel if multiple)
-        toolResults = await executeToolCalls(currentToolCalls, message, turnContext);
-        calledToolNames.push(...currentToolCalls.map((tc) => tc.function.name));
-        const postToolEffort = isCoachSession
-          ? reasoningEffortAfterTools(calledToolNames, COACH_REASONING_EFFORT)
-          : undefined;
-        if (toolResults.some((r) => Array.isArray(r.saved) && r.saved.length > 0)) {
-          notesSavedThisTurn = true;
-        }
-
-        // Add tool results to conversation (compact to reduce context bloat)
-        for (const result of toolResults) {
-          conversation.push({
-            role: "tool",
-            tool_call_id: result.tool_call_id,
-            content: safeStringify(compactToolResult(result))
-          });
-        }
-
-        // If the tools already handled user-visible output, don't force an extra LLM "result summary".
-        // Exception: we still do the playful stats commentary below.
-        // A posted coach overview is the whole reply; anything after it would only repeat it.
-        const shouldSkipGenericAnswer =
-          currentToolCalls.every(tc => TOOLS_THAT_REPLY_DIRECTLY.has(tc.function.name)) ||
-          (toolResults.length > 0 && toolResults.every(r => r.sent_full));
-
-        // Check if we should generate a follow-up commentary for stats
-        const hasStatsCall = currentToolCalls.some(
-          tc => tc.function.name === "rider_stats" || tc.function.name === "team_stats"
-        );
-        const allSuccessful = toolResults.every(r => r.success);
-
-        if (hasStatsCall && allSuccessful && shouldSkipGenericAnswer) {
-          // Trim conversation before follow-up
-          conversation = trimConversation(conversation);
-
-          try {
-            const isTeamStats = currentToolCalls.some(tc => tc.function.name === "team_stats");
-            const prompt = isTeamStats
-              ? "Give a playful 1-3 sentence commentary comparing these riders. Use a light lyrical or pop-culture vibe if it fits, and feel free to exaggerate for humor. Do not include raw numbers or W/kg, and avoid bullet points or lists."
-              : "Give a playful 1-3 sentence commentary about the rider. Use a light lyrical or pop-culture vibe if it fits, and feel free to exaggerate for humor. Do not include raw numbers or W/kg, and avoid bullet points or lists.";
-
-            const followUpMessages = [
-              ...conversation,
-              { role: "user", content: prompt }
-            ];
-
-            const followUp = await callAndTrack(
-              buildChatCompletionParams({
-                messages: followUpMessages,
-                maxTokens: 300,
-                temperature: 1.0, // Higher creativity on models that support sampling
-              })
-            );
-
-            const followUpMessage = followUp.choices[0]?.message;
-
-            if (followUpMessage?.content && followUpMessage.content.trim().length > 0) {
-              conversation.push({
-                role: "assistant",
-                content: followUpMessage.content
-              });
-
-              await safeReply(message, followUpMessage.content);
-            } else {
-              // Fallback to heuristic commentary
-              const statsResult = toolResults.find(r => r.rider || r.team);
-              if (statsResult?.rider) {
-                const fallback = buildRiderComment(statsResult.rider);
-                if (fallback) {
-                  conversation.push({ role: "assistant", content: fallback });
-                  await safeReply(message, fallback);
-                }
-              } else if (statsResult?.team) {
-                const fallback = buildTeamComment(statsResult.team);
-                if (fallback) {
-                  conversation.push({ role: "assistant", content: fallback });
-                  await safeReply(message, fallback);
-                }
-              }
-            }
-          } catch (followUpError) {
-            console.error("Error generating follow-up AI response:", followUpError);
-            // Fallback to heuristic commentary
-            const statsResult = toolResults.find(r => r.rider || r.team);
-            if (statsResult?.rider) {
-              const fallback = buildRiderComment(statsResult.rider);
-              if (fallback) {
-                conversation.push({ role: "assistant", content: fallback });
-                await safeReply(message, fallback);
-              }
-            } else if (statsResult?.team) {
-              const fallback = buildTeamComment(statsResult.team);
-              if (fallback) {
-                conversation.push({ role: "assistant", content: fallback });
-                await safeReply(message, fallback);
-              }
-            }
-          }
-        }
-
-        // Generic answer step: turn tool results into a natural-language reply when tools didn't already reply.
-        if (!shouldSkipGenericAnswer) {
-          // Trim before asking again
-          conversation = trimConversation(conversation);
-
-          const postTool = await callAndTrack(
-            buildChatCompletionParams({
-              messages: conversation,
-              tools: activeTools,
-              toolChoice: "auto",
-              maxTokens,
-              reasoningEffort: postToolEffort,
-            })
-          );
-          if (postToolEffort) answerEffort = postToolEffort;
-
-          const postToolMsg = postTool.choices[0]?.message;
-          if (!postToolMsg) break;
-
-          console.log("🤖 Post-tool model reply", {
-            finish_reason: postTool.choices[0]?.finish_reason,
-            reasoningEffort: postToolEffort,
-            contentLen: getMessageText(postToolMsg).length,
-            toolCalls: postToolMsg.tool_calls?.length || 0,
-            usage: postTool.usage,
-          });
-
-          // If the model wants to call more tools, continue the loop — but only if we can
-          // actually execute them within maxIters. Otherwise we'd push an assistant
-          // message with unresolved tool_calls into history, which OpenAI rejects on the next turn.
-          if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0 && iteration + 1 < maxIters) {
-            conversation.push({
-              role: "assistant",
-              content: postToolMsg.content || null,
-              tool_calls: postToolMsg.tool_calls
-            });
-            currentToolCalls = postToolMsg.tool_calls;
-            iteration++;
-            continue;
-          }
-
-          let text = getMessageText(postToolMsg);
-
-          // gpt-5 can spend the whole completion budget on reasoning and return empty content.
-          if (!text && isCoachSession) {
-            const retry = await callAndTrack(
-              buildChatCompletionParams({
-                messages: [
-                  ...conversation,
-                  {
-                    role: "user",
-                    content: "Skriv nu coaching-svaret til atleten ud fra tool-resultaterne. Ingen flere tool calls. Kort og konkret.",
-                  },
-                ],
-                maxTokens: COACH_MAX_TOKENS,
-                reasoningEffort: COACH_REASONING_EFFORT,
-              })
-            );
-            text = getMessageText(retry.choices[0]?.message);
-            answerEffort = COACH_REASONING_EFFORT;
-          }
-          text = stripSentStamp(text);
-
-          if (text) {
-            conversation.push({ role: "assistant", content: text });
-            await replyAndTag(text);
-          } else if (isCoachSession) {
-            const fallback = fallbackCoachFromTools(toolResults);
-            conversation.push({ role: "assistant", content: fallback });
-            await replyAndTag(fallback, { fromModel: false });
-          } else if (postToolMsg.tool_calls && postToolMsg.tool_calls.length > 0) {
-            // Hit the iteration cap and the model only offered more tool calls, no text.
-            await safeReply(message, "⚠️ I wasn't able to finish that request after a few tool calls. Please try rephrasing or breaking it into a simpler question.");
-          }
-        }
-
-        break; // Done with tools for this message
-      }
-    } else {
-      // Model responded conversationally (no tool calls)
-      const modelText = stripSentStamp(getMessageText(responseMessage));
-      let text = modelText;
-      if (!text && isCoachSession) {
-        text = "Jeg er klar som DZR Coach, men fik et tomt modelsvar. Prøv at spørge igen, fx *Hvordan var min uge?*";
-      }
-      conversation.push({
-        role: "assistant",
-        content: text
-      });
-      
+      const text = stripSentStamp(clubTurn.text);
       if (text) {
-        await replyAndTag(text, { fromModel: Boolean(modelText) });
+        conversation.push({ role: "assistant", content: text });
+        await replyAndTag(text, { fromModel: clubTurn.fromModel });
+      } else if (!clubTurn.handledExternally) {
+        await safeReply(message, "⚠️ I couldn't produce an answer. Please try again.");
       }
-    }
     }
     
     // Trim conversation if it has grown too long after processing

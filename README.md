@@ -99,8 +99,12 @@ DZR Coach uses OpenAI's Responses API with `store: false`: encrypted reasoning i
 inside the current tool sequence and is discarded after the visible reply. The default model is
 `gpt-6-luna`; `COACH_MODEL` is the rollback switch. Routing starts at
 `COACH_REASONING_EFFORT=low` and analysis tools raise the answer to
-`COACH_ANALYSIS_REASONING_EFFORT=medium`. The non-Coach club assistant remains on Chat
-Completions.
+`COACH_ANALYSIS_REASONING_EFFORT=medium`.
+
+The non-Coach club assistant uses the same stateless Responses architecture and keeps
+`gpt-5-mini` as its cost-effective default. Configure it independently with
+`CLUB_ASSISTANT_MODEL`, `CLUB_ASSISTANT_REASONING_EFFORT` and
+`CLUB_ASSISTANT_MAX_OUTPUT_TOKENS`; changing those settings does not affect Coach.
 
 Before changing Coach models, run `npm run eval:dry`, then a repeated live comparison from
 `apps/bot`. Keep the judge fixed so candidates do not grade themselves:

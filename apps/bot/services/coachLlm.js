@@ -1,5 +1,5 @@
 /**
- * Stateless OpenAI Responses API adapter for DZR Coach.
+ * Stateless OpenAI Responses API adapter for DZR's AI assistants.
  *
  * The Coach deliberately does not use previous_response_id or Conversations. Responses are sent
  * with store:false, and encrypted reasoning is replayed only inside the current tool loop. Once a
@@ -33,7 +33,7 @@ function errorInfo(error) {
   };
 }
 
-/** Convert the Chat Completions tool declarations already used by Coach to Responses tools. */
+/** Convert the existing Chat Completions tool declarations to Responses tools. */
 function toResponsesTools(tools) {
   if (!Array.isArray(tools)) return [];
   return tools
@@ -161,7 +161,7 @@ async function createResponseWithRetry(client, params, {
  * One Responses API round. The caller owns the bounded tool loop and passes the accumulated input
  * back on later rounds, including replayableOutput() and function_call_output items.
  */
-async function createCoachResponse(client, {
+async function createStatelessResponse(client, {
   instructions,
   input,
   tools,
@@ -208,6 +208,9 @@ async function createCoachResponse(client, {
   };
 }
 
+// Backwards-compatible name for Coach-specific callers and tests.
+const createCoachResponse = createStatelessResponse;
+
 module.exports = {
   COACH_MODEL,
   COACH_BASE_EFFORT,
@@ -223,5 +226,6 @@ module.exports = {
   configurationUpdate,
   functionCallOutputs,
   createResponseWithRetry,
+  createStatelessResponse,
   createCoachResponse,
 };
