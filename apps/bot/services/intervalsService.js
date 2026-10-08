@@ -18,7 +18,7 @@ const CONNECT_TOKEN_TTL_MS = 15 * 60 * 1000;
 const STREAM_CACHE_COLLECTION = "coach_activity_metrics";
 const USER_AGENT = "DZR-Coach/1.0";
 // Bump when activity metrics change shape or meaning, so stale cache rows are recomputed.
-const METRICS_CACHE_VERSION = 3;
+const METRICS_CACHE_VERSION = 4;
 
 function notClubMemberResult() {
   return {
@@ -577,7 +577,7 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
     try {
       const streamRes = await intervalsFetch(
         discordId,
-        `/activity/${encodeURIComponent(id)}/streams.json?types=time,watts,heartrate,cadence`
+        `/activity/${encodeURIComponent(id)}/streams.json?types=time,watts,heartrate,cadence,core_temperature`
       );
       streams = streamRes.data;
     } catch (err) {
@@ -590,14 +590,23 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
       : [];
     const heartrate = metrics.resampleTo1Hz(time, streamArray(streams, ["heartrate", "heart_rate", "fixed_heartrate"]), "hold");
     const cadence = metrics.resampleTo1Hz(time, streamArray(streams, ["cadence"]), "zero");
+    const coreTemperature = metrics.resampleTo1Hz(
+      time,
+      streamArray(streams, ["core_temperature"]),
+      "hold"
+    );
     const ftp = num(activity?.icu_ftp) || num(conn.ftp) || null;
 
     const hr = metrics.positiveStats(heartrate);
     const cad = metrics.positiveStats(cadence);
+    const core = metrics.temperatureStats(coreTemperature);
     const common = {
       averageHeartRate: hr?.average ?? num(activity?.average_heartrate),
       maxHeartRate: hr?.max ?? num(activity?.max_heartrate),
       averageCadence: cad?.average ?? num(activity?.average_cadence),
+      averageCoreTemperatureC: core?.average ?? null,
+      minCoreTemperatureC: core?.min ?? null,
+      maxCoreTemperatureC: core?.max ?? null,
       powerZoneSeconds: powerUsable ? zoneSeconds(activity?.icu_zone_times) : null,
       heartRateZoneSeconds: zoneSeconds(activity?.icu_hr_zone_times),
     };
@@ -618,7 +627,7 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
         intervals: ftp
           ? metrics.enrichIntervals(
               metrics.detectIntervals(watts, { thresholdWatts: Math.round(ftp * 0.95) }).slice(0, 12),
-              { heartrate, cadence }
+              { heartrate, cadence, coreTemperature }
             )
           : compactIntervals(activity).slice(0, 12),
         ftpUsed: ftp,
@@ -637,9 +646,9 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
         intervals: compactIntervals(activity).slice(0, 12),
         ftpUsed: ftp,
       };
-    } else if (common.averageHeartRate != null) {
+    } else if (common.averageHeartRate != null || common.averageCoreTemperatureC != null) {
       summary = {
-        durationSeconds: heartrate.length || num(activity?.moving_time),
+        durationSeconds: heartrate.length || coreTemperature.length || num(activity?.moving_time),
         powerAvailable: false,
         ...common,
         intervals: compactIntervals(activity).slice(0, 12),
@@ -647,10 +656,10 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
     }
 
     if (!summary) {
-      return { success: true, metrics: null, message: "No power or heart-rate data on this activity." };
+      return { success: true, metrics: null, message: "No power, heart-rate or core-temperature data on this activity." };
     }
     const message = summary.powerAvailable === false
-      ? "This ride has no usable power data, only heart rate. Comment on duration, heart rate and how it felt."
+      ? "This ride has no usable power data. Use the available heart-rate and core-temperature fields without implying missing data exists."
       : null;
 
     try {
@@ -667,7 +676,12 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
     }
 
     if (range) {
-      const segment = metrics.segmentSummary({ watts, heartrate, cadence }, range.fromSeconds, range.toSeconds, { ftp });
+      const segment = metrics.segmentSummary(
+        { watts, heartrate, cadence, coreTemperature },
+        range.fromSeconds,
+        range.toSeconds,
+        { ftp }
+      );
       if (!segment) {
         return {
           success: true,

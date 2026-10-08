@@ -11,6 +11,7 @@ const {
   timeInZones,
   detectIntervals,
   positiveStats,
+  temperatureStats,
   enrichIntervals,
   segmentSummary,
 } = require("./streamMetrics");
@@ -110,16 +111,28 @@ test("heart-rate and cadence stats ignore dropouts and coasting", () => {
   assert.equal(positiveStats(null), null);
 });
 
-test("each interval gets its own heart rate and cadence", () => {
+test("core-temperature stats preserve sensor precision and ignore missing samples", () => {
+  assert.deepEqual(temperatureStats([null, 0, 37.12, 37.46, 37.8]), {
+    average: 37.46,
+    min: 37.12,
+    max: 37.8,
+  });
+  assert.equal(temperatureStats([null, 0]), null);
+});
+
+test("each interval gets its own heart rate, cadence and core temperature", () => {
   const heartrate = [...Array(60).fill(120), ...Array(60).fill(170), ...Array(60).fill(130)];
   const cadence = [...Array(60).fill(80), ...Array(60).fill(95), ...Array(60).fill(0)];
+  const coreTemperature = [...Array(60).fill(37.2), ...Array(60).fill(38.45), ...Array(60).fill(37.8)];
   const [interval] = enrichIntervals(
     [{ startSeconds: 60, durationSeconds: 60, averageWatts: 300, peakWatts: 320 }],
-    { heartrate, cadence }
+    { heartrate, cadence, coreTemperature }
   );
   assert.equal(interval.averageHeartRate, 170);
   assert.equal(interval.maxHeartRate, 170);
   assert.equal(interval.averageCadence, 95);
+  assert.equal(interval.averageCoreTemperatureC, 38.45);
+  assert.equal(interval.maxCoreTemperatureC, 38.45);
   assert.equal(interval.averageWatts, 300, "power fields are kept");
 });
 
@@ -128,11 +141,20 @@ test("a segment summarises only its window and reports intervals in ride time", 
   const watts = [...Array(600).fill(150), ...Array(300).fill(300), ...Array(600).fill(150)];
   const heartrate = [...Array(600).fill(130), ...Array(300).fill(170), ...Array(600).fill(135)];
   const cadence = Array(1500).fill(90);
-  const seg = segmentSummary({ watts, heartrate, cadence }, 600, 900, { ftp: 280 });
+  const coreTemperature = [
+    ...Array(600).fill(37.4),
+    ...Array(150).fill(38.1),
+    ...Array(150).fill(38.7),
+    ...Array(600).fill(37.8),
+  ];
+  const seg = segmentSummary({ watts, heartrate, cadence, coreTemperature }, 600, 900, { ftp: 280 });
   assert.equal(seg.durationSeconds, 300);
   assert.equal(seg.averageWatts, 300);
   assert.equal(seg.averageHeartRate, 170);
   assert.equal(seg.averageCadence, 90);
+  assert.equal(seg.averageCoreTemperatureC, 38.4);
+  assert.equal(seg.minCoreTemperatureC, 38.1);
+  assert.equal(seg.maxCoreTemperatureC, 38.7);
   assert.equal(seg.meanMaxPower[3600], undefined, "durations longer than the window are left out");
   assert.equal(seg.intervals.length, 1);
   assert.equal(seg.intervals[0].startSeconds, 600, "start is from the ride start, not the window");

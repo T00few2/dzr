@@ -224,19 +224,37 @@ function positiveStats(series) {
   return count ? { average: Math.round(sum / count), max: Math.round(max) } : null;
 }
 
-/** Heart rate and cadence for each detected interval, read from the same 1 Hz grid. */
-function enrichIntervals(intervals, { heartrate = [], cadence = [] } = {}) {
+/** Preserve the decimal precision needed for body-temperature sensor data. */
+function temperatureStats(series) {
+  if (!Array.isArray(series)) return null;
+  const values = series
+    .map(Number)
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (!values.length) return null;
+  const rounded = (value) => Number(value.toFixed(2));
+  return {
+    average: rounded(values.reduce((sum, value) => sum + value, 0) / values.length),
+    min: rounded(Math.min(...values)),
+    max: rounded(Math.max(...values)),
+  };
+}
+
+/** Heart rate, cadence and core temperature for each detected interval. */
+function enrichIntervals(intervals, { heartrate = [], cadence = [], coreTemperature = [] } = {}) {
   if (!Array.isArray(intervals)) return [];
   return intervals.map((interval) => {
     const from = interval.startSeconds;
     const to = from + interval.durationSeconds;
     const hr = positiveStats(heartrate.slice(from, to));
     const cad = positiveStats(cadence.slice(from, to));
+    const core = temperatureStats(coreTemperature.slice(from, to));
     return {
       ...interval,
       averageHeartRate: hr?.average ?? null,
       maxHeartRate: hr?.max ?? null,
       averageCadence: cad?.average ?? null,
+      averageCoreTemperatureC: core?.average ?? null,
+      maxCoreTemperatureC: core?.max ?? null,
     };
   });
 }
@@ -245,8 +263,13 @@ function enrichIntervals(intervals, { heartrate = [], cadence = [] } = {}) {
  * Metrics for one stretch of a ride, `fromSeconds` inclusive to `toSeconds` exclusive.
  * Returns null when the window is under 30 seconds or outside the ride.
  */
-function segmentSummary({ watts = [], heartrate = [], cadence = [] } = {}, fromSeconds, toSeconds, { ftp } = {}) {
-  const length = Math.max(watts.length, heartrate.length);
+function segmentSummary(
+  { watts = [], heartrate = [], cadence = [], coreTemperature = [] } = {},
+  fromSeconds,
+  toSeconds,
+  { ftp } = {}
+) {
+  const length = Math.max(watts.length, heartrate.length, cadence.length, coreTemperature.length);
   const from = Math.max(0, Math.floor(Number(fromSeconds) || 0));
   const to = Math.min(length, Math.floor(Number.isFinite(Number(toSeconds)) ? Number(toSeconds) : length));
   if (!(to - from >= 30)) return null;
@@ -255,11 +278,16 @@ function segmentSummary({ watts = [], heartrate = [], cadence = [] } = {}, fromS
   const h = heartrate.slice(from, to);
   const hr = positiveStats(h);
   const cad = positiveStats(cadence.slice(from, to));
+  const core = temperatureStats(coreTemperature.slice(from, to));
   const np = w.length >= 30 ? normalizedPower(w) : null;
   const intervals = ftp && w.length
     ? enrichIntervals(
         detectIntervals(w, { thresholdWatts: Math.round(ftp * 0.95) }).slice(0, 12),
-        { heartrate: h, cadence: cadence.slice(from, to) }
+        {
+          heartrate: h,
+          cadence: cadence.slice(from, to),
+          coreTemperature: coreTemperature.slice(from, to),
+        }
       ).map((interval) => ({ ...interval, startSeconds: interval.startSeconds + from }))
     : [];
 
@@ -275,6 +303,9 @@ function segmentSummary({ watts = [], heartrate = [], cadence = [] } = {}, fromS
     averageHeartRate: hr?.average ?? null,
     maxHeartRate: hr?.max ?? null,
     averageCadence: cad?.average ?? null,
+    averageCoreTemperatureC: core?.average ?? null,
+    minCoreTemperatureC: core?.min ?? null,
+    maxCoreTemperatureC: core?.max ?? null,
     aerobicDecouplingPercent: aerobicDecoupling(w, h),
     intervals,
   };
@@ -292,6 +323,7 @@ module.exports = {
   timeInZones,
   detectIntervals,
   positiveStats,
+  temperatureStats,
   enrichIntervals,
   segmentSummary,
 };

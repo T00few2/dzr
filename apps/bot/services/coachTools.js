@@ -68,7 +68,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_activity_metrics",
-      description: "Holds one ride's detail, computed from the second-by-second power, heart-rate and cadence streams: normalized power, mean-max power, aerobic decoupling, average and max heart rate, cadence, time in power and heart-rate zones, and each interval's power, heart rate and cadence. Needs an activity id from get_recent_activities. Call when the answer needs how a ride went beyond its averages. One activity at a time.",
+      description: "Holds one ride's detail, computed from the second-by-second power, heart-rate, cadence and CORE body-temperature streams when present: normalized power, mean-max power, aerobic decoupling, heart rate, cadence, core temperature in °C, zone time, and interval metrics. Needs an activity id from get_recent_activities. Call when the answer needs how a ride went beyond its averages, including heat/core-temperature questions. One activity at a time.",
       parameters: {
         type: "object",
         properties: {
