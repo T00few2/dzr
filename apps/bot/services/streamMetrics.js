@@ -109,6 +109,24 @@ function trainingStressScore(np, ftp, durationSeconds) {
 }
 
 /**
+ * Intervals.icu-style W′ balance. Work above FTP spends finite anaerobic capacity; riding below
+ * FTP restores it progressively. Inputs are one-second power samples and W′ in joules.
+ */
+function wPrimeBalance(watts1Hz, ftp, wPrimeJ) {
+  if (!Array.isArray(watts1Hz) || !watts1Hz.length || !ftp || ftp <= 0 || !wPrimeJ || wPrimeJ <= 0) {
+    return [];
+  }
+  let balance = Number(wPrimeJ);
+  return watts1Hz.map((raw) => {
+    const watts = Math.max(0, Number(raw) || 0);
+    const delta = Number(ftp) - watts;
+    if (delta > 0) balance += delta * (wPrimeJ - balance) / wPrimeJ;
+    else balance += delta;
+    return Math.round(balance);
+  });
+}
+
+/**
  * Aerobic decoupling: how far the power-to-heart-rate ratio drifts from the first half of a ride
  * to the second. Rising cardiac cost at the same power indicates fading durability. Conventionally
  * anything under about 5% is considered aerobically sound.
@@ -325,6 +343,7 @@ module.exports = {
   normalizedPower,
   intensityFactor,
   trainingStressScore,
+  wPrimeBalance,
   aerobicDecoupling,
   timeInZones,
   detectIntervals,

@@ -7,6 +7,7 @@ const {
   normalizedPower,
   intensityFactor,
   trainingStressScore,
+  wPrimeBalance,
   aerobicDecoupling,
   timeInZones,
   detectIntervals,
@@ -62,6 +63,18 @@ test("intensity and stress scale as expected against threshold", () => {
   // An hour exactly at threshold is 100 by definition.
   assert.equal(trainingStressScore(250, 250, 3600), 100);
   assert.equal(trainingStressScore(250, 250, 1800), 50);
+});
+
+test("W-prime balance spends above FTP and recharges below it", () => {
+  const balance = wPrimeBalance(
+    [...Array(10).fill(300), ...Array(30).fill(100)],
+    250,
+    20000
+  );
+  assert.equal(balance[9], 19500, "ten seconds at 50 W above FTP spends 500 J");
+  assert.ok(balance.at(-1) > balance[9], "easy riding restores some W-prime");
+  assert.ok(balance.at(-1) < 20000, "recovery is progressive, not instantaneous");
+  assert.deepEqual(wPrimeBalance([300], null, 20000), []);
 });
 
 test("decoupling is near zero for a steady ride and positive when HR drifts up", () => {

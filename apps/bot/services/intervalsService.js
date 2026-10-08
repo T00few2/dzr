@@ -18,7 +18,7 @@ const CONNECT_TOKEN_TTL_MS = 15 * 60 * 1000;
 const STREAM_CACHE_COLLECTION = "coach_activity_metrics";
 const USER_AGENT = "DZR-Coach/1.0";
 // Bump when activity metrics change shape or meaning, so stale cache rows are recomputed.
-const METRICS_CACHE_VERSION = 5;
+const METRICS_CACHE_VERSION = 6;
 
 function notClubMemberResult() {
   return {
@@ -621,6 +621,9 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
       return { success: true, metrics: null, message: unreadableSourceMessage(1) };
     }
     const powerUsable = activity?.icu_ignore_power !== true;
+    const activityWPrime = num(activity?.icu_w_prime);
+    const modelWPrime = num(activity?.icu_pm_w_prime);
+    const wPrimeCapacityJ = activityWPrime ?? modelWPrime;
 
     let streams = null;
     try {
@@ -649,6 +652,10 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
         ...baseStreamTypes,
         ...optionalStreamTypes.filter((type) => available.has(type)),
       ];
+      // W′bal is often derived from FTP, W′ and power instead of being advertised like a sensor
+      // stream. Request it whenever Intervals supplied a W′ capacity; we still compute a local
+      // fallback below if no trace comes back.
+      if (wPrimeCapacityJ != null && !requestedTypes.includes("w_bal")) requestedTypes.push("w_bal");
       const streamRes = await intervalsFetch(
         discordId,
         `/activity/${encodeURIComponent(id)}/streams.json?types=${requestedTypes.join(",")}`
@@ -669,6 +676,15 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
       streamArray(streams, ["core_temperature"]),
       "hold"
     );
+    const ftp = num(activity?.icu_ftp) || num(conn.ftp) || null;
+    const returnedWPrimeBalance = metrics.resampleTo1Hz(
+      time,
+      streamArray(streams, ["w_bal"]),
+      "hold"
+    );
+    const wPrimeBalance = returnedWPrimeBalance.length
+      ? returnedWPrimeBalance
+      : metrics.wPrimeBalance(watts, ftp, wPrimeCapacityJ);
     const additionalStreams = {
       skinTemperature: metrics.resampleTo1Hz(time, streamArray(streams, ["skin_temperature"]), "hold"),
       ambientTemperature: metrics.resampleTo1Hz(time, streamArray(streams, ["temp"]), "hold"),
@@ -677,13 +693,11 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
       respiration: metrics.resampleTo1Hz(time, streamArray(streams, ["respiration"]), "hold"),
       tidalVolume: metrics.resampleTo1Hz(time, streamArray(streams, ["tidal_volume"]), "hold"),
       minuteVentilation: metrics.resampleTo1Hz(time, streamArray(streams, ["tidal_volume_min"]), "hold"),
-      wPrimeBalance: metrics.resampleTo1Hz(time, streamArray(streams, ["w_bal"]), "hold"),
+      wPrimeBalance,
       altitude: metrics.resampleTo1Hz(time, streamArray(streams, ["altitude", "fixed_altitude"]), "hold"),
       gradient: metrics.resampleTo1Hz(time, streamArray(streams, ["grade_smooth"]), "hold"),
       speed: metrics.resampleTo1Hz(time, streamArray(streams, ["velocity_smooth"]), "hold"),
     };
-    const ftp = num(activity?.icu_ftp) || num(conn.ftp) || null;
-
     const hr = metrics.positiveStats(heartrate);
     const cad = metrics.positiveStats(cadence);
     const core = metrics.temperatureStats(coreTemperature);
@@ -695,6 +709,12 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
       averageCoreTemperatureC: core?.average ?? null,
       minCoreTemperatureC: core?.min ?? null,
       maxCoreTemperatureC: core?.max ?? null,
+      ...(wPrimeCapacityJ != null
+        ? {
+            wPrimeCapacityJ,
+            wPrimeCapacitySource: activityWPrime != null ? "activity" : "power_model",
+          }
+        : {}),
       ...additional,
       powerZoneSeconds: powerUsable ? zoneSeconds(activity?.icu_zone_times) : null,
       heartRateZoneSeconds: zoneSeconds(activity?.icu_hr_zone_times),
