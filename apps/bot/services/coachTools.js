@@ -68,7 +68,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_activity_metrics",
-      description: "Holds one ride's detail, computed from available second-by-second streams. Includes power, heart rate, cadence and CORE temperature, plus skin/ambient temperature, muscle oxygen, haemoglobin, breathing, ventilation, W-prime capacity and balance, altitude, gradient and speed when available. W-prime balance is derived from power, FTP and Intervals' W-prime value when no stored trace exists. Missing fields mean the source data was unavailable. Needs an activity id from get_recent_activities. Call when the answer needs how a ride went beyond its averages. One activity at a time.",
+      description: "Holds one ride's detail, computed from every performance field and sensor stream Intervals advertises for it. Common cycling data has named metrics; sourceData preserves other non-empty numeric/boolean activity fields; additionalStreamData compactly summarizes unfamiliar numeric streams. Raw samples, free text, identifiers and route coordinates are deliberately excluded. W-prime balance is derived from power, FTP and Intervals' W-prime value when no stored trace exists. Missing fields mean the source data was unavailable. Needs an activity id from get_recent_activities. Call when the answer needs how a ride went beyond its averages. One activity at a time.",
       parameters: {
         type: "object",
         properties: {

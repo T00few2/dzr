@@ -4,6 +4,7 @@ const config = require("../config/config");
 const shared = require("../constants.json");
 const { db, getUserZwiftId, getLatestClubStats, isPaidClubMember } = require("./firebase");
 const metrics = require("./streamMetrics");
+const discovery = require("./activityDataDiscovery");
 const weeklyLoad = require("./weeklyLoad");
 const {
   canEncryptTokens,
@@ -18,7 +19,7 @@ const CONNECT_TOKEN_TTL_MS = 15 * 60 * 1000;
 const STREAM_CACHE_COLLECTION = "coach_activity_metrics";
 const USER_AGENT = "DZR-Coach/1.0";
 // Bump when activity metrics change shape or meaning, so stale cache rows are recomputed.
-const METRICS_CACHE_VERSION = 6;
+const METRICS_CACHE_VERSION = 7;
 
 function notClubMemberResult() {
   return {
@@ -456,16 +457,32 @@ async function getRecentActivities(discordId, { days = 14 } = {}) {
 
 function compactIntervals(activity) {
   const rows = Array.isArray(activity?.icu_intervals) ? activity.icu_intervals : [];
-  return rows.slice(0, 20).map((row) => ({
-    name: row.type || null,
-    elapsed_time: row.elapsed_time ?? null,
-    moving_time: row.moving_time ?? null,
-    distance_m: row.distance ?? null,
-    average_watts: row.average_watts ?? null,
-    average_heartrate: row.average_heartrate ?? null,
-    zone: row.zone ?? null,
-    decoupling: row.decoupling ?? null,
-  }));
+  const normalized = new Set([
+    "elapsed_time",
+    "moving_time",
+    "distance",
+    "average_watts",
+    "average_heartrate",
+    "zone",
+    "decoupling",
+  ]);
+  return rows.slice(0, 20).map((row) => {
+    const discovered = discovery.discoverActivityFields(row, { maxFields: 64 }).values;
+    const sourceData = Object.fromEntries(
+      Object.entries(discovered).filter(([key]) => !normalized.has(key))
+    );
+    return {
+      name: row.type || null,
+      elapsed_time: row.elapsed_time ?? null,
+      moving_time: row.moving_time ?? null,
+      distance_m: row.distance ?? null,
+      average_watts: row.average_watts ?? null,
+      average_heartrate: row.average_heartrate ?? null,
+      zone: row.zone ?? null,
+      decoupling: row.decoupling ?? null,
+      ...(Object.keys(sourceData).length ? { sourceData } : {}),
+    };
+  });
 }
 
 async function getActivityDetails(discordId, activityId) {
@@ -507,6 +524,62 @@ function streamArray(streams, names) {
     if (Array.isArray(value?.data)) return value.data;
   }
   return [];
+}
+
+const NORMALIZED_STREAM_TYPES = [
+  "time",
+  "watts",
+  "fixed_watts",
+  "heartrate",
+  "heart_rate",
+  "fixed_heartrate",
+  "cadence",
+  "core_temperature",
+  "skin_temperature",
+  "temp",
+  "smo2",
+  "thb",
+  "respiration",
+  "tidal_volume",
+  "tidal_volume_min",
+  "w_bal",
+  "altitude",
+  "fixed_altitude",
+  "grade_smooth",
+  "velocity_smooth",
+];
+
+const NORMALIZED_ACTIVITY_FIELDS = new Set([
+  "moving_time",
+  "elapsed_time",
+  "distance",
+  "total_elevation_gain",
+  "average_heartrate",
+  "max_heartrate",
+  "average_cadence",
+  "icu_average_watts",
+  "average_watts",
+  "icu_weighted_avg_watts",
+  "weighted_average_watts",
+  "max_watts",
+  "icu_joules",
+  "kilojoules",
+  "icu_training_load",
+  "icu_ftp",
+  "icu_w_prime",
+  "icu_pm_w_prime",
+  "icu_zone_times",
+  "icu_hr_zone_times",
+  "icu_ignore_power",
+  "indoor",
+]);
+
+function safeStreamTypes(types) {
+  const rows = Array.isArray(types) ? types : typeof types === "string" ? types.split(",") : [];
+  return [...new Set(rows
+    .map(String)
+    .map((type) => type.trim())
+    .filter((type) => /^[A-Za-z0-9_:-]{1,80}$/.test(type)))];
 }
 
 function streamWindow(series, fromSeconds = 0, toSeconds = Infinity) {
@@ -624,41 +697,22 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
     const activityWPrime = num(activity?.icu_w_prime);
     const modelWPrime = num(activity?.icu_pm_w_prime);
     const wPrimeCapacityJ = activityWPrime ?? modelWPrime;
+    const advertisedStreamTypes = safeStreamTypes(activity?.stream_types);
+    const activityDiscovery = discovery.discoverActivityFields(activity);
 
     let streams = null;
     try {
       const baseStreamTypes = ["time", "watts", "heartrate", "cadence"];
-      const optionalStreamTypes = [
-        "core_temperature",
-        "skin_temperature",
-        "temp",
-        "smo2",
-        "thb",
-        "respiration",
-        "tidal_volume",
-        "tidal_volume_min",
-        "w_bal",
-        "altitude",
-        "fixed_altitude",
-        "grade_smooth",
-        "velocity_smooth",
-      ];
-      const available = new Set(
-        (Array.isArray(activity?.stream_types) ? activity.stream_types : []).map(String)
-      );
-      // Detailed sensor streams are sparse across athletes. Ask Intervals only for streams its
-      // activity metadata says exist; absent metrics then consume no transfer, cache or model tokens.
-      const requestedTypes = [
-        ...baseStreamTypes,
-        ...optionalStreamTypes.filter((type) => available.has(type)),
-      ];
+      // Request every stream Intervals advertises. Known streams get sport-specific calculations;
+      // future or custom numeric streams automatically get compact generic summaries below.
+      const requestedTypes = [...new Set([...baseStreamTypes, ...advertisedStreamTypes])];
       // W′bal is often derived from FTP, W′ and power instead of being advertised like a sensor
       // stream. Request it whenever Intervals supplied a W′ capacity; we still compute a local
       // fallback below if no trace comes back.
       if (wPrimeCapacityJ != null && !requestedTypes.includes("w_bal")) requestedTypes.push("w_bal");
       const streamRes = await intervalsFetch(
         discordId,
-        `/activity/${encodeURIComponent(id)}/streams.json?types=${requestedTypes.join(",")}`
+        `/activity/${encodeURIComponent(id)}/streams.json?types=${requestedTypes.map(encodeURIComponent).join(",")}`
       );
       streams = streamRes.data;
     } catch (err) {
@@ -702,6 +756,22 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
     const cad = metrics.positiveStats(cadence);
     const core = metrics.temperatureStats(coreTemperature);
     const additional = additionalStreamSummary(additionalStreams);
+    const discoveredStreams = discovery.discoverStreamSummaries(streams, {
+      time,
+      exclude: NORMALIZED_STREAM_TYPES,
+    });
+    const sourceData = Object.fromEntries(
+      Object.entries(activityDiscovery.values)
+        .filter(([key]) => !NORMALIZED_ACTIVITY_FIELDS.has(key))
+    );
+    const additionalStreamData = discoveredStreams.summaries;
+    const dataAvailability = {
+      streamTypes: [...new Set([...advertisedStreamTypes, ...discoveredStreams.available])].sort(),
+      ...(discoveredStreams.redacted.length
+        ? { redactedLocationStreams: discoveredStreams.redacted }
+        : {}),
+      ...(activityDiscovery.truncated ? { sourceDataTruncated: true } : {}),
+    };
     const common = {
       averageHeartRate: hr?.average ?? num(activity?.average_heartrate),
       maxHeartRate: hr?.max ?? num(activity?.max_heartrate),
@@ -718,6 +788,11 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
       ...additional,
       powerZoneSeconds: powerUsable ? zoneSeconds(activity?.icu_zone_times) : null,
       heartRateZoneSeconds: zoneSeconds(activity?.icu_hr_zone_times),
+      ...(Object.keys(sourceData).length ? { sourceData } : {}),
+      ...(Object.keys(additionalStreamData).length ? { additionalStreamData } : {}),
+      ...(dataAvailability.streamTypes.length || dataAvailability.sourceDataTruncated
+        ? { dataAvailability }
+        : {}),
     };
 
     let summary = null;
@@ -758,7 +833,9 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
     } else if (
       common.averageHeartRate != null ||
       common.averageCoreTemperatureC != null ||
-      Object.keys(additional).length > 0
+      Object.keys(additional).length > 0 ||
+      Object.keys(sourceData).length > 0 ||
+      Object.keys(additionalStreamData).length > 0
     ) {
       summary = {
         durationSeconds: heartrate.length || coreTemperature.length || num(activity?.moving_time),
@@ -802,6 +879,12 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
           message: `That time range is outside this ride, which lasted ${Math.round((summary.durationSeconds || 0) / 60)} minutes. Whole-ride metrics are included instead.`,
         };
       }
+      const segmentStreamData = discovery.discoverStreamSummaries(streams, {
+        time,
+        exclude: NORMALIZED_STREAM_TYPES,
+        fromSeconds: range.fromSeconds,
+        toSeconds: range.toSeconds,
+      }).summaries;
       return {
         success: true,
         metrics: {
@@ -809,6 +892,9 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
           segment: {
             ...segment,
             ...additionalStreamSummary(additionalStreams, range.fromSeconds, range.toSeconds),
+            ...(Object.keys(segmentStreamData).length
+              ? { additionalStreamData: segmentStreamData }
+              : {}),
           },
         },
         message,
