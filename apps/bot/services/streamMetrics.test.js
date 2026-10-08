@@ -12,6 +12,7 @@ const {
   detectIntervals,
   positiveStats,
   temperatureStats,
+  seriesStats,
   enrichIntervals,
   segmentSummary,
 } = require("./streamMetrics");
@@ -118,6 +119,19 @@ test("core-temperature stats preserve sensor precision and ignore missing sample
     max: 37.8,
   });
   assert.equal(temperatureStats([null, 0]), null);
+});
+
+test("generic sensor stats retain negative terrain values when requested", () => {
+  assert.deepEqual(seriesStats([-4.24, 0, 7.86], { digits: 1 }), {
+    average: 1.2,
+    min: -4.2,
+    max: 7.9,
+  });
+  assert.deepEqual(seriesStats([0, 0.5, 1], { digits: 2, positiveOnly: true }), {
+    average: 0.75,
+    min: 0.5,
+    max: 1,
+  });
 });
 
 test("each interval gets its own heart rate, cadence and core temperature", () => {

@@ -226,12 +226,18 @@ function positiveStats(series) {
 
 /** Preserve the decimal precision needed for body-temperature sensor data. */
 function temperatureStats(series) {
+  return seriesStats(series, { digits: 2, positiveOnly: true });
+}
+
+/** Decimal-preserving summary for sensor streams. */
+function seriesStats(series, { digits = 1, positiveOnly = false } = {}) {
   if (!Array.isArray(series)) return null;
   const values = series
+    .filter((value) => value != null && value !== "")
     .map(Number)
-    .filter((value) => Number.isFinite(value) && value > 0);
+    .filter((value) => Number.isFinite(value) && (!positiveOnly || value > 0));
   if (!values.length) return null;
-  const rounded = (value) => Number(value.toFixed(2));
+  const rounded = (value) => Number(value.toFixed(digits));
   return {
     average: rounded(values.reduce((sum, value) => sum + value, 0) / values.length),
     min: rounded(Math.min(...values)),
@@ -324,6 +330,7 @@ module.exports = {
   detectIntervals,
   positiveStats,
   temperatureStats,
+  seriesStats,
   enrichIntervals,
   segmentSummary,
 };

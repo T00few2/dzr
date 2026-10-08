@@ -18,7 +18,7 @@ const CONNECT_TOKEN_TTL_MS = 15 * 60 * 1000;
 const STREAM_CACHE_COLLECTION = "coach_activity_metrics";
 const USER_AGENT = "DZR-Coach/1.0";
 // Bump when activity metrics change shape or meaning, so stale cache rows are recomputed.
-const METRICS_CACHE_VERSION = 4;
+const METRICS_CACHE_VERSION = 5;
 
 function notClubMemberResult() {
   return {
@@ -509,6 +509,55 @@ function streamArray(streams, names) {
   return [];
 }
 
+function streamWindow(series, fromSeconds = 0, toSeconds = Infinity) {
+  if (!Array.isArray(series)) return [];
+  const from = Math.max(0, Math.floor(Number(fromSeconds) || 0));
+  const numericTo = Number(toSeconds);
+  const to = Number.isFinite(numericTo) ? Math.max(from, Math.floor(numericTo)) : series.length;
+  return series.slice(from, to);
+}
+
+function additionalStreamSummary(streams, fromSeconds = 0, toSeconds = Infinity) {
+  const window = (name) => streamWindow(streams[name], fromSeconds, toSeconds);
+  const positive = (name, digits = 1) =>
+    metrics.seriesStats(window(name), { digits, positiveOnly: true });
+  const signed = (name, digits = 1) =>
+    metrics.seriesStats(window(name), { digits });
+  const speed = positive("speed", 1);
+  const wPrime = signed("wPrimeBalance", 0);
+  const wPrimeValues = window("wPrimeBalance")
+    .filter((value) => value != null && value !== "" && Number.isFinite(Number(value)))
+    .map(Number);
+
+  const summary = {
+    ambientTemperatureC: signed("ambientTemperature", 2),
+    skinTemperatureC: metrics.temperatureStats(window("skinTemperature")),
+    muscleOxygenPercent: positive("smo2", 1),
+    totalHemoglobinGdl: positive("thb", 2),
+    respirationBreathsPerMinute: positive("respiration", 1),
+    tidalVolumeLitresPerBreath: positive("tidalVolume", 2),
+    minuteVentilationLitresPerMinute: positive("minuteVentilation", 1),
+    altitudeM: signed("altitude", 1),
+    gradientPercent: signed("gradient", 1),
+    speedKph: speed
+      ? {
+          average: Number((speed.average * 3.6).toFixed(1)),
+          min: Number((speed.min * 3.6).toFixed(1)),
+          max: Number((speed.max * 3.6).toFixed(1)),
+        }
+      : null,
+    wPrimeBalanceJ: wPrime
+      ? {
+          start: Math.round(wPrimeValues[0]),
+          end: Math.round(wPrimeValues[wPrimeValues.length - 1]),
+          min: Math.round(wPrime.min),
+          max: Math.round(wPrime.max),
+        }
+      : null,
+  };
+  return Object.fromEntries(Object.entries(summary).filter(([, value]) => value != null));
+}
+
 /**
  * Seconds per zone as intervals.icu computed them, keyed by zone name. Power zone times arrive as
  * [{ id: "Z1", secs }] (including a sweet-spot "SS" entry that overlaps Z3/Z4); HR zone times as a
@@ -575,9 +624,34 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
 
     let streams = null;
     try {
+      const baseStreamTypes = ["time", "watts", "heartrate", "cadence"];
+      const optionalStreamTypes = [
+        "core_temperature",
+        "skin_temperature",
+        "temp",
+        "smo2",
+        "thb",
+        "respiration",
+        "tidal_volume",
+        "tidal_volume_min",
+        "w_bal",
+        "altitude",
+        "fixed_altitude",
+        "grade_smooth",
+        "velocity_smooth",
+      ];
+      const available = new Set(
+        (Array.isArray(activity?.stream_types) ? activity.stream_types : []).map(String)
+      );
+      // Detailed sensor streams are sparse across athletes. Ask Intervals only for streams its
+      // activity metadata says exist; absent metrics then consume no transfer, cache or model tokens.
+      const requestedTypes = [
+        ...baseStreamTypes,
+        ...optionalStreamTypes.filter((type) => available.has(type)),
+      ];
       const streamRes = await intervalsFetch(
         discordId,
-        `/activity/${encodeURIComponent(id)}/streams.json?types=time,watts,heartrate,cadence,core_temperature`
+        `/activity/${encodeURIComponent(id)}/streams.json?types=${requestedTypes.join(",")}`
       );
       streams = streamRes.data;
     } catch (err) {
@@ -595,11 +669,25 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
       streamArray(streams, ["core_temperature"]),
       "hold"
     );
+    const additionalStreams = {
+      skinTemperature: metrics.resampleTo1Hz(time, streamArray(streams, ["skin_temperature"]), "hold"),
+      ambientTemperature: metrics.resampleTo1Hz(time, streamArray(streams, ["temp"]), "hold"),
+      smo2: metrics.resampleTo1Hz(time, streamArray(streams, ["smo2"]), "hold"),
+      thb: metrics.resampleTo1Hz(time, streamArray(streams, ["thb"]), "hold"),
+      respiration: metrics.resampleTo1Hz(time, streamArray(streams, ["respiration"]), "hold"),
+      tidalVolume: metrics.resampleTo1Hz(time, streamArray(streams, ["tidal_volume"]), "hold"),
+      minuteVentilation: metrics.resampleTo1Hz(time, streamArray(streams, ["tidal_volume_min"]), "hold"),
+      wPrimeBalance: metrics.resampleTo1Hz(time, streamArray(streams, ["w_bal"]), "hold"),
+      altitude: metrics.resampleTo1Hz(time, streamArray(streams, ["altitude", "fixed_altitude"]), "hold"),
+      gradient: metrics.resampleTo1Hz(time, streamArray(streams, ["grade_smooth"]), "hold"),
+      speed: metrics.resampleTo1Hz(time, streamArray(streams, ["velocity_smooth"]), "hold"),
+    };
     const ftp = num(activity?.icu_ftp) || num(conn.ftp) || null;
 
     const hr = metrics.positiveStats(heartrate);
     const cad = metrics.positiveStats(cadence);
     const core = metrics.temperatureStats(coreTemperature);
+    const additional = additionalStreamSummary(additionalStreams);
     const common = {
       averageHeartRate: hr?.average ?? num(activity?.average_heartrate),
       maxHeartRate: hr?.max ?? num(activity?.max_heartrate),
@@ -607,6 +695,7 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
       averageCoreTemperatureC: core?.average ?? null,
       minCoreTemperatureC: core?.min ?? null,
       maxCoreTemperatureC: core?.max ?? null,
+      ...additional,
       powerZoneSeconds: powerUsable ? zoneSeconds(activity?.icu_zone_times) : null,
       heartRateZoneSeconds: zoneSeconds(activity?.icu_hr_zone_times),
     };
@@ -646,7 +735,11 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
         intervals: compactIntervals(activity).slice(0, 12),
         ftpUsed: ftp,
       };
-    } else if (common.averageHeartRate != null || common.averageCoreTemperatureC != null) {
+    } else if (
+      common.averageHeartRate != null ||
+      common.averageCoreTemperatureC != null ||
+      Object.keys(additional).length > 0
+    ) {
       summary = {
         durationSeconds: heartrate.length || coreTemperature.length || num(activity?.moving_time),
         powerAvailable: false,
@@ -659,7 +752,7 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
       return { success: true, metrics: null, message: "No power, heart-rate or core-temperature data on this activity." };
     }
     const message = summary.powerAvailable === false
-      ? "This ride has no usable power data. Use the available heart-rate and core-temperature fields without implying missing data exists."
+      ? "This ride has no usable power data. Use only the available sensor fields without implying missing data exists."
       : null;
 
     try {
@@ -689,7 +782,17 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
           message: `That time range is outside this ride, which lasted ${Math.round((summary.durationSeconds || 0) / 60)} minutes. Whole-ride metrics are included instead.`,
         };
       }
-      return { success: true, metrics: { ...summary, segment }, message };
+      return {
+        success: true,
+        metrics: {
+          ...summary,
+          segment: {
+            ...segment,
+            ...additionalStreamSummary(additionalStreams, range.fromSeconds, range.toSeconds),
+          },
+        },
+        message,
+      };
     }
     return { success: true, metrics: summary, message };
   });
