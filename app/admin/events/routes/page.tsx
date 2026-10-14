@@ -13,6 +13,7 @@ import { Box, Button, Flex, Heading, Input, Select, Stack, Text, Textarea } from
 
 type SeriesId = 'after-party' | 'zwifty-fifty'
 type RouteHit = { routeId: number; name: string; world: string | null }
+type SegmentHit = { id: string; name: string; world: string }
 type Suggestion = { match: RouteHit | null; sameName: boolean; options: RouteHit[] }
 
 const readableOutline = {
@@ -35,6 +36,7 @@ export default function RouteSetupPage() {
   const [index, setIndex] = useState<number | null>(null)
   const [draft, setDraft] = useState<CatalogRoute>(emptyCatalogRoute())
   const [options, setOptions] = useState<RouteHit[]>([])
+  const [sprintHits, setSprintHits] = useState<Record<number, SegmentHit[]>>({})
   const [query, setQuery] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -56,6 +58,7 @@ export default function RouteSetupPage() {
     setIndex(null)
     setDraft(emptyCatalogRoute())
     setOptions([])
+    setSprintHits({})
     void load(series)
     // The series button is the only trigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,6 +70,7 @@ export default function RouteSetupPage() {
     setIndex(routeIndex)
     setDraft(route)
     setOptions([])
+    setSprintHits({})
     setQuery(route.zwiftRouteName || route.route)
     setError('')
     setNotice('')
@@ -76,6 +80,7 @@ export default function RouteSetupPage() {
     setIndex(null)
     setDraft(emptyCatalogRoute())
     setOptions([])
+    setSprintHits({})
     setQuery('')
     setError('')
     setNotice('')
@@ -109,6 +114,54 @@ export default function RouteSetupPage() {
     } else {
       setNotice('No single Zwift route matched. Choose one from the list, or search again.')
     }
+  }
+
+  function setSprint(sprintIndex: number, name: string) {
+    const sprints = draft.sprints.slice()
+    sprints[sprintIndex] = name
+    setField({ sprints })
+  }
+
+  function setSprintLap(sprintIndex: number, laps: string) {
+    const sprintLaps = draft.sprintLaps.slice()
+    while (sprintLaps.length <= sprintIndex) sprintLaps.push('')
+    sprintLaps[sprintIndex] = laps
+    setField({ sprintLaps })
+  }
+
+  function addSprint() {
+    setField({ sprints: [...draft.sprints, ''], sprintLaps: [...draft.sprintLaps, ''] })
+  }
+
+  function removeSprint(sprintIndex: number) {
+    setSprintHits({})
+    setField({
+      sprints: draft.sprints.filter((_, index) => index !== sprintIndex),
+      sprintLaps: draft.sprintLaps.filter((_, index) => index !== sprintIndex),
+    })
+  }
+
+  async function findSprint(sprintIndex: number) {
+    const name = (draft.sprints[sprintIndex] || '').trim()
+    if (name.length < 2) {
+      setError('Enter a sprint name to search ZwiftPower')
+      return
+    }
+    setBusy(`sprint:${sprintIndex}`)
+    setError('')
+    const res = await fetch(`/api/admin/events/segments?q=${encodeURIComponent(name)}`)
+    setBusy('')
+    if (!res.ok) {
+      setError(await errorMessage(res))
+      return
+    }
+    const body = await res.json()
+    const hits = Array.isArray(body) ? (body as SegmentHit[]) : []
+    setSprintHits((current) => ({ ...current, [sprintIndex]: hits }))
+    const exact = hits.find((hit) => hit.name.toLowerCase() === name.toLowerCase())
+    if (exact) setSprint(sprintIndex, exact.name)
+    else if (!hits.length) setNotice(`ZwiftPower has no segment matching ${name}.`)
+    else setNotice('Pick the ZwiftPower segment. The saved name has to match it exactly.')
   }
 
   async function searchZwift() {
@@ -256,18 +309,65 @@ export default function RouteSetupPage() {
                   onChange={(e) => setField({ climbs: textToList(e.target.value) })}
                   {...field}
                 />
-                <Textarea
-                  placeholder="Sprints, separated by commas"
-                  value={listToText(draft.sprints)}
-                  onChange={(e) => setField({ sprints: textToList(e.target.value) })}
-                  {...field}
-                />
-                <Input
-                  placeholder="Sprint laps, separated by commas"
-                  value={listToText(draft.sprintLaps)}
-                  onChange={(e) => setField({ sprintLaps: textToList(e.target.value) })}
-                  {...field}
-                />
+                <Box>
+                  <Text fontSize="sm" color="gray.400" mb={2}>
+                    Sprints use the ZwiftPower segment name. Fuego Flats is not a segment; Fuego Flats Long is.
+                  </Text>
+                  <Stack spacing={2}>
+                    {draft.sprints.map((sprint, sprintIndex) => (
+                      <Box key={sprintIndex}>
+                        <Flex gap={2} wrap="wrap">
+                          <Input
+                            placeholder="Sprint name"
+                            value={sprint}
+                            onChange={(e) => setSprint(sprintIndex, e.target.value)}
+                            {...field}
+                          />
+                          <Input
+                            placeholder="Laps"
+                            value={draft.sprintLaps[sprintIndex] || ''}
+                            onChange={(e) => setSprintLap(sprintIndex, e.target.value)}
+                            maxW="120px"
+                            {...field}
+                          />
+                          <Button
+                            {...readableOutline}
+                            isLoading={busy === `sprint:${sprintIndex}`}
+                            onClick={() => void findSprint(sprintIndex)}
+                          >
+                            Find
+                          </Button>
+                          <Button {...readableOutline} onClick={() => removeSprint(sprintIndex)}>
+                            Remove
+                          </Button>
+                        </Flex>
+                        {sprintHits[sprintIndex]?.length ? (
+                          <Select
+                            mt={2}
+                            placeholder="Choose the ZwiftPower segment"
+                            bg="gray.900"
+                            borderColor="gray.700"
+                            value={sprintHits[sprintIndex].some((hit) => hit.name === sprint) ? sprint : ''}
+                            onChange={(e) => {
+                              const hit = sprintHits[sprintIndex].find((option) => option.name === e.target.value)
+                              if (hit) setSprint(sprintIndex, hit.name)
+                            }}
+                          >
+                            {sprintHits[sprintIndex].map((hit) => (
+                              <option key={hit.id} value={hit.name}>
+                                {hit.name}
+                                {hit.world ? ` · ${hit.world}` : ''}
+                              </option>
+                            ))}
+                          </Select>
+                        ) : null}
+                      </Box>
+                    ))}
+                    <Button {...readableOutline} alignSelf="flex-start" onClick={addSprint}>
+                      Add sprint
+                    </Button>
+                  </Stack>
+                </Box>
                 <Input
                   placeholder="Bonus seconds, separated by commas"
                   value={listToText(draft.bonus)}

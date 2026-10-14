@@ -5,6 +5,9 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
+_zp_segments = None
+
+
 class ZwiftPower:
     """
     A class to log into ZwiftPower, maintain an authenticated session,
@@ -559,6 +562,50 @@ class ZwiftPower:
             "top_watts_per_kg_5min": top_wkg300, # top riders by 5-minute power
             "top_watts_per_kg_1min": top_wkg60 # top riders by 1-minute power
         }
+
+    def list_segments(self) -> list:
+        """ZwiftPower segment names, one list for every world. Names match the Primes dropdown."""
+        global _zp_segments
+        if _zp_segments:
+            return _zp_segments
+        response = self.session.get("https://zwiftpower.com/segments.php", allow_redirects=True)
+        if response.status_code >= 400:
+            raise RuntimeError("ZwiftPower segments are unavailable")
+        soup = BeautifulSoup(response.text, "html.parser")
+        rows = []
+        seen = set()
+        for pane in soup.select("div.tab-pane[id^=tab_]"):
+            pane_id = pane.get("id") or ""
+            link = soup.find("a", href=f"#{pane_id}")
+            world = link.get_text(strip=True) if link else ""
+            select = pane.find("select")
+            if not select:
+                continue
+            for option in select.find_all("option"):
+                name = option.get_text(strip=True)
+                value = str(option.get("value") or "").strip()
+                if not name or value in {"", "0"} or name.lower().startswith("change segment"):
+                    continue
+                if value in seen:
+                    continue
+                seen.add(value)
+                rows.append({"id": value, "name": name, "world": world})
+        if not rows:
+            raise RuntimeError("ZwiftPower did not list any segments")
+        _zp_segments = rows
+        return rows
+
+    def search_segments(self, query: str) -> list:
+        folded = " ".join(str(query or "").casefold().split())
+        if len(folded) < 2:
+            return []
+        hits = []
+        for row in self.list_segments():
+            name = row["name"].casefold()
+            if folded == name or folded in name:
+                hits.append(row)
+        hits.sort(key=lambda row: (row["name"].casefold() != folded, not row["name"].casefold().startswith(folded), row["name"]))
+        return hits[:20]
 
     def wkg_category_preview(self, event_id: int) -> dict:
         """WKG finishers, and the Unfiltered pen they should be moved to. Reads only."""

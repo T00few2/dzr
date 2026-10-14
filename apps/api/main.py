@@ -774,6 +774,19 @@ def zwiftpower_wkg_categories(event_id: int):
         return jsonify({"error": str(exc)}), 502
 
 
+@app.route('/api/zwiftpower/segments', methods=['GET'])
+def zwiftpower_search_segments():
+    """Search ZwiftPower segment names. Auth: Bearer CONTENT_API_KEY."""
+    unauthorized = require_api_or_401()
+    if unauthorized:
+        return unauthorized
+    try:
+        return jsonify(get_organizer_zwiftpower().search_segments(request.args.get("q", "")))
+    except Exception as exc:
+        print(f"ZwiftPower segment search failed: {exc}")
+        return jsonify({"error": str(exc)}), 502
+
+
 @app.route('/api/zwiftpower/results/fix-due', methods=['POST'])
 def zwiftpower_fix_due_results():
     """Fix a Zwifty Fifty whose start was a couple of hours ago. Auth: Bearer CONTENT_API_KEY."""
