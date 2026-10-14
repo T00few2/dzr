@@ -1,13 +1,21 @@
 "use client"
 import { useState, useEffect } from "react";
-import { CalenderTemplate } from "./calendarTemplate";
+import type { CatalogRoute } from "@/app/lib/catalogRoute";
 
-function publishedRow(row: { date?: string; route?: string; raceID?: string }) {
-  const item = new CalenderTemplate()
-  item.date = String(row.date || '')
-  item.route = String(row.route || '')
-  item.raceID = String(row.raceID || '')
-  return item
+export type PublishedRace = {
+  date: string
+  route: string
+  raceID: string
+  catalog: CatalogRoute | null
+}
+
+function publishedRow(row: { date?: string; route?: string; raceID?: string; catalog?: CatalogRoute | null }): PublishedRace {
+  return {
+    date: String(row.date || ''),
+    route: String(row.route || ''),
+    raceID: String(row.raceID || ''),
+    catalog: row.catalog || null,
+  }
 }
 
 async function loadPublished(series: 'after-party' | 'zwifty-fifty') {
@@ -18,7 +26,7 @@ async function loadPublished(series: 'after-party' | 'zwifty-fifty') {
 }
 
 export function useRaceCalendarAPS() {
-  const [calendarDataAPS, setCalendarDataAPS] = useState<CalenderTemplate[]>([]);
+  const [calendarDataAPS, setCalendarDataAPS] = useState<PublishedRace[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -43,7 +51,7 @@ export function useRaceCalendarAPS() {
 }
 
 export function useRaceCalendarZF() {
-  const [calendarDataZF, setCalendarDataZF] = useState<CalenderTemplate[]>([]);
+  const [calendarDataZF, setCalendarDataZF] = useState<PublishedRace[]>([]);
   const [loadingZF, setLoading] = useState<boolean>(true);
 
   useEffect(() => {

@@ -3,7 +3,7 @@ import React from 'react';
 import { useRaceCalendarZF } from '../api/google/googleSheetsData';
 import { ZwiftyFiftyRacesData } from './ZwiftyFiftyRaces';
 import Carousel from '../carousel';
-import { CalenderTemplate } from '../api/google/calendarTemplate';
+import type { PublishedRace } from '../api/google/googleSheetsData';
 import ZwiftyFiftyRules from './ZwiftyFiftyRules'
 import LoadingSpinner from '@/components/LoadingSpinner';
 
@@ -36,14 +36,28 @@ function RaceList() {
         )
       }
 
-    const nextRace = calendarDataZF.filter(data => data.raceID !== '').slice(-1) as CalenderTemplate[]
-    const nextRouteName = nextRace.map((nextRace) =>(nextRace.route));
-    const nextRouteDetails = ZwiftyFiftyRacesData.filter(race => nextRouteName.includes(race.route));
+    const nextRace = calendarDataZF.filter(data => data.raceID !== '').slice(-1) as PublishedRace[]
        
     return (
         <Stack spacing={6}>
-            {nextRace.map((nextRace)=>(
-                nextRouteDetails.map((nextRouteDetails)=>(
+            {nextRace.map((nextRace) => {
+                const fileRoute = ZwiftyFiftyRacesData.find((race) => race.route === nextRace.route)
+                const nextRouteDetails = nextRace.catalog
+                    ? {
+                        world: nextRace.catalog.world || fileRoute?.world || '',
+                        route: nextRace.catalog.route || nextRace.route,
+                        linkRoute: nextRace.catalog.linkRoute || fileRoute?.linkRoute || '',
+                        laps: nextRace.catalog.laps || fileRoute?.laps || '',
+                        length: nextRace.catalog.distance || fileRoute?.length || '',
+                        hm: nextRace.catalog.elevation || fileRoute?.hm || '',
+                        climbs: nextRace.catalog.climbs.length ? nextRace.catalog.climbs : fileRoute?.climbs || [],
+                        sprints: nextRace.catalog.sprints.length ? nextRace.catalog.sprints : fileRoute?.sprints || [],
+                        sprintLaps: nextRace.catalog.sprintLaps.length ? nextRace.catalog.sprintLaps : fileRoute?.sprintLaps || [],
+                        bonus: nextRace.catalog.bonus.length ? nextRace.catalog.bonus : fileRoute?.bonus || [],
+                    }
+                    : fileRoute
+                if (!nextRouteDetails) return null
+                return (
                     <Stack key={nextRace.date} spacing={6}>
                         <Heading color={'white'}>The Zwifty Fifty</Heading>
             <Text color={'white'} fontSize={'lg'} whiteSpace="pre-line">
@@ -138,7 +152,7 @@ function RaceList() {
                             </Table>
                         </TableContainer>
                     </Stack>
-                ))))}
+            )})}
         </Stack>
     );
 }

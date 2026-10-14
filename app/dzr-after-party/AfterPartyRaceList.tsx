@@ -16,7 +16,7 @@ import {
   } from '@chakra-ui/react'
 
 import { ExternalLinkIcon } from '@chakra-ui/icons'
-import { CalenderTemplate } from '../api/google/calendarTemplate';
+import type { PublishedRace } from '../api/google/googleSheetsData';
 
 export default function AfterPartyRaceList() {
 
@@ -31,15 +31,26 @@ export default function AfterPartyRaceList() {
           }
       }
 
-    const nextRace = calendarDataAPS.filter(data => data.raceID !== '').slice(-1) as CalenderTemplate[]
-    const nextRouteName = nextRace.map((nextRace) =>(nextRace.route));
-    const nextRouteDetails = AfterPartyRacesData.filter(race => nextRouteName.includes(race.route));
+    const nextRace = calendarDataAPS.filter(data => data.raceID !== '').slice(-1) as PublishedRace[]
     
     return (
         <Stack spacing={6}>
         
-                {nextRace.map((nextRace)=>(
-                nextRouteDetails.map((nextRouteDetails)=>(
+                {nextRace.map((nextRace) => {
+                const fileRoute = AfterPartyRacesData.find((race) => race.route === nextRace.route)
+                const nextRouteDetails = nextRace.catalog
+                    ? {
+                        world: nextRace.catalog.world || fileRoute?.world || '',
+                        route: nextRace.catalog.route || nextRace.route,
+                        laps: nextRace.catalog.laps || fileRoute?.laps || '',
+                        distance: nextRace.catalog.distance || fileRoute?.distance || '',
+                        elevation: nextRace.catalog.elevation || fileRoute?.elevation || '',
+                        finish: nextRace.catalog.finish || fileRoute?.finish || '',
+                        linkRoute: nextRace.catalog.linkRoute || fileRoute?.linkRoute || '',
+                    }
+                    : fileRoute
+                if (!nextRouteDetails) return null
+                return (
                     
                     <Stack key={nextRace.date} spacing={6}>
                         <Text color={'white'} fontSize={'md'} align={'center'}>A weekly race series with carefully selected routes all finishing uphill (aka after parties).
@@ -86,7 +97,7 @@ export default function AfterPartyRaceList() {
                         />
                     </Stack>
                     
-                ))))}
+                )})}
         </Stack>
     );
 }

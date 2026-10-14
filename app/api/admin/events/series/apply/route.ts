@@ -32,7 +32,12 @@ export async function POST(req: Request) {
   try {
     const route = await plannedSeriesRoute(seriesId, date)
     const event = await matchingFeedEvent(seriesId, date)
-    const course = await courseForRoute(seriesId, route)
+    const requested = Number(body?.routeId)
+    const course = await courseForRoute(
+      seriesId,
+      route,
+      Number.isInteger(requested) && requested > 0 ? requested : undefined
+    )
     const payload: { routeId: number; laps?: number; distanceMeters?: number } = { routeId: course.routeId }
     if ('laps' in course) payload.laps = course.laps
     else payload.distanceMeters = course.distanceMeters

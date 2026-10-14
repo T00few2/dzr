@@ -1,19 +1,66 @@
 import { flaskData } from '@/app/api/admin/_lib/flask'
-import { chooseZwiftRoute } from '@/packages/shared/zwiftRouteMatch'
+import { chooseZwiftRoute, foldRouteName } from '@/packages/shared/zwiftRouteMatch'
 
 export type ZwiftRouteHit = { routeId: number; name: string; world: string | null }
 
-export async function findZwiftRoute(routeName: string): Promise<ZwiftRouteHit> {
-  const result = await flaskData(`/api/zwift/routes?q=${encodeURIComponent(routeName)}`)
+async function searchRoutes(query: string): Promise<ZwiftRouteHit[]> {
+  const result = await flaskData(`/api/zwift/routes?q=${encodeURIComponent(query)}`)
   if (result.status >= 400) {
     throw new Error(String(result.body?.error || 'Route search failed'))
   }
-  const hits: ZwiftRouteHit[] = Array.isArray(result.body) ? result.body : []
-  const chosen = chooseZwiftRoute(hits, routeName)
-  if (!chosen?.routeId) throw new Error(`Could not match a single Zwift route for ${routeName}`)
+  return Array.isArray(result.body) ? result.body : []
+}
+
+function asHit(hit: ZwiftRouteHit): ZwiftRouteHit | null {
+  const routeId = Number(hit?.routeId)
+  if (!routeId) return null
   return {
-    routeId: Number(chosen.routeId),
-    name: String(chosen.name || routeName),
-    world: chosen.world ? String(chosen.world) : null,
+    routeId,
+    name: String(hit.name || ''),
+    world: hit.world ? String(hit.world) : null,
   }
+}
+
+function dedupe(hits: ZwiftRouteHit[]) {
+  const seen = new Set<number>()
+  const rows: ZwiftRouteHit[] = []
+  for (const hit of hits) {
+    const row = asHit(hit)
+    if (!row || seen.has(row.routeId)) continue
+    seen.add(row.routeId)
+    rows.push(row)
+  }
+  return rows
+}
+
+async function gatherZwiftRoutes(routeName: string) {
+  let hits = dedupe(await searchRoutes(routeName))
+  if (chooseZwiftRoute(hits, routeName)) return hits
+  const words = routeName
+    .split(/\s+/)
+    .map((word) => word.replace(/['’‘`+]/g, ''))
+    .filter((word) => word.length >= 4)
+    .sort((a, b) => b.length - a.length)
+  for (const word of words) {
+    hits = dedupe([...hits, ...(await searchRoutes(word))])
+    if (chooseZwiftRoute(hits, routeName)) break
+  }
+  return hits
+}
+
+export async function suggestZwiftRoutes(routeName: string) {
+  const options = await gatherZwiftRoutes(routeName)
+  const chosen = chooseZwiftRoute(options, routeName)
+  const match = chosen ? asHit(chosen) : null
+  return {
+    match,
+    sameName: Boolean(match && foldRouteName(match.name) === foldRouteName(routeName)),
+    options: options.slice(0, 15),
+  }
+}
+
+export async function findZwiftRoute(routeName: string): Promise<ZwiftRouteHit> {
+  const { match } = await suggestZwiftRoutes(routeName)
+  if (!match?.routeId) throw new Error(`Could not match a single Zwift route for ${routeName}`)
+  return match
 }

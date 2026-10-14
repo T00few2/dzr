@@ -593,6 +593,9 @@ class ZwiftAPI:
     def search_routes(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
         """Match game-dictionary routes by name, or by an exact route id."""
         text = str(query or "").strip().lower()
+        folded = text
+        for mark in ("'", "’", "‘", "`"):
+            folded = folded.replace(mark, "")
         if len(text) < 2 and not text.isdigit():
             return []
         try:
@@ -604,7 +607,10 @@ class ZwiftAPI:
             signature = route.get("signature") or route.get("routeSignature")
             name = self._route_name(route) or ""
             id_match = text.isdigit() and signature is not None and str(signature) == text
-            if not id_match and text not in name.lower():
+            folded_name = name.lower()
+            for mark in ("'", "’", "‘", "`"):
+                folded_name = folded_name.replace(mark, "")
+            if not id_match and folded not in folded_name:
                 continue
             map_name = route.get("map")
             try:

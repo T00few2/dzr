@@ -3,6 +3,7 @@ import { AfterPartyRacesData } from '@/app/dzr-after-party/AfterPartyRaces'
 import { ZwiftyFiftyRacesData } from '@/app/the-zwifty-fifty/ZwiftyFiftyRaces'
 import { getSheetData } from '@/services/google-sheets.action'
 import { findZwiftRoute } from '@/app/lib/zwiftRouteLookup'
+import { catalogRouteByName, ensureCatalog } from '@/app/lib/seriesCatalog'
 import { loadUpcomingDzrEvents } from '@/app/lib/zwiftPublicEvents'
 import {
   courseLength,
@@ -131,9 +132,14 @@ async function readStored(seriesId: SeriesId) {
   return asStored(snap.data())
 }
 
-function catalogRoute(seriesId: SeriesId, route: string) {
-  const found = SERIES[seriesId].routes.find((name) => name.toLowerCase() === route.trim().toLowerCase())
+function matchRouteName(names: string[], route: string) {
+  const found = names.find((name) => name.toLowerCase() === route.trim().toLowerCase())
   return found || ''
+}
+
+async function routeNames(seriesId: SeriesId) {
+  const catalog = await ensureCatalog(seriesId)
+  return catalog.length ? catalog.map((route) => route.route) : SERIES[seriesId].routes
 }
 
 async function seedFromSheet(seriesId: SeriesId): Promise<StoredSchedule> {
@@ -145,8 +151,9 @@ async function seedFromSheet(seriesId: SeriesId): Promise<StoredSchedule> {
     const route = String(row?.[1] || '').trim()
     const date = parseSheetDate(row?.[0])
     if (!raceID || !route || !date) continue
-    const index = spec.routes.findIndex((name) => name.toLowerCase() === route.toLowerCase())
-    const canonical = index >= 0 ? spec.routes[index] : route
+    const names = await routeNames(seriesId)
+    const index = names.findIndex((name) => name.toLowerCase() === route.toLowerCase())
+    const canonical = index >= 0 ? names[index] : route
     return {
       anchorDate: date,
       anchorIndex: index >= 0 ? index : 0,
@@ -169,19 +176,19 @@ export async function ensureSeries(seriesId: SeriesId): Promise<StoredSchedule> 
   return (await readStored(seriesId)) || seeded
 }
 
-function plannedRoute(seriesId: SeriesId, stored: StoredSchedule, date: string) {
-  return routeForDate(SERIES[seriesId].routes, stored.anchorDate, stored.anchorIndex, stored.overrides, date)
+function plannedRoute(names: string[], stored: StoredSchedule, date: string) {
+  return routeForDate(names, stored.anchorDate, stored.anchorIndex, stored.overrides, date)
 }
 
 export async function plannedSeriesRoute(seriesId: SeriesId, date: string) {
   const iso = parseIsoDate(date)
   if (!iso) throw new SeriesError('Date must be YYYY-MM-DD')
   const stored = await ensureSeries(seriesId)
-  return plannedRoute(seriesId, stored, iso)
+  return plannedRoute(await routeNames(seriesId), stored, iso)
 }
 
-function naturalRoute(seriesId: SeriesId, stored: StoredSchedule, date: string) {
-  return routeForDate(SERIES[seriesId].routes, stored.anchorDate, stored.anchorIndex, {}, date)
+function naturalRoute(names: string[], stored: StoredSchedule, date: string) {
+  return routeForDate(names, stored.anchorDate, stored.anchorIndex, {}, date)
 }
 
 export type PublishedRace = { date: string; label: string; route: string; raceID: string }
@@ -206,13 +213,19 @@ function feedEventId(events: ZwiftEventSummary[] | null, seriesId: SeriesId, dat
   return hits.length === 1 ? hits[0].id : null
 }
 
-function toView(seriesId: SeriesId, stored: StoredSchedule, events: ZwiftEventSummary[] | null, error = ''): SeriesView {
+function toView(
+  seriesId: SeriesId,
+  stored: StoredSchedule,
+  events: ZwiftEventSummary[] | null,
+  names: string[],
+  error = ''
+): SeriesView {
   const dates = listSeriesDates(stored.anchorDate, Object.keys(stored.events), DATE_COUNT).map((date) => {
     const published = stored.events[date]
     return {
       date,
       label: displayDate(date),
-      route: plannedRoute(seriesId, stored, date),
+      route: plannedRoute(names, stored, date),
       overridden: Boolean(stored.overrides[date]),
       eventId: published?.id || '',
       publishedRoute: published?.route || '',
@@ -222,7 +235,7 @@ function toView(seriesId: SeriesId, stored: StoredSchedule, events: ZwiftEventSu
   return {
     id: seriesId,
     name: SERIES[seriesId].name,
-    routes: SERIES[seriesId].routes,
+    routes: names,
     dates,
     error,
     feedUnavailable: events == null,
@@ -242,7 +255,7 @@ export async function listSeriesViews(): Promise<SeriesView[]> {
     ids.map(async (seriesId) => {
       try {
         const stored = await ensureSeries(seriesId)
-        return toView(seriesId, stored, feedUnavailable ? null : events)
+        return toView(seriesId, stored, feedUnavailable ? null : events, await routeNames(seriesId))
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Could not load this series'
         return {
@@ -261,11 +274,12 @@ export async function listSeriesViews(): Promise<SeriesView[]> {
 export async function setSeriesOverride(seriesId: SeriesId, date: string, route: string) {
   const iso = parseIsoDate(date)
   if (!iso) throw new SeriesError('Date must be YYYY-MM-DD')
-  const canonical = catalogRoute(seriesId, route)
+  const names = await routeNames(seriesId)
+  const canonical = matchRouteName(names, route)
   if (!canonical) throw new SeriesError('Route is not in this series')
   const stored = await ensureSeries(seriesId)
   const field = `overrides.${iso}`
-  if (canonical === naturalRoute(seriesId, stored, iso)) {
+  if (canonical === naturalRoute(names, stored, iso)) {
     await refFor(seriesId).update({ [field]: admin.firestore.FieldValue.delete() })
   } else {
     await refFor(seriesId).update({ [field]: canonical })
@@ -282,12 +296,16 @@ async function resolveRouteId(routeName: string) {
   }
 }
 
-export async function courseForRoute(seriesId: SeriesId, routeName: string) {
-  const route = catalogRoute(seriesId, routeName)
-  if (!route) throw new SeriesError('Route is not in this series')
-  const length = courseLength(SERIES[seriesId].laps(route), SERIES[seriesId].km(route))
+export async function courseForRoute(seriesId: SeriesId, routeName: string, chosenRouteId?: number) {
+  const entry = await catalogRouteByName(seriesId, routeName)
+  const route = entry?.route || matchRouteName(await routeNames(seriesId), routeName)
+  if (!route || !entry) throw new SeriesError('Route is not in this series')
+  const length = courseLength(entry.laps, entry.distance)
   if (!length) throw new SeriesError(`${route} has no laps or distance`)
-  const routeId = await resolveRouteId(route)
+  const routeId =
+    chosenRouteId && chosenRouteId > 0
+      ? chosenRouteId
+      : entry.zwiftRouteId || (await resolveRouteId(route))
   if ('laps' in length) return { route, routeId, laps: length.laps }
   return { route, routeId, distanceMeters: length.distanceMeters }
 }

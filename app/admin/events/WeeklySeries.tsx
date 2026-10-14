@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
   Badge,
   Box,
@@ -384,7 +385,8 @@ export default function WeeklySeries({
         </Heading>
         <Text color="gray.400">
           The route rotates through the catalog. Changing a date affects that date only. The public site and Discord
-          move when Apply saves the event id, after Zwift has created that event.
+          move when Apply saves the event id, after Zwift has created that event. Routes are edited on the{' '}
+          <Link href="/admin/events/routes">route setup</Link> page.
         </Text>
       </Box>
       {error ? <Text color="red.300">{error}</Text> : null}

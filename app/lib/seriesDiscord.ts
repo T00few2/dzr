@@ -2,6 +2,7 @@ import axios from 'axios'
 import { CalenderTemplate, apsInfo, zfInfo } from '@/app/api/google/calendarTemplate'
 import { AfterPartyRacesData } from '@/app/dzr-after-party/AfterPartyRaces'
 import { ZwiftyFiftyRacesData } from '@/app/the-zwifty-fifty/ZwiftyFiftyRaces'
+import { catalogRouteByName } from '@/app/lib/seriesCatalog'
 import { displayDate } from '@/packages/shared/seriesRotation'
 import {
   SeriesError,
@@ -19,10 +20,14 @@ function raceRow(date: string, route: string, raceID: string) {
   return row
 }
 
-function messageFor(seriesId: SeriesId, date: string, route: string, raceID: string) {
+async function messageFor(seriesId: SeriesId, date: string, route: string, raceID: string) {
   const row = raceRow(date, route, raceID)
+  const saved = await catalogRouteByName(seriesId, route)
   if (seriesId === 'after-party') {
-    const details = AfterPartyRacesData.find((race) => race.route === route)
+    const fileRoute = AfterPartyRacesData.find((race) => race.route === route)
+    const details = saved
+      ? { ...fileRoute, ...saved }
+      : fileRoute
     if (!details) throw new SeriesError(`${route} is not an After Party route`)
     const race = apsInfo(row, details)
     const message = `**Race Details for ${race.date}** \n **World:** ${race.world} \n **Route:** [${race.route}](${race.linkRoute}) \n **Laps:** ${race.laps} \n **Distance:** ${race.distance} km \n **Elevation:** ${race.elevation} hm \n **Race Pass:** [Zwift](https://www.zwift.com/eu/events/view/${race.raceID}) \n **More information on:** [www.dzrracingseries.com/dzr-after-party](https://www.dzrracingseries.com/${race.raceSeries.toLowerCase().replace(/\s+/g, '-')}/)`
@@ -33,7 +38,10 @@ function messageFor(seriesId: SeriesId, date: string, route: string, raceID: str
       webhookEnvName: 'DISCORD_WEB_HOOK_DZR_AFTER_PARTY',
     }
   }
-  const details = ZwiftyFiftyRacesData.find((race) => race.route === route)
+  const fileRoute = ZwiftyFiftyRacesData.find((race) => race.route === route)
+  const details = saved
+    ? { ...fileRoute, ...saved, length: saved.distance, hm: saved.elevation }
+    : fileRoute
   if (!details) throw new SeriesError(`${route} is not a Zwifty Fifty route`)
   const race = zfInfo(row, details)
   const message = `**Race Details for ${race.date}** \n **World:** ${race.world} \n **Route:** [${race.route}](${race.linkRoute}) \n **Laps:** ${race.laps} \n **Distance:** ${race.distance} km \n **Elevation:** ${race.elevation} hm \n **Sprints:** ${race.sprints.join(', ')} \n **Bonus Seconds:** ${race.bonus.join('s, ')}s\n **Race Pass:** [Zwift](https://www.zwift.com/eu/events/view/${race.raceID}) \n **More information on:** [www.dzrracingseries.com/the-zwifty-fifty](https://www.dzrracingseries.com/${race.raceSeries.toLowerCase().replace(/\s+/g, '-')}/)`
@@ -46,7 +54,7 @@ function messageFor(seriesId: SeriesId, date: string, route: string, raceID: str
 }
 
 export async function postSeriesDiscord(seriesId: SeriesId, date: string, route: string, raceID: string) {
-  const built = messageFor(seriesId, date, route, raceID)
+  const built = await messageFor(seriesId, date, route, raceID)
   if (!built.webhookUrl) throw new SeriesError(`Missing webhook env var: ${built.webhookEnvName}`, 500)
   await axios.post(built.webhookUrl, {
     content: built.message,
