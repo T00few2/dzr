@@ -34,6 +34,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         routeId: body.routeId,
         laps: body.laps,
         distanceMeters: body.distanceMeters,
+        ...(Array.isArray(body.subgroupRoutes) ? { subgroupRoutes: body.subgroupRoutes } : {}),
       },
     })
   }

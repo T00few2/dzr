@@ -495,22 +495,54 @@ class ZwiftAPI:
 
         return self._update_event(event_id, mutate)
 
+    def _assign_route(self, target: dict, route_id: int, paddock_index: int, set_start: bool) -> None:
+        target["routeId"] = int(route_id)
+        route_meta = self.get_route_metadata(int(route_id))
+        if not route_meta:
+            return
+        world_id = WORLD_NAME_TO_ID.get(str(route_meta.get("map") or "").upper())
+        if world_id is not None:
+            target["mapId"] = world_id
+        if not set_start:
+            return
+        paddocks_raw = str(route_meta.get("eventPaddocks") or "")
+        paddocks = [int(part) for part in paddocks_raw.split(",") if part.strip()]
+        if paddocks:
+            target["startLocation"] = paddocks[int(paddock_index) % len(paddocks)]
+
     def update_event_course(
         self,
         event_id: int,
         new_route_id: Optional[int] = None,
         new_distance_meters: Optional[float] = None,
         new_laps: Optional[int] = None,
+        subgroup_routes: Optional[List[dict]] = None,
     ) -> Dict[str, Any]:
         """Set the route and/or laps or distance on the event and its subgroups.
 
-        Laps and distance cannot both be set. Duration is not an input; choosing
-        laps or distance clears the other length mode, including duration, which
-        is how Zwift stores a single length mode.
+        One route updates every category. subgroup_routes sets a different route
+        on each listed category. Laps and distance cannot both be set. Duration
+        is not an input; choosing laps or distance clears the other length mode,
+        including duration, which is how Zwift stores a single length mode.
         """
         if new_distance_meters is not None and new_laps is not None:
             raise ValueError("Specify only one of laps or distance")
-        if new_route_id is None and new_distance_meters is None and new_laps is None:
+        if subgroup_routes is not None and new_route_id is not None:
+            raise ValueError("Specify one route for the event, or a route per category")
+        category_routes: List[tuple] = []
+        if subgroup_routes is not None:
+            if not subgroup_routes:
+                raise ValueError("Specify a route for at least one category")
+            for item in subgroup_routes:
+                try:
+                    category_id = int(item.get("id"))
+                    category_route_id = int(item.get("routeId"))
+                except (TypeError, ValueError, AttributeError):
+                    raise ValueError("Each category needs an id and a routeId")
+                if category_id <= 0 or category_route_id <= 0:
+                    raise ValueError("Category id and routeId must be greater than 0")
+                category_routes.append((category_id, category_route_id))
+        elif new_route_id is None and new_distance_meters is None and new_laps is None:
             raise ValueError("Specify a route, laps, or distance")
         if new_route_id is not None and int(new_route_id) <= 0:
             raise ValueError("routeId must be greater than 0")
@@ -519,40 +551,42 @@ class ZwiftAPI:
         if new_distance_meters is not None and float(new_distance_meters) <= 0:
             raise ValueError("distance must be greater than 0")
 
-        def mutate(event: dict) -> None:
-            paddocks: List[int] = []
-            if new_route_id is not None:
-                event["routeId"] = int(new_route_id)
-                route_meta = self.get_route_metadata(int(new_route_id))
-                if route_meta:
-                    world_id = WORLD_NAME_TO_ID.get(str(route_meta.get("map") or "").upper())
-                    if world_id is not None:
-                        event["mapId"] = world_id
-                    paddocks_raw = str(route_meta.get("eventPaddocks") or "")
-                    paddocks = [int(part) for part in paddocks_raw.split(",") if part.strip()]
+        def apply_length(target: dict) -> None:
             if new_laps is not None:
-                event["laps"] = int(new_laps)
-                event["distanceInMeters"] = 0
-                event["durationInSeconds"] = 0
+                target["laps"] = int(new_laps)
+                target["distanceInMeters"] = 0
+                target["durationInSeconds"] = 0
             elif new_distance_meters is not None:
-                event["laps"] = 0
-                event["distanceInMeters"] = float(new_distance_meters)
-                event["durationInSeconds"] = 0
-            for index, subgroup in enumerate(event.get("eventSubgroups") or []):
-                if new_route_id is not None:
-                    subgroup["routeId"] = int(new_route_id)
-                    if "mapId" in event:
-                        subgroup["mapId"] = event["mapId"]
-                    if paddocks:
-                        subgroup["startLocation"] = paddocks[index % len(paddocks)]
-                if new_laps is not None:
-                    subgroup["laps"] = int(new_laps)
-                    subgroup["distanceInMeters"] = 0
-                    subgroup["durationInSeconds"] = 0
-                elif new_distance_meters is not None:
-                    subgroup["laps"] = 0
-                    subgroup["distanceInMeters"] = float(new_distance_meters)
-                    subgroup["durationInSeconds"] = 0
+                target["laps"] = 0
+                target["distanceInMeters"] = float(new_distance_meters)
+                target["durationInSeconds"] = 0
+
+        def mutate(event: dict) -> None:
+            subgroups = event.get("eventSubgroups") or []
+            if category_routes:
+                known = {}
+                for index, subgroup in enumerate(subgroups):
+                    subgroup_id = subgroup.get("id")
+                    if subgroup_id is not None:
+                        known[int(subgroup_id)] = index
+                for category_id, _route_id in category_routes:
+                    if category_id not in known:
+                        raise ValueError(f"Unknown category {category_id}")
+                first_route = None
+                for category_id, category_route_id in category_routes:
+                    index = known[category_id]
+                    self._assign_route(subgroups[index], category_route_id, index, True)
+                    if first_route is None:
+                        first_route = category_route_id
+                if first_route is not None:
+                    self._assign_route(event, first_route, 0, False)
+            elif new_route_id is not None:
+                self._assign_route(event, int(new_route_id), 0, False)
+                for index, subgroup in enumerate(subgroups):
+                    self._assign_route(subgroup, int(new_route_id), index, True)
+            apply_length(event)
+            for subgroup in subgroups:
+                apply_length(subgroup)
 
         return self._update_event(event_id, mutate)
 

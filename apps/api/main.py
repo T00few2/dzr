@@ -642,11 +642,25 @@ def zwift_update_event_course(event_id: int):
         route_id = _optional_number(body, "routeId", int)
         laps = _optional_number(body, "laps", int)
         distance = _optional_number(body, "distanceMeters", float)
+        subgroup_routes = None
+        if body.get("subgroupRoutes") is not None:
+            raw_categories = body.get("subgroupRoutes")
+            if not isinstance(raw_categories, list):
+                raise ValueError("subgroupRoutes must be a list")
+            subgroup_routes = []
+            for item in raw_categories:
+                if not isinstance(item, dict):
+                    raise ValueError("subgroupRoutes entries must be objects")
+                try:
+                    subgroup_routes.append({"id": int(item.get("id")), "routeId": int(item.get("routeId"))})
+                except (TypeError, ValueError):
+                    raise ValueError("Each category needs an id and a routeId")
         updated = get_authenticated_organizer_api().update_event_course(
             event_id,
             new_route_id=route_id,
             new_distance_meters=distance,
             new_laps=laps,
+            subgroup_routes=subgroup_routes,
         )
         return _zwift_event_response(updated)
     except Exception as exc:

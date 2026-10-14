@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import AdminShell from '@/components/admin/AdminShell'
+import WeeklySeries from '@/app/admin/events/WeeklySeries'
 import {
   Badge,
   Box,
@@ -316,6 +317,8 @@ export default function AdminEventsPage() {
       <Text color="gray.400" mb={6}>
         Upcoming DZR events, plus any event id the organizer account can read. Edits are saved on Zwift.
       </Text>
+
+      <WeeklySeries upcoming={upcoming} feedDown={feedDown} />
 
       <Flex as="form" onSubmit={onInspectSubmit} gap={2} mb={6} wrap="wrap">
         <Input
