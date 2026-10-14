@@ -196,6 +196,16 @@ async function refreshZwiftPowerRoster() {
   return response.data;
 }
 
+/**
+ * Move WKG Zwifty Fifty finishers to their Unfiltered pen, once a race is a couple of hours old.
+ */
+async function fixDueFiftyResults() {
+  const response = await axios.post(`${API_BASE_URL}/api/zwiftpower/results/fix-due`, {}, {
+    headers: { Authorization: `Bearer ${API_KEY}` }
+  });
+  return response.data;
+}
+
 module.exports = {
   getWelcomeMessage,
   getDueScheduledMessages,
@@ -204,4 +214,5 @@ module.exports = {
   processMessageContent,
   refreshClubRoster,
   refreshZwiftPowerRoster,
+  fixDueFiftyResults,
 }; 

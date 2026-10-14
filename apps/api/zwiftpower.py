@@ -1,7 +1,9 @@
+import html
+from collections import defaultdict
+from urllib.parse import urljoin
+
 import requests
 from bs4 import BeautifulSoup
-from collections import defaultdict
-import html
 
 class ZwiftPower:
     """
@@ -557,3 +559,133 @@ class ZwiftPower:
             "top_watts_per_kg_5min": top_wkg300, # top riders by 5-minute power
             "top_watts_per_kg_1min": top_wkg60 # top riders by 1-minute power
         }
+
+    def wkg_category_preview(self, event_id: int) -> dict:
+        """WKG finishers, and the Unfiltered pen they should be moved to. Reads only."""
+        loaded = self._load_result_edit(int(event_id))
+        return _public_category_preview(loaded)
+
+    def apply_wkg_categories(self, event_id: int) -> dict:
+        """Submit WKG lines with the category replaced by the Unfiltered pen. DQ is left as it is."""
+        loaded = self._load_result_edit(int(event_id))
+        preview = _public_category_preview(loaded)
+        if preview["pending"] or not loaded["changes"]:
+            return preview
+        payload = dict(loaded["fields"])
+        payload["edit_results"] = "\n".join(change["line"] for change in loaded["changes"])
+        payload["post"] = "Update Results"
+        response = self.session.post(loaded["action"], data=payload, allow_redirects=True)
+        if response.status_code >= 400:
+            raise RuntimeError(f"ZwiftPower rejected the category update ({response.status_code})")
+        confirmed = self.wkg_category_preview(int(event_id))
+        still = {change["zwid"] for change in confirmed["changes"]}
+        failed = [change["name"] for change in preview["changes"] if change["zwid"] in still]
+        if failed:
+            names = ", ".join(failed)
+            raise RuntimeError(f"ZwiftPower still has WKG results for {names}")
+        confirmed["updated"] = preview["changes"]
+        return confirmed
+
+    def _load_result_edit(self, event_id: int) -> dict:
+        results = self.session.get(f"https://zwiftpower.com/cache3/results/{event_id}_zwift.json")
+        edit = self.session.get(
+            f"https://zwiftpower.com/zz.php?do=edit_results&zwift_event_id={event_id}",
+            allow_redirects=True,
+        )
+        if results.status_code >= 400 or edit.status_code >= 400:
+            raise RuntimeError("ZwiftPower results are unavailable")
+        soup = BeautifulSoup(edit.text, "html.parser")
+        form = soup.find("form", id="postform")
+        if not form or not form.get("action"):
+            raise RuntimeError("ZwiftPower did not show the results editor")
+        try:
+            payload = results.json()
+        except Exception:
+            payload = {}
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        textarea = form.find("textarea", attrs={"name": "all_riders"})
+        riders = textarea.string if textarea is not None and textarea.string is not None else ""
+        if not isinstance(rows, list) or not riders.strip():
+            return {"pending": True, "changes": [], "skipped": [], "fields": {}, "action": ""}
+        pens = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            zwid = str(row.get("zwid") or "").strip()
+            if zwid:
+                pens[zwid] = row.get("label")
+        fields = {
+            tag["name"]: tag.get("value", "")
+            for tag in form.find_all("input")
+            if tag.get("name")
+        }
+        for area in form.find_all("textarea"):
+            if area.get("name"):
+                fields[area["name"]] = area.string if area.string is not None else ""
+        changes = []
+        skipped = []
+        for raw_line in riders.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            parts = [part.strip() for part in line.split(",")]
+            if not parts or parts[0] != "WKG":
+                continue
+            name = parts[4] if len(parts) > 4 else ""
+            zwid = parts[5] if len(parts) > 5 else ""
+            category = pen_category(pens.get(zwid))
+            if not zwid or category is None:
+                skipped.append({"name": name or zwid or "Unknown rider", "zwid": zwid, "reason": "No pen on the unfiltered results"})
+                continue
+            changes.append({
+                "name": name or zwid,
+                "zwid": zwid,
+                "from": "WKG",
+                "to": category,
+                "line": retarget_wkg_line(line, category),
+            })
+        return {
+            "pending": False,
+            "changes": changes,
+            "skipped": skipped,
+            "fields": fields,
+            "action": urljoin("https://zwiftpower.com/", form["action"]),
+        }
+
+
+def pen_category(label) -> str | None:
+    """Unfiltered result label. 1 is A, 2 is B, 3 is C, 4 is D, and 5 and above is E."""
+    try:
+        number = int(label)
+    except (TypeError, ValueError):
+        return None
+    if number <= 1:
+        return "A"
+    if number == 2:
+        return "B"
+    if number == 3:
+        return "C"
+    if number == 4:
+        return "D"
+    if number >= 5:
+        return "E"
+    return None
+
+
+def retarget_wkg_line(line: str, category: str) -> str:
+    prefix, separator, rest = line.partition(",")
+    if prefix.strip() != "WKG" or not separator:
+        raise ValueError("Line is not a WKG result")
+    return f"{category}{separator}{rest}"
+
+
+def _public_category_preview(loaded: dict) -> dict:
+    changes = [
+        {"name": change["name"], "zwid": change["zwid"], "from": change["from"], "to": change["to"]}
+        for change in loaded.get("changes") or []
+    ]
+    return {
+        "pending": bool(loaded.get("pending")),
+        "changes": changes,
+        "skipped": list(loaded.get("skipped") or []),
+    }

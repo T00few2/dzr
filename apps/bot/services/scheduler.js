@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { getDueScheduledMessages, getProbabilitySelectedMessages, markScheduledMessageSent, processMessageContent, refreshClubRoster, refreshZwiftPowerRoster } = require("./contentApi");
+const { getDueScheduledMessages, getProbabilitySelectedMessages, markScheduledMessageSent, processMessageContent, refreshClubRoster, refreshZwiftPowerRoster, fixDueFiftyResults } = require("./contentApi");
 const { sweepGuildForNewMembers } = require("./newMemberService");
 const config = require("../config/config");
 const { getBotState, setBotState } = require("./firebase");
@@ -30,6 +30,8 @@ async function checkScheduledMessages(client) {
 
     // Refresh ZwiftPower club roster once per day (via backend Content API)
     await checkZwiftPowerRosterRefresh();
+
+    await checkFiftyResultsFix();
 
     // Assign ZwiftPower pace-group roles once per day (add-only)
     await checkZpRoleSync(client);
@@ -173,6 +175,21 @@ async function checkZwiftPowerRosterRefresh() {
     console.log("✅ ZwiftPower roster refresh completed:", result);
   } catch (error) {
     console.error("❌ Error refreshing ZwiftPower roster:", error?.message || error);
+  }
+}
+
+/**
+ * Twice an hour, ask the API to fix a Zwifty Fifty that started a couple of hours ago.
+ * The API itself decides whether a race is due, and does nothing the rest of the week.
+ */
+async function checkFiftyResultsFix() {
+  try {
+    const local = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Copenhagen" }));
+    if (local.getMinutes() % 30 !== 0) return;
+    const result = await fixDueFiftyResults();
+    if (result?.checked) console.log("✅ Zwifty Fifty categories checked:", result);
+  } catch (error) {
+    console.error("❌ Error fixing Zwifty Fifty categories:", error?.message || error);
   }
 }
 

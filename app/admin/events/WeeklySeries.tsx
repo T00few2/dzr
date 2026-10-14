@@ -14,6 +14,7 @@ import {
   Text,
 } from '@chakra-ui/react'
 import type { ZwiftEventSummary } from '@/packages/shared/zwiftEvents'
+import FiftyResults from '@/app/admin/events/FiftyResults'
 
 type SeriesDate = {
   date: string
@@ -449,6 +450,7 @@ export default function WeeklySeries({
               </Box>
             ))}
           </Stack>
+          {item.id === 'zwifty-fifty' ? <FiftyResults /> : null}
         </Box>
       ))}
       <GroupRide upcoming={upcoming} feedDown={feedDown} />

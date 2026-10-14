@@ -17,7 +17,9 @@ import type { ZwiftEventSummary } from '@/packages/shared/zwiftEvents'
 
 export type SeriesId = 'after-party' | 'zwifty-fifty'
 
-type PublishedEvent = { id: string; route: string }
+export type ResultsFix = { at: string; updated: number; skipped: number }
+
+type PublishedEvent = { id: string; route: string; resultsFix: ResultsFix | null }
 
 type StoredSchedule = {
   anchorDate: string
@@ -116,7 +118,7 @@ function asStored(data: Record<string, any> | undefined): StoredSchedule | null 
     const row = value as { id?: unknown; route?: unknown }
     const id = String(row.id || '').trim()
     const route = String(row.route || '').trim()
-    if (id && route) events[date] = { id, route }
+    if (id && route) events[date] = { id, route, resultsFix: asResultsFix((value as { resultsFix?: unknown }).resultsFix) }
   }
   return {
     anchorDate: String(data.anchorDate),
@@ -158,7 +160,7 @@ async function seedFromSheet(seriesId: SeriesId): Promise<StoredSchedule> {
       anchorDate: date,
       anchorIndex: index >= 0 ? index : 0,
       overrides: index >= 0 ? {} : { [date]: route },
-      events: { [date]: { id: raceID, route: canonical } },
+      events: { [date]: { id: raceID, route: canonical, resultsFix: null } },
     }
   }
   throw new SeriesError(`No published ${spec.name} row to start the rotation`, 500)
@@ -199,6 +201,39 @@ export function latestPublished(seriesId: SeriesId, stored: StoredSchedule): Pub
   if (!date) return null
   const event = stored.events[date]
   return { date, label: displayDate(date), route: event.route, raceID: event.id }
+}
+
+function asResultsFix(value: unknown): ResultsFix | null {
+  if (!value || typeof value !== 'object') return null
+  const row = value as { at?: unknown; updated?: unknown; skipped?: unknown }
+  const at = String(row.at || '').trim()
+  if (!at) return null
+  return {
+    at,
+    updated: Number.isFinite(Number(row.updated)) ? Number(row.updated) : 0,
+    skipped: Number.isFinite(Number(row.skipped)) ? Number(row.skipped) : 0,
+  }
+}
+
+export type SavedEvent = {
+  date: string
+  label: string
+  route: string
+  eventId: string
+  resultsFix: ResultsFix | null
+}
+
+export async function listSavedEvents(seriesId: SeriesId): Promise<SavedEvent[]> {
+  const stored = await ensureSeries(seriesId)
+  return Object.entries(stored.events)
+    .map(([date, event]) => ({
+      date,
+      label: displayDate(date),
+      route: event.route,
+      eventId: event.id,
+      resultsFix: event.resultsFix,
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date))
 }
 
 export async function publishedRaces(seriesId: SeriesId): Promise<PublishedRace[]> {

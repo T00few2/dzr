@@ -60,6 +60,8 @@ cached_zwift_api = None
 cached_zwift_api_timestamp = None
 cached_organizer_api = None
 cached_organizer_api_timestamp = None
+cached_organizer_zp = None
+cached_organizer_zp_timestamp = None
 SESSION_VALIDITY = 3600  # seconds (how long the session is expected to be valid)
 
 ZWIFT_USERNAME = os.getenv("ZWIFT_USERNAME", "your_username")
@@ -580,6 +582,91 @@ def get_authenticated_organizer_api() -> ZwiftAPI:
     return api
 
 
+def get_organizer_zwiftpower() -> ZwiftPower:
+    """ZwiftPower login that can edit DZR results. Separate from the roster account."""
+    global cached_organizer_zp, cached_organizer_zp_timestamp
+    if not ZWIFT_ORGANIZER_USERNAME or not ZWIFT_ORGANIZER_PASSWORD:
+        raise RuntimeError(
+            "ZWIFT_ORGANIZER_USERNAME and ZWIFT_ORGANIZER_PASSWORD are not configured"
+        )
+    now = time.time()
+    if (
+        cached_organizer_zp
+        and cached_organizer_zp_timestamp
+        and (now - cached_organizer_zp_timestamp < SESSION_VALIDITY)
+    ):
+        return cached_organizer_zp
+    zp = ZwiftPower(ZWIFT_ORGANIZER_USERNAME, ZWIFT_ORGANIZER_PASSWORD)
+    zp.login()
+    cached_organizer_zp = zp
+    cached_organizer_zp_timestamp = now
+    return zp
+
+
+def _updated_count(result: dict) -> int:
+    if "updated" in result:
+        return len(result.get("updated") or [])
+    return len(result.get("changes") or [])
+
+
+def _mark_fifty_results_fix(event_id: int, updated: int, skipped: int):
+    doc = firebase.db.collection("series_schedules").document("zwifty-fifty").get()
+    events = (doc.to_dict() or {}).get("events") or {}
+    for date, row in events.items():
+        if isinstance(row, dict) and str(row.get("id") or "").strip() == str(event_id):
+            firebase.db.collection("series_schedules").document("zwifty-fifty").update({
+                f"events.{date}.resultsFix": {
+                    "at": datetime.now(timezone.utc).isoformat(),
+                    "updated": updated,
+                    "skipped": skipped,
+                }
+            })
+            return
+
+
+def _fix_due_fifty_results() -> dict:
+    """Move WKG finishers for a Fifty that started a couple of hours ago."""
+    doc = firebase.get_document("series_schedules", "zwifty-fifty") or {}
+    events = doc.get("events") or {}
+    now = datetime.now(timezone.utc)
+    copenhagen = pytz.timezone("Europe/Copenhagen")
+    today = now.astimezone(copenhagen).date()
+    yesterday = today - timedelta(days=1)
+    due = []
+    for date, row in events.items():
+        if not isinstance(row, dict) or row.get("resultsFix"):
+            continue
+        try:
+            event_date = datetime.strptime(str(date), "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if event_date not in (today, yesterday):
+            continue
+        event_id = str(row.get("id") or "").strip()
+        if not event_id.isdigit():
+            continue
+        inspected = get_authenticated_organizer_api().inspect_event(int(event_id))
+        start = datetime.fromisoformat(str(inspected.get("eventStart") or "").replace("Z", "+00:00"))
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        if not (start + timedelta(hours=2) <= now < start + timedelta(hours=12)):
+            continue
+        due.append(int(event_id))
+    if not due:
+        return {"checked": 0, "results": []}
+    zp = get_organizer_zwiftpower()
+    results = []
+    for event_id in due:
+        preview = zp.wkg_category_preview(event_id)
+        if preview.get("pending"):
+            results.append({"eventId": event_id, "pending": True, "changes": [], "skipped": []})
+            continue
+        applied = zp.apply_wkg_categories(event_id) if preview.get("changes") else preview
+        _mark_fifty_results_fix(event_id, _updated_count(applied), len(applied.get("skipped") or []))
+        results.append({"eventId": event_id, **applied})
+    return {"checked": len(due), "results": results}
+
+
 def _zwift_event_response(result):
     return jsonify(result)
 
@@ -665,6 +752,39 @@ def zwift_update_event_course(event_id: int):
         return _zwift_event_response(updated)
     except Exception as exc:
         return _zwift_event_error(exc)
+
+
+@app.route('/api/zwiftpower/events/<int:event_id>/categories', methods=['GET', 'POST'])
+def zwiftpower_wkg_categories(event_id: int):
+    """Preview or apply WKG result categories for one event. Auth: Bearer CONTENT_API_KEY."""
+    unauthorized = require_api_or_401()
+    if unauthorized:
+        return unauthorized
+    try:
+        zp = get_organizer_zwiftpower()
+        if request.method == 'POST':
+            result = zp.apply_wkg_categories(event_id)
+            if not result.get("pending"):
+                _mark_fifty_results_fix(event_id, _updated_count(result), len(result.get("skipped") or []))
+        else:
+            result = zp.wkg_category_preview(event_id)
+        return jsonify({"eventId": event_id, **result})
+    except Exception as exc:
+        print(f"ZwiftPower category update failed: {exc}")
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.route('/api/zwiftpower/results/fix-due', methods=['POST'])
+def zwiftpower_fix_due_results():
+    """Fix a Zwifty Fifty whose start was a couple of hours ago. Auth: Bearer CONTENT_API_KEY."""
+    unauthorized = require_api_or_401()
+    if unauthorized:
+        return unauthorized
+    try:
+        return jsonify(_fix_due_fifty_results())
+    except Exception as exc:
+        print(f"ZwiftPower due category update failed: {exc}")
+        return jsonify({"error": str(exc)}), 502
 
 
 @app.route('/api/zwift/routes', methods=['GET'])
