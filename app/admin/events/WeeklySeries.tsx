@@ -54,6 +54,13 @@ type CategoryPick = {
   picked: RouteHit | null
 }
 
+type WeekRoute = {
+  name: string
+  url: string
+  route: RouteHit | null
+  warning: string
+}
+
 const readableOutline = {
   variant: 'outline' as const,
   color: 'white',
@@ -69,30 +76,54 @@ async function errorMessage(res: Response) {
 function GroupRide({ upcoming, feedDown }: { upcoming: ZwiftEventSummary[]; feedDown: boolean }) {
   const rides = upcoming.filter((event) => /always a race/i.test(event.name))
   const [event, setEvent] = useState<InspectedEvent | null>(null)
+  const [rideDate, setRideDate] = useState('')
+  const [week, setWeek] = useState<WeekRoute | null>(null)
   const [picks, setPicks] = useState<Record<string, CategoryPick>>({})
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
-  async function openRide(id: number, keepNotice = false) {
+  async function openRide(id: number, eventDate: string, keepNotice = false) {
     setBusy('load')
     setError('')
+    setWeek(null)
     if (!keepNotice) setNotice('')
     const res = await fetch(`/api/admin/events/${id}`)
-    setBusy('')
     if (!res.ok) {
+      setBusy('')
       setEvent(null)
       setError(await errorMessage(res))
       return
     }
     const body = (await res.json()) as InspectedEvent
     setEvent(body)
+    setRideDate(eventDate)
     const next: Record<string, CategoryPick> = {}
     for (const subgroup of body.subgroups || []) {
       if (subgroup.id == null) continue
       next[String(subgroup.id)] = { query: '', results: [], picked: null }
     }
+    if (eventDate) {
+      const weekRes = await fetch(`/api/admin/events/route-of-the-week?date=${encodeURIComponent(eventDate)}`)
+      if (weekRes.ok) {
+        const listed = (await weekRes.json()) as WeekRoute
+        setWeek(listed)
+        if (listed.route) {
+          for (const subgroup of body.subgroups || []) {
+            if (subgroup.id == null || String(subgroup.label || '').trim().toUpperCase() !== 'B') continue
+            next[String(subgroup.id)] = {
+              query: listed.route.name,
+              results: [listed.route],
+              picked: listed.route,
+            }
+          }
+        }
+      } else {
+        setError(await errorMessage(weekRes))
+      }
+    }
     setPicks(next)
+    setBusy('')
   }
 
   function updatePick(id: string, patch: Partial<CategoryPick>) {
@@ -148,7 +179,7 @@ function GroupRide({ upcoming, feedDown }: { upcoming: ZwiftEventSummary[]; feed
       setError(await errorMessage(res))
       return
     }
-    await openRide(event.id, true)
+    await openRide(event.id, rideDate, true)
     setNotice('Saved. Category routes reloaded.')
     setBusy('')
   }
@@ -159,8 +190,8 @@ function GroupRide({ upcoming, feedDown }: { upcoming: ZwiftEventSummary[]; feed
         It&apos;s always a race
       </Heading>
       <Text color="gray.400" mb={4}>
-        Pick a route for each category, then Apply. Zwift creates the next ride about 24 hours after the last one.
-        This ride is not posted to Discord.
+        Category B is filled from the Zwift Insider route of the week. Pick category A yourself, then Apply.
+        Zwift creates the next ride about 24 hours after the last one. This ride is not posted to Discord.
       </Text>
       {feedDown ? <Text color="orange.300">The public event list is unavailable right now.</Text> : null}
       {!feedDown && rides.length === 0 ? (
@@ -173,7 +204,7 @@ function GroupRide({ upcoming, feedDown }: { upcoming: ZwiftEventSummary[]; feed
             {...readableOutline}
             justifyContent="space-between"
             borderColor={event?.id === ride.id ? 'red.400' : 'whiteAlpha.600'}
-            onClick={() => void openRide(ride.id)}
+            onClick={() => void openRide(ride.id, ride.eventDate)}
             isLoading={busy === 'load'}
           >
             <Text as="span">{ride.name}</Text>
@@ -195,6 +226,15 @@ function GroupRide({ upcoming, feedDown }: { upcoming: ZwiftEventSummary[]; feed
       ) : null}
       {event ? (
         <Stack spacing={4}>
+          {week ? (
+            <Text color="gray.300">
+              Route of the week: {week.name}.{' '}
+              <a href={week.url} target="_blank" rel="noreferrer">
+                Zwift Insider
+              </a>
+              {week.warning ? ` ${week.warning}` : ''}
+            </Text>
+          ) : null}
           {event.subgroups.map((subgroup) => {
             const id = String(subgroup.id)
             const pick = picks[id]

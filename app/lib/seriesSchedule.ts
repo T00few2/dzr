@@ -2,7 +2,7 @@ import { admin, adminDb } from '@/app/utils/firebaseAdminConfig'
 import { AfterPartyRacesData } from '@/app/dzr-after-party/AfterPartyRaces'
 import { ZwiftyFiftyRacesData } from '@/app/the-zwifty-fifty/ZwiftyFiftyRaces'
 import { getSheetData } from '@/services/google-sheets.action'
-import { flaskData } from '@/app/api/admin/_lib/flask'
+import { findZwiftRoute } from '@/app/lib/zwiftRouteLookup'
 import { loadUpcomingDzrEvents } from '@/app/lib/zwiftPublicEvents'
 import {
   courseLength,
@@ -273,26 +273,13 @@ export async function setSeriesOverride(seriesId: SeriesId, date: string, route:
   return listSeriesViews()
 }
 
-type RouteHit = { routeId: number; name: string }
-
 async function resolveRouteId(routeName: string) {
-  const result = await flaskData(`/api/zwift/routes?q=${encodeURIComponent(routeName)}`)
-  if (result.status >= 400) {
-    throw new SeriesError(String(result.body?.error || 'Route search failed'), result.status)
+  try {
+    const hit = await findZwiftRoute(routeName)
+    return hit.routeId
+  } catch (error) {
+    throw new SeriesError(error instanceof Error ? error.message : 'Route search failed')
   }
-  const hits: RouteHit[] = Array.isArray(result.body) ? result.body : []
-  const exact = hits.filter((hit) => String(hit.name || '').toLowerCase() === routeName.toLowerCase())
-  const pool = exact.length
-    ? exact
-    : hits.filter((hit) => {
-        const name = String(hit.name || '').toLowerCase()
-        const query = routeName.toLowerCase()
-        return name.includes(query) || query.includes(name)
-      })
-  if (pool.length !== 1 || !pool[0].routeId) {
-    throw new SeriesError(`Could not match a single Zwift route for ${routeName}`)
-  }
-  return Number(pool[0].routeId)
 }
 
 export async function courseForRoute(seriesId: SeriesId, routeName: string) {
