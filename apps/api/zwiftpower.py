@@ -607,6 +607,114 @@ class ZwiftPower:
         hits.sort(key=lambda row: (row["name"].casefold() != folded, not row["name"].casefold().startswith(folded), row["name"]))
         return hits[:20]
 
+    def sprint_preview(self, event_id: int, sprints: list, points: str) -> dict:
+        """Match catalog sprints to the Primes dropdown. Reads only."""
+        loaded = self._load_prime_form(int(event_id))
+        if loaded.get("pending"):
+            return {"pending": True, "sprints": [], "points": points}
+        return _public_sprints(_match_primes(loaded["options"], sprints, points))
+
+    def apply_sprints(self, event_id: int, sprints: list, points: str) -> dict:
+        """Fill the Primes tab from the catalog and press Update."""
+        loaded = self._load_prime_form(int(event_id))
+        if loaded.get("pending"):
+            return {"pending": True, "sprints": [], "points": points, "updated": []}
+        preview = _match_primes(loaded["options"], sprints, points)
+        if any(not row["matched"] for row in preview["sprints"]):
+            return _public_sprints(preview)
+        if not preview["sprints"]:
+            public = _public_sprints(preview)
+            public["updated"] = []
+            return public
+        fields = dict(loaded["fields"])
+        for index in range(8):
+            if index < len(preview["sprints"]):
+                row = preview["sprints"][index]
+                fields[f"segment_type_{index}"] = "0"
+                fields[f"segment_id_{index}"] = row["segmentId"]
+                fields[f"segment_category_type_{index}"] = "0"
+                fields[f"segment_laps_{index}"] = row["laps"]
+                fields[f"segment_points_{index}"] = preview["points"]
+                fields[f"segment_points_all_{index}"] = ""
+                fields[f"segment_culling_{index}"] = "0"
+            else:
+                fields[f"segment_type_{index}"] = "0"
+                fields[f"segment_id_{index}"] = "0"
+                fields[f"segment_category_type_{index}"] = "0"
+                fields[f"segment_laps_{index}"] = ""
+                fields[f"segment_points_{index}"] = ""
+                fields[f"segment_points_all_{index}"] = ""
+                fields[f"segment_culling_{index}"] = "0"
+        fields["post"] = "Update"
+        response = self.session.post(loaded["action"], data=fields, allow_redirects=True)
+        if response.status_code >= 400:
+            raise RuntimeError(f"ZwiftPower rejected the sprint update ({response.status_code})")
+        confirmed = self._load_prime_form(int(event_id))
+        expected = [row["segment"] for row in preview["sprints"]]
+        if confirmed.get("selected") != expected:
+            raise RuntimeError("ZwiftPower did not keep the sprint setup")
+        public = _public_sprints(preview)
+        public["updated"] = public["sprints"]
+        return public
+
+    def _load_prime_form(self, event_id: int) -> dict:
+        response = self.session.get(
+            f"https://zwiftpower.com/zz.php?do=edit_race&zwift_event_id={event_id}",
+            allow_redirects=True,
+        )
+        if response.status_code >= 400:
+            raise RuntimeError("ZwiftPower race editor is unavailable")
+        soup = BeautifulSoup(response.text, "html.parser")
+        form = None
+        for candidate in soup.find_all("form"):
+            if "edit_race" in str(candidate.get("action") or ""):
+                form = candidate
+                break
+        if not form or not form.find("select", attrs={"name": "segment_id_0"}):
+            return {"pending": True}
+        fields = {}
+        for tag in form.find_all("input"):
+            name = tag.get("name")
+            if not name:
+                continue
+            input_type = str(tag.get("type") or "text").lower()
+            if input_type in {"submit", "button", "image"}:
+                continue
+            if input_type in {"checkbox", "radio"} and not tag.has_attr("checked"):
+                continue
+            fields[name] = tag.get("value") or ""
+        for tag in form.find_all("textarea"):
+            if tag.get("name"):
+                fields[tag["name"]] = tag.string if tag.string is not None else ""
+        options = {}
+        selected = []
+        for tag in form.find_all("select"):
+            name = tag.get("name")
+            if not name:
+                continue
+            chosen = tag.find("option", selected=True)
+            fields[name] = str(chosen.get("value") or "") if chosen else "0"
+            if name == "segment_id_0":
+                for option in tag.find_all("option"):
+                    label = option.get_text(strip=True)
+                    value = str(option.get("value") or "").strip()
+                    if label and value and value != "0":
+                        options[label.casefold()] = {"name": label, "id": value}
+        for index in range(8):
+            value = str(fields.get(f"segment_id_{index}") or "0")
+            if value in {"", "0"}:
+                break
+            label = next((row["name"] for row in options.values() if row["id"] == value), "")
+            if label:
+                selected.append(label)
+        return {
+            "pending": False,
+            "fields": fields,
+            "options": options,
+            "selected": selected,
+            "action": urljoin("https://zwiftpower.com/", form["action"]),
+        }
+
     def wkg_category_preview(self, event_id: int) -> dict:
         """WKG finishers, and the Unfiltered pen they should be moved to. Reads only."""
         loaded = self._load_result_edit(int(event_id))
@@ -724,6 +832,40 @@ def retarget_wkg_line(line: str, category: str) -> str:
     if prefix.strip() != "WKG" or not separator:
         raise ValueError("Line is not a WKG result")
     return f"{category}{separator}{rest}"
+
+
+def _match_primes(options: dict, sprints: list, points: str) -> dict:
+    if len(sprints) > 8:
+        raise ValueError("ZwiftPower accepts at most 8 sprints")
+    rows = []
+    for item in sprints:
+        name = str(item.get("name") or "").strip()
+        laps = str(item.get("laps") or "1").strip() or "1"
+        hit = options.get(name.casefold())
+        rows.append({
+            "name": name,
+            "laps": laps,
+            "segment": hit["name"] if hit else "",
+            "segmentId": hit["id"] if hit else "",
+            "matched": bool(hit),
+        })
+    return {"pending": False, "points": points, "sprints": rows}
+
+
+def _public_sprints(preview: dict) -> dict:
+    return {
+        "pending": bool(preview.get("pending")),
+        "points": preview.get("points") or "",
+        "sprints": [
+            {
+                "name": row.get("name") or "",
+                "laps": row.get("laps") or "",
+                "segment": row.get("segment") or "",
+                "matched": bool(row.get("matched")),
+            }
+            for row in preview.get("sprints") or []
+        ],
+    }
 
 
 def _public_category_preview(loaded: dict) -> dict:

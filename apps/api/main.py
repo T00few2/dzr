@@ -667,6 +667,119 @@ def _fix_due_fifty_results() -> dict:
     return {"checked": len(due), "results": results}
 
 
+def _prime_points(bonus) -> str:
+    parts = []
+    for item in bonus if isinstance(bonus, list) else []:
+        text = str(item).strip()
+        if not text:
+            continue
+        try:
+            seconds = float(text.replace(",", "."))
+        except ValueError:
+            raise ValueError(f"Bonus {text} is not a number of seconds")
+        parts.append(str(int(round(seconds * -1000))))
+    if not parts:
+        raise ValueError("This route has no bonus seconds")
+    return ",".join(parts)
+
+
+def _fifty_sprints(event_id: int):
+    schedule = firebase.get_document("series_schedules", "zwifty-fifty") or {}
+    route_name = ""
+    for row in (schedule.get("events") or {}).values():
+        if isinstance(row, dict) and str(row.get("id") or "").strip() == str(event_id):
+            route_name = str(row.get("route") or "").strip()
+            break
+    if not route_name:
+        raise ValueError("This event is not a saved Zwifty Fifty")
+    catalog = firebase.get_document("series_catalogs", "zwifty-fifty") or {}
+    entry = None
+    for row in catalog.get("routes") or []:
+        if isinstance(row, dict) and str(row.get("route") or "").strip().casefold() == route_name.casefold():
+            entry = row
+            break
+    if not entry:
+        raise ValueError(f"{route_name} is not in the route catalog")
+    names = entry.get("sprints") if isinstance(entry.get("sprints"), list) else []
+    laps = entry.get("sprintLaps") if isinstance(entry.get("sprintLaps"), list) else []
+    sprints = []
+    for index, name in enumerate(names):
+        lap = laps[index] if index < len(laps) else "1"
+        cleaned = str(name).strip()
+        if cleaned:
+            sprints.append({"name": cleaned, "laps": str(lap).strip() or "1"})
+    points = _prime_points(entry.get("bonus") or []) if sprints else ""
+    return route_name, sprints, points
+
+
+def _mark_fifty_primes(event_id: int, updated: int, skipped: int):
+    doc = firebase.db.collection("series_schedules").document("zwifty-fifty").get()
+    events = (doc.to_dict() or {}).get("events") or {}
+    for date, row in events.items():
+        if isinstance(row, dict) and str(row.get("id") or "").strip() == str(event_id):
+            firebase.db.collection("series_schedules").document("zwifty-fifty").update({
+                f"events.{date}.primesFix": {
+                    "at": datetime.now(timezone.utc).isoformat(),
+                    "updated": updated,
+                    "skipped": skipped,
+                }
+            })
+            return
+
+
+def _fix_due_fifty_sprints() -> dict:
+    """Set Primes about a day after Apply, once ZwiftPower has the event and the race is still ahead."""
+    doc = firebase.get_document("series_schedules", "zwifty-fifty") or {}
+    events = doc.get("events") or {}
+    now = datetime.now(timezone.utc)
+    copenhagen = pytz.timezone("Europe/Copenhagen")
+    today = now.astimezone(copenhagen).date()
+    due = []
+    for date, row in events.items():
+        if not isinstance(row, dict) or row.get("primesFix"):
+            continue
+        try:
+            event_date = datetime.strptime(str(date), "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if event_date < today:
+            continue
+        event_id = str(row.get("id") or "").strip()
+        if not event_id.isdigit():
+            continue
+        inspected = get_authenticated_organizer_api().inspect_event(int(event_id))
+        start = datetime.fromisoformat(str(inspected.get("eventStart") or "").replace("Z", "+00:00"))
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        if start <= now:
+            continue
+        published = row.get("publishedAt")
+        if published:
+            published_at = datetime.fromisoformat(str(published).replace("Z", "+00:00"))
+            if published_at.tzinfo is None:
+                published_at = published_at.replace(tzinfo=timezone.utc)
+            if now < published_at + timedelta(hours=24):
+                continue
+        elif start - now > timedelta(days=6):
+            continue
+        due.append(int(event_id))
+    if not due:
+        return {"checked": 0, "results": []}
+    zp = get_organizer_zwiftpower()
+    results = []
+    for event_id in due:
+        _route_name, sprints, points = _fifty_sprints(event_id)
+        preview = zp.sprint_preview(event_id, sprints, points)
+        if preview.get("pending") or any(not row.get("matched") for row in preview.get("sprints") or []):
+            results.append({"eventId": event_id, **preview})
+            continue
+        applied = zp.apply_sprints(event_id, sprints, points) if preview.get("sprints") else preview
+        skipped = len([row for row in applied.get("sprints") or [] if not row.get("matched")])
+        _mark_fifty_primes(event_id, len(applied.get("updated") or []), skipped)
+        results.append({"eventId": event_id, **applied})
+    return {"checked": len(due), "results": results}
+
+
 def _zwift_event_response(result):
     return jsonify(result)
 
@@ -787,16 +900,42 @@ def zwiftpower_search_segments():
         return jsonify({"error": str(exc)}), 502
 
 
-@app.route('/api/zwiftpower/results/fix-due', methods=['POST'])
-def zwiftpower_fix_due_results():
-    """Fix a Zwifty Fifty whose start was a couple of hours ago. Auth: Bearer CONTENT_API_KEY."""
+@app.route('/api/zwiftpower/events/<int:event_id>/sprints', methods=['GET', 'POST'])
+def zwiftpower_event_sprints(event_id: int):
+    """Preview or apply the catalog sprints on the Primes tab. Auth: Bearer CONTENT_API_KEY."""
     unauthorized = require_api_or_401()
     if unauthorized:
         return unauthorized
     try:
-        return jsonify(_fix_due_fifty_results())
+        route_name, sprints, points = _fifty_sprints(event_id)
+        zp = get_organizer_zwiftpower()
+        if request.method == 'POST':
+            result = zp.apply_sprints(event_id, sprints, points)
+            ready = not result.get("pending") and all(row.get("matched") for row in result.get("sprints") or [])
+            if ready:
+                _mark_fifty_primes(event_id, len(result.get("updated") or []), 0)
+        else:
+            result = zp.sprint_preview(event_id, sprints, points)
+        return jsonify({"eventId": event_id, "route": route_name, **result})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     except Exception as exc:
-        print(f"ZwiftPower due category update failed: {exc}")
+        print(f"ZwiftPower sprint update failed: {exc}")
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.route('/api/zwiftpower/results/fix-due', methods=['POST'])
+def zwiftpower_fix_due_results():
+    """Fix categories after the start, and set sprints about a day after Apply. Auth: Bearer CONTENT_API_KEY."""
+    unauthorized = require_api_or_401()
+    if unauthorized:
+        return unauthorized
+    try:
+        categories = _fix_due_fifty_results()
+        sprints = _fix_due_fifty_sprints()
+        return jsonify({"categories": categories, "sprints": sprints})
+    except Exception as exc:
+        print(f"ZwiftPower due update failed: {exc}")
         return jsonify({"error": str(exc)}), 502
 
 

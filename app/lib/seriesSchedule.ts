@@ -19,7 +19,7 @@ export type SeriesId = 'after-party' | 'zwifty-fifty'
 
 export type ResultsFix = { at: string; updated: number; skipped: number }
 
-type PublishedEvent = { id: string; route: string; resultsFix: ResultsFix | null }
+type PublishedEvent = { id: string; route: string; resultsFix: ResultsFix | null; primesFix: ResultsFix | null }
 
 type StoredSchedule = {
   anchorDate: string
@@ -118,7 +118,14 @@ function asStored(data: Record<string, any> | undefined): StoredSchedule | null 
     const row = value as { id?: unknown; route?: unknown }
     const id = String(row.id || '').trim()
     const route = String(row.route || '').trim()
-    if (id && route) events[date] = { id, route, resultsFix: asResultsFix((value as { resultsFix?: unknown }).resultsFix) }
+    if (id && route) {
+      events[date] = {
+        id,
+        route,
+        resultsFix: asResultsFix((value as { resultsFix?: unknown }).resultsFix),
+        primesFix: asResultsFix((value as { primesFix?: unknown }).primesFix),
+      }
+    }
   }
   return {
     anchorDate: String(data.anchorDate),
@@ -160,7 +167,7 @@ async function seedFromSheet(seriesId: SeriesId): Promise<StoredSchedule> {
       anchorDate: date,
       anchorIndex: index >= 0 ? index : 0,
       overrides: index >= 0 ? {} : { [date]: route },
-      events: { [date]: { id: raceID, route: canonical, resultsFix: null } },
+      events: { [date]: { id: raceID, route: canonical, resultsFix: null, primesFix: null } },
     }
   }
   throw new SeriesError(`No published ${spec.name} row to start the rotation`, 500)
@@ -221,6 +228,7 @@ export type SavedEvent = {
   route: string
   eventId: string
   resultsFix: ResultsFix | null
+  primesFix: ResultsFix | null
 }
 
 export async function listSavedEvents(seriesId: SeriesId): Promise<SavedEvent[]> {
@@ -232,6 +240,7 @@ export async function listSavedEvents(seriesId: SeriesId): Promise<SavedEvent[]>
       route: event.route,
       eventId: event.id,
       resultsFix: event.resultsFix,
+      primesFix: event.primesFix,
     }))
     .sort((a, b) => b.date.localeCompare(a.date))
 }
@@ -348,9 +357,15 @@ export async function courseForRoute(seriesId: SeriesId, routeName: string, chos
 export async function savePublishedEvent(seriesId: SeriesId, date: string, eventId: string, route: string) {
   const iso = parseIsoDate(date)
   if (!iso) throw new SeriesError('Date must be YYYY-MM-DD')
-  await ensureSeries(seriesId)
+  const stored = await ensureSeries(seriesId)
+  const existing = stored.events[iso]
   await refFor(seriesId).update({
-    [`events.${iso}`]: { id: String(eventId), route },
+    [`events.${iso}`]: {
+      id: String(eventId),
+      route,
+      publishedAt: new Date().toISOString(),
+      ...(existing?.resultsFix ? { resultsFix: existing.resultsFix } : {}),
+    },
   })
 }
 
