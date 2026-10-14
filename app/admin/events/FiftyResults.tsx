@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Badge, Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
+import { Badge, Box, Button, Flex, Link, Stack, Text } from '@chakra-ui/react'
 
 type SavedEvent = {
   date: string
@@ -167,6 +167,13 @@ export default function FiftyResults() {
             <Flex gap={2} align="center" wrap="wrap">
               <Text minW="180px">{event.label}</Text>
               <Badge colorScheme="green">Event {event.eventId}</Badge>
+              <Link
+                color="orange.300"
+                href={`https://zwiftpower.com/events.php?zid=${event.eventId}`}
+                isExternal
+              >
+                ZwiftPower
+              </Link>
               {event.resultsFix ? <Badge colorScheme="purple">Categories checked</Badge> : null}
               {event.primesFix ? <Badge colorScheme="blue">Sprints set</Badge> : null}
               <Button
