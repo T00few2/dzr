@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import AdminShell from '@/components/admin/AdminShell'
 import {
   Badge,
@@ -92,6 +92,13 @@ async function errorMessage(res: Response) {
   return String(body?.error || body?.message || `Request failed (${res.status})`)
 }
 
+const readableOutline = {
+  variant: 'outline' as const,
+  color: 'white',
+  borderColor: 'whiteAlpha.600',
+  _hover: { bg: 'whiteAlpha.200' },
+}
+
 function TagList({ tags, scheme }: { tags: string[]; scheme: string }) {
   if (!tags.length) return <Text color="gray.500">None</Text>
   return (
@@ -131,6 +138,19 @@ export default function AdminEventsPage() {
   const [lengthMode, setLengthMode] = useState<'laps' | 'distance' | ''>('')
   const [laps, setLaps] = useState('')
   const [distanceKm, setDistanceKm] = useState('')
+  const [notice, setNotice] = useState('')
+  const detailsRef = useRef<HTMLDivElement>(null)
+
+  async function reloadDetails(id: number) {
+    const res = await fetch(`/api/admin/events/${id}`)
+    if (!res.ok) {
+      setError(await errorMessage(res))
+      return
+    }
+    setEvent(await res.json())
+    setNotice('Saved. Details reloaded.')
+    detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -158,6 +178,7 @@ export default function AdminEventsPage() {
     }
     setBusy('inspect')
     setError('')
+    setNotice('')
     setEventId(trimmed)
     const res = await fetch(`/api/admin/events/${trimmed}`)
     setBusy('')
@@ -186,18 +207,20 @@ export default function AdminEventsPage() {
     if (!window.confirm(`Add ${tags.join(', ')} to ${name}? This updates the event and every category.`)) return
     setBusy('tags')
     setError('')
+    setNotice('')
     const res = await fetch(`/api/admin/events/${event.id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'tags', tags }),
     })
-    setBusy('')
     if (!res.ok) {
+      setBusy('')
       setError(await errorMessage(res))
       return
     }
-    setEvent(await res.json())
     setExtraTags('')
+    await reloadDetails(event.id)
+    setBusy('')
   }
 
   function onAddExtraTags(e: FormEvent) {
@@ -267,21 +290,25 @@ export default function AdminEventsPage() {
     if (!window.confirm(`Update ${name} to ${parts.join(', ')}? This updates the event and every category.`)) return
     setBusy('course')
     setError('')
+    setNotice('')
     const res = await fetch(`/api/admin/events/${event.id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    setBusy('')
     if (!res.ok) {
+      setBusy('')
       setError(await errorMessage(res))
       return
     }
-    setEvent(await res.json())
     setPickedRoute(null)
     setLengthMode('')
     setLaps('')
     setDistanceKm('')
+    setRoutes([])
+    setRouteQuery('')
+    await reloadDetails(event.id)
+    setBusy('')
   }
 
   return (
@@ -320,9 +347,9 @@ export default function AdminEventsPage() {
           <Button
             key={item.id}
             w="full"
-            variant="outline"
+            {...readableOutline}
             justifyContent="space-between"
-            borderColor={event?.id === item.id ? 'red.400' : 'gray.700'}
+            borderColor={event?.id === item.id ? 'red.400' : 'whiteAlpha.600'}
             onClick={() => void inspect(String(item.id))}
           >
             <Text as="span">{item.name}</Text>
@@ -341,9 +368,14 @@ export default function AdminEventsPage() {
           {error}
         </Text>
       ) : null}
+      {notice ? (
+        <Text color="green.300" mb={4}>
+          {notice}
+        </Text>
+      ) : null}
 
       {event ? (
-        <Stack spacing={8}>
+        <Stack spacing={8} ref={detailsRef}>
           <Box>
             <Heading size="md" mb={1}>
               {event.name || 'Untitled event'}
@@ -423,7 +455,7 @@ export default function AdminEventsPage() {
                 <Button
                   key={kit.id}
                   size="sm"
-                  variant="outline"
+                  {...readableOutline}
                   isLoading={busy === 'tags'}
                   onClick={() => void addTags([kit.tag])}
                 >
@@ -457,7 +489,7 @@ export default function AdminEventsPage() {
                 bg="gray.900"
                 borderColor="gray.700"
               />
-              <Button type="submit" variant="outline" isLoading={busy === 'routes'}>
+              <Button type="submit" {...readableOutline} isLoading={busy === 'routes'}>
                 Search
               </Button>
             </Flex>
@@ -472,8 +504,11 @@ export default function AdminEventsPage() {
                 <Button
                   key={route.routeId}
                   size="sm"
-                  variant={pickedRoute?.routeId === route.routeId ? 'solid' : 'ghost'}
                   justifyContent="flex-start"
+                  color="white"
+                  variant={pickedRoute?.routeId === route.routeId ? 'solid' : 'ghost'}
+                  colorScheme={pickedRoute?.routeId === route.routeId ? 'red' : undefined}
+                  _hover={{ bg: 'whiteAlpha.200' }}
                   onClick={() => setPickedRoute(route)}
                 >
                   {route.name} · {route.routeId}
@@ -485,7 +520,7 @@ export default function AdminEventsPage() {
               <Button
                 size="sm"
                 type="button"
-                variant={lengthMode === 'laps' ? 'solid' : 'outline'}
+                {...(lengthMode === 'laps' ? { variant: 'solid' as const, colorScheme: 'red' } : readableOutline)}
                 onClick={() => setLengthMode(lengthMode === 'laps' ? '' : 'laps')}
               >
                 Laps
@@ -493,7 +528,7 @@ export default function AdminEventsPage() {
               <Button
                 size="sm"
                 type="button"
-                variant={lengthMode === 'distance' ? 'solid' : 'outline'}
+                {...(lengthMode === 'distance' ? { variant: 'solid' as const, colorScheme: 'red' } : readableOutline)}
                 onClick={() => setLengthMode(lengthMode === 'distance' ? '' : 'distance')}
               >
                 Distance
