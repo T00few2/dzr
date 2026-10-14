@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { HOLDKAPTAJN_ROLE_ID, VERIFIED_MEMBER_ROLE_ID } from '@/app/lib/sharedConstants';
+import { isEventEditor } from '@/app/api/admin/_lib/auth';
 
 export async function middleware(req: NextRequest) {
 	const { pathname } = req.nextUrl;
@@ -26,6 +27,9 @@ export async function middleware(req: NextRequest) {
 
 	if (isAdminPath) {
 		if (!Boolean((token as any)?.isAdmin)) {
+			return new NextResponse('Not Found', { status: 404 });
+		}
+		if (pathname.startsWith('/admin/events') && !isEventEditor(token as { discordId?: unknown })) {
 			return new NextResponse('Not Found', { status: 404 });
 		}
 		return NextResponse.next();

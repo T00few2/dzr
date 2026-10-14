@@ -35,3 +35,5 @@ export function suggestedSubgroup(
 
 export function localParts(iso: unknown): { eventDate: string; startTime: string } | null
 export const TZ: string
+/** Public upcoming feed for events tagged dzr. About the next week, not a season. */
+export const DZR_UPCOMING_EVENTS_URL: string

@@ -9,6 +9,79 @@ from typing import Any, Dict, List, Optional
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('ZwiftAPI')
 
+RELAY = "https://us-or-rly101.zwift.com"
+GAME_DICTIONARY_URL = "https://www.zwift.com/zwift-web-pages/gamedictionaryextended"
+
+# Game-dictionary world name -> Zwift mapId. Used when a route change has to
+# keep the event on the route's world and a valid start paddock.
+WORLD_NAME_TO_ID = {
+    "WATOPIA": 1,
+    "RICHMOND": 2,
+    "LONDON": 3,
+    "NEWYORK": 4,
+    "INNSBRUCK": 5,
+    "BOLOGNA": 6,
+    "YORKSHIRE": 7,
+    "CRIT_CITY": 8,
+    "MAKURI_ISLANDS": 9,
+    "FRANCE": 10,
+    "PARIS": 11,
+    "SCOTLAND": 13,
+}
+ID_TO_WORLD_NAME = {world_id: name for name, world_id in WORLD_NAME_TO_ID.items()}
+
+# Tags that grant an in-game unlock. Exact name, or one of these prefixes.
+UNLOCK_TAGS = {"jerseyunlock"}
+UNLOCK_PREFIXES = (
+    "completionprize",
+    "head_gear=",
+    "socks=",
+    "running_shirts=",
+)
+
+# completionprize1=<id> grants the kit on finish. jerseyHash is separate and
+# is not set by these presets.
+DZR_KITS = (
+    {"id": "2025", "label": "DZR 2025 kit", "tag": "completionprize1=1381648520"},
+    {"id": "old", "label": "Older DZR kit", "tag": "completionprize1=3709517096"},
+)
+
+
+class ZwiftError(Exception):
+    def __init__(self, message: str, status_code: Optional[int] = None):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def is_unlock_tag(tag: str) -> bool:
+    if tag in UNLOCK_TAGS:
+        return True
+    return tag.startswith(UNLOCK_PREFIXES)
+
+
+def split_tags(tags: Optional[list]) -> tuple:
+    """Unlock tags first, then every other tag, each in its original order."""
+    unlocks: List[str] = []
+    rest: List[str] = []
+    for tag in tags or []:
+        text = str(tag)
+        if is_unlock_tag(text):
+            if text not in unlocks:
+                unlocks.append(text)
+        else:
+            rest.append(text)
+    return unlocks, rest
+
+
+def merge_tags(existing: Optional[list], extra: List[str]) -> List[str]:
+    """Append tags that are not already present, keeping the current order."""
+    merged = [str(tag) for tag in (existing or [])]
+    for tag in extra:
+        if tag not in merged:
+            merged.append(tag)
+    return merged
+
+
 class ZwiftAPI:
     def __init__(self, username, password, client_id='Zwift Game Client'):
         self.username = username
@@ -225,3 +298,292 @@ class ZwiftAPI:
                 }
             )
         return out
+
+    def _event_headers(self) -> Dict[str, str]:
+        self.ensure_valid_token()
+        return {
+            "Authorization": f"Bearer {self.auth_token['access_token']}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Referer": "https://www.zwift.com/",
+            "Origin": "https://www.zwift.com",
+        }
+
+    def get_event(self, event_id: int):
+        """Return (eventTemplateId, eventData) from the organizer events-core document."""
+        self.ensure_valid_token()
+        url = f"{RELAY}/api/events-core/events/{int(event_id)}"
+        headers = {
+            "Authorization": f"Bearer {self.auth_token['access_token']}",
+            "Accept": "application/json",
+        }
+        try:
+            payload = self.fetch_json_with_retry(
+                url, headers=headers, params={"skipDefaults": "true"}
+            )
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            body = exc.response.text if exc.response is not None else ""
+            raise ZwiftError(
+                f"Failed to fetch event {event_id}: {status}. Body: {body}",
+                status_code=status,
+            ) from exc
+        if not isinstance(payload, dict):
+            raise ZwiftError(f"Unexpected event payload for {event_id}")
+        template_id = payload.get("eventTemplateId")
+        event = payload["eventData"] if "eventData" in payload else payload
+        if not isinstance(event, dict):
+            raise ZwiftError(f"Unexpected event payload for {event_id}")
+        if template_id is None:
+            template_id = event.get("eventTemplateId")
+        return template_id, event
+
+    def save_event(self, event_id: int, event: dict, event_template_id=None) -> None:
+        """PUT the events-core document. Success is an empty 200 body."""
+        if event_template_id is None:
+            event_template_id = event.get("eventTemplateId")
+        payload = {
+            "eventTemplateId": event_template_id,
+            "eventData": event,
+        }
+        url = f"{RELAY}/api/events-core/events/{int(event_id)}"
+        response = requests.put(
+            url,
+            headers=self._event_headers(),
+            params={"skipDefaults": "true"},
+            json=payload,
+            timeout=30,
+        )
+        if not response.ok:
+            raise ZwiftError(
+                f"Failed to update event {event_id}: "
+                f"{response.status_code} {response.reason}. Body: {response.text}",
+                status_code=response.status_code,
+            )
+
+    def _load_game_dictionary(self) -> dict:
+        if getattr(ZwiftAPI, "_game_dict_cache", None) is not None:
+            return ZwiftAPI._game_dict_cache
+        response = requests.get(
+            GAME_DICTIONARY_URL,
+            headers={"Accept": "application/json"},
+            timeout=20,
+        )
+        response.raise_for_status()
+        ZwiftAPI._game_dict_cache = response.json()
+        return ZwiftAPI._game_dict_cache
+
+    def get_route_metadata(self, route_id: int) -> Optional[dict]:
+        """Route dict from the public game dictionary, or None."""
+        try:
+            routes = self._load_game_dictionary().get("ROUTES", {}).get("ROUTE", [])
+        except (requests.RequestException, ValueError) as exc:
+            logger.warning("Game dictionary unavailable: %s", exc)
+            return None
+        wanted = int(route_id)
+        for route in routes:
+            signature = route.get("signature") or route.get("routeSignature")
+            if signature is None:
+                continue
+            try:
+                if int(signature) == wanted:
+                    return route
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    @staticmethod
+    def _route_name(route_meta: Optional[dict]) -> Optional[str]:
+        if not route_meta:
+            return None
+        for key in ("name", "routeName", "displayName"):
+            value = route_meta.get(key)
+            if value:
+                return str(value)
+        return None
+
+    @staticmethod
+    def _world_name(map_id) -> Optional[str]:
+        try:
+            return ID_TO_WORLD_NAME.get(int(map_id))
+        except (TypeError, ValueError):
+            return None
+
+    def _describe_course(self, source: dict, fallback_world_id=None) -> Dict[str, Any]:
+        route_id = source.get("routeId")
+        route_meta = None
+        if route_id is not None:
+            try:
+                route_meta = self.get_route_metadata(int(route_id))
+            except (TypeError, ValueError):
+                route_meta = None
+        map_id = source.get("mapId")
+        # worldId is the world. mapId is often the same number after a route
+        # edit, but an untouched event can have them differ.
+        world_id = source.get("worldId")
+        if world_id is None:
+            world_id = fallback_world_id
+        return {
+            "routeId": route_id,
+            "routeName": self._route_name(route_meta),
+            "mapId": map_id,
+            "worldId": source.get("worldId"),
+            "world": self._world_name(world_id) or self._world_name(map_id),
+            "laps": source.get("laps"),
+            "distanceInMeters": source.get("distanceInMeters"),
+            "durationInSeconds": source.get("durationInSeconds"),
+        }
+
+    def inspect_event(self, event_id: int) -> Dict[str, Any]:
+        """Settings and unlocks for one event. Reads only."""
+        _template_id, event = self.get_event(event_id)
+        unlocks, other_tags = split_tags(event.get("tags"))
+        subgroups = []
+        for subgroup in event.get("eventSubgroups") or []:
+            sub_unlocks, sub_tags = split_tags(subgroup.get("tags"))
+            subgroups.append(
+                {
+                    "id": subgroup.get("id"),
+                    "label": subgroup.get("subgroupLabel"),
+                    "eventStart": subgroup.get("eventSubgroupStart"),
+                    "startLocation": subgroup.get("startLocation"),
+                    "jerseyHash": subgroup.get("jerseyHash"),
+                    "bikeHash": subgroup.get("bikeHash"),
+                    "unlockTags": sub_unlocks,
+                    "tags": sub_tags,
+                    **self._describe_course(subgroup, event.get("worldId")),
+                }
+            )
+        return {
+            "id": event.get("id") or int(event_id),
+            "name": event.get("name"),
+            "type": event.get("type") or event.get("eventType"),
+            "sport": event.get("sport"),
+            "eventStart": event.get("eventStart"),
+            "jerseyHash": event.get("jerseyHash"),
+            "bikeHash": event.get("bikeHash"),
+            "unlockTags": unlocks,
+            "tags": other_tags,
+            "kitPresets": [dict(kit) for kit in DZR_KITS],
+            "url": f"https://www.zwift.com/events/view/{int(event_id)}",
+            "subgroups": subgroups,
+            **self._describe_course(event),
+        }
+
+    def _update_event(self, event_id: int, mutate) -> Dict[str, Any]:
+        template_id, event = self.get_event(event_id)
+        mutate(event)
+        self.save_event(event_id, event, template_id)
+        # The first response after PUT can still show the previous tags.
+        return self.inspect_event(event_id)
+
+    def add_event_tags(self, event_id: int, tags: List[str]) -> Dict[str, Any]:
+        """Add tags to the event and every subgroup. Existing tags stay."""
+        clean: List[str] = []
+        for tag in tags or []:
+            text = str(tag).strip()
+            if text and text not in clean:
+                clean.append(text)
+        if not clean:
+            raise ValueError("At least one tag is required")
+
+        def mutate(event: dict) -> None:
+            event["tags"] = merge_tags(event.get("tags"), clean)
+            for subgroup in event.get("eventSubgroups") or []:
+                subgroup["tags"] = merge_tags(subgroup.get("tags"), clean)
+
+        return self._update_event(event_id, mutate)
+
+    def update_event_course(
+        self,
+        event_id: int,
+        new_route_id: Optional[int] = None,
+        new_distance_meters: Optional[float] = None,
+        new_laps: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Set the route and/or laps or distance on the event and its subgroups.
+
+        Laps and distance cannot both be set. Duration is not an input; choosing
+        laps or distance clears the other length mode, including duration, which
+        is how Zwift stores a single length mode.
+        """
+        if new_distance_meters is not None and new_laps is not None:
+            raise ValueError("Specify only one of laps or distance")
+        if new_route_id is None and new_distance_meters is None and new_laps is None:
+            raise ValueError("Specify a route, laps, or distance")
+        if new_route_id is not None and int(new_route_id) <= 0:
+            raise ValueError("routeId must be greater than 0")
+        if new_laps is not None and int(new_laps) <= 0:
+            raise ValueError("laps must be greater than 0")
+        if new_distance_meters is not None and float(new_distance_meters) <= 0:
+            raise ValueError("distance must be greater than 0")
+
+        def mutate(event: dict) -> None:
+            paddocks: List[int] = []
+            if new_route_id is not None:
+                event["routeId"] = int(new_route_id)
+                route_meta = self.get_route_metadata(int(new_route_id))
+                if route_meta:
+                    world_id = WORLD_NAME_TO_ID.get(str(route_meta.get("map") or "").upper())
+                    if world_id is not None:
+                        event["mapId"] = world_id
+                    paddocks_raw = str(route_meta.get("eventPaddocks") or "")
+                    paddocks = [int(part) for part in paddocks_raw.split(",") if part.strip()]
+            if new_laps is not None:
+                event["laps"] = int(new_laps)
+                event["distanceInMeters"] = 0
+                event["durationInSeconds"] = 0
+            elif new_distance_meters is not None:
+                event["laps"] = 0
+                event["distanceInMeters"] = float(new_distance_meters)
+                event["durationInSeconds"] = 0
+            for index, subgroup in enumerate(event.get("eventSubgroups") or []):
+                if new_route_id is not None:
+                    subgroup["routeId"] = int(new_route_id)
+                    if "mapId" in event:
+                        subgroup["mapId"] = event["mapId"]
+                    if paddocks:
+                        subgroup["startLocation"] = paddocks[index % len(paddocks)]
+                if new_laps is not None:
+                    subgroup["laps"] = int(new_laps)
+                    subgroup["distanceInMeters"] = 0
+                    subgroup["durationInSeconds"] = 0
+                elif new_distance_meters is not None:
+                    subgroup["laps"] = 0
+                    subgroup["distanceInMeters"] = float(new_distance_meters)
+                    subgroup["durationInSeconds"] = 0
+
+        return self._update_event(event_id, mutate)
+
+    def search_routes(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
+        """Match game-dictionary routes by name, or by an exact route id."""
+        text = str(query or "").strip().lower()
+        if len(text) < 2 and not text.isdigit():
+            return []
+        try:
+            routes = self._load_game_dictionary().get("ROUTES", {}).get("ROUTE", [])
+        except (requests.RequestException, ValueError) as exc:
+            raise ZwiftError(f"Game dictionary unavailable: {exc}") from exc
+        matches: List[Dict[str, Any]] = []
+        for route in routes:
+            signature = route.get("signature") or route.get("routeSignature")
+            name = self._route_name(route) or ""
+            id_match = text.isdigit() and signature is not None and str(signature) == text
+            if not id_match and text not in name.lower():
+                continue
+            map_name = route.get("map")
+            try:
+                route_id = int(signature)
+            except (TypeError, ValueError):
+                continue
+            matches.append(
+                {
+                    "routeId": route_id,
+                    "name": name,
+                    "world": str(map_name) if map_name else None,
+                }
+            )
+            if len(matches) >= int(limit):
+                break
+        return matches

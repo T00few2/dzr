@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, date, timezone
 from collections import Counter
 import firebase
 from discord_api import DiscordAPI
-from zwift import ZwiftAPI
+from zwift import ZwiftAPI, ZwiftError
 import pytz
 from bisect import bisect_right
 from typing import Optional
@@ -58,10 +58,15 @@ cached_session = None
 cached_session_timestamp = None 
 cached_zwift_api = None
 cached_zwift_api_timestamp = None
+cached_organizer_api = None
+cached_organizer_api_timestamp = None
 SESSION_VALIDITY = 3600  # seconds (how long the session is expected to be valid)
 
 ZWIFT_USERNAME = os.getenv("ZWIFT_USERNAME", "your_username")
 ZWIFT_PASSWORD = os.getenv("ZWIFT_PASSWORD", "your_password")
+# Event inspect and edits. Kept off the roster account on purpose.
+ZWIFT_ORGANIZER_USERNAME = os.getenv("ZWIFT_ORGANIZER_USERNAME", "").strip()
+ZWIFT_ORGANIZER_PASSWORD = os.getenv("ZWIFT_ORGANIZER_PASSWORD", "")
 
 OPENAI_KEY = os.getenv("OPENAI_KEY", "your_openai_key")
 
@@ -551,6 +556,115 @@ def get_authenticated_zwift_api() -> ZwiftAPI:
     cached_zwift_api = new_zwift_api
     cached_zwift_api_timestamp = now
     return new_zwift_api
+
+
+def get_authenticated_organizer_api() -> ZwiftAPI:
+    """Zwift login that can edit DZR events. Separate from the roster account."""
+    global cached_organizer_api, cached_organizer_api_timestamp
+    if not ZWIFT_ORGANIZER_USERNAME or not ZWIFT_ORGANIZER_PASSWORD:
+        raise RuntimeError(
+            "ZWIFT_ORGANIZER_USERNAME and ZWIFT_ORGANIZER_PASSWORD are not configured"
+        )
+    now = time.time()
+    if (
+        cached_organizer_api
+        and cached_organizer_api_timestamp
+        and (now - cached_organizer_api_timestamp < SESSION_VALIDITY)
+    ):
+        cached_organizer_api.ensure_valid_token()
+        return cached_organizer_api
+    api = ZwiftAPI(ZWIFT_ORGANIZER_USERNAME, ZWIFT_ORGANIZER_PASSWORD)
+    api.authenticate()
+    cached_organizer_api = api
+    cached_organizer_api_timestamp = now
+    return api
+
+
+def _zwift_event_response(result):
+    return jsonify(result)
+
+
+def _zwift_event_error(exc: Exception):
+    if isinstance(exc, ValueError):
+        return jsonify({"error": str(exc)}), 400
+    if isinstance(exc, ZwiftError):
+        status = exc.status_code if exc.status_code and 400 <= exc.status_code < 500 else 502
+        return jsonify({"error": str(exc)}), status
+    print(f"Zwift event error: {exc}")
+    return jsonify({"error": str(exc)}), 502
+
+
+def _optional_number(body: dict, key: str, caster):
+    if key not in body or body.get(key) is None or body.get(key) == "":
+        return None
+    try:
+        return caster(body.get(key))
+    except (TypeError, ValueError):
+        raise ValueError(f"{key} is not a number")
+
+
+@app.route('/api/zwift/events/<int:event_id>', methods=['GET'])
+def zwift_inspect_event(event_id: int):
+    """Organizer settings and unlocks for one event. Auth: Bearer CONTENT_API_KEY."""
+    unauthorized = require_api_or_401()
+    if unauthorized:
+        return unauthorized
+    try:
+        return _zwift_event_response(get_authenticated_organizer_api().inspect_event(event_id))
+    except Exception as exc:
+        return _zwift_event_error(exc)
+
+
+@app.route('/api/zwift/events/<int:event_id>/tags', methods=['POST'])
+def zwift_add_event_tags(event_id: int):
+    """Add tags to an event and its subgroups. Auth: Bearer CONTENT_API_KEY."""
+    unauthorized = require_api_or_401()
+    if unauthorized:
+        return unauthorized
+    body = request.get_json(silent=True) or {}
+    tags = body.get("tags")
+    if not isinstance(tags, list):
+        return jsonify({"error": "tags must be a list"}), 400
+    try:
+        return _zwift_event_response(get_authenticated_organizer_api().add_event_tags(event_id, tags))
+    except Exception as exc:
+        return _zwift_event_error(exc)
+
+
+@app.route('/api/zwift/events/<int:event_id>/course', methods=['POST'])
+def zwift_update_event_course(event_id: int):
+    """Set route and/or laps or distance. Auth: Bearer CONTENT_API_KEY."""
+    unauthorized = require_api_or_401()
+    if unauthorized:
+        return unauthorized
+    body = request.get_json(silent=True) or {}
+    try:
+        route_id = _optional_number(body, "routeId", int)
+        laps = _optional_number(body, "laps", int)
+        distance = _optional_number(body, "distanceMeters", float)
+        updated = get_authenticated_organizer_api().update_event_course(
+            event_id,
+            new_route_id=route_id,
+            new_distance_meters=distance,
+            new_laps=laps,
+        )
+        return _zwift_event_response(updated)
+    except Exception as exc:
+        return _zwift_event_error(exc)
+
+
+@app.route('/api/zwift/routes', methods=['GET'])
+def zwift_search_routes():
+    """Search the public game dictionary by route name or exact id. Auth: Bearer CONTENT_API_KEY."""
+    unauthorized = require_api_or_401()
+    if unauthorized:
+        return unauthorized
+    try:
+        # The dictionary is public, so this does not use the organizer login.
+        return jsonify(ZwiftAPI(None, None).search_routes(request.args.get("q", "")))
+    except Exception as exc:
+        return _zwift_event_error(exc)
+
 
 @app.route('/team_riders/<int:club_id>', methods=['GET'])
 def team_riders(club_id: int):

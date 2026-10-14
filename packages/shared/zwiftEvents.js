@@ -1,8 +1,9 @@
 /**
  * Compact Zwift's public event feed into calendar suggestions.
  *
- * Pure: the raw feed goes in, calendar-shaped rows come out, no I/O. app/api/calendar/events does
- * the fetching and caching. Unlike the modules in coach/, this one is not copied into apps/bot —
+ * Pure: the raw feed goes in, calendar-shaped rows come out, no I/O. The feed URL lives here so
+ * the site has one place for it. app/lib/zwiftPublicEvents.ts does the fetching and caching.
+ * Unlike the modules in coach/, this one is not copied into apps/bot —
  * only the website offers the picker — so it is imported directly by the site and tested from the
  * repo root.
  *
@@ -16,6 +17,8 @@
  */
 
 const TZ = "Europe/Copenhagen";
+const DZR_UPCOMING_EVENTS_URL =
+  "https://us-or-rly101.zwift.com/api/public/events/upcoming?limit=200&tags=dzr";
 const MAX_EVENTS = 40;
 const MAX_SUBGROUPS = 10;
 
@@ -120,4 +123,4 @@ function suggestedSubgroup(event, racingScore) {
   return null;
 }
 
-module.exports = { compactZwiftEvents, suggestedSubgroup, localParts, TZ };
+module.exports = { compactZwiftEvents, suggestedSubgroup, localParts, TZ, DZR_UPCOMING_EVENTS_URL };

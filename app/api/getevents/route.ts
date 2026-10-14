@@ -1,11 +1,5 @@
-import axios from 'axios';
 import { NextResponse } from 'next/server';
-
-type Event = {
-  id: number;
-  name: string;
-  eventStart: string;
-};
+import { loadUpcomingDzrEvents } from '@/app/lib/zwiftPublicEvents';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -20,27 +14,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Channel ID is required' }, { status: 400 });
   }
 
-  const url = "https://us-or-rly101.zwift.com/api/public/events/upcoming?limit=200&tags=dzr";
-
   try {
-    const response = await axios.get(url);
-    const data = response.data;
-
-    // Extract event details
-    const events: Event[] = data.map((event: any) => ({
-      id: event.id,
-      name: event.name,
-      eventStart: event.eventStart,
-    }));
-
-    // Find the event with the matching name
-    const matchedEvent = events.find(event => event.name.toLowerCase() === eventName.toLowerCase());
+    const events = await loadUpcomingDzrEvents();
+    const matchedEvent = events.find((event) => event.name.toLowerCase() === eventName.toLowerCase());
 
     if (!matchedEvent) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    const messageContent = `Link til næste ${matchedEvent.name}: https://www.zwift.com/events/view/${matchedEvent.id}`;
+    const messageContent = `Link til næste ${matchedEvent.name}: ${matchedEvent.url}`;
 
     const responseBot = await fetch(`https://www.dzrracingseries.com/api/discord-bot/sendMessage`, {
       method: 'POST',

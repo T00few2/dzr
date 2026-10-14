@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { getRacingScore } from '@/app/utils/fetchZPdata'
-import { compactZwiftEvents } from '@/packages/shared/zwiftEvents'
+import { loadUpcomingDzrEvents } from '@/app/lib/zwiftPublicEvents'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -14,34 +14,11 @@ export const runtime = 'nodejs'
  * window, so this is "DZR events this week", not a season — anything further out is manual entry.
  * ZRL does not appear in it at all, being WTRL-organised rather than DZR-tagged.
  *
- * The shaping lives in packages/shared/zwiftEvents.js, which is pure and unit tested; this file is
- * only the fetch, the cache and the auth. Nothing here writes to the calendar — the member picks a
- * category and posts it themselves, so a suggestion is a copy rather than a subscription.
+ * The shaping lives in packages/shared/zwiftEvents.js, and the fetch lives in
+ * app/lib/zwiftPublicEvents.ts. This file is the auth and the racing-score hint. Nothing here
+ * writes to the calendar — the member picks a category and posts it themselves, so a suggestion
+ * is a copy rather than a subscription.
  */
-
-const FEED_URL = 'https://us-or-rly101.zwift.com/api/public/events/upcoming?limit=200&tags=dzr'
-const CACHE_MS = 10 * 60 * 1000
-const FETCH_TIMEOUT_MS = 6000
-
-let cache: { at: number; events: unknown[] } | null = null
-
-async function loadEvents(): Promise<unknown[]> {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache.events
-
-  // An unauthenticated third party on a page-load path: bounded, and any failure degrades to an
-  // empty picker rather than breaking the calendar.
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-  try {
-    const res = await fetch(FEED_URL, { signal: controller.signal, cache: 'no-store' })
-    if (!res.ok) throw new Error(`zwift feed responded ${res.status}`)
-    const events = compactZwiftEvents(await res.json())
-    cache = { at: Date.now(), events }
-    return events
-  } finally {
-    clearTimeout(timer)
-  }
-}
 
 /**
  * The member's Zwift Racing Score, used only to highlight which category they are likely eligible
@@ -72,7 +49,7 @@ export async function GET(req: Request) {
   if (!discordId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 })
 
   const [events, racingScore] = await Promise.all([
-    loadEvents().catch((err) => {
+    loadUpcomingDzrEvents().catch((err) => {
       console.warn('calendar events: zwift feed unavailable', err)
       return null
     }),
