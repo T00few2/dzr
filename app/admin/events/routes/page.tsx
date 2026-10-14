@@ -251,17 +251,23 @@ export default function RouteSetupPage() {
         </Text>
       ) : null}
       <Flex gap={8} align="flex-start" wrap="wrap">
-        <Stack spacing={2} flex="1" minW="260px">
+        <Stack spacing={2} flex="1" minW="260px" maxW="360px" overflow="hidden">
           {routes.map((route, routeIndex) => (
             <Button
               key={`${route.route}-${routeIndex}`}
               {...readableOutline}
+              w="100%"
+              h="auto"
+              whiteSpace="normal"
+              overflow="hidden"
               justifyContent="space-between"
               borderColor={index === routeIndex ? 'red.400' : 'whiteAlpha.600'}
               onClick={() => openRoute(routeIndex)}
             >
-              <Text as="span">{route.route}</Text>
-              <Text as="span" color="gray.400" fontWeight="normal">
+              <Text as="span" noOfLines={1} textAlign="left">
+                {route.route}
+              </Text>
+              <Text as="span" noOfLines={1} color="gray.400" fontWeight="normal" textAlign="right">
                 {route.zwiftRouteName || 'No Zwift route'}
               </Text>
             </Button>
@@ -271,9 +277,12 @@ export default function RouteSetupPage() {
           </Button>
         </Stack>
         <Box flex="2" minW="320px" borderWidth="1px" borderColor="gray.700" rounded="md" p={4}>
-          <Heading size="sm" mb={4}>
-            {index == null ? 'New route' : draft.route || 'Edit route'}
-          </Heading>
+          <Flex justify="space-between" align="center" gap={3} mb={4}>
+            <Heading size="sm">{index == null ? 'New route' : draft.route || 'Edit route'}</Heading>
+            <Button colorScheme="red" flexShrink={0} isLoading={busy === 'save'} onClick={() => void save()}>
+              {index == null ? 'Add route' : 'Save route'}
+            </Button>
+          </Flex>
           <Stack spacing={3}>
             <Input placeholder="Route name" value={draft.route} onChange={(e) => setField({ route: e.target.value })} {...field} />
             <Input placeholder="World" value={draft.world} onChange={(e) => setField({ world: e.target.value })} {...field} />
@@ -320,6 +329,8 @@ export default function RouteSetupPage() {
                           <Input
                             placeholder="Sprint name"
                             value={sprint}
+                            flex="1"
+                            minW="180px"
                             onChange={(e) => setSprint(sprintIndex, e.target.value)}
                             {...field}
                           />
