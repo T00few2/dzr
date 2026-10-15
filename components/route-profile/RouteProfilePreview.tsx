@@ -45,8 +45,16 @@ function ProfileChart({
     <Box h={`${height}px`} w="100%">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <XAxis dataKey="distance" stroke="#A0AEC0" tick={{ fill: '#A0AEC0', fontSize: 12 }} unit=" km" />
-          <YAxis stroke="#A0AEC0" tick={{ fill: '#A0AEC0', fontSize: 12 }} width={48} unit=" m" />
+          <XAxis
+            dataKey="distance"
+            type="number"
+            domain={[fromKm, toKm]}
+            allowDataOverflow
+            stroke="#A0AEC0"
+            tick={{ fill: '#A0AEC0', fontSize: 12 }}
+            unit=" km"
+          />
+          <YAxis type="number" stroke="#A0AEC0" tick={{ fill: '#A0AEC0', fontSize: 12 }} width={48} unit=" m" />
           <Tooltip
             contentStyle={{ background: '#1A202C', border: '1px solid #4A5568' }}
             labelFormatter={(label) => `${Number(label).toFixed(1)} km`}
@@ -59,7 +67,8 @@ function ProfileChart({
                 key={`${segment.name}-${segment.fromKm}`}
                 x={segment.fromKm}
                 stroke={COLORS[segment.type]}
-                strokeWidth={2}
+                strokeWidth={3}
+                ifOverflow="visible"
               />
             ) : (
               <ReferenceArea
@@ -67,8 +76,10 @@ function ProfileChart({
                 x1={segment.fromKm}
                 x2={segment.toKm}
                 fill={COLORS[segment.type]}
-                fillOpacity={0.45}
-                strokeOpacity={0}
+                fillOpacity={0.55}
+                stroke={COLORS[segment.type]}
+                strokeWidth={2}
+                ifOverflow="visible"
               />
             )
           )}
