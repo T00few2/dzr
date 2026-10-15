@@ -48,6 +48,24 @@ test("sprint laps follow each time the segment is crossed", () => {
   assert.deepStrictEqual(profile.sprints, [{ name: "Country Sprint", laps: "1,2,3" }])
 })
 
+test("ZwiftPower names match the segment on the route", () => {
+  const profile = buildRaceProfile({
+    distanceM: [0, 16200],
+    altitudeM: [40, 40],
+    segments: [
+      { name: "Richmond KOM", type: "climb", fromKm: 12, toKm: 12.6, direction: "forward" },
+      { name: "Titans Grove KOM Rev.", type: "climb", fromKm: 4, toKm: 5.2, direction: "reverse" },
+    ],
+    raceKm: 32.4,
+    finishText: "Banner second time on Governor St. Climb",
+    climbNames: ["Libby Hill", "Titans Groove KOM Reverse"],
+  })
+  assert.strictEqual(profile.finish.matched, true)
+  assert.ok(profile.finish.fromKm > 16)
+  assert.strictEqual(profile.climbs[0].matched, true)
+  assert.strictEqual(profile.climbs[1].matched, true)
+})
+
 test("the existing profile picture path stays the same", () => {
   assert.strictEqual(
     profileImageSrc("after-party", "Itza Climb Finish"),

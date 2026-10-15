@@ -61,11 +61,80 @@ function parseFinish(value) {
   return null
 }
 
+const NAME_ALIASES = {
+  "governor st": ["richmond kom"],
+  "libby hill": ["richmond kom"],
+  "ny kom": ["new york kom"],
+  "ny sprint": ["new york sprint"],
+  "leg snapper": ["innsbruck kom"],
+  "legsnapper": ["innsbruck kom"],
+  "monument ave": ["richmond sprint"],
+}
+
+function comparableName(value) {
+  return foldName(value).replace(/\bgroove\b/g, "grove")
+}
+
+function queryKeys(value) {
+  const folded = comparableName(value)
+  const stripped = folded
+    .replace(/\b(koms|kom|climbs|climb|sprints|sprint|banners|banner)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+  const keys = new Set([folded, stripped])
+  for (const key of [folded, stripped]) {
+    for (const alias of NAME_ALIASES[key] || []) keys.add(alias)
+  }
+  return [...keys].filter((key) => key.length >= 3)
+}
+
 function namesMatch(segmentName, query) {
-  const left = foldName(segmentName)
-  const right = foldName(query)
-  if (!left || !right) return false
-  return left === right || left.startsWith(right) || right.startsWith(left)
+  const left = comparableName(segmentName)
+  if (!left) return false
+  return queryKeys(query).some((right) => left === right || left.startsWith(right) || right.startsWith(left))
+}
+
+function placeOnRoute(routeLatLng, routeDistanceM, segmentLatLng) {
+  if (!Array.isArray(routeLatLng) || !Array.isArray(segmentLatLng)) return null
+  if (routeLatLng.length < 2 || segmentLatLng.length < 2 || routeLatLng.length !== routeDistanceM.length) return null
+  const sampleAt = [0, Math.floor(segmentLatLng.length / 2), segmentLatLng.length - 1]
+  const hits = sampleAt.map((index) => nearestRoutePoint(routeLatLng, segmentLatLng[index]))
+  if (hits.some((hit) => hit.meters > 40)) return null
+  const fromM = routeDistanceM[hits[0].index]
+  const toM = routeDistanceM[hits[2].index]
+  const along = Math.abs(toM - fromM)
+  const length = pathLength(segmentLatLng)
+  if (!(along > 30) || along > length * 2.5 || along < length * 0.35) return null
+  return { fromM: Math.min(fromM, toM), toM: Math.max(fromM, toM) }
+}
+
+function pathLength(points) {
+  let total = 0
+  for (let index = 1; index < points.length; index += 1) total += haversineMeters(points[index - 1], points[index])
+  return total
+}
+
+function nearestRoutePoint(routeLatLng, point) {
+  let index = 0
+  let meters = Infinity
+  for (let cursor = 0; cursor < routeLatLng.length; cursor += 1) {
+    const distance = haversineMeters(routeLatLng[cursor], point)
+    if (distance < meters) {
+      meters = distance
+      index = cursor
+    }
+  }
+  return { index, meters }
+}
+
+function haversineMeters(a, b) {
+  const toRad = Math.PI / 180
+  const dLat = (b[0] - a[0]) * toRad
+  const dLon = (b[1] - a[1]) * toRad
+  const lat1 = a[0] * toRad
+  const lat2 = b[0] * toRad
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
+  return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(h)))
 }
 
 function displaySegmentName(segment) {
@@ -74,9 +143,10 @@ function displaySegmentName(segment) {
   return name
 }
 
-function prepareLap(distance, altitude, leadInKm, lapKm) {
+function prepareLap(distance, altitude, leadInKm, lapKm, latlng) {
   const meters = Array.isArray(distance) ? distance.map(Number) : []
   const heights = Array.isArray(altitude) ? altitude.map(Number) : []
+  const points = Array.isArray(latlng) ? latlng : []
   const leadInM = Number(leadInKm) > 0 ? Number(leadInKm) * 1000 : 0
   const lapM = Number(lapKm) > 0 ? Number(lapKm) * 1000 : 0
   const endM = meters.length ? meters[meters.length - 1] : 0
@@ -85,16 +155,18 @@ function prepareLap(distance, altitude, leadInKm, lapKm) {
     lapM > 0 &&
     meters.length > 1 &&
     Math.abs(endM - (lapM + leadInM)) <= Math.abs(endM - lapM)
-  if (!includesLeadIn) return { distance: meters, altitude: heights }
+  if (!includesLeadIn) return { distance: meters, altitude: heights, latlng: points }
   let start = meters.findIndex((point) => point >= leadInM)
   if (start < 0) start = 0
   let nextDistance = meters.slice(start).map((point) => Math.max(0, point - leadInM))
   let nextAltitude = heights.slice(start)
+  let nextLatLng = points.slice(start)
   if (nextDistance.length && nextDistance[0] > 0) {
     nextDistance = [0, ...nextDistance]
     nextAltitude = [nextAltitude[0] || 0, ...nextAltitude]
+    if (nextLatLng.length) nextLatLng = [nextLatLng[0], ...nextLatLng]
   }
-  return { distance: nextDistance, altitude: nextAltitude }
+  return { distance: nextDistance, altitude: nextAltitude, latlng: nextLatLng }
 }
 
 function raceDistanceKm(lapKm, lapsText, distanceText) {
@@ -242,4 +314,5 @@ module.exports = {
   raceDistanceKm,
   buildRaceProfile,
   profileImageSrc,
+  placeOnRoute,
 }

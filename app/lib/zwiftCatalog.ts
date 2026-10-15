@@ -1,5 +1,5 @@
 import { routes as zwiftRoutes, segments as zwiftSegments } from 'zwift-data'
-import { slugifyZwiftName, type ProfileSegment } from '@/packages/shared/routeProfile'
+import { foldName, slugifyZwiftName, type ProfileSegment } from '@/packages/shared/routeProfile'
 
 type CatalogRoute = {
   world: string
@@ -44,11 +44,19 @@ function inferDirection(slug: string, name: string, url?: string): 'forward' | '
 
 export type ResolvedRoute = {
   name: string
+  world: string
   slug: string
   lapKm: number
   leadInKm: number
   stravaSegmentId: number
   segments: ProfileSegment[]
+}
+
+export type SegmentCandidate = {
+  slug: string
+  name: string
+  type: 'sprint' | 'climb'
+  direction: 'forward' | 'reverse'
 }
 
 export function resolveCatalogRoute(world: string, routeName: string): ResolvedRoute | null {
@@ -62,6 +70,7 @@ export function resolveCatalogRoute(world: string, routeName: string): ResolvedR
   const stravaSegmentId = match.stravaSegmentId || STRAVA_SEGMENT_OVERRIDES[match.slug] || 0
   return {
     name: match.name,
+    world: match.world,
     slug: match.slug,
     lapKm: Number(match.distance) || 0,
     leadInKm: Number(match.leadInDistance) || 0,
@@ -78,4 +87,18 @@ export function resolveCatalogRoute(world: string, routeName: string): ResolvedR
       }
     }),
   }
+}
+
+export function segmentsToLocate(world: string, placed: ProfileSegment[]): SegmentCandidate[] {
+  const worldSlug = slugifyZwiftName(world)
+  const names = new Set(placed.map((segment) => foldName(segment.name)))
+  return segments
+    .filter((segment) => segment.world === worldSlug && (segment.type === 'sprint' || segment.type === 'climb'))
+    .filter((segment) => !names.has(foldName(segment.name)))
+    .map((segment) => ({
+      slug: segment.slug,
+      name: segment.name,
+      type: segment.type as 'sprint' | 'climb',
+      direction: inferDirection(segment.slug, segment.name, segment.whatsOnZwiftUrl),
+    }))
 }

@@ -1,10 +1,29 @@
 import { NextResponse } from 'next/server'
-import { elevationForSlug } from '@/app/lib/routeElevation'
-import { resolveCatalogRoute } from '@/app/lib/zwiftCatalog'
-import { buildRaceProfile, prepareLap, raceDistanceKm } from '@/packages/shared/routeProfile'
+import { elevationForSlug, segmentLatLng } from '@/app/lib/routeElevation'
+import { resolveCatalogRoute, segmentsToLocate } from '@/app/lib/zwiftCatalog'
+import { buildRaceProfile, placeOnRoute, prepareLap, raceDistanceKm, type ProfileSegment } from '@/packages/shared/routeProfile'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+
+function locatedSegments(world: string, placed: ProfileSegment[], distanceM: number[], latlng: number[][]) {
+  if (latlng.length !== distanceM.length || latlng.length < 2) return []
+  const found: ProfileSegment[] = []
+  for (const candidate of segmentsToLocate(world, placed)) {
+    const points = segmentLatLng(candidate.slug)
+    if (!points) continue
+    const hit = placeOnRoute(latlng, distanceM, points)
+    if (!hit) continue
+    found.push({
+      name: candidate.name,
+      type: candidate.type,
+      fromKm: hit.fromM / 1000,
+      toKm: hit.toM / 1000,
+      direction: candidate.direction,
+    })
+  }
+  return found
+}
 
 export async function GET(req: Request) {
   const url = new URL(req.url)
@@ -17,16 +36,17 @@ export async function GET(req: Request) {
 
   try {
     const streams = await elevationForSlug(match.slug)
-    const lap = prepareLap(streams.distance, streams.altitude, match.leadInKm, match.lapKm)
+    const lap = prepareLap(streams.distance, streams.altitude, match.leadInKm, match.lapKm, streams.latlng)
     const raceKm = raceDistanceKm(match.lapKm, url.searchParams.get('laps'), url.searchParams.get('distance'))
     const climbs = (url.searchParams.get('climbs') || '')
       .split(',')
       .map((name) => name.trim())
       .filter(Boolean)
+    const segments = [...match.segments, ...locatedSegments(match.world, match.segments, lap.distance, lap.latlng)]
     const profile = buildRaceProfile({
       distanceM: lap.distance,
       altitudeM: lap.altitude,
-      segments: match.segments,
+      segments,
       raceKm,
       finishText: url.searchParams.get('finish') || '',
       climbNames: climbs,

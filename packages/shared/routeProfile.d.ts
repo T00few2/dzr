@@ -39,8 +39,15 @@ export function prepareLap(
   distance: number[],
   altitude: number[],
   leadInKm: number,
-  lapKm: number
-): { distance: number[]; altitude: number[] }
+  lapKm: number,
+  latlng?: number[][]
+): { distance: number[]; altitude: number[]; latlng: number[][] }
+
+export function placeOnRoute(
+  routeLatLng: number[][],
+  routeDistanceM: number[],
+  segmentLatLng: number[][]
+): { fromM: number; toM: number } | null
 
 export function raceDistanceKm(lapKm: number, lapsText: unknown, distanceText: unknown): number
 
