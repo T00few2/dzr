@@ -13,6 +13,7 @@ type CatalogRoute = {
 }
 
 type CatalogSegment = {
+  world: string
   slug: string
   name: string
   type: 'sprint' | 'climb' | 'segment'
