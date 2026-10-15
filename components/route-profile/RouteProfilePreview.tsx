@@ -150,7 +150,7 @@ export function RouteProfilePreview({
     : ''
 
   useEffect(() => {
-    if (!request?.world || !request.route) {
+    if (!request?.route) {
       setProfile(null)
       setError('')
       onProfile?.(null)

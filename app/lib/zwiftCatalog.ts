@@ -54,15 +54,12 @@ export type ResolvedRoute = {
 export function resolveCatalogRoute(world: string, routeName: string): ResolvedRoute | null {
   const worldSlug = slugifyZwiftName(world)
   const routeSlug = slugifyZwiftName(routeName)
-  if (!worldSlug || !routeSlug) return null
-  const inWorld = routes.filter((route) => route.world === worldSlug)
-  const match =
-    inWorld.find((route) => route.slug === routeSlug) ||
-    inWorld.find((route) => fold(route.name) === fold(routeName)) ||
-    null
+  if (!routeSlug) return null
+  const named = routes.filter((route) => route.slug === routeSlug || fold(route.name) === fold(routeName))
+  const inWorld = worldSlug ? named.filter((route) => route.world === worldSlug) : []
+  const match = inWorld[0] || (named.length === 1 ? named[0] : null)
   if (!match) return null
-  const stravaSegmentId = match.stravaSegmentId || STRAVA_SEGMENT_OVERRIDES[match.slug]
-  if (!stravaSegmentId) return null
+  const stravaSegmentId = match.stravaSegmentId || STRAVA_SEGMENT_OVERRIDES[match.slug] || 0
   return {
     name: match.name,
     slug: match.slug,

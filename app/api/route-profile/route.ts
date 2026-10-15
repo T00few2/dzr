@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { elevationForSegment } from '@/app/lib/stravaElevation'
+import { elevationForSlug } from '@/app/lib/routeElevation'
 import { resolveCatalogRoute } from '@/app/lib/zwiftCatalog'
 import { buildRaceProfile, prepareLap, raceDistanceKm } from '@/packages/shared/routeProfile'
 
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const streams = await elevationForSegment(match.stravaSegmentId)
+    const streams = await elevationForSlug(match.slug)
     const lap = prepareLap(streams.distance, streams.altitude, match.leadInKm, match.lapKm)
     const raceKm = raceDistanceKm(match.lapKm, url.searchParams.get('laps'), url.searchParams.get('distance'))
     const climbs = (url.searchParams.get('climbs') || '')

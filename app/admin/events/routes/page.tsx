@@ -439,7 +439,11 @@ export default function RouteSetupPage() {
                   onChange={(e) => {
                     const hit = options.find((option) => String(option.routeId) === e.target.value)
                     if (!hit) return
-                    setField({ zwiftRouteId: hit.routeId, zwiftRouteName: hit.name })
+                    setField({
+                      zwiftRouteId: hit.routeId,
+                      zwiftRouteName: hit.name,
+                      world: draft.world.trim() ? draft.world : hit.world ? `${hit.world[0]}${hit.world.slice(1).toLowerCase()}` : draft.world,
+                    })
                   }}
                 >
                   {options.map((option) => (
