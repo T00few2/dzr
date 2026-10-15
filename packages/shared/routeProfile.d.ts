@@ -43,6 +43,11 @@ export function prepareLap(
   latlng?: number[][]
 ): { distance: number[]; altitude: number[]; latlng: number[][] }
 
+export function mergePositionedSegments(
+  existing: ProfileSegment[],
+  extra: ProfileSegment[]
+): ProfileSegment[]
+
 export function placeOnRoute(
   routeLatLng: number[][],
   routeDistanceM: number[],

@@ -94,6 +94,29 @@ function namesMatch(segmentName, query) {
   return queryKeys(query).some((right) => left === right || left.startsWith(right) || right.startsWith(left))
 }
 
+function rangesOverlap(left, right) {
+  const leftStart = Math.min(left.fromKm, left.toKm)
+  const leftEnd = Math.max(left.fromKm, left.toKm)
+  const rightStart = Math.min(right.fromKm, right.toKm)
+  const rightEnd = Math.max(right.fromKm, right.toKm)
+  const overlap = Math.min(leftEnd, rightEnd) - Math.max(leftStart, rightStart)
+  if (overlap > 0.02) return true
+  return Math.abs(left.fromKm - right.fromKm) < 0.12
+}
+
+function mergePositionedSegments(existing, extra) {
+  const merged = Array.isArray(existing) ? [...existing] : []
+  for (const segment of extra || []) {
+    if (!segment || (segment.type !== "sprint" && segment.type !== "climb")) continue
+    const duplicate = merged.some(
+      (current) => current.type === segment.type && rangesOverlap(current, segment)
+    )
+    if (duplicate) continue
+    merged.push(segment)
+  }
+  return merged
+}
+
 function placeOnRoute(routeLatLng, routeDistanceM, segmentLatLng) {
   if (!Array.isArray(routeLatLng) || !Array.isArray(segmentLatLng)) return null
   if (routeLatLng.length < 2 || segmentLatLng.length < 2 || routeLatLng.length !== routeDistanceM.length) return null
@@ -315,4 +338,5 @@ module.exports = {
   buildRaceProfile,
   profileImageSrc,
   placeOnRoute,
+  mergePositionedSegments,
 }

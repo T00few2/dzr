@@ -2,6 +2,7 @@
 const elevationFiles = [
   './node_modules/zwift-data/lib/streams/routes/**/*',
   './node_modules/zwift-data/lib/streams/segments/**/*',
+  './data/sauce-route-segments.json',
 ]
 
 const nextConfig = {

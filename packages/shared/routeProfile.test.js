@@ -1,6 +1,6 @@
 const test = require("node:test")
 const assert = require("node:assert")
-const { parseFinish, buildRaceProfile, raceDistanceKm, profileImageSrc } = require("./routeProfile")
+const { parseFinish, buildRaceProfile, raceDistanceKm, profileImageSrc, mergePositionedSegments } = require("./routeProfile")
 
 test("an After Party finish names the segment and the pass", () => {
   assert.deepStrictEqual(parseFinish("Banner on Petit KOM Reverse"), { pass: 1, name: "Petit KOM Reverse" })
@@ -64,6 +64,18 @@ test("ZwiftPower names match the segment on the route", () => {
   assert.ok(profile.finish.fromKm > 16)
   assert.strictEqual(profile.climbs[0].matched, true)
   assert.strictEqual(profile.climbs[1].matched, true)
+})
+
+test("Sauce positions fill gaps and leave an existing band in place", () => {
+  const merged = mergePositionedSegments(
+    [{ name: "Richmond Sprint", type: "sprint", fromKm: 3.7, toKm: 3.9, direction: "forward" }],
+    [
+      { name: "Richmond Sprint", type: "sprint", fromKm: 3.74, toKm: 3.97, direction: "forward" },
+      { name: "Country Sprint", type: "sprint", fromKm: 13.995, toKm: 14.142, direction: "forward" },
+    ]
+  )
+  assert.deepStrictEqual(merged.map((segment) => segment.name), ["Richmond Sprint", "Country Sprint"])
+  assert.strictEqual(merged[0].fromKm, 3.7)
 })
 
 test("the existing profile picture path stays the same", () => {

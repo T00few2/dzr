@@ -2,6 +2,7 @@ import { routes as zwiftRoutes, segments as zwiftSegments } from 'zwift-data'
 import { foldName, slugifyZwiftName, type ProfileSegment } from '@/packages/shared/routeProfile'
 
 type CatalogRoute = {
+  id?: number
   world: string
   slug: string
   name: string
@@ -44,6 +45,7 @@ function inferDirection(slug: string, name: string, url?: string): 'forward' | '
 }
 
 export type ResolvedRoute = {
+  id?: number
   name: string
   world: string
   slug: string
@@ -70,6 +72,7 @@ export function resolveCatalogRoute(world: string, routeName: string): ResolvedR
   if (!match) return null
   const stravaSegmentId = match.stravaSegmentId || STRAVA_SEGMENT_OVERRIDES[match.slug] || 0
   return {
+    id: match.id,
     name: match.name,
     world: match.world,
     slug: match.slug,
