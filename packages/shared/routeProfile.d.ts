@@ -41,7 +41,9 @@ export function prepareLap(
   leadInKm: number,
   lapKm: number,
   latlng?: number[][]
-): { distance: number[]; altitude: number[]; latlng: number[][] }
+): { distance: number[]; altitude: number[]; latlng: number[][]; leadInKm: number }
+
+export function shiftProfileSegments(segments: ProfileSegment[], leadInKm: number): ProfileSegment[]
 
 export function mergePositionedSegments(
   existing: ProfileSegment[],

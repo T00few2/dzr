@@ -1,6 +1,6 @@
 const test = require("node:test")
 const assert = require("node:assert")
-const { parseFinish, buildRaceProfile, raceDistanceKm, profileImageSrc, mergePositionedSegments } = require("./routeProfile")
+const { parseFinish, buildRaceProfile, raceDistanceKm, profileImageSrc, mergePositionedSegments, prepareLap, shiftProfileSegments } = require("./routeProfile")
 
 test("an After Party finish names the segment and the pass", () => {
   assert.deepStrictEqual(parseFinish("Banner on Petit KOM Reverse"), { pass: 1, name: "Petit KOM Reverse" })
@@ -76,6 +76,17 @@ test("Sauce positions fill gaps and leave an existing band in place", () => {
   )
   assert.deepStrictEqual(merged.map((segment) => segment.name), ["Richmond Sprint", "Country Sprint"])
   assert.strictEqual(merged[0].fromKm, 3.7)
+})
+
+test("a lead-in in the elevation stream is removed from the segment marks", () => {
+  const lap = prepareLap([0, 497, 831, 1731, 46103], [5, 5, 7, 58, 144], 0.497, 45.753)
+  assert.ok(lap.leadInKm > 0.4)
+  const shifted = shiftProfileSegments(
+    [{ name: "Zwift KOM", type: "climb", fromKm: 0.831, toKm: 1.731, direction: "forward" }],
+    lap.leadInKm
+  )
+  assert.ok(Math.abs(shifted[0].fromKm - 0.334) < 0.01)
+  assert.ok(shifted[0].toKm < 1.3)
 })
 
 test("the existing profile picture path stays the same", () => {

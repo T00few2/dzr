@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { elevationForSlug, segmentLatLng } from '@/app/lib/routeElevation'
 import { sauceSegmentsForRoute } from '@/app/lib/sauceRouteSegments'
 import { resolveCatalogRoute, segmentsToLocate } from '@/app/lib/zwiftCatalog'
-import { buildRaceProfile, mergePositionedSegments, placeOnRoute, prepareLap, raceDistanceKm, type ProfileSegment } from '@/packages/shared/routeProfile'
+import { buildRaceProfile, mergePositionedSegments, placeOnRoute, prepareLap, raceDistanceKm, shiftProfileSegments, type ProfileSegment } from '@/packages/shared/routeProfile'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -43,7 +43,10 @@ export async function GET(req: Request) {
       .split(',')
       .map((name) => name.trim())
       .filter(Boolean)
-    const positioned = mergePositionedSegments(match.segments, sauceSegmentsForRoute(match.id))
+    const positioned = shiftProfileSegments(
+      mergePositionedSegments(match.segments, sauceSegmentsForRoute(match.id)),
+      lap.leadInKm,
+    )
     const segments = [...positioned, ...locatedSegments(match.world, positioned, lap.distance, lap.latlng)]
     const profile = buildRaceProfile({
       distanceM: lap.distance,

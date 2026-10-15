@@ -178,7 +178,7 @@ function prepareLap(distance, altitude, leadInKm, lapKm, latlng) {
     lapM > 0 &&
     meters.length > 1 &&
     Math.abs(endM - (lapM + leadInM)) <= Math.abs(endM - lapM)
-  if (!includesLeadIn) return { distance: meters, altitude: heights, latlng: points }
+  if (!includesLeadIn) return { distance: meters, altitude: heights, latlng: points, leadInKm: 0 }
   let start = meters.findIndex((point) => point >= leadInM)
   if (start < 0) start = 0
   let nextDistance = meters.slice(start).map((point) => Math.max(0, point - leadInM))
@@ -189,7 +189,23 @@ function prepareLap(distance, altitude, leadInKm, lapKm, latlng) {
     nextAltitude = [nextAltitude[0] || 0, ...nextAltitude]
     if (nextLatLng.length) nextLatLng = [nextLatLng[0], ...nextLatLng]
   }
-  return { distance: nextDistance, altitude: nextAltitude, latlng: nextLatLng }
+  return { distance: nextDistance, altitude: nextAltitude, latlng: nextLatLng, leadInKm: leadInM / 1000 }
+}
+
+function shiftProfileSegments(segments, leadInKm) {
+  const shift = Number(leadInKm) || 0
+  if (!(shift > 0)) return Array.isArray(segments) ? segments : []
+  return (segments || [])
+    .map((segment) => {
+      const fromKm = Math.min(segment.fromKm, segment.toKm) - shift
+      const toKm = Math.max(segment.fromKm, segment.toKm) - shift
+      return {
+        ...segment,
+        fromKm: roundKm(Math.max(0, fromKm)),
+        toKm: roundKm(Math.max(0, toKm)),
+      }
+    })
+    .filter((segment) => segment.toKm > segment.fromKm || (segment.toKm === segment.fromKm && segment.fromKm > 0))
 }
 
 function raceDistanceKm(lapKm, lapsText, distanceText) {
@@ -339,4 +355,5 @@ module.exports = {
   profileImageSrc,
   placeOnRoute,
   mergePositionedSegments,
+  shiftProfileSegments,
 }
