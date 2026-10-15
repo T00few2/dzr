@@ -6,6 +6,7 @@ import Carousel from '../carousel';
 import type { PublishedRace } from '../api/google/googleSheetsData';
 import ZwiftyFiftyRules from './ZwiftyFiftyRules'
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { KeepExistingImages, RouteProfilePreview } from '@/components/route-profile/RouteProfilePreview';
 
 import {
     Heading,
@@ -100,12 +101,29 @@ function RaceList() {
                         <Heading as='h1' size ='lg' color={'white'}>Route Profile and Key Climbs</Heading>
                         <Heading as='h2' size ='lg' color={'white'}>{nextRouteDetails.route}</Heading>
 
+                        <KeepExistingImages
+                            series="zwifty-fifty"
+                            routeName={nextRouteDetails.route}
+                            fallback={
+                                <RouteProfilePreview
+                                    request={{
+                                        world: nextRouteDetails.world,
+                                        route: nextRace.catalog?.zwiftRouteName || nextRouteDetails.route,
+                                        laps: nextRouteDetails.laps,
+                                        distance: nextRouteDetails.length,
+                                        climbs: nextRouteDetails.climbs,
+                                    }}
+                                    showClimbs
+                                />
+                            }
+                        >
                         <Carousel
                             cards={[
                                 `/the-zwifty-fifty/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${nextRouteDetails.route.split(' ').join('-')}-profile.png`,
                                 ...nextRouteDetails.climbs.map(climb => `/the-zwifty-fifty/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${climb.split(' ').join('-')}.png`)
                                     ]}
                         />
+                        </KeepExistingImages>
                         <Heading as='h1' size ='lg' color={'white'}>Bonus Sprints</Heading>
                         <Heading as='h2' size ='md' color={'white'}>First across line (FAL) bonus seconds on segments below</Heading>
                         <TableContainer  textAlign="center" gridTemplateColumns="auto auto auto">

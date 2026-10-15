@@ -10,6 +10,8 @@ import {
   type CatalogRoute,
 } from '@/app/lib/catalogRoute'
 import { Box, Button, Flex, Heading, Input, Select, Stack, Text, Textarea } from '@chakra-ui/react'
+import { RouteProfilePreview } from '@/components/route-profile/RouteProfilePreview'
+import type { RaceProfile } from '@/packages/shared/routeProfile'
 
 type SeriesId = 'after-party' | 'zwifty-fifty'
 type RouteHit = { routeId: number; name: string; world: string | null }
@@ -41,6 +43,7 @@ export default function RouteSetupPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState('')
+  const [profile, setProfile] = useState<RaceProfile | null>(null)
 
   const fifty = series === 'zwifty-fifty'
 
@@ -72,6 +75,7 @@ export default function RouteSetupPage() {
     setOptions([])
     setSprintHits({})
     setQuery(route.zwiftRouteName || route.route)
+    setProfile(null)
     setError('')
     setNotice('')
   }
@@ -82,6 +86,7 @@ export default function RouteSetupPage() {
     setOptions([])
     setSprintHits({})
     setQuery('')
+    setProfile(null)
     setError('')
     setNotice('')
   }
@@ -322,6 +327,23 @@ export default function RouteSetupPage() {
                   <Text fontSize="sm" color="gray.400" mb={2}>
                     Sprints use the ZwiftPower segment name. Fuego Flats is not a segment; Fuego Flats Long is.
                   </Text>
+                  <Button
+                    {...readableOutline}
+                    size="sm"
+                    mb={2}
+                    isDisabled={!profile?.sprints.length}
+                    onClick={() => {
+                      if (!profile?.sprints.length) return
+                      const filled = draft.sprints.some((sprint) => sprint.trim())
+                      if (filled && !window.confirm('Replace the sprint list with the sprints on this route?')) return
+                      setField({
+                        sprints: profile.sprints.map((sprint) => sprint.name),
+                        sprintLaps: profile.sprints.map((sprint) => sprint.laps),
+                      })
+                    }}
+                  >
+                    Suggest sprints
+                  </Button>
                   <Stack spacing={2}>
                     {draft.sprints.map((sprint, sprintIndex) => (
                       <Box key={sprintIndex}>
@@ -432,6 +454,23 @@ export default function RouteSetupPage() {
             <Button colorScheme="red" alignSelf="flex-start" isLoading={busy === 'save'} onClick={() => void save()}>
               {index == null ? 'Add route' : 'Save route'}
             </Button>
+            {draft.zwiftRouteName ? (
+              <RouteProfilePreview
+                request={{
+                  world: draft.world,
+                  route: draft.zwiftRouteName,
+                  laps: draft.laps,
+                  distance: draft.distance,
+                  finish: draft.finish,
+                  climbs: draft.climbs,
+                }}
+                showFinish={!fifty}
+                showClimbs={fifty}
+                onProfile={setProfile}
+              />
+            ) : (
+              <Text color="gray.500">Choose the Zwift route to preview the profile.</Text>
+            )}
           </Stack>
         </Box>
       </Flex>

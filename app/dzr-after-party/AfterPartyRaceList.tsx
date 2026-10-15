@@ -4,6 +4,7 @@ import { AfterPartyRacesData } from './AfterPartyRaces';
 import Carousel from '../carousel';
 import {useRaceCalendarAPS} from '../api/google/googleSheetsData';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { KeepExistingImages, RouteProfilePreview } from '@/components/route-profile/RouteProfilePreview';
 
 import {
     Heading,
@@ -87,6 +88,22 @@ export default function AfterPartyRaceList() {
 
                         </center>
                         
+                        <KeepExistingImages
+                            series="after-party"
+                            routeName={nextRouteDetails.route}
+                            fallback={
+                                <RouteProfilePreview
+                                    request={{
+                                        world: nextRouteDetails.world,
+                                        route: nextRace.catalog?.zwiftRouteName || nextRouteDetails.route,
+                                        laps: nextRouteDetails.laps,
+                                        distance: nextRouteDetails.distance,
+                                        finish: nextRouteDetails.finish,
+                                    }}
+                                    showFinish
+                                />
+                            }
+                        >
                         <Carousel
                             cards={[
                                 `/dzr-after-party/${nextRouteDetails.route.toLowerCase().replace(/\s+/g, '-')}/${nextRouteDetails.route.split(' ').join('-')}-profile.png`,
@@ -95,6 +112,7 @@ export default function AfterPartyRaceList() {
                             ]}
    
                         />
+                        </KeepExistingImages>
                     </Stack>
                     
                 )})}
