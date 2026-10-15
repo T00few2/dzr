@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   Badge,
@@ -11,10 +11,16 @@ import {
   Input,
   Select,
   Stack,
+  Table,
+  Tbody,
+  Td,
   Text,
+  Th,
+  Thead,
+  Tr,
 } from '@chakra-ui/react'
 import type { ZwiftEventSummary } from '@/packages/shared/zwiftEvents'
-import FiftyResults from '@/app/admin/events/FiftyResults'
+import { FiftyDetail, FiftyStatus, type FiftyPanel, type SavedEvent } from '@/app/admin/events/FiftyResults'
 
 type SeriesDate = {
   date: string
@@ -188,12 +194,11 @@ function GroupRide({ upcoming, feedDown }: { upcoming: ZwiftEventSummary[]; feed
 
   return (
     <Box borderWidth="1px" borderColor="gray.700" rounded="md" p={4}>
-      <Heading size="sm" mb={1}>
+      <Heading size="sm" mb={3}>
         It&apos;s always a race
       </Heading>
       <Text color="gray.400" mb={4}>
-        Category B is filled from the Zwift Insider route of the week. Pick category A yourself, then Apply.
-        Zwift creates the next ride about 24 hours after the last one. This ride is not posted to Discord.
+        Category B is the route of the week. Pick category A, then Apply.
       </Text>
       {feedDown ? <Text color="orange.300">The public event list is unavailable right now.</Text> : null}
       {!feedDown && rides.length === 0 ? (
@@ -292,12 +297,63 @@ function GroupRide({ upcoming, feedDown }: { upcoming: ZwiftEventSummary[]; feed
             )
           })}
           <Button type="button" colorScheme="red" isLoading={busy === 'apply'} alignSelf="flex-start" onClick={() => void apply()}>
-            Apply category routes
+            Apply
           </Button>
         </Stack>
       ) : null}
     </Box>
   )
+}
+
+type SeriesMessage = { error: string; notice: string }
+type ScheduleRow = SeriesDate & {
+  strong: boolean
+  past: boolean
+  resultsFix: SavedEvent['resultsFix']
+  primesFix: SavedEvent['primesFix']
+}
+
+function scheduleRows(dates: SeriesDate[], saved: SavedEvent[]): ScheduleRow[] {
+  const savedByDate = new Map(saved.map((event) => [event.date, event]))
+  const pending = dates.filter((row) => !row.eventId).sort((a, b) => a.date.localeCompare(b.date))
+  const nextDate = pending[0]?.date
+  const upcoming = (nextDate ? dates.filter((row) => row.date >= nextDate) : dates).sort((a, b) =>
+    a.date.localeCompare(b.date)
+  )
+  const earlier = nextDate ? dates.filter((row) => row.date < nextDate) : []
+  const known = new Set(dates.map((row) => row.date))
+  const older = saved.filter((event) => !known.has(event.date))
+  const asRow = (row: SeriesDate, strong: boolean, past: boolean): ScheduleRow => {
+    const match = savedByDate.get(row.date)
+    return {
+      ...row,
+      strong,
+      past,
+      resultsFix: match?.resultsFix || null,
+      primesFix: match?.primesFix || null,
+    }
+  }
+  return [
+    ...upcoming.map((row) => asRow(row, row.date === nextDate, false)),
+    ...earlier
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((row) => asRow(row, false, true)),
+    ...older
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((event) => ({
+        date: event.date,
+        label: event.label,
+        route: event.route,
+        overridden: false,
+        eventId: event.eventId,
+        publishedRoute: event.route,
+        feedEventId: null,
+        strong: false,
+        past: true,
+        resultsFix: event.resultsFix,
+        primesFix: event.primesFix,
+      })),
+  ]
 }
 
 export default function WeeklySeries({
@@ -308,18 +364,32 @@ export default function WeeklySeries({
   feedDown: boolean
 }) {
   const [series, setSeries] = useState<SeriesView[]>([])
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  const [saved, setSaved] = useState<SavedEvent[]>([])
+  const [loadError, setLoadError] = useState('')
+  const [messages, setMessages] = useState<Record<string, SeriesMessage>>({})
   const [busy, setBusy] = useState('')
+  const [fiftyOpen, setFiftyOpen] = useState<{ id: string; panel: FiftyPanel } | null>(null)
+
+  function setMessage(seriesId: string, message: SeriesMessage) {
+    setMessages((current) => ({ ...current, [seriesId]: message }))
+  }
+
+  async function loadSaved() {
+    const res = await fetch('/api/admin/events/results', { cache: 'no-store' })
+    if (!res.ok) return
+    const body = await res.json()
+    setSaved(Array.isArray(body.events) ? body.events : [])
+  }
 
   async function load() {
     const res = await fetch('/api/admin/events/series', { cache: 'no-store' })
     if (!res.ok) {
-      setError(await errorMessage(res))
+      setLoadError(await errorMessage(res))
       return
     }
     const body = await res.json()
     setSeries(Array.isArray(body.series) ? body.series : [])
+    await loadSaved()
   }
 
   useEffect(() => {
@@ -328,8 +398,7 @@ export default function WeeklySeries({
 
   async function saveOverride(seriesId: string, date: string, route: string) {
     setBusy(`${seriesId}:${date}`)
-    setError('')
-    setNotice('')
+    setMessage(seriesId, { error: '', notice: '' })
     const res = await fetch('/api/admin/events/series', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -337,7 +406,7 @@ export default function WeeklySeries({
     })
     setBusy('')
     if (!res.ok) {
-      setError(await errorMessage(res))
+      setMessage(seriesId, { error: await errorMessage(res), notice: '' })
       return
     }
     const body = await res.json()
@@ -357,8 +426,7 @@ export default function WeeklySeries({
       return
     }
     setBusy(`apply:${item.id}:${row.date}`)
-    setError('')
-    setNotice('')
+    setMessage(item.id, { error: '', notice: '' })
     const res = await fetch('/api/admin/events/series/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -366,93 +434,184 @@ export default function WeeklySeries({
     })
     setBusy('')
     if (!res.ok) {
-      setError(await errorMessage(res))
+      setMessage(item.id, { error: await errorMessage(res), notice: '' })
       return
     }
     const body = await res.json()
     setSeries(Array.isArray(body.series) ? body.series : [])
-    setNotice(
-      body.discordError
+    setMessage(item.id, {
+      error: '',
+      notice: body.discordError
         ? `Saved ${row.label}. Discord post failed: ${body.discordError}`
-        : `Saved ${row.label}. Discord post sent.`
-    )
+        : `Saved ${row.label}. Discord post sent.`,
+    })
+    await loadSaved()
   }
 
   return (
     <Stack spacing={6} mb={10}>
-      <Box>
-        <Heading size="md" mb={1}>
-          Weekly series
-        </Heading>
-        <Text color="gray.400">
-          The route rotates through the catalog. Changing a date affects that date only. The public site and Discord
-          move when Apply saves the event id, after Zwift has created that event. Routes are edited on the{' '}
-          <Link href="/admin/events/routes">route setup</Link> page.
-        </Text>
-      </Box>
-      {error ? <Text color="red.300">{error}</Text> : null}
-      {notice ? <Text color="green.300">{notice}</Text> : null}
-      {series.map((item) => (
-        <Box key={item.id} borderWidth="1px" borderColor="gray.700" rounded="md" p={4}>
-          <Heading size="sm" mb={3}>
-            {item.name}
-          </Heading>
-          {item.error ? (
-            <Text color="red.300" mb={3}>
-              {item.error}
-            </Text>
-          ) : null}
-          {item.feedUnavailable ? (
-            <Text color="orange.300" mb={3}>
-              The public event list is unavailable, so Apply cannot see a new event yet.
-            </Text>
-          ) : null}
-          <Stack spacing={4}>
-            {item.dates.map((row) => (
-              <Box key={row.date}>
-                <Flex gap={2} align="center" wrap="wrap" mb={2}>
-                  <Text minW="180px">{row.label}</Text>
-                  {row.overridden ? <Badge colorScheme="orange">Changed</Badge> : null}
-                  {row.eventId ? <Badge colorScheme="green">Event {row.eventId}</Badge> : null}
-                  {!row.eventId && row.feedEventId ? <Badge colorScheme="blue">Ready to apply</Badge> : null}
-                </Flex>
-                <Flex gap={2} wrap="wrap">
-                  <Select
-                    value={row.route}
-                    bg="gray.900"
-                    borderColor="gray.700"
-                    maxW="360px"
-                    isDisabled={busy === `${item.id}:${row.date}`}
-                    onChange={(e) => void saveOverride(item.id, row.date, e.target.value)}
-                  >
-                    {row.route && !item.routes.includes(row.route) ? (
-                      <option value={row.route}>{row.route}</option>
-                    ) : null}
-                    {item.routes.map((route) => (
-                      <option key={route} value={route}>
-                        {route}
-                      </option>
-                    ))}
-                  </Select>
-                  <Button
-                    colorScheme="red"
-                    isLoading={busy === `apply:${item.id}:${row.date}`}
-                    onClick={() => void apply(item, row)}
-                  >
-                    Apply
-                  </Button>
-                </Flex>
-                {row.eventId && row.publishedRoute && row.publishedRoute !== row.route ? (
-                  <Text color="gray.400" fontSize="sm" mt={2}>
-                    The site still shows {row.publishedRoute} until you Apply.
-                  </Text>
-                ) : null}
-              </Box>
-            ))}
-          </Stack>
-          {item.id === 'zwifty-fifty' ? <FiftyResults /> : null}
-        </Box>
-      ))}
+      <Flex justify="space-between" align="center" gap={3} wrap="wrap">
+        <Heading size="md">Weekly series</Heading>
+        <Button as={Link} href="/admin/events/routes" {...readableOutline} size="sm">
+          Route setup
+        </Button>
+      </Flex>
+      {loadError ? <Text color="red.300">{loadError}</Text> : null}
+      {series.map((item) => {
+        const message = messages[item.id]
+        const rows = scheduleRows(item.dates, item.id === 'zwifty-fifty' ? saved : [])
+        const columns = item.id === 'zwifty-fifty' ? 5 : 4
+        return (
+          <Box key={item.id} borderWidth="1px" borderColor="gray.700" rounded="md" p={4}>
+            <Heading size="sm" mb={3}>
+              {item.name}
+            </Heading>
+            {item.error ? (
+              <Text color="red.300" mb={3}>
+                {item.error}
+              </Text>
+            ) : null}
+            {message?.error ? (
+              <Text color="red.300" mb={3}>
+                {message.error}
+              </Text>
+            ) : null}
+            {message?.notice ? (
+              <Text color="green.300" mb={3}>
+                {message.notice}
+              </Text>
+            ) : null}
+            {item.feedUnavailable ? (
+              <Text color="orange.300" mb={3}>
+                The public event list is unavailable, so Apply cannot see a new event yet.
+              </Text>
+            ) : null}
+            <Box overflowX="auto">
+              <Table size="sm" variant="unstyled">
+                <Thead>
+                  <Tr>
+                    <Th color="gray.500">Date</Th>
+                    <Th color="gray.500">Route</Th>
+                    <Th color="gray.500">Status</Th>
+                    <Th color="gray.500" />
+                    {item.id === 'zwifty-fifty' ? <Th color="gray.500">ZwiftPower</Th> : null}
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {rows.map((row) => {
+                    const open = row.eventId && fiftyOpen?.id === row.eventId ? fiftyOpen.panel : null
+                    return (
+                      <Fragment key={row.date}>
+                        <Tr bg={row.strong ? 'whiteAlpha.100' : undefined}>
+                          <Td color={row.strong ? 'white' : 'gray.400'} fontWeight={row.strong ? 'semibold' : 'normal'}>
+                            {row.label}
+                          </Td>
+                          <Td>
+                            {row.past && !item.dates.some((date) => date.date === row.date) ? (
+                              <Text color="gray.300">{row.route}</Text>
+                            ) : (
+                              <Select
+                                value={row.route}
+                                bg="gray.900"
+                                borderColor="gray.700"
+                                maxW="320px"
+                                isDisabled={busy === `${item.id}:${row.date}`}
+                                onChange={(e) => void saveOverride(item.id, row.date, e.target.value)}
+                              >
+                                {row.route && !item.routes.includes(row.route) ? (
+                                  <option value={row.route}>{row.route}</option>
+                                ) : null}
+                                {item.routes.map((route) => (
+                                  <option key={route} value={route}>
+                                    {route}
+                                  </option>
+                                ))}
+                              </Select>
+                            )}
+                            {row.eventId && row.publishedRoute && row.publishedRoute !== row.route ? (
+                              <Text color="gray.500" fontSize="xs" mt={1}>
+                                Site still shows {row.publishedRoute}
+                              </Text>
+                            ) : null}
+                          </Td>
+                          <Td>
+                            <Flex gap={2} wrap="wrap">
+                              {row.overridden ? <Badge colorScheme="orange">Changed</Badge> : null}
+                              {row.eventId ? <Badge colorScheme="green">Event {row.eventId}</Badge> : null}
+                              {!row.eventId && row.feedEventId ? <Badge colorScheme="blue">Ready to apply</Badge> : null}
+                            </Flex>
+                          </Td>
+                          <Td>
+                            {row.past && !item.dates.some((date) => date.date === row.date) ? null : (
+                              <Button
+                                colorScheme="red"
+                                size="sm"
+                                isLoading={busy === `apply:${item.id}:${row.date}`}
+                                onClick={() => void apply(item, row)}
+                              >
+                                Apply
+                              </Button>
+                            )}
+                          </Td>
+                          {item.id === 'zwifty-fifty' ? (
+                            <Td>
+                              {row.eventId ? (
+                                <Stack spacing={2}>
+                                  <FiftyStatus
+                                    event={{
+                                      date: row.date,
+                                      label: row.label,
+                                      route: row.route,
+                                      eventId: row.eventId,
+                                      resultsFix: row.resultsFix,
+                                      primesFix: row.primesFix,
+                                    }}
+                                  />
+                                  <Flex gap={2} wrap="wrap">
+                                    <Button
+                                      {...readableOutline}
+                                      size="sm"
+                                      onClick={() =>
+                                        setFiftyOpen(open === 'categories' ? null : { id: row.eventId, panel: 'categories' })
+                                      }
+                                    >
+                                      Check categories
+                                    </Button>
+                                    <Button
+                                      {...readableOutline}
+                                      size="sm"
+                                      onClick={() =>
+                                        setFiftyOpen(open === 'sprints' ? null : { id: row.eventId, panel: 'sprints' })
+                                      }
+                                    >
+                                      Check sprints
+                                    </Button>
+                                  </Flex>
+                                </Stack>
+                              ) : null}
+                            </Td>
+                          ) : null}
+                        </Tr>
+                        {item.id === 'zwifty-fifty' && open ? (
+                          <Tr>
+                            <Td colSpan={columns} borderTopWidth="0">
+                              <FiftyDetail
+                                eventId={row.eventId}
+                                panel={open}
+                                onUpdated={() => void loadSaved()}
+                              />
+                            </Td>
+                          </Tr>
+                        ) : null}
+                      </Fragment>
+                    )
+                  })}
+                </Tbody>
+              </Table>
+            </Box>
+          </Box>
+        )
+      })}
       <GroupRide upcoming={upcoming} feedDown={feedDown} />
     </Stack>
   )

@@ -10,9 +10,14 @@ import {
   Flex,
   Heading,
   Input,
-  SimpleGrid,
   Stack,
+  Table,
+  Tbody,
+  Td,
   Text,
+  Th,
+  Thead,
+  Tr,
 } from '@chakra-ui/react'
 import type { ZwiftEventSummary } from '@/packages/shared/zwiftEvents'
 
@@ -73,16 +78,6 @@ function formatDistance(meters: number | null) {
   return `${(meters / 1000).toFixed(1)} km`
 }
 
-function formatDuration(seconds: number | null) {
-  if (!seconds) return '—'
-  return `${Math.round(seconds / 60)} min`
-}
-
-function formatLaps(laps: number | null) {
-  if (!laps) return '—'
-  return String(laps)
-}
-
 function dash(value: unknown) {
   if (value == null || value === '') return '—'
   return String(value)
@@ -113,15 +108,9 @@ function TagList({ tags, scheme }: { tags: string[]; scheme: string }) {
   )
 }
 
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <Box>
-      <Text fontSize="xs" color="gray.500" textTransform="uppercase">
-        {label}
-      </Text>
-      <Text>{value}</Text>
-    </Box>
-  )
+function lengthLabel(laps: number | null, distanceInMeters: number | null) {
+  if (laps) return `${laps} lap${laps === 1 ? '' : 's'}`
+  return formatDistance(distanceInMeters)
 }
 
 export default function AdminEventsPage() {
@@ -320,6 +309,13 @@ export default function AdminEventsPage() {
 
       <WeeklySeries upcoming={upcoming} feedDown={feedDown} />
 
+      <Heading size="md" mb={1}>
+        Inspect an event
+      </Heading>
+      <Text color="gray.400" mb={4}>
+        A one-off event. Pick it from the list, or enter an event id.
+      </Text>
+
       <Flex as="form" onSubmit={onInspectSubmit} gap={2} mb={6} wrap="wrap">
         <Input
           value={eventId}
@@ -378,81 +374,33 @@ export default function AdminEventsPage() {
       ) : null}
 
       {event ? (
-        <Stack spacing={8} ref={detailsRef}>
+        <Stack spacing={6} ref={detailsRef}>
           <Box>
-            <Heading size="md" mb={1}>
-              {event.name || 'Untitled event'}
+            <Heading size="sm" mb={2}>
+              Summary
             </Heading>
-            <Text color="gray.400" mb={4}>
+            <Text fontWeight="semibold">{event.name || 'Untitled event'}</Text>
+            <Text color="gray.300">{formatStart(event.eventStart)}</Text>
+            <Text mb={2}>
               <a href={event.url} target="_blank" rel="noreferrer">
-                {event.url}
+                Zwift
               </a>
             </Text>
-            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4} mb={4}>
-              <Field label="Type" value={dash(event.type)} />
-              <Field label="Sport" value={dash(event.sport)} />
-              <Field label="Start" value={formatStart(event.eventStart)} />
-              <Field label="Route" value={event.routeName ? `${event.routeName} (${event.routeId})` : dash(event.routeId)} />
-              <Field label="World" value={event.world ? `${event.world}${event.worldId != null ? ` (${event.worldId})` : ''}` : dash(event.worldId)} />
-              <Field label="Map" value={dash(event.mapId)} />
-              <Field label="Laps" value={formatLaps(event.laps)} />
-              <Field label="Distance" value={formatDistance(event.distanceInMeters)} />
-              <Field label="Duration" value={formatDuration(event.durationInSeconds)} />
-              <Field label="Jersey hash" value={dash(event.jerseyHash)} />
-              <Field label="Bike hash" value={dash(event.bikeHash)} />
-            </SimpleGrid>
-            <Text fontSize="sm" color="gray.400" mb={1}>
-              Unlocks
+            <Text color="gray.300">
+              {event.routeName || 'No route'} · {lengthLabel(event.laps, event.distanceInMeters)}
             </Text>
-            <TagList tags={event.unlockTags} scheme="green" />
-            <Text fontSize="sm" color="gray.400" mt={3} mb={1}>
-              Other tags
-            </Text>
-            <TagList tags={event.tags} scheme="gray" />
-          </Box>
-
-          <Box>
-            <Heading size="sm" mb={3}>
-              Categories
-            </Heading>
-            <Stack spacing={4}>
-              {event.subgroups.map((subgroup) => (
-                <Box key={subgroup.id ?? subgroup.label} borderWidth="1px" borderColor="gray.700" rounded="md" p={4}>
-                  <Text fontWeight="bold" mb={3}>
-                    {subgroup.label || 'Category'} {subgroup.id ? `· ${subgroup.id}` : ''}
-                  </Text>
-                  <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3} mb={3}>
-                    <Field label="Start" value={formatStart(subgroup.eventStart)} />
-                    <Field
-                      label="Route"
-                      value={subgroup.routeName ? `${subgroup.routeName} (${subgroup.routeId})` : dash(subgroup.routeId)}
-                    />
-                    <Field label="World" value={dash(subgroup.world)} />
-                    <Field label="Map" value={dash(subgroup.mapId)} />
-                    <Field label="Laps" value={formatLaps(subgroup.laps)} />
-                    <Field label="Distance" value={formatDistance(subgroup.distanceInMeters)} />
-                    <Field label="Duration" value={formatDuration(subgroup.durationInSeconds)} />
-                    <Field label="Start location" value={dash(subgroup.startLocation)} />
-                    <Field label="Jersey hash" value={dash(subgroup.jerseyHash)} />
-                    <Field label="Bike hash" value={dash(subgroup.bikeHash)} />
-                  </SimpleGrid>
-                  <Text fontSize="sm" color="gray.400" mb={1}>
-                    Unlocks
-                  </Text>
-                  <TagList tags={subgroup.unlockTags} scheme="green" />
-                  <Text fontSize="sm" color="gray.400" mt={3} mb={1}>
-                    Other tags
-                  </Text>
-                  <TagList tags={subgroup.tags} scheme="gray" />
-                </Box>
-              ))}
-            </Stack>
           </Box>
 
           <Box borderWidth="1px" borderColor="gray.700" rounded="md" p={4}>
             <Heading size="sm" mb={3}>
-              Add tags
+              Tags
             </Heading>
+            <Text fontSize="sm" color="gray.400" mb={2}>
+              Unlocks
+            </Text>
+            <Box mb={4}>
+              <TagList tags={event.unlockTags} scheme="green" />
+            </Box>
             <Flex gap={2} wrap="wrap" mb={4}>
               {event.kitPresets.map((kit) => (
                 <Button
@@ -482,7 +430,7 @@ export default function AdminEventsPage() {
 
           <Box borderWidth="1px" borderColor="gray.700" rounded="md" p={4}>
             <Heading size="sm" mb={3}>
-              Route or length
+              Course
             </Heading>
             <Flex as="form" onSubmit={searchRoutes} gap={2} mb={3} wrap="wrap">
               <Input
@@ -562,6 +510,38 @@ export default function AdminEventsPage() {
             <Button type="button" colorScheme="red" isLoading={busy === 'course'} onClick={() => void saveCourse()}>
               Save course
             </Button>
+          </Box>
+
+          <Box>
+            <Heading size="sm" mb={3}>
+              Categories
+            </Heading>
+            <Box overflowX="auto">
+              <Table size="sm" variant="unstyled">
+                <Thead>
+                  <Tr>
+                    <Th color="gray.500">Category</Th>
+                    <Th color="gray.500">Start</Th>
+                    <Th color="gray.500">Route</Th>
+                    <Th color="gray.500">Length</Th>
+                    <Th color="gray.500">Unlocks</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {event.subgroups.map((subgroup) => (
+                    <Tr key={subgroup.id ?? subgroup.label}>
+                      <Td>{subgroup.label || 'Category'}</Td>
+                      <Td>{formatStart(subgroup.eventStart)}</Td>
+                      <Td>{subgroup.routeName || dash(subgroup.routeId)}</Td>
+                      <Td>{lengthLabel(subgroup.laps, subgroup.distanceInMeters)}</Td>
+                      <Td>
+                        <TagList tags={subgroup.unlockTags} scheme="green" />
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </Box>
           </Box>
         </Stack>
       ) : null}
