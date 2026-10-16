@@ -445,7 +445,7 @@ export default function RouteSetupPage() {
                   </Select>
                 ) : null}
               </Box>
-            )} />
+            )}
             <Input placeholder="World" value={draft.world} onChange={(e) => setField({ world: e.target.value })} {...field} />
             <Flex gap={2}>
               <Input placeholder="Laps" value={draft.laps} onChange={(e) => setField({ laps: e.target.value })} {...field} />
