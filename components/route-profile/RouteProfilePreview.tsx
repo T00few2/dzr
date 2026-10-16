@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Area, AreaChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, usePlotArea, XAxis, YAxis } from 'recharts'
 import { Box, HStack, Spinner, Stack, Text } from '@chakra-ui/react'
 import type { ProfileSegment, ProfileZoom, RaceProfile } from '@/packages/shared/routeProfile'
@@ -11,7 +11,7 @@ const GRADE_BANDS = [
   { label: '<4%', color: '#3CB44A' },
   { label: '4–7%', color: '#2E6BFF' },
   { label: '7–10%', color: '#E10600' },
-  { label: '10%+', color: '#7A1020' },
+  { label: '10%+', color: '#111111' },
 ]
 
 type BonusSprint = { name: string; laps?: string }
@@ -145,47 +145,173 @@ function elevationDomain(points: { altitude: number }[]): [number, number] {
   return [floor, Math.max(ceil, floor + step)]
 }
 
-function GradeStroke({
+function clipToWindow(points: { distance: number; altitude: number }[], fromKm: number, toKm: number) {
+  const clipped: { distance: number; altitude: number }[] = []
+  const at = (left: { distance: number; altitude: number }, right: { distance: number; altitude: number }, km: number) => {
+    const span = right.distance - left.distance || 1
+    const ratio = (km - left.distance) / span
+    return { distance: km, altitude: left.altitude + (right.altitude - left.altitude) * ratio }
+  }
+  for (let index = 0; index < points.length; index += 1) {
+    const point = points[index]
+    const previous = points[index - 1]
+    if (previous && previous.distance < fromKm && point.distance >= fromKm) clipped.push(at(previous, point, fromKm))
+    if (point.distance >= fromKm && point.distance <= toKm) clipped.push(point)
+    if (previous && previous.distance <= toKm && point.distance > toKm) clipped.push(at(previous, point, toKm))
+  }
+  return clipped
+}
+
+function kmStep(span: number) {
+  if (span > 8) return 2
+  if (span > 3) return 1
+  if (span > 1.2) return 0.5
+  if (span > 0.6) return 0.2
+  return 0.1
+}
+
+function RibbonChart({
   points,
-  xDomain,
-  yDomain,
+  fromKm,
+  toKm,
+  height,
 }: {
   points: { distance: number; altitude: number }[]
-  xDomain: [number, number]
-  yDomain: [number, number]
+  fromKm: number
+  toKm: number
+  height: number
 }) {
-  const plot = usePlotArea()
+  const frame = useRef<HTMLDivElement>(null)
   const clipId = useId().replace(/:/g, '')
-  if (!plot || plot.width <= 0 || plot.height <= 0 || points.length < 2) return null
-  const [x0, x1] = xDomain
-  const [y0, y1] = yDomain
-  const xSpan = x1 - x0 || 1
+  const [width, setWidth] = useState(0)
+  const [hover, setHover] = useState<{ distance: number; altitude: number } | null>(null)
+  useEffect(() => {
+    const node = frame.current
+    if (!node) return
+    const measure = () => setWidth(node.clientWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
+  const data = clipToWindow(points, fromKm, toKm)
+  const [y0, y1] = elevationDomain(data.length ? data : points)
+  const depthX = 26
+  const depthY = 22
+  const margin = { top: 8, right: 16, bottom: 32, left: 52 }
+  const plotLeft = margin.left
+  const plotTop = margin.top + depthY
+  const plotWidth = Math.max(1, width - margin.left - margin.right - depthX)
+  const plotHeight = Math.max(1, height - margin.top - margin.bottom - depthY)
+  const xSpan = toKm - fromKm || 1
   const ySpan = y1 - y0 || 1
-  const pieces = []
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const start = points[index]
-    const end = points[index + 1]
-    if (end.distance < x0 || start.distance > x1) continue
+  const fx = (distance: number) => plotLeft + ((distance - fromKm) / xSpan) * plotWidth
+  const fy = (altitude: number) => plotTop + (1 - (altitude - y0) / ySpan) * plotHeight
+  const bottom = plotTop + plotHeight
+  const front = data.map((point) => ({ x: fx(point.distance), y: fy(point.altitude) }))
+  const face =
+    front.length > 1
+      ? `M ${front[0].x} ${bottom} ${front.map((point) => `L ${point.x} ${point.y}`).join(' ')} L ${front[front.length - 1].x} ${bottom} Z`
+      : ''
+  const quads = []
+  for (let index = 0; index < data.length - 1; index += 1) {
+    const start = data[index]
+    const end = data[index + 1]
     const run = (end.distance - start.distance) * 1000
     const grade = ((end.altitude - start.altitude) / Math.max(0.001, run)) * 100
-    const xStart = plot.x + ((start.distance - x0) / xSpan) * plot.width
-    const xEnd = plot.x + ((end.distance - x0) / xSpan) * plot.width
-    const yStart = plot.y + (1 - (start.altitude - y0) / ySpan) * plot.height
-    const yEnd = plot.y + (1 - (end.altitude - y0) / ySpan) * plot.height
-    if (![xStart, xEnd, yStart, yEnd].every((value) => Number.isFinite(value))) continue
-    pieces.push(
-      <line key={index} x1={xStart} y1={yStart} x2={xEnd} y2={yEnd} stroke={gradeColor(grade)} strokeWidth={4} strokeLinecap="butt" />
+    const color = gradeColor(grade)
+    quads.push(
+      <polygon
+        key={index}
+        points={`${fx(start.distance)},${fy(start.altitude)} ${fx(end.distance)},${fy(end.altitude)} ${fx(end.distance) + depthX},${fy(end.altitude) - depthY} ${fx(start.distance) + depthX},${fy(start.altitude) - depthY}`}
+        fill={color}
+        stroke={color}
+        strokeWidth={0.6}
+      />
     )
   }
+  const last = data[data.length - 1]
+  const cap = last
+    ? `${fx(last.distance)},${bottom} ${fx(last.distance)},${fy(last.altitude)} ${fx(last.distance) + depthX},${fy(last.altitude) - depthY} ${fx(last.distance) + depthX},${bottom - depthY}`
+    : ''
+  const yStep = y1 - y0 > 120 ? 20 : 10
+  const yTicks = []
+  for (let altitude = y0; altitude <= y1 + 0.1; altitude += yStep) yTicks.push(altitude)
+  const xTicks = []
+  const step = kmStep(xSpan)
+  for (let distance = Math.ceil(fromKm / step) * step; distance <= toKm + step * 0.01; distance += step) xTicks.push(distance)
+  const hatch = []
+  if (front.length > 1) {
+    for (let x = plotLeft; x <= plotLeft + plotWidth; x += 3) hatch.push(<line key={x} x1={x} y1={bottom} x2={x} y2={plotTop} stroke="#D0D0D0" strokeWidth={1} />)
+  }
+  function track(event: MouseEvent<SVGSVGElement>) {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    let nearest = data[0]
+    let best = Infinity
+    for (const point of data) {
+      const delta = Math.abs(fx(point.distance) - x)
+      if (delta < best) {
+        best = delta
+        nearest = point
+      }
+    }
+    setHover(nearest || null)
+  }
+
   return (
-    <g>
-      <defs>
-        <clipPath id={clipId}>
-          <rect x={plot.x} y={plot.y} width={plot.width} height={plot.height} />
-        </clipPath>
-      </defs>
-      <g clipPath={`url(#${clipId})`}>{pieces}</g>
-    </g>
+    <Box ref={frame} h={`${height}px`} w="100%">
+      {width > 0 && data.length > 1 ? (
+        <svg width={width} height={height} role="img" onMouseMove={track} onMouseLeave={() => setHover(null)}>
+          <polygon points={cap} fill="#E4E4E4" />
+          <clipPath id={clipId}>
+            <path d={face} />
+          </clipPath>
+          <path d={face} fill="#F7F7F7" />
+          <g clipPath={`url(#${clipId})`}>{hatch}</g>
+          {quads}
+          <polyline
+            points={front.map((point) => `${point.x},${point.y}`).join(' ')}
+            fill="none"
+            stroke="#8A8A8A"
+            strokeWidth={1}
+          />
+          <polyline
+            points={front.map((point) => `${point.x + depthX},${point.y - depthY}`).join(' ')}
+            fill="none"
+            stroke="#8A8A8A"
+            strokeWidth={1}
+          />
+          <line x1={front[0].x} y1={front[0].y} x2={front[0].x + depthX} y2={front[0].y - depthY} stroke="#8A8A8A" />
+          <line
+            x1={front[front.length - 1].x}
+            y1={front[front.length - 1].y}
+            x2={front[front.length - 1].x + depthX}
+            y2={front[front.length - 1].y - depthY}
+            stroke="#8A8A8A"
+          />
+          {yTicks.map((altitude) => (
+            <text key={altitude} x={plotLeft - 8} y={fy(altitude) + 4} textAnchor="end" fill="#A0AEC0" fontSize={12}>
+              {altitude} m
+            </text>
+          ))}
+          {xTicks.map((distance) => (
+            <text key={distance} x={fx(distance)} y={bottom + 18} textAnchor="middle" fill="#A0AEC0" fontSize={12}>
+              {distance.toFixed(1)} km
+            </text>
+          ))}
+          {hover ? (
+            <g>
+              <line x1={fx(hover.distance)} y1={bottom} x2={fx(hover.distance)} y2={fy(hover.altitude)} stroke="#718096" strokeDasharray="3 3" />
+              <text x={fx(hover.distance) + 6} y={fy(hover.altitude) - 8} fill="white" fontSize={12}>
+                {hover.distance.toFixed(1)} km · {Math.round(hover.altitude)} m
+              </text>
+            </g>
+          ) : null}
+        </svg>
+      ) : null}
+    </Box>
   )
 }
 
@@ -225,8 +351,8 @@ function ProfileChart({
   const bonusLabels = bonusNames(profile.segments, bonusSprints, profile.lapKm)
   const bands = segmentsIn(profile.segments, fromKm, toKm, bonusLabels)
   if (data.length < 2) return <Text color="gray.500">No elevation in this section.</Text>
+  if (colorByGrade) return <RibbonChart points={data} fromKm={fromKm} toKm={toKm} height={height} />
   const xDomain: [number, number] = [fromKm, toKm]
-  const yRange = elevationDomain(data)
   return (
     <Box h={`${height}px`} w="100%">
       <ResponsiveContainer width="100%" height="100%">
@@ -241,26 +367,15 @@ function ProfileChart({
             tickFormatter={(value) => Number(value).toFixed(1)}
             unit=" km"
           />
-          <YAxis
-            type="number"
-            domain={colorByGrade ? yRange : undefined}
-            allowDataOverflow={colorByGrade}
-            stroke="#A0AEC0"
-            tick={{ fill: '#A0AEC0', fontSize: 12 }}
-            width={48}
-            unit=" m"
-          />
+          <YAxis type="number" stroke="#A0AEC0" tick={{ fill: '#A0AEC0', fontSize: 12 }} width={48} unit=" m" />
           <Tooltip
             contentStyle={{ background: '#1A202C', border: '1px solid #4A5568' }}
             labelFormatter={(label) => `${Number(label).toFixed(1)} km`}
             formatter={(value) => [`${Math.round(Number(value))} m`, 'Elevation']}
           />
-          <Area type="monotone" dataKey="altitude" stroke={colorByGrade ? 'none' : '#E2E8F0'} fill="#2D3748" fillOpacity={0.9} dot={false} />
-          {colorByGrade ? <GradeStroke points={data} xDomain={xDomain} yDomain={yRange} /> : null}
+          <Area type="monotone" dataKey="altitude" stroke="#E2E8F0" fill="#2D3748" fillOpacity={0.9} dot={false} />
           {named ? <SegmentNames bands={bands} bonusLabels={bonusLabels} xDomain={xDomain} /> : null}
-          {colorByGrade
-            ? null
-            : bands.map((segment) => {
+          {bands.map((segment) => {
                 const bonusName = bonusLabels.get(segmentId(segment))
                 const color = bonusName ? COLORS.bonus : COLORS[segment.type] || COLORS.segment
                 return segment.toKm - segment.fromKm < 0.05 ? (
@@ -283,7 +398,7 @@ function ProfileChart({
                     ifOverflow="visible"
                   />
                 )
-              })}
+          })}
         </AreaChart>
       </ResponsiveContainer>
     </Box>
@@ -295,7 +410,7 @@ function GradeLegend() {
     <HStack spacing={3} mb={1} flexWrap="wrap">
       {GRADE_BANDS.map((band) => (
         <HStack key={band.label} spacing={1}>
-          <Box w="12px" h="12px" bg={band.color} rounded="sm" />
+          <Box w="12px" h="12px" bg={band.color} borderWidth="1px" borderColor="whiteAlpha.500" rounded="sm" />
           <Text color="gray.300" fontSize="xs">
             {band.label}
           </Text>
@@ -314,7 +429,7 @@ function ZoomBlock({ profile, zoom, climb }: { profile: RaceProfile; zoom: Profi
       </Text>
       {zoom.matched && grade ? <GradeLegend /> : null}
       {zoom.matched ? (
-        <ProfileChart profile={profile} fromKm={zoom.fromKm} toKm={zoom.toKm} height={180} colorByGrade={grade} />
+        <ProfileChart profile={profile} fromKm={zoom.fromKm} toKm={zoom.toKm} height={grade ? 240 : 180} colorByGrade={grade} />
       ) : (
         <Text color="orange.300">No matching segment on this route.</Text>
       )}
@@ -432,7 +547,7 @@ export function RouteProfilePreview({
   return (
     <Stack spacing={4}>
       <Text color="gray.400" fontSize="sm">
-        Profile preview. Green is a sprint, red is a climb, gold awards bonus seconds. A climb close-up is colored by gradient.
+        Profile preview. Green is a sprint, red is a climb, gold awards bonus seconds. A climb close-up is a 3D profile colored by gradient.
       </Text>
       {loading ? <Text color="gray.400">Loading profile…</Text> : null}
       {error ? <Text color="red.300">{error}</Text> : null}
