@@ -197,22 +197,28 @@ function RibbonChart({
 
   const data = clipToWindow(points, fromKm, toKm)
   const [y0, y1] = elevationDomain(data.length ? data : points)
-  const depthX = 26
-  const depthY = 22
-  const margin = { top: 8, right: 16, bottom: 32, left: 52 }
+  const depthX = 18
+  const depthY = 64
+  const margin = { top: 6, right: 12, bottom: 28, left: 52 }
   const plotLeft = margin.left
-  const plotTop = margin.top + depthY
   const plotWidth = Math.max(1, width - margin.left - margin.right - depthX)
-  const plotHeight = Math.max(1, height - margin.top - margin.bottom - depthY)
+  const faceRoom = Math.max(1, height - margin.top - margin.bottom - depthY)
+  const tiltRise = Math.min(plotWidth * 0.2, faceRoom * 0.42)
+  const plotHeight = Math.max(1, faceRoom - tiltRise)
+  const plotTop = margin.top + depthY + tiltRise
   const xSpan = toKm - fromKm || 1
   const ySpan = y1 - y0 || 1
+  const shear = tiltRise / plotWidth
   const fx = (distance: number) => plotLeft + ((distance - fromKm) / xSpan) * plotWidth
   const fy = (altitude: number) => plotTop + (1 - (altitude - y0) / ySpan) * plotHeight
-  const bottom = plotTop + plotHeight
-  const front = data.map((point) => ({ x: fx(point.distance), y: fy(point.altitude) }))
+  const lift = (distance: number) => (fx(distance) - plotLeft) * shear
+  const px = (distance: number, back = false) => fx(distance) + (back ? depthX : 0)
+  const py = (distance: number, altitude: number, back = false) => fy(altitude) - lift(distance) - (back ? depthY : 0)
+  const ground = (distance: number, back = false) => fy(y0) - lift(distance) - (back ? depthY : 0)
+  const front = data.map((point) => ({ x: px(point.distance), y: py(point.distance, point.altitude) }))
   const face =
     front.length > 1
-      ? `M ${front[0].x} ${bottom} ${front.map((point) => `L ${point.x} ${point.y}`).join(' ')} L ${front[front.length - 1].x} ${bottom} Z`
+      ? `M ${px(data[0].distance)} ${ground(data[0].distance)} ${front.map((point) => `L ${point.x} ${point.y}`).join(' ')} L ${px(data[data.length - 1].distance)} ${ground(data[data.length - 1].distance)} Z`
       : ''
   const quads = []
   for (let index = 0; index < data.length - 1; index += 1) {
@@ -224,7 +230,7 @@ function RibbonChart({
     quads.push(
       <polygon
         key={index}
-        points={`${fx(start.distance)},${fy(start.altitude)} ${fx(end.distance)},${fy(end.altitude)} ${fx(end.distance) + depthX},${fy(end.altitude) - depthY} ${fx(start.distance) + depthX},${fy(start.altitude) - depthY}`}
+        points={`${px(start.distance)},${py(start.distance, start.altitude)} ${px(end.distance)},${py(end.distance, end.altitude)} ${px(end.distance, true)},${py(end.distance, end.altitude, true)} ${px(start.distance, true)},${py(start.distance, start.altitude, true)}`}
         fill={color}
         stroke={color}
         strokeWidth={0.6}
@@ -233,7 +239,7 @@ function RibbonChart({
   }
   const last = data[data.length - 1]
   const cap = last
-    ? `${fx(last.distance)},${bottom} ${fx(last.distance)},${fy(last.altitude)} ${fx(last.distance) + depthX},${fy(last.altitude) - depthY} ${fx(last.distance) + depthX},${bottom - depthY}`
+    ? `${px(last.distance)},${ground(last.distance)} ${px(last.distance)},${py(last.distance, last.altitude)} ${px(last.distance, true)},${py(last.distance, last.altitude, true)} ${px(last.distance, true)},${ground(last.distance, true)}`
     : ''
   const yStep = y1 - y0 > 120 ? 20 : 10
   const yTicks = []
@@ -243,7 +249,10 @@ function RibbonChart({
   for (let distance = Math.ceil(fromKm / step) * step; distance <= toKm + step * 0.01; distance += step) xTicks.push(distance)
   const hatch = []
   if (front.length > 1) {
-    for (let x = plotLeft; x <= plotLeft + plotWidth; x += 3) hatch.push(<line key={x} x1={x} y1={bottom} x2={x} y2={plotTop} stroke="#D0D0D0" strokeWidth={1} />)
+    for (let x = plotLeft; x <= plotLeft + plotWidth; x += 3) {
+      const along = fromKm + ((x - plotLeft) / plotWidth) * xSpan
+      hatch.push(<line key={x} x1={x} y1={ground(along)} x2={x} y2={0} stroke="#D0D0D0" strokeWidth={1} />)
+    }
   }
   function track(event: MouseEvent<SVGSVGElement>) {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -278,17 +287,23 @@ function RibbonChart({
             strokeWidth={1}
           />
           <polyline
-            points={front.map((point) => `${point.x + depthX},${point.y - depthY}`).join(' ')}
+            points={data.map((point) => `${px(point.distance, true)},${py(point.distance, point.altitude, true)}`).join(' ')}
             fill="none"
             stroke="#8A8A8A"
             strokeWidth={1}
           />
-          <line x1={front[0].x} y1={front[0].y} x2={front[0].x + depthX} y2={front[0].y - depthY} stroke="#8A8A8A" />
           <line
-            x1={front[front.length - 1].x}
-            y1={front[front.length - 1].y}
-            x2={front[front.length - 1].x + depthX}
-            y2={front[front.length - 1].y - depthY}
+            x1={px(data[0].distance)}
+            y1={py(data[0].distance, data[0].altitude)}
+            x2={px(data[0].distance, true)}
+            y2={py(data[0].distance, data[0].altitude, true)}
+            stroke="#8A8A8A"
+          />
+          <line
+            x1={px(last.distance)}
+            y1={py(last.distance, last.altitude)}
+            x2={px(last.distance, true)}
+            y2={py(last.distance, last.altitude, true)}
             stroke="#8A8A8A"
           />
           {yTicks.map((altitude) => (
@@ -297,14 +312,21 @@ function RibbonChart({
             </text>
           ))}
           {xTicks.map((distance) => (
-            <text key={distance} x={fx(distance)} y={bottom + 18} textAnchor="middle" fill="#A0AEC0" fontSize={12}>
+            <text key={distance} x={px(distance)} y={ground(distance) + 16} textAnchor="middle" fill="#A0AEC0" fontSize={12}>
               {distance.toFixed(1)} km
             </text>
           ))}
           {hover ? (
             <g>
-              <line x1={fx(hover.distance)} y1={bottom} x2={fx(hover.distance)} y2={fy(hover.altitude)} stroke="#718096" strokeDasharray="3 3" />
-              <text x={fx(hover.distance) + 6} y={fy(hover.altitude) - 8} fill="white" fontSize={12}>
+              <line
+                x1={px(hover.distance)}
+                y1={ground(hover.distance)}
+                x2={px(hover.distance)}
+                y2={py(hover.distance, hover.altitude)}
+                stroke="#718096"
+                strokeDasharray="3 3"
+              />
+              <text x={px(hover.distance) + 6} y={py(hover.distance, hover.altitude) - 8} fill="white" fontSize={12}>
                 {hover.distance.toFixed(1)} km · {Math.round(hover.altitude)} m
               </text>
             </g>
@@ -429,7 +451,7 @@ function ZoomBlock({ profile, zoom, climb }: { profile: RaceProfile; zoom: Profi
       </Text>
       {zoom.matched && grade ? <GradeLegend /> : null}
       {zoom.matched ? (
-        <ProfileChart profile={profile} fromKm={zoom.fromKm} toKm={zoom.toKm} height={grade ? 240 : 180} colorByGrade={grade} />
+        <ProfileChart profile={profile} fromKm={zoom.fromKm} toKm={zoom.toKm} height={grade ? 340 : 180} colorByGrade={grade} />
       ) : (
         <Text color="orange.300">No matching segment on this route.</Text>
       )}
