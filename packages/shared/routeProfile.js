@@ -133,10 +133,31 @@ function bonusNamesMatch(segmentName, query) {
   return phraseMatch(left, stripped)
 }
 
-function namesMatch(segmentName, query) {
+function kindHint(value) {
+  const folded = foldName(value)
+  if (/\b(kom|climb)\b/.test(folded)) return "climb"
+  if (/\bsprint\b/.test(folded)) return "sprint"
+  return ""
+}
+
+function matchRank(segmentName, query) {
   const left = comparableName(segmentName)
-  if (!left) return false
-  return queryKeys(query).some((right) => left === right || left.startsWith(right) || right.startsWith(left))
+  if (!left) return 0
+  let rank = 0
+  for (const right of queryKeys(query)) {
+    if (!right) continue
+    if (left === right) {
+      rank = Math.max(rank, 100 + right.length)
+      continue
+    }
+    if (WORLD_PREFIXES.includes(right)) continue
+    if (left.startsWith(`${right} `) || right.startsWith(`${left} `)) rank = Math.max(rank, 10 + right.length)
+  }
+  return rank
+}
+
+function namesMatch(segmentName, query) {
+  return matchRank(segmentName, query) > 0
 }
 
 function rangesOverlap(left, right) {
@@ -315,13 +336,26 @@ function matchingSegments(segments, query) {
   const hits = segments.filter((segment) => namesMatch(segment.name, query))
   const reverse = wantsReverse(query)
   const directed = hits.filter((segment) => (segment.direction === "reverse") === reverse)
-  return (directed.length ? directed : hits).slice().sort((a, b) => a.fromKm - b.fromKm)
+  const pool = directed.length ? directed : hits
+  const hint = kindHint(query)
+  const typed = hint ? pool.filter((segment) => segment.type === hint) : []
+  const chosen = typed.length ? typed : pool
+  const best = chosen.reduce((max, segment) => Math.max(max, matchRank(segment.name, query)), 0)
+  return chosen
+    .filter((segment) => matchRank(segment.name, query) === best)
+    .slice()
+    .sort((a, b) => a.fromKm - b.fromKm)
 }
 
 function zoomOf(segment, raceKm, title) {
   const from = Math.max(0, segment.fromKm - 0.15)
   const to = Math.min(raceKm, Math.max(segment.toKm, segment.fromKm) + 0.08)
-  return { title, fromKm: roundKm(from), toKm: roundKm(Math.max(to, from + 0.2)) }
+  return {
+    title,
+    fromKm: roundKm(from),
+    toKm: roundKm(Math.max(to, from + 0.2)),
+    climb: segment.type === "climb",
+  }
 }
 
 function finishZoom(segments, finishText, raceKm) {

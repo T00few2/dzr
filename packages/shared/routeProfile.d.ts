@@ -11,6 +11,7 @@ export type ProfileZoom = {
   fromKm: number
   toKm: number
   matched: boolean
+  climb?: boolean
 }
 
 export type SprintSuggestion = {

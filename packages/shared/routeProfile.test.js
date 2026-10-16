@@ -89,6 +89,26 @@ test("a lead-in in the elevation stream is removed from the segment marks", () =
   assert.ok(shifted[0].toKm < 1.3)
 })
 
+test("a KOM finish stays on the climb when a sprint shares the world name", () => {
+  const profile = buildRaceProfile({
+    distanceM: [0, 17149],
+    altitudeM: [120, 170],
+    segments: [
+      { name: "Yorkshire Sprint Rev.", type: "sprint", fromKm: 2.581, toKm: 2.978, direction: "reverse" },
+      { name: "Yorkshire KOM Rev.", type: "climb", fromKm: 15.981, toKm: 17.141, direction: "reverse" },
+      { name: "New York Sprint", type: "sprint", fromKm: 1, toKm: 1.3, direction: "forward" },
+      { name: "New York KOM", type: "climb", fromKm: 8, toKm: 9.4, direction: "forward" },
+    ],
+    raceKm: 17.149,
+    finishText: "Banner on Yorkshire KOM Reverse",
+    climbNames: ["New York KOM"],
+  })
+  assert.strictEqual(profile.finish.matched, true)
+  assert.ok(profile.finish.fromKm > 15)
+  assert.strictEqual(profile.finish.climb, true)
+  assert.ok(profile.climbs[0].fromKm > 7)
+})
+
 test("a ZwiftPower title with the world in front still marks the segment", () => {
   assert.strictEqual(bonusNamesMatch("Fox Hill", "London Fox Hill"), true)
   assert.strictEqual(bonusNamesMatch("Box Hill", "London Box Hill"), true)

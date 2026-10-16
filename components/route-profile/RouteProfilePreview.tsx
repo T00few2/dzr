@@ -273,14 +273,15 @@ function GradeLegend() {
 }
 
 function ZoomBlock({ profile, zoom, climb }: { profile: RaceProfile; zoom: ProfileZoom; climb?: boolean }) {
+  const grade = Boolean(climb || zoom.climb)
   return (
     <Box>
       <Text color="white" fontWeight="semibold" mb={1}>
         {zoom.title}
       </Text>
-      {zoom.matched && climb ? <GradeLegend /> : null}
+      {zoom.matched && grade ? <GradeLegend /> : null}
       {zoom.matched ? (
-        <ProfileChart profile={profile} fromKm={zoom.fromKm} toKm={zoom.toKm} height={180} colorByGrade={climb} />
+        <ProfileChart profile={profile} fromKm={zoom.fromKm} toKm={zoom.toKm} height={180} colorByGrade={grade} />
       ) : (
         <Text color="orange.300">No matching segment on this route.</Text>
       )}
