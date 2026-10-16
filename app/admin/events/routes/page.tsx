@@ -68,6 +68,15 @@ function savedSegmentName(segment: ProfileSegment, segments: ProfileSegment[]) {
   return segment.name
 }
 
+function worldLabel(world: string | null | undefined) {
+  return String(world || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => `${part[0].toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(' ')
+}
+
 function segmentKind(segment: ProfileSegment) {
   if (segment.type === 'climb') return 'Climb'
   if (segment.type === 'sprint') return 'Sprint'
@@ -87,6 +96,7 @@ export default function RouteSetupPage() {
   const [options, setOptions] = useState<RouteHit[]>([])
   const [sprintHits, setSprintHits] = useState<Record<number, SegmentHit[]>>({})
   const [namedSearch, setNamedSearch] = useState<Record<number, boolean>>({})
+  const [routeNameSearch, setRouteNameSearch] = useState(false)
   const [query, setQuery] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -111,6 +121,7 @@ export default function RouteSetupPage() {
     setOptions([])
     setSprintHits({})
     setNamedSearch({})
+    setRouteNameSearch(false)
     void load(series)
     // The series button is the only trigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,6 +135,7 @@ export default function RouteSetupPage() {
     setOptions([])
     setSprintHits({})
     setNamedSearch({})
+    setRouteNameSearch(false)
     setQuery(route.zwiftRouteName || route.route)
     setProfile(null)
     setError('')
@@ -136,6 +148,7 @@ export default function RouteSetupPage() {
     setOptions([])
     setSprintHits({})
     setNamedSearch({})
+    setRouteNameSearch(false)
     setQuery('')
     setProfile(null)
     setError('')
@@ -165,11 +178,24 @@ export default function RouteSetupPage() {
     const found = Array.isArray(body.options) ? body.options : []
     setOptions(found)
     if (body.match) {
-      setField({ zwiftRouteId: body.match.routeId, zwiftRouteName: body.match.name })
+      applyZwiftRoute(body.match, { keepSearching: !body.sameName })
       if (!body.sameName) setNotice(`Zwift calls this ${body.match.name}. Pick another result if that is wrong.`)
     } else {
+      setRouteNameSearch(true)
       setNotice('No single Zwift route matched. Choose one from the list, or search again.')
     }
+  }
+
+  function applyZwiftRoute(hit: RouteHit, options?: { keepSearching?: boolean }) {
+    setRouteNameSearch(Boolean(options?.keepSearching))
+    setQuery(hit.name)
+    setDraft((current) => ({
+      ...current,
+      zwiftRouteId: hit.routeId,
+      zwiftRouteName: hit.name,
+      world: current.world.trim() ? current.world : worldLabel(hit.world),
+      route: current.route.trim() ? current.route : hit.name,
+    }))
   }
 
   function setSprint(sprintIndex: number, name: string) {
@@ -350,7 +376,76 @@ export default function RouteSetupPage() {
             </Button>
           </Flex>
           <Stack spacing={3}>
-            <Input placeholder="Route name" value={draft.route} onChange={(e) => setField({ route: e.target.value })} {...field} />
+            {draft.zwiftRouteId && draft.zwiftRouteName && !routeNameSearch ? (
+              <Flex gap={2} wrap="wrap" align="center">
+                <Box flex="1" minW="180px" borderWidth="1px" borderColor="green.400" rounded="md" px={3} py={2}>
+                  <Text color="white" fontWeight="semibold">
+                    {draft.zwiftRouteName}
+                  </Text>
+                  <Text color="green.200" fontSize="sm">
+                    {worldLabel(draft.world) || 'Zwift route'} · {draft.zwiftRouteId}
+                  </Text>
+                  {draft.route.trim() && foldName(draft.route) !== foldName(draft.zwiftRouteName) ? (
+                    <Text color="gray.400" fontSize="sm">
+                      Shown on the site as {draft.route}
+                    </Text>
+                  ) : null}
+                </Box>
+                <Button {...readableOutline} onClick={() => setRouteNameSearch(true)}>
+                  Type a name
+                </Button>
+              </Flex>
+            ) : (
+              <Box>
+                <Input
+                  placeholder="Route name"
+                  value={draft.route}
+                  onChange={(e) => {
+                    setRouteNameSearch(true)
+                    setField({ route: e.target.value })
+                  }}
+                  {...field}
+                />
+                <Text fontSize="sm" color="gray.400" mt={2} mb={2}>
+                  Find matches the typed name. Choose a result to select the Zwift route.
+                </Text>
+                <Flex gap={2} mb={2} wrap="wrap">
+                  <Button {...readableOutline} isLoading={busy === 'find'} onClick={() => void findZwift(draft.route || query)}>
+                    Find from route name
+                  </Button>
+                </Flex>
+                <Flex gap={2} mb={2} wrap="wrap">
+                  <Input
+                    placeholder="Search Zwift by name or id"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    {...field}
+                  />
+                  <Button {...readableOutline} isLoading={busy === 'search'} onClick={() => void searchZwift()}>
+                    Search
+                  </Button>
+                </Flex>
+                {options.length ? (
+                  <Select
+                    value=""
+                    placeholder="Choose the Zwift route"
+                    bg="gray.900"
+                    borderColor="gray.700"
+                    onChange={(e) => {
+                      const hit = options.find((option) => String(option.routeId) === e.target.value)
+                      if (hit) applyZwiftRoute(hit)
+                    }}
+                  >
+                    {options.map((option) => (
+                      <option key={option.routeId} value={option.routeId}>
+                        {option.name}
+                        {option.world ? ` · ${worldLabel(option.world)}` : ''} · {option.routeId}
+                      </option>
+                    ))}
+                  </Select>
+                ) : null}
+              </Box>
+            )} />
             <Input placeholder="World" value={draft.world} onChange={(e) => setField({ world: e.target.value })} {...field} />
             <Flex gap={2}>
               <Input placeholder="Laps" value={draft.laps} onChange={(e) => setField({ laps: e.target.value })} {...field} />
@@ -563,52 +658,6 @@ export default function RouteSetupPage() {
                 />
               </>
             ) : null}
-            <Box>
-              <Text fontSize="sm" color="gray.400" mb={2}>
-                Zwift route{draft.zwiftRouteName ? `: ${draft.zwiftRouteName}` : ''}
-                {draft.zwiftRouteId ? ` (${draft.zwiftRouteId})` : ''}
-              </Text>
-              <Flex gap={2} mb={2} wrap="wrap">
-                <Button {...readableOutline} isLoading={busy === 'find'} onClick={() => void findZwift(draft.route)}>
-                  Find from route name
-                </Button>
-              </Flex>
-              <Flex gap={2} mb={2} wrap="wrap">
-                <Input
-                  placeholder="Search Zwift by name or id"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  {...field}
-                />
-                <Button {...readableOutline} isLoading={busy === 'search'} onClick={() => void searchZwift()}>
-                  Search
-                </Button>
-              </Flex>
-              {options.length ? (
-                <Select
-                  value={draft.zwiftRouteId ? String(draft.zwiftRouteId) : ''}
-                  placeholder="Choose the Zwift route"
-                  bg="gray.900"
-                  borderColor="gray.700"
-                  onChange={(e) => {
-                    const hit = options.find((option) => String(option.routeId) === e.target.value)
-                    if (!hit) return
-                    setField({
-                      zwiftRouteId: hit.routeId,
-                      zwiftRouteName: hit.name,
-                      world: draft.world.trim() ? draft.world : hit.world ? `${hit.world[0]}${hit.world.slice(1).toLowerCase()}` : draft.world,
-                    })
-                  }}
-                >
-                  {options.map((option) => (
-                    <option key={option.routeId} value={option.routeId}>
-                      {option.name}
-                      {option.world ? ` · ${option.world}` : ''} · {option.routeId}
-                    </option>
-                  ))}
-                </Select>
-              ) : null}
-            </Box>
             <Button colorScheme="red" alignSelf="flex-start" isLoading={busy === 'save'} onClick={() => void save()}>
               {index == null ? 'Add route' : 'Save route'}
             </Button>
