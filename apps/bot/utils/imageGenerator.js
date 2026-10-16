@@ -1,4 +1,5 @@
 const { createCanvas, loadImage } = require("canvas");
+const { phenotypeLabel } = require("./phenotype");
 
 function getRacingScore(rider) {
   if (rider && typeof rider.racingScore === "number" && Number.isFinite(rider.racingScore)) {
@@ -81,7 +82,7 @@ async function generateSingleRiderStatsImage(rider) {
   ctx.fillText(rider.zpCategory, xOffset, yOffset);       yOffset += rowHeight;
   const veloCat = `${rider.race.current.mixed.category} (${rider.race.current.rating.toFixed(0)})`;
   ctx.fillText(veloCat, xOffset, yOffset);                yOffset += rowHeight;
-  ctx.fillText(rider.phenotype.value, xOffset, yOffset);  yOffset += rowHeight;
+  ctx.fillText(phenotypeLabel(rider.phenotype) || "—", xOffset, yOffset);  yOffset += rowHeight;
   const ftpString = `${rider.zpFTP} W (${(rider.zpFTP / rider.weight).toFixed(2)} W/kg)`;
   ctx.fillText(ftpString, xOffset, yOffset);              yOffset += rowHeight;
   const w30String = `${rider.power.w30} W (${rider.power.wkg30.toFixed(2)} W/kg)`;
@@ -167,7 +168,7 @@ async function generateTeamStatsImage(ridersArray) {
     ctx.fillText(rider.zpCategory, xOffset, yOffset);     yOffset += rowHeight;
     const veloCat = `${rider.race.current.mixed.category} (${rider.race.current.rating.toFixed(0)})`;
     ctx.fillText(veloCat, xOffset, yOffset);              yOffset += rowHeight;
-    ctx.fillText(rider.phenotype.value, xOffset, yOffset);  yOffset += rowHeight;
+    ctx.fillText(phenotypeLabel(rider.phenotype) || "—", xOffset, yOffset);  yOffset += rowHeight;
     const ftpString = `${rider.zpFTP} W (${(rider.zpFTP / rider.weight).toFixed(2)} W/kg)`;
     ctx.fillText(ftpString, xOffset, yOffset);            yOffset += rowHeight;
     const w30String = `${rider.power.w30} W (${rider.power.wkg30.toFixed(2)} W/kg)`;

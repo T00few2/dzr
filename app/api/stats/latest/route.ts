@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
 import { getRacingScore } from '@/app/utils/fetchZPdata';
+import { phenotypeLabel } from '@/packages/shared/phenotype';
 
 export async function GET() {
   try {
@@ -28,7 +29,7 @@ export async function GET() {
         zpCategory: r?.zpCategory ?? null,
         racingScore: getRacingScore(r),
         veloRating: typeof r?.rating === 'number' ? r.rating : null,
-        phenotype: r?.phenotype?.value ?? null,
+        phenotype: phenotypeLabel(r?.phenotype),
         weight: r?.weight ?? null,
       }));
 

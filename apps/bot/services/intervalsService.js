@@ -5,6 +5,7 @@ const shared = require("../constants.json");
 const { db, getUserZwiftId, getLatestClubStats, isPaidClubMember } = require("./firebase");
 const metrics = require("./streamMetrics");
 const discovery = require("./activityDataDiscovery");
+const { phenotypeLabel } = require("../utils/phenotype");
 const weeklyLoad = require("./weeklyLoad");
 const {
   canEncryptTokens,
@@ -924,7 +925,7 @@ async function getZwiftPowerContext(discordId) {
         veloCategory: rider.race?.current?.mixed?.category ?? null,
         veloRating: num(rider.race?.current?.rating),
         racingScore: num(rider.racingScore ?? rider.zrs?.score),
-        phenotype: rider.phenotype?.value ?? null,
+        phenotype: phenotypeLabel(rider.phenotype),
         ftp: num(rider.zpFTP),
         weight_kg: num(rider.weight),
         races: rider.race?.finishes != null

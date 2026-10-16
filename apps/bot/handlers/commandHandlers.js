@@ -2,6 +2,7 @@ const axios = require("axios");
 const { AttachmentBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require("discord.js");
 const { generatePowerLineGraph, generatePowerLineGraph2 } = require("../utils/powerGraph");
 const { generateSingleRiderStatsImage, generateTeamStatsImage, generateEventResultsImage } = require("../utils/imageGenerator");
+const { phenotypeLabel } = require("../utils/phenotype");
 const { getUserZwiftId, linkUserZwiftId, searchRidersByName, getTodaysClubStats } = require("../services/firebase");
 const { ephemeralReplyWithPublish } = require("../utils/ephemeralStore");
 const { generatePowerGraph } = require("../utils/powerGraph");
@@ -195,7 +196,7 @@ async function handleRiderStats(interaction) {
       name: rider?.name ?? null,
       zwiftId: rider?.riderId ?? null,
       paceGroup: rider?.zpCategory ?? null,
-      phenotype: rider?.phenotype?.value ?? null,
+      phenotype: phenotypeLabel(rider?.phenotype),
       velo: {
         category: rider?.race?.current?.mixed?.category ?? null,
         rating: toNumber(rider?.race?.current?.rating)
@@ -325,7 +326,7 @@ async function handleTeamStats(interaction) {
       name: r?.name ?? null,
       zwiftId: r?.riderId ?? null,
       paceGroup: r?.zpCategory ?? null,
-      phenotype: r?.phenotype?.value ?? null,
+      phenotype: phenotypeLabel(r?.phenotype),
       velo: {
         category: r?.race?.current?.mixed?.category ?? null,
         rating: toNumber(r?.race?.current?.rating)

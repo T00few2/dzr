@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { adminDb } from '@/app/utils/firebaseAdminConfig';
 import { getRacingScore } from '@/app/utils/fetchZPdata';
+import { phenotypeLabel } from '@/packages/shared/phenotype';
 
 type RiderRow = {
   riderId: number;
@@ -98,7 +99,7 @@ export async function GET(req: Request) {
         max30Rating: typeof r?.race?.max30?.rating === 'number' ? r.race.max30.rating : null,
         max90Rating: typeof r?.race?.max90?.rating === 'number' ? r.race.max90.rating : null,
         zpFTP: typeof r?.zpFTP === 'number' ? r.zpFTP : null,
-        phenotype: r?.phenotype?.value ?? null,
+        phenotype: phenotypeLabel(r?.phenotype),
         weight: r?.weight ?? null,
         // Power absolute (watts)
         w5: typeof r?.power?.w5 === 'number' ? r.power.w5 : null,

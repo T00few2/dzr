@@ -94,8 +94,13 @@ export interface PhenotypeData {
     climber?: number;
     tt?: number;
   };
+  /** Current ZwiftRacing name, e.g. "puncheur". */
+  label?: string;
+  /** Older snapshots used this instead of label. */
   value?: string;
   bias?: number;
+  confidence?: number;
+  version?: number;
 }
 
 export interface ZrsData {
