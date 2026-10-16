@@ -197,24 +197,20 @@ function RibbonChart({
 
   const data = clipToWindow(points, fromKm, toKm)
   const [y0, y1] = elevationDomain(data.length ? data : points)
-  const depthX = 18
-  const depthY = 64
+  const depthX = 12
+  const depthY = 40
   const margin = { top: 6, right: 12, bottom: 28, left: 52 }
   const plotLeft = margin.left
   const plotWidth = Math.max(1, width - margin.left - margin.right - depthX)
-  const faceRoom = Math.max(1, height - margin.top - margin.bottom - depthY)
-  const tiltRise = Math.min(plotWidth * 0.2, faceRoom * 0.42)
-  const plotHeight = Math.max(1, faceRoom - tiltRise)
-  const plotTop = margin.top + depthY + tiltRise
+  const plotTop = margin.top + depthY
+  const plotHeight = Math.max(1, height - plotTop - margin.bottom)
   const xSpan = toKm - fromKm || 1
   const ySpan = y1 - y0 || 1
-  const shear = tiltRise / plotWidth
   const fx = (distance: number) => plotLeft + ((distance - fromKm) / xSpan) * plotWidth
   const fy = (altitude: number) => plotTop + (1 - (altitude - y0) / ySpan) * plotHeight
-  const lift = (distance: number) => (fx(distance) - plotLeft) * shear
   const px = (distance: number, back = false) => fx(distance) + (back ? depthX : 0)
-  const py = (distance: number, altitude: number, back = false) => fy(altitude) - lift(distance) - (back ? depthY : 0)
-  const ground = (distance: number, back = false) => fy(y0) - lift(distance) - (back ? depthY : 0)
+  const py = (distance: number, altitude: number, back = false) => fy(altitude) - (back ? depthY : 0)
+  const ground = (_distance: number, back = false) => fy(y0) - (back ? depthY : 0)
   const front = data.map((point) => ({ x: px(point.distance), y: py(point.distance, point.altitude) }))
   const face =
     front.length > 1
@@ -451,7 +447,7 @@ function ZoomBlock({ profile, zoom, climb }: { profile: RaceProfile; zoom: Profi
       </Text>
       {zoom.matched && grade ? <GradeLegend /> : null}
       {zoom.matched ? (
-        <ProfileChart profile={profile} fromKm={zoom.fromKm} toKm={zoom.toKm} height={grade ? 340 : 180} colorByGrade={grade} />
+        <ProfileChart profile={profile} fromKm={zoom.fromKm} toKm={zoom.toKm} height={grade ? 280 : 180} colorByGrade={grade} />
       ) : (
         <Text color="orange.300">No matching segment on this route.</Text>
       )}
