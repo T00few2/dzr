@@ -89,6 +89,19 @@ test("a lead-in in the elevation stream is removed from the segment marks", () =
   assert.ok(shifted[0].toKm < 1.3)
 })
 
+test("a few extra meters of race distance do not repeat the start of the lap", () => {
+  const profile = buildRaceProfile({
+    distanceM: [0, 2, 17146],
+    altitudeM: [132.6, 132.6, 162.8],
+    segments: [],
+    raceKm: 17.149,
+    finishText: "",
+    climbNames: [],
+  })
+  assert.ok(profile.altitudeM[profile.altitudeM.length - 1] > 150)
+  assert.ok(profile.distanceKm[profile.distanceKm.length - 1] > 17)
+})
+
 test("a KOM finish stays on the climb when a sprint shares the world name", () => {
   const profile = buildRaceProfile({
     distanceM: [0, 17149],

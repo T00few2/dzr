@@ -304,7 +304,9 @@ function tileLap(distanceM, altitudeM, segments, raceKm) {
   const lapKm = distanceM.length ? distanceM[distanceM.length - 1] / 1000 : 0
   const limit = Number(raceKm) > 0 ? Number(raceKm) : lapKm
   if (!(lapKm > 0) || !(limit > 0)) return { distanceKm: [], altitude: [], segments: [], lapKm }
-  const copies = Math.max(1, Math.ceil((limit - 1e-6) / lapKm))
+  const fullLaps = Math.floor((limit + 1e-6) / lapKm)
+  const remainderKm = limit - fullLaps * lapKm
+  const copies = Math.max(1, fullLaps + (remainderKm > 0.03 ? 1 : 0))
   const distanceKm = []
   const altitude = []
   const tiled = []

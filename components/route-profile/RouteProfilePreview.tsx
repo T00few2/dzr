@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Area, AreaChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, usePlotArea, XAxis, YAxis } from 'recharts'
 import { Box, HStack, Spinner, Stack, Text } from '@chakra-ui/react'
 import type { ProfileSegment, ProfileZoom, RaceProfile } from '@/packages/shared/routeProfile'
@@ -79,6 +79,15 @@ function segmentLabel(segment: ProfileSegment, bonusName: string | undefined) {
   return segment.type === 'climb' ? `Bonus: ${bonusName}` : `Bonus Sprint: ${bonusName}`
 }
 
+function textWidth(text: string) {
+  if (typeof document === 'undefined') return text.length * 7
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return text.length * 7
+  ctx.font = '600 12px system-ui, sans-serif'
+  return ctx.measureText(text).width
+}
+
 function SegmentNames({
   bands,
   bonusLabels,
@@ -92,21 +101,33 @@ function SegmentNames({
   if (!plot || plot.width <= 0) return null
   const [x0, x1] = xDomain
   const span = x1 - x0 || 1
-  const placed: { x: number; y: number; text: string; fill: string }[] = []
-  for (const segment of bands) {
+  const placed: { x: number; row: number; text: string; fill: string; half: number }[] = []
+  const ordered = [...bands].sort((left, right) => left.fromKm - right.fromKm)
+  for (const segment of ordered) {
     const bonusName = bonusLabels.get(segmentId(segment))
     const text = segmentLabel(segment, bonusName)
-    const width = text.length * 6.4
+    const half = textWidth(text) / 2
     const mid = (segment.fromKm + segment.toKm) / 2
     const raw = plot.x + ((mid - x0) / span) * plot.width
-    const x = Math.min(plot.x + plot.width - width / 2, Math.max(plot.x + width / 2, raw))
-    const row = placed.filter((label) => Math.abs(label.x - x) < (text.length + label.text.length) * 3.2).length
-    placed.push({ x, y: 15 + row * 14, text, fill: bonusName ? '#E6C35C' : 'white' })
+    const minX = plot.x + Math.min(half, plot.width / 2)
+    const maxX = plot.x + plot.width - Math.min(half, plot.width / 2)
+    const x = Math.min(maxX, Math.max(minX, raw))
+    let row = 0
+    while (placed.some((label) => label.row === row && Math.abs(label.x - x) < label.half + half + 8)) row += 1
+    placed.push({ x, row, text, fill: bonusName ? '#E6C35C' : 'white', half })
   }
   return (
     <g>
       {placed.map((label) => (
-        <text key={`${label.text}-${label.x}`} x={label.x} y={label.y} textAnchor="middle" fill={label.fill} fontSize={12} fontWeight={600}>
+        <text
+          key={`${label.text}-${label.x}-${label.row}`}
+          x={label.x}
+          y={14 + label.row * 16}
+          textAnchor="middle"
+          fill={label.fill}
+          fontSize={12}
+          fontWeight={600}
+        >
           {label.text}
         </text>
       ))}
@@ -134,6 +155,7 @@ function GradeStroke({
   yDomain: [number, number]
 }) {
   const plot = usePlotArea()
+  const clipId = useId().replace(/:/g, '')
   if (!plot || plot.width <= 0 || plot.height <= 0 || points.length < 2) return null
   const [x0, x1] = xDomain
   const [y0, y1] = yDomain
@@ -143,6 +165,7 @@ function GradeStroke({
   for (let index = 0; index < points.length - 1; index += 1) {
     const start = points[index]
     const end = points[index + 1]
+    if (end.distance < x0 || start.distance > x1) continue
     const run = (end.distance - start.distance) * 1000
     const grade = ((end.altitude - start.altitude) / Math.max(0.001, run)) * 100
     const xStart = plot.x + ((start.distance - x0) / xSpan) * plot.width
@@ -151,10 +174,19 @@ function GradeStroke({
     const yEnd = plot.y + (1 - (end.altitude - y0) / ySpan) * plot.height
     if (![xStart, xEnd, yStart, yEnd].every((value) => Number.isFinite(value))) continue
     pieces.push(
-      <line key={index} x1={xStart} y1={yStart} x2={xEnd} y2={yEnd} stroke={gradeColor(grade)} strokeWidth={4} strokeLinecap="round" />
+      <line key={index} x1={xStart} y1={yStart} x2={xEnd} y2={yEnd} stroke={gradeColor(grade)} strokeWidth={4} strokeLinecap="butt" />
     )
   }
-  return <g>{pieces}</g>
+  return (
+    <g>
+      <defs>
+        <clipPath id={clipId}>
+          <rect x={plot.x} y={plot.y} width={plot.width} height={plot.height} />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clipId})`}>{pieces}</g>
+    </g>
+  )
 }
 
 function pointsIn(profile: RaceProfile, fromKm: number, toKm: number) {
@@ -198,7 +230,7 @@ function ProfileChart({
   return (
     <Box h={`${height}px`} w="100%">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: named ? 46 : 8, right: 8, left: 0, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: named ? 64 : 8, right: 8, left: 0, bottom: 0 }}>
           <XAxis
             dataKey="distance"
             type="number"
@@ -206,6 +238,7 @@ function ProfileChart({
             allowDataOverflow
             stroke="#A0AEC0"
             tick={{ fill: '#A0AEC0', fontSize: 12 }}
+            tickFormatter={(value) => Number(value).toFixed(1)}
             unit=" km"
           />
           <YAxis
