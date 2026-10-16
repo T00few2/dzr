@@ -31,6 +31,8 @@ export type RaceProfile = {
 
 export function foldName(value: unknown): string
 
+export function bonusNamesMatch(segmentName: unknown, query: unknown): boolean
+
 export function slugifyZwiftName(value: unknown): string
 
 export function parseFinish(value: unknown): { pass: number; name: string } | null

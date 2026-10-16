@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Area, AreaChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, usePlotArea, XAxis, YAxis } from 'recharts'
 import { Box, HStack, Spinner, Stack, Text } from '@chakra-ui/react'
 import type { ProfileSegment, ProfileZoom, RaceProfile } from '@/packages/shared/routeProfile'
-import { foldName, profileImageSrc } from '@/packages/shared/routeProfile'
+import { bonusNamesMatch, profileImageSrc } from '@/packages/shared/routeProfile'
 
 const COLORS = { sprint: '#56A845', climb: '#ed2324', segment: '#718096', bonus: '#C9A227' }
 const GRADE_BANDS = [
@@ -40,22 +40,8 @@ function segmentId(segment: ProfileSegment) {
   return `${segment.name}|${segment.direction}|${segment.fromKm.toFixed(3)}`
 }
 
-function bonusKey(value: string) {
-  return foldName(value)
-    .replace(/\b(forward|long|short)\b/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
 function isReverse(segment: ProfileSegment) {
   return segment.direction === 'reverse' || wantsReverse(segment.name)
-}
-
-function sameBonusName(segmentName: string, query: string) {
-  const left = bonusKey(segmentName)
-  const right = bonusKey(query)
-  if (!left || !right) return false
-  return left === right || left.startsWith(`${right} `) || right.startsWith(`${left} `)
 }
 
 function bonusNames(segments: ProfileSegment[], bonusSprints: BonusSprint[], lapKm: number) {
@@ -63,7 +49,7 @@ function bonusNames(segments: ProfileSegment[], bonusSprints: BonusSprint[], lap
   for (const row of bonusSprints) {
     const query = row.name.trim()
     if (!query) continue
-    let candidates = segments.filter((segment) => sameBonusName(segment.name, query))
+    let candidates = segments.filter((segment) => bonusNamesMatch(segment.name, query))
     const hint = /\blong\b/i.test(query) ? 'long' : /\bshort\b/i.test(query) ? 'short' : ''
     if (hint && candidates.length > 1) {
       const sorted = [...candidates].sort((left, right) => left.toKm - left.fromKm - (right.toKm - right.fromKm))

@@ -88,6 +88,51 @@ function queryKeys(value) {
   return [...keys].filter((key) => key.length >= 3)
 }
 
+const WORLD_PREFIXES = [
+  "makuri islands",
+  "crit city",
+  "new york",
+  "watopia",
+  "london",
+  "richmond",
+  "innsbruck",
+  "yorkshire",
+  "france",
+  "scotland",
+  "paris",
+  "bologna",
+  "makuri",
+]
+
+function bonusKey(value) {
+  return foldName(value)
+    .replace(/\b(forward|long|short)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function stripLeadingWorld(value) {
+  for (const world of WORLD_PREFIXES) {
+    if (value === world) return ""
+    if (value.startsWith(`${world} `)) return value.slice(world.length).trim()
+  }
+  return value
+}
+
+function phraseMatch(left, right) {
+  if (!left || !right) return false
+  return left === right || left.startsWith(`${right} `) || right.startsWith(`${left} `)
+}
+
+function bonusNamesMatch(segmentName, query) {
+  const left = bonusKey(segmentName)
+  const right = bonusKey(query)
+  if (phraseMatch(left, right)) return true
+  const stripped = stripLeadingWorld(right)
+  if (!stripped || stripped === right || stripped.length < 3) return false
+  return phraseMatch(left, stripped)
+}
+
 function namesMatch(segmentName, query) {
   const left = comparableName(segmentName)
   if (!left) return false
@@ -347,6 +392,7 @@ function profileImageSrc(series, routeName) {
 
 module.exports = {
   foldName,
+  bonusNamesMatch,
   slugifyZwiftName,
   parseFinish,
   prepareLap,

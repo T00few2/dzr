@@ -11,7 +11,7 @@ import {
 } from '@/app/lib/catalogRoute'
 import { Box, Button, Flex, Heading, Input, Select, Stack, Text, Textarea } from '@chakra-ui/react'
 import { RouteProfilePreview } from '@/components/route-profile/RouteProfilePreview'
-import type { RaceProfile } from '@/packages/shared/routeProfile'
+import { foldName, type ProfileSegment, type RaceProfile } from '@/packages/shared/routeProfile'
 
 type SeriesId = 'after-party' | 'zwifty-fifty'
 type RouteHit = { routeId: number; name: string; world: string | null }
@@ -27,6 +27,53 @@ const readableOutline = {
 
 const field = { bg: 'gray.900', borderColor: 'gray.700' }
 
+function coreName(value: string) {
+  return foldName(value)
+    .replace(/\b(forward|reverse|rev)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function segmentChoices(segments: ProfileSegment[]) {
+  const seen = new Set<string>()
+  return segments.filter((segment) => {
+    const key = `${segment.name}|${segment.direction}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function choiceValue(segment: ProfileSegment) {
+  return `${segment.name}|${segment.direction}`
+}
+
+function confirmedSegment(name: string, segments: ProfileSegment[]) {
+  const key = coreName(name)
+  if (!key) return null
+  const matches = segments.filter((segment) => coreName(segment.name) === key)
+  if (!matches.length) return null
+  const wantReverse = /\b(reverse|rev\.?)\b/i.test(name)
+  const directed = matches.filter(
+    (segment) => (segment.direction === 'reverse' || /\b(reverse|rev\.?)\b/i.test(segment.name)) === wantReverse
+  )
+  return directed[0] || matches[0]
+}
+
+function savedSegmentName(segment: ProfileSegment, segments: ProfileSegment[]) {
+  const directions = new Set(segments.filter((item) => item.name === segment.name).map((item) => item.direction))
+  if (directions.size > 1 && segment.direction === 'reverse' && !/\b(reverse|rev\.?)\b/i.test(segment.name)) {
+    return `${segment.name} Rev.`
+  }
+  return segment.name
+}
+
+function segmentKind(segment: ProfileSegment) {
+  if (segment.type === 'climb') return 'Climb'
+  if (segment.type === 'sprint') return 'Sprint'
+  return 'Segment'
+}
+
 async function errorMessage(res: Response) {
   const body = await res.json().catch(() => ({}))
   return String(body?.error || `Request failed (${res.status})`)
@@ -39,6 +86,7 @@ export default function RouteSetupPage() {
   const [draft, setDraft] = useState<CatalogRoute>(emptyCatalogRoute())
   const [options, setOptions] = useState<RouteHit[]>([])
   const [sprintHits, setSprintHits] = useState<Record<number, SegmentHit[]>>({})
+  const [namedSearch, setNamedSearch] = useState<Record<number, boolean>>({})
   const [query, setQuery] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -62,6 +110,7 @@ export default function RouteSetupPage() {
     setDraft(emptyCatalogRoute())
     setOptions([])
     setSprintHits({})
+    setNamedSearch({})
     void load(series)
     // The series button is the only trigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,6 +123,7 @@ export default function RouteSetupPage() {
     setDraft(route)
     setOptions([])
     setSprintHits({})
+    setNamedSearch({})
     setQuery(route.zwiftRouteName || route.route)
     setProfile(null)
     setError('')
@@ -85,6 +135,7 @@ export default function RouteSetupPage() {
     setDraft(emptyCatalogRoute())
     setOptions([])
     setSprintHits({})
+    setNamedSearch({})
     setQuery('')
     setProfile(null)
     setError('')
@@ -138,8 +189,18 @@ export default function RouteSetupPage() {
     setField({ sprints: [...draft.sprints, ''], sprintLaps: [...draft.sprintLaps, ''] })
   }
 
+  function selectRouteSegment(sprintIndex: number, value: string) {
+    if (!profile) return
+    const segment = segmentChoices(profile.segments).find((item) => choiceValue(item) === value)
+    if (!segment) return
+    setSprint(sprintIndex, savedSegmentName(segment, profile.segments))
+    setNamedSearch((current) => ({ ...current, [sprintIndex]: false }))
+    setSprintHits((current) => ({ ...current, [sprintIndex]: [] }))
+  }
+
   function removeSprint(sprintIndex: number) {
     setSprintHits({})
+    setNamedSearch({})
     setField({
       sprints: draft.sprints.filter((_, index) => index !== sprintIndex),
       sprintLaps: draft.sprintLaps.filter((_, index) => index !== sprintIndex),
@@ -325,7 +386,7 @@ export default function RouteSetupPage() {
                 />
                 <Box>
                   <Text fontSize="sm" color="gray.400" mb={2}>
-                    Sprints use the ZwiftPower segment name. Fuego Flats is not a segment; Fuego Flats Long is.
+                    Pick a segment on this route. A typed name is only for older rows: Find still searches ZwiftPower.
                   </Text>
                   <Button
                     {...readableOutline}
@@ -336,6 +397,7 @@ export default function RouteSetupPage() {
                       if (!profile?.sprints.length) return
                       const filled = draft.sprints.some((sprint) => sprint.trim())
                       if (filled && !window.confirm('Replace the sprint list with the sprints on this route?')) return
+                      setNamedSearch({})
                       setField({
                         sprints: profile.sprints.map((sprint) => sprint.name),
                         sprintLaps: profile.sprints.map((sprint) => sprint.laps),
@@ -345,59 +407,151 @@ export default function RouteSetupPage() {
                     Suggest sprints
                   </Button>
                   <Stack spacing={2}>
-                    {draft.sprints.map((sprint, sprintIndex) => (
-                      <Box key={sprintIndex}>
-                        <Flex gap={2} wrap="wrap">
-                          <Input
-                            placeholder="Sprint name"
-                            value={sprint}
-                            flex="1"
-                            minW="180px"
-                            onChange={(e) => setSprint(sprintIndex, e.target.value)}
-                            {...field}
-                          />
-                          <Input
-                            placeholder="Laps"
-                            value={draft.sprintLaps[sprintIndex] || ''}
-                            onChange={(e) => setSprintLap(sprintIndex, e.target.value)}
-                            maxW="120px"
-                            {...field}
-                          />
-                          <Button
-                            {...readableOutline}
-                            isLoading={busy === `sprint:${sprintIndex}`}
-                            onClick={() => void findSprint(sprintIndex)}
-                          >
-                            Find
-                          </Button>
-                          <Button {...readableOutline} onClick={() => removeSprint(sprintIndex)}>
-                            Remove
-                          </Button>
-                        </Flex>
-                        {sprintHits[sprintIndex]?.length ? (
-                          <Select
-                            mt={2}
-                            placeholder="Choose the ZwiftPower segment"
-                            bg="gray.900"
-                            borderColor="gray.700"
-                            value={sprintHits[sprintIndex].some((hit) => hit.name === sprint) ? sprint : ''}
-                            onChange={(e) => {
-                              const hit = sprintHits[sprintIndex].find((option) => option.name === e.target.value)
-                              if (hit) setSprint(sprintIndex, hit.name)
-                            }}
-                          >
-                            {sprintHits[sprintIndex].map((hit) => (
-                              <option key={hit.id} value={hit.name}>
-                                {hit.name}
-                                {hit.world ? ` · ${hit.world}` : ''}
-                              </option>
-                            ))}
-                          </Select>
-                        ) : null}
-                      </Box>
-                    ))}
+                    {draft.sprints.map((sprint, sprintIndex) => {
+                      const choices = segmentChoices(profile?.segments || [])
+                      const selected = confirmedSegment(sprint, profile?.segments || [])
+                      const showTyped = Boolean(namedSearch[sprintIndex]) || (Boolean(sprint.trim()) && !selected)
+                      return (
+                        <Box key={sprintIndex}>
+                          {selected && !showTyped ? (
+                            <Flex gap={2} wrap="wrap" align="center">
+                              <Box flex="1" minW="180px" borderWidth="1px" borderColor="green.400" rounded="md" px={3} py={2}>
+                                <Text color="white" fontWeight="semibold">
+                                  {selected.name}
+                                </Text>
+                                <Text color="green.200" fontSize="sm">
+                                  {segmentKind(selected)} · {selected.direction === 'reverse' ? 'Reverse' : 'Forward'} ·{' '}
+                                  {selected.fromKm.toFixed(1)} km
+                                </Text>
+                              </Box>
+                              <Input
+                                placeholder="Laps"
+                                value={draft.sprintLaps[sprintIndex] || ''}
+                                onChange={(e) => setSprintLap(sprintIndex, e.target.value)}
+                                maxW="120px"
+                                {...field}
+                              />
+                              <Button
+                                {...readableOutline}
+                                onClick={() => setNamedSearch((current) => ({ ...current, [sprintIndex]: true }))}
+                              >
+                                Type a name
+                              </Button>
+                              <Button {...readableOutline} onClick={() => removeSprint(sprintIndex)}>
+                                Remove
+                              </Button>
+                            </Flex>
+                          ) : showTyped ? (
+                            <>
+                              <Flex gap={2} wrap="wrap">
+                                <Input
+                                  placeholder="ZwiftPower segment name"
+                                  value={sprint}
+                                  flex="1"
+                                  minW="180px"
+                                  onChange={(e) => {
+                                    setNamedSearch((current) => ({ ...current, [sprintIndex]: true }))
+                                    setSprint(sprintIndex, e.target.value)
+                                  }}
+                                  {...field}
+                                />
+                                <Input
+                                  placeholder="Laps"
+                                  value={draft.sprintLaps[sprintIndex] || ''}
+                                  onChange={(e) => setSprintLap(sprintIndex, e.target.value)}
+                                  maxW="120px"
+                                  {...field}
+                                />
+                                <Button
+                                  {...readableOutline}
+                                  isLoading={busy === `sprint:${sprintIndex}`}
+                                  onClick={() => void findSprint(sprintIndex)}
+                                >
+                                  Find
+                                </Button>
+                                <Button {...readableOutline} onClick={() => removeSprint(sprintIndex)}>
+                                  Remove
+                                </Button>
+                              </Flex>
+                              {sprintHits[sprintIndex]?.length ? (
+                                <Select
+                                  mt={2}
+                                  placeholder="Choose the ZwiftPower segment"
+                                  bg="gray.900"
+                                  borderColor="gray.700"
+                                  value={sprintHits[sprintIndex].some((hit) => hit.name === sprint) ? sprint : ''}
+                                  onChange={(e) => {
+                                    const hit = sprintHits[sprintIndex].find((option) => option.name === e.target.value)
+                                    if (hit) setSprint(sprintIndex, hit.name)
+                                  }}
+                                >
+                                  {sprintHits[sprintIndex].map((hit) => (
+                                    <option key={hit.id} value={hit.name}>
+                                      {hit.name}
+                                      {hit.world ? ` · ${hit.world}` : ''}
+                                    </option>
+                                  ))}
+                                </Select>
+                              ) : null}
+                              {choices.length ? (
+                                <Select
+                                  mt={2}
+                                  placeholder="Replace with a segment on this route"
+                                  bg="gray.900"
+                                  borderColor="gray.700"
+                                  value=""
+                                  onChange={(e) => selectRouteSegment(sprintIndex, e.target.value)}
+                                >
+                                  {choices.map((segment) => (
+                                    <option key={choiceValue(segment)} value={choiceValue(segment)}>
+                                      {segment.name} · {segmentKind(segment)} · {segment.direction === 'reverse' ? 'Reverse' : 'Forward'} ·{' '}
+                                      {segment.fromKm.toFixed(1)} km
+                                    </option>
+                                  ))}
+                                </Select>
+                              ) : null}
+                            </>
+                          ) : (
+                            <Flex gap={2} wrap="wrap" align="center">
+                              <Select
+                                flex="1"
+                                minW="220px"
+                                placeholder={choices.length ? 'Choose a segment on this route' : 'Load the route profile first'}
+                                bg="gray.900"
+                                borderColor="gray.700"
+                                value=""
+                                onChange={(e) => selectRouteSegment(sprintIndex, e.target.value)}
+                              >
+                                {choices.map((segment) => (
+                                  <option key={choiceValue(segment)} value={choiceValue(segment)}>
+                                    {segment.name} · {segmentKind(segment)} · {segment.direction === 'reverse' ? 'Reverse' : 'Forward'} ·{' '}
+                                    {segment.fromKm.toFixed(1)} km
+                                  </option>
+                                ))}
+                              </Select>
+                              <Input
+                                placeholder="Laps"
+                                value={draft.sprintLaps[sprintIndex] || ''}
+                                onChange={(e) => setSprintLap(sprintIndex, e.target.value)}
+                                maxW="120px"
+                                {...field}
+                              />
+                              <Button
+                                {...readableOutline}
+                                onClick={() => setNamedSearch((current) => ({ ...current, [sprintIndex]: true }))}
+                              >
+                                Type a name
+                              </Button>
+                              <Button {...readableOutline} onClick={() => removeSprint(sprintIndex)}>
+                                Remove
+                              </Button>
+                            </Flex>
+                          )}
+                        </Box>
+                      )
+                    })}
                     <Button {...readableOutline} alignSelf="flex-start" onClick={addSprint}>
-                      Add sprint
+                      Add segment
                     </Button>
                   </Stack>
                 </Box>
