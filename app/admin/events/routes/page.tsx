@@ -470,6 +470,13 @@ export default function RouteSetupPage() {
                 }}
                 showFinish={!fifty}
                 showClimbs={fifty}
+                bonusSprints={
+                  fifty
+                    ? draft.sprints
+                        .map((name, sprintIndex) => ({ name: name.trim(), laps: (draft.sprintLaps[sprintIndex] || '').trim() }))
+                        .filter((row) => row.name)
+                    : []
+                }
                 onProfile={setProfile}
               />
             ) : (

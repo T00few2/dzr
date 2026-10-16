@@ -17,6 +17,13 @@ const {
   deleteCalendarEntry,
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
+const {
+  FULFILLMENT_INSTRUCTIONS,
+  fulfillmentUserContent,
+  parseFulfillment,
+  partitionByFulfillment,
+  unmetToolOutput,
+} = require("../services/toolFulfillment");
 const { trimConversation } = require("../services/conversationTrim");
 const { fromDiscordMessage, dmRecordsToHistory, stripSentStamp, DM_READBACK_MAX_AGE_MS } = require("../services/dmHistory");
 const { createTurnQueue } = require("../services/turnQueue");
@@ -91,7 +98,9 @@ const TYPING_REFRESH_MS = 8000;
 
 // Configuration
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-const MAX_TOOL_ITERATIONS = 2;
+// One extra step beyond a normal tool call, so a neighbouring tool can be refused and replaced
+// before anything is posted. The third step covers a follow-up tool after that correction.
+const MAX_TOOL_ITERATIONS = 3;
 const COACH_MAX_TOOL_ITERATIONS = 4;
 const COACH_MAX_TOKENS = 16000;
 // Per-athlete daily ceiling. Usage was recorded but never enforced, so a runaway loop or a very
@@ -288,7 +297,7 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "zrl_category",
-      description: "Determine a rider's Zwift Racing League (ZRL) pace-group category by combining admin ZRL limits with the rider's current watt stats. Use this whenever someone asks which ZRL category/division/gruppe they or another rider belong to.",
+      description: "Decide which Zwift Racing League category a rider fits, from their current watts and the category limits. Use this whenever they ask which category, division, or group they or someone else should race in. Showing the stats card, or returning a ZwiftID number, is a different action.",
       parameters: {
         type: "object",
         properties: {
@@ -332,7 +341,7 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "rider_stats",
-      description: "Fetch stats for a single rider by their Zwift ID or Discord user mention",
+      description: "Show one rider's current stats: power curve, FTP, vELO, finishes, wins and podiums. Use this whenever they want to see how a rider is performing, including their own, however they phrase it. Omit both arguments to use the person asking. Reading back a ZwiftID, linking one, and deciding a race category are different actions.",
       parameters: {
         type: "object",
         properties: {
@@ -372,7 +381,7 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "whoami",
-      description: "Get the Zwift ID linked to the user who is asking",
+      description: "Return only the ZwiftID number linked to the person asking. Use this only when they want that number. Showing their stats, linking or changing the ID, and deciding a race category are different actions.",
       parameters: {
         type: "object",
         properties: {}
@@ -383,7 +392,7 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "get_zwiftid",
-      description: "Get the linked Zwift ID for a specific Discord user",
+      description: "Return only the ZwiftID number linked to a different Discord user. Use this only when they want that number. Showing that person's stats or race category is a different action.",
       parameters: {
         type: "object",
         properties: {
@@ -400,7 +409,7 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "browse_riders",
-      description: "Search for riders by name (first 3+ letters)",
+      description: "Search club riders by the start of a name. Use this when they are looking for a person. Showing someone's stats, ID, or race category is a different action.",
       parameters: {
         type: "object",
         properties: {
@@ -445,7 +454,7 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "my_zwiftid",
-      description: "Link the user's Discord account to their Zwift ID. Can provide direct Zwift ID or search term.",
+      description: "Link or change the ZwiftID on the Discord account of the person asking. Use this when they want their account connected to a ZwiftID, either from a number or by searching their name. Reading back an ID that is already linked, or showing stats, is a different action.",
       parameters: {
         type: "object",
         properties: {
@@ -1729,10 +1738,11 @@ You can help users with:
 1. **ALWAYS use a tool call** when the user wants to take an action (fetch stats, link ID, search, ZRL category, etc.)
 2. **Respond conversationally** only for greetings, clarifying questions, or general chat
 3. When users mention Discord users with @ (like @Chris), **preserve the mention format** in your tool calls
-4. If you're unsure what the user wants, **ask for clarification** rather than guessing
-5. Before inventing answers about DZR teams or help topics, **check the knowledge base** or team data first
-6. If a question needs two knowledge articles, call get_help_article once per topic and combine the results
-7. **ZRL category questions** ("hvilken ZRL kategori/gruppe/division er jeg?", "kan jeg køre B?", etc.): ALWAYS call zrl_category. Do not answer from memory, and do not use only rider_stats or get_help_article for this. Use the tool's summary and numbers as-is — do not recalculate.
+4. If several actions could fit and you cannot tell which one they want, **ask**. Do not perform a related but different action
+5. These are different actions, even when they concern the same rider: reading back a ZwiftID, linking a ZwiftID, showing stats, and deciding a race category. Call the one they asked for
+6. Before inventing answers about DZR teams or help topics, **check the knowledge base** or team data first
+7. If a question needs two knowledge articles, call get_help_article once per topic and combine the results
+8. **ZRL category questions** ("hvilken ZRL kategori/gruppe/division er jeg?", "kan jeg køre B?", etc.): ALWAYS call zrl_category. Do not answer from memory, and do not use only rider_stats or get_help_article for this. Use the tool's summary and numbers as-is — do not recalculate.
 
 ## Knowledge base
 Available articles (use get_help_article with the key or a tag):
@@ -2072,6 +2082,75 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
   return queued;
 }
 
+function toolDescription(name) {
+  const tool = toolDefinitions.find((entry) => entry.function?.name === name);
+  return tool?.function?.description || name;
+}
+
+function latestUserText(input) {
+  for (let i = input.length - 1; i >= 0; i--) {
+    if (input[i]?.role === "user" && typeof input[i].content === "string") return input[i].content;
+  }
+  return "";
+}
+
+/**
+ * Ask whether each proposed call does what the user asked. An explicit "no" is not executed, so a
+ * neighbouring tool (an ID lookup when they asked for stats, stats when they asked for a category)
+ * never reaches Discord. An inconclusive check allows the call.
+ */
+async function screenClubToolCalls(userText, toolCalls, rejectedNames) {
+  if (!userText) {
+    return partitionByFulfillment(toolCalls, new Map());
+  }
+
+  const verdictById = new Map();
+  await Promise.all(toolCalls.map(async (toolCall) => {
+    const name = toolCall.name;
+    if (rejectedNames.has(name)) {
+      verdictById.set(toolCall.id, false);
+      return;
+    }
+    verdictById.set(toolCall.id, await toolCallFulfills(userText, toolCall, toolDescription(name)));
+  }));
+  return partitionByFulfillment(toolCalls, verdictById);
+}
+
+async function toolCallFulfills(userText, toolCall, description) {
+  try {
+    const response = await createStatelessResponse(openai, {
+      instructions: FULFILLMENT_INSTRUCTIONS,
+      input: [{
+        role: "user",
+        content: fulfillmentUserContent({
+          userText,
+          name: toolCall.name,
+          description,
+          args: toolCall.arguments || toolCall.function?.arguments || "{}",
+        }),
+      }],
+      tools: [],
+      allowTools: false,
+      model: AI_CONFIG.model,
+      maxOutputTokens: 800,
+      reasoningEffort: AI_CONFIG.reasoningEffort,
+      cacheKey: "dzr-club-assistant:fulfillment:v1",
+    });
+    const verdict = parseFulfillment(response.text);
+    if (verdict === null) {
+      console.warn("Club tool fulfillment check was inconclusive; allowing the call", {
+        tool: toolCall.name,
+        status: response.status,
+        incompleteReason: response.incompleteReason,
+      });
+    }
+    return verdict;
+  } catch (error) {
+    console.warn("Club tool fulfillment check failed; allowing the call:", error?.message || error);
+    return null;
+  }
+}
+
 /**
  * Run one club-assistant turn on the same stateless Responses architecture as Coach.
  * Tool and reasoning items exist only inside this function; callers retain visible text only.
@@ -2097,7 +2176,7 @@ async function runClubResponsesTurn({
       model: AI_CONFIG.model,
       maxOutputTokens,
       reasoningEffort: AI_CONFIG.reasoningEffort,
-      cacheKey: "dzr-club-assistant:v1",
+      cacheKey: "dzr-club-assistant:v2",
     });
     input.push(...response.outputItems);
     return response;
@@ -2108,19 +2187,53 @@ async function runClubResponsesTurn({
     return { text: response.text, fromModel: Boolean(response.text), handledExternally: false };
   }
 
+  const rejectedToolNames = new Set();
   let currentToolCalls = response.toolCalls;
   for (let iteration = 0; currentToolCalls.length && iteration < maxIters; iteration++) {
-    lastToolResults = await executeToolCalls(currentToolCalls, message, turnContext);
-    calledToolNames.push(...currentToolCalls.map((toolCall) => toolCall.name));
+    const screened = await screenClubToolCalls(latestUserText(input), currentToolCalls, rejectedToolNames);
+    for (const name of screened.newlyRejected) rejectedToolNames.add(name);
+
+    if (screened.rejected.length) {
+      console.log("🤖 Club tool call did not match the request", {
+        rejected: screened.rejected.map((toolCall) => toolCall.name),
+        accepted: screened.accepted.map((toolCall) => toolCall.name),
+      });
+      input.push(...functionCallOutputs(screened.rejected.map((toolCall) => ({
+        tool_call_id: toolCall.id,
+        output: unmetToolOutput(toolCall.name, toolDescription(toolCall.name)),
+      }))));
+    }
+
+    if (!screened.accepted.length) {
+      response = await call();
+      if (response.toolCalls.length && iteration + 1 < maxIters) {
+        currentToolCalls = response.toolCalls;
+        continue;
+      }
+      if (response.text) {
+        return { text: response.text, fromModel: true, handledExternally: false };
+      }
+      if (response.toolCalls.length) {
+        return {
+          text: "⚠️ I wasn't able to finish that request after a few tool calls. Please try rephrasing or breaking it into a simpler question.",
+          fromModel: false,
+          handledExternally: false,
+        };
+      }
+      break;
+    }
+
+    lastToolResults = await executeToolCalls(screened.accepted, message, turnContext);
+    calledToolNames.push(...screened.accepted.map((toolCall) => toolCall.name));
     input.push(...functionCallOutputs(lastToolResults.map((result) => ({
       tool_call_id: result.tool_call_id,
       output: safeStringify(compactToolResult(result)),
     }))));
 
     const handledExternally =
-      currentToolCalls.every((toolCall) => TOOLS_THAT_REPLY_DIRECTLY.has(toolCall.name)) ||
+      screened.accepted.every((toolCall) => TOOLS_THAT_REPLY_DIRECTLY.has(toolCall.name)) ||
       (lastToolResults.length > 0 && lastToolResults.every((result) => result.sent_full));
-    const hasStatsCall = currentToolCalls.some(
+    const hasStatsCall = screened.accepted.some(
       (toolCall) => toolCall.name === "rider_stats" || toolCall.name === "team_stats"
     );
     const allSuccessful = lastToolResults.every((result) => result.success);
@@ -2129,7 +2242,7 @@ async function runClubResponsesTurn({
     // the old Chat Completions path added afterwards.
     if (handledExternally && hasStatsCall && allSuccessful) {
       try {
-        const isTeamStats = currentToolCalls.some((toolCall) => toolCall.name === "team_stats");
+        const isTeamStats = screened.accepted.some((toolCall) => toolCall.name === "team_stats");
         input.push({
           role: "user",
           content: isTeamStats

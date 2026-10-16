@@ -114,6 +114,10 @@ function RaceList() {
                                         climbs: nextRouteDetails.climbs,
                                     }}
                                     showClimbs
+                                    bonusSprints={nextRouteDetails.sprints.map((name, sprintIndex) => ({
+                                        name,
+                                        laps: nextRouteDetails.sprintLaps[sprintIndex] || '',
+                                    }))}
                                 />
                             }
                         >
