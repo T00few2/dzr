@@ -70,7 +70,7 @@ function LoginContent() {
             <Text color="orange.200" width="xs" textAlign="left">
               {showMissingRole
                 ? 'Discord godkendte dig, men den konto er ikke registreret som betalende medlem i år. Brug samme Discord-konto som på /join.'
-                : 'Discord-login blev afbrudt, før du kom ind. Prøv igen.'}
+                : `Login blev ikke færdigt (${urlError}). Prøv igen.`}
             </Text>
           ) : null}
           <Text color="white" width='xs' textAlign='left'>Not a member yet? Click the button below to join the DZR Discord server.</Text>

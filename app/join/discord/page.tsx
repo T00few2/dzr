@@ -23,11 +23,15 @@ export default function JoinDiscordPage() {
   const [isRemoving, setIsRemoving] = React.useState(false)
   const [canUnlink, setCanUnlink] = React.useState(false)
   const [infoMessage, setInfoMessage] = React.useState('')
+  const [oauthError, setOauthError] = React.useState('')
 
   React.useEffect(() => {
     let ignore = false
     async function init() {
       const search = new URLSearchParams(window.location.search)
+      if (search.get('error')) {
+        setOauthError('Discord-login blev ikke færdigt. Tryk på knappen og prøv igen.')
+      }
       const utm: Record<string, string> = {}
       for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']) {
         const value = search.get(key)
@@ -119,6 +123,7 @@ export default function JoinDiscordPage() {
             Har du ikke en Discord-konto endnu, kan du oprette en gratis konto i login-flowet.
           </Text>
         ) : null}
+        {oauthError ? <Text color="orange.300">{oauthError}</Text> : null}
         {infoMessage ? <Text color="orange.300">{infoMessage}</Text> : null}
         {discordLinked ? (
           <Stack spacing={3}>

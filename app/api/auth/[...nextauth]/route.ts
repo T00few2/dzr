@@ -7,9 +7,10 @@ const REQUIRED_ROLE_ID = (process.env.DISCORD_REQUIRED_ROLE_ID || VERIFIED_MEMBE
 
 // Admin determination now uses a specific admin role id from the guild
 
-type AccessDecision = { roles: string[]; paid: boolean; allow: boolean };
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const accessCache = new Map<string, Promise<AccessDecision>>();
+type AccessDecision = { roles: string[]; paid: boolean; allow: boolean };
 
 async function fetchMemberRoles(accessToken: string): Promise<string[] | null> {
 	const res = await fetch(`https://discord.com/api/v10/users/@me/guilds/${DISCORD_GUILD_ID}/member`, {
@@ -70,34 +71,28 @@ async function isPaidMember(discordId: string): Promise<boolean> {
 	}
 }
 
+function hasVerifiedRole(roles: string[]): boolean {
+	return roles.includes(REQUIRED_ROLE_ID) || roles.includes(VERIFIED_MEMBER_ROLE_ID);
+}
+
+async function settle<T>(label: string, task: Promise<T>, fallback: T): Promise<T> {
+	try {
+		return await task;
+	} catch (err) {
+		console.error(`[auth] ${label}`, err);
+		return fallback;
+	}
+}
+
 async function resolveAccess(accessToken: string, discordId: string): Promise<AccessDecision> {
-	const cached = accessCache.get(accessToken);
-	if (cached) return cached;
-
-	const pending = (async () => {
-		const [oauthRoles, botRoles] = await Promise.all([
-			fetchMemberRoles(accessToken),
-			fetchMemberRolesViaBot(discordId),
-		]);
-		const roles = Array.from(new Set([...(oauthRoles ?? []), ...(botRoles ?? [])]));
-		const paid = await isPaidMember(discordId);
-		const hasVerifiedRole = roles.includes(REQUIRED_ROLE_ID) || roles.includes(VERIFIED_MEMBER_ROLE_ID);
-		const allow = hasVerifiedRole || paid;
-		if (paid) {
-			try {
-				const { syncAccessRoles } = await import("@/app/utils/discordRoleSync");
-				await syncAccessRoles(discordId, "site-login");
-			} catch (err) {
-				console.error("[auth] role sync failed", err);
-			}
-		}
-		return { roles, paid, allow };
-	})().finally(() => {
-		setTimeout(() => accessCache.delete(accessToken), 30_000);
-	});
-
-	accessCache.set(accessToken, pending);
-	return pending;
+	const oauthRoles = await settle("discord role lookup", fetchMemberRoles(accessToken), null);
+	let roles = oauthRoles ?? [];
+	if (!hasVerifiedRole(roles)) {
+		const botRoles = await settle("bot role lookup", fetchMemberRolesViaBot(discordId), null);
+		roles = Array.from(new Set([...roles, ...(botRoles ?? [])]));
+	}
+	const paid = hasVerifiedRole(roles) ? false : await isPaidMember(discordId);
+	return { roles, paid, allow: hasVerifiedRole(roles) || paid };
 }
 
 const handler = NextAuth({
@@ -116,12 +111,18 @@ const handler = NextAuth({
 	],
 	callbacks: {
 		async signIn({ account, profile }) {
-			if (!account?.access_token) return false;
-			const discordId = await discordIdFrom(account.access_token, profile);
-			const access = await resolveAccess(account.access_token, discordId);
-			return access.allow;
+			try {
+				if (!account?.access_token) return false;
+				const discordId = await discordIdFrom(account.access_token, profile);
+				const access = await resolveAccess(account.access_token, discordId);
+				return access.allow;
+			} catch (err) {
+				console.error("[auth] signIn failed", err);
+				return false;
+			}
 		},
 		async jwt({ token, account, profile }) {
+			try {
 			if (account?.access_token) {
 				const discordId = await discordIdFrom(account.access_token, profile);
 				if (discordId) token.discordId = discordId;
@@ -131,6 +132,9 @@ const handler = NextAuth({
 				token.membershipActive = access.paid;
 				// Compute isAdmin by presence of the Admin role id
 				token.isAdmin = Array.isArray(roles) && roles.includes(ADMIN_ROLE_ID);
+			}
+			} catch (err) {
+				console.error("[auth] jwt failed", err);
 			}
 			if (profile && (profile as any).id) {
 				token.discordId = (profile as any).id;
