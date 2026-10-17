@@ -368,26 +368,43 @@ function finishZoom(segments, finishText, raceKm) {
   return { ...zoomOf(hit, raceKm, parsed.name), matched: true }
 }
 
-function climbZooms(segments, climbNames, raceKm) {
+function customClimbZoom(range, raceKm) {
+  const name = String(range?.name || "").trim() || "Custom KOM"
+  const from = Number(range?.fromKm)
+  const to = Number(range?.toKm)
+  if (!(to > from)) return { title: name, fromKm: 0, toKm: 0, matched: false, climb: true }
+  const start = Math.max(0, from)
+  const end = Math.min(raceKm, to)
+  return {
+    title: name,
+    fromKm: roundKm(start),
+    toKm: roundKm(Math.max(end, start + 0.05)),
+    matched: end > start,
+    climb: true,
+  }
+}
+
+function climbZooms(segments, climbNames, raceKm, customClimbs) {
   const names = (Array.isArray(climbNames) ? climbNames : []).map((name) => String(name || "").trim()).filter(Boolean)
-  if (names.length) {
-    return names.map((name) => {
-      const hit = matchingSegments(segments, name).find((segment) => segment.type === "climb") || matchingSegments(segments, name)[0]
-      if (!hit) return { title: name, fromKm: 0, toKm: 0, matched: false }
-      return { ...zoomOf(hit, raceKm, name), matched: true }
-    })
-  }
-  const seen = new Set()
-  const zooms = []
-  for (const segment of segments) {
-    if (segment.type !== "climb") continue
-    const key = `${foldName(segment.name)}::${segment.direction}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    zooms.push({ ...zoomOf(segment, raceKm, displaySegmentName(segment)), matched: true })
-    if (zooms.length >= 8) break
-  }
+  const ranges = Array.isArray(customClimbs) ? customClimbs : []
+  if (!names.length && !ranges.length) return []
+  const zooms = names.map((name) => {
+    const hit = matchingSegments(segments, name).find((segment) => segment.type === "climb") || matchingSegments(segments, name)[0]
+    if (!hit) return { title: name, fromKm: 0, toKm: 0, matched: false }
+    return { ...zoomOf(hit, raceKm, name), matched: true }
+  })
+  ranges.forEach((range) => zooms.push(customClimbZoom(range, raceKm)))
   return zooms
+}
+
+function elevationGainM(altitude) {
+  let gain = 0
+  const values = Array.isArray(altitude) ? altitude : []
+  for (let index = 1; index < values.length; index += 1) {
+    const rise = Number(values[index]) - Number(values[index - 1])
+    if (rise > 0) gain += rise
+  }
+  return Math.round(gain)
 }
 
 function sprintRows(segments, lapKm) {
@@ -406,16 +423,18 @@ function sprintRows(segments, lapKm) {
   }))
 }
 
-function buildRaceProfile({ distanceM, altitudeM, segments, raceKm, finishText, climbNames }) {
+function buildRaceProfile({ distanceM, altitudeM, segments, raceKm, finishText, climbNames, customClimbs }) {
   const tiled = tileLap(distanceM, altitudeM, segments, raceKm)
+  const limit = tiled.distanceKm[tiled.distanceKm.length - 1] || raceKm
   return {
     lapKm: roundKm(tiled.lapKm),
+    lapGainM: elevationGainM(altitudeM),
     raceKm: roundKm(raceKm),
     distanceKm: tiled.distanceKm,
     altitudeM: tiled.altitude,
     segments: tiled.segments,
-    finish: finishZoom(tiled.segments, finishText, tiled.distanceKm[tiled.distanceKm.length - 1] || raceKm),
-    climbs: climbZooms(tiled.segments, climbNames, tiled.distanceKm[tiled.distanceKm.length - 1] || raceKm),
+    finish: finishZoom(tiled.segments, finishText, limit),
+    climbs: climbZooms(tiled.segments, climbNames, limit, customClimbs),
     sprints: sprintRows(tiled.segments, tiled.lapKm),
   }
 }

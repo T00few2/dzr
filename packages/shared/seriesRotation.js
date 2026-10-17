@@ -105,9 +105,13 @@ function parseSheetDate(value) {
   return parseIsoDate(`${dmy[3]}-${month}-${day}`);
 }
 
+function usesLapCount(lapsText) {
+  return /^\d+$/.test(String(lapsText ?? "").trim());
+}
+
 function courseLength(lapsText, kmText) {
   const laps = String(lapsText ?? "").trim();
-  if (/^\d+$/.test(laps)) {
+  if (usesLapCount(laps)) {
     const count = Number(laps);
     if (count <= 0) return null;
     return { laps: count };
@@ -126,4 +130,5 @@ module.exports = {
   displayDate,
   parseSheetDate,
   courseLength,
+  usesLapCount,
 };

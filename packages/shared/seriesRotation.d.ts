@@ -22,3 +22,5 @@ export function courseLength(
   lapsText: unknown,
   kmText: unknown
 ): { laps: number } | { distanceMeters: number } | null
+
+export function usesLapCount(lapsText: unknown): boolean

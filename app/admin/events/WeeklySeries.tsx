@@ -39,6 +39,7 @@ type SeriesView = {
   dates: SeriesDate[]
   error: string
   feedUnavailable: boolean
+  primeRoutes?: string[]
 }
 
 type RouteHit = { routeId: number; name: string; world: string | null }
@@ -364,7 +365,7 @@ export default function WeeklySeries({
   feedDown: boolean
 }) {
   const [series, setSeries] = useState<SeriesView[]>([])
-  const [saved, setSaved] = useState<SavedEvent[]>([])
+  const [savedBySeries, setSavedBySeries] = useState<Record<string, SavedEvent[]>>({})
   const [loadError, setLoadError] = useState('')
   const [messages, setMessages] = useState<Record<string, SeriesMessage>>({})
   const [busy, setBusy] = useState('')
@@ -375,10 +376,16 @@ export default function WeeklySeries({
   }
 
   async function loadSaved() {
-    const res = await fetch('/api/admin/events/results', { cache: 'no-store' })
-    if (!res.ok) return
-    const body = await res.json()
-    setSaved(Array.isArray(body.events) ? body.events : [])
+    const ids = ['after-party', 'zwifty-fifty'] as const
+    const loaded = await Promise.all(
+      ids.map(async (seriesId) => {
+        const res = await fetch(`/api/admin/events/results?series=${seriesId}`, { cache: 'no-store' })
+        if (!res.ok) return [seriesId, []] as const
+        const body = await res.json()
+        return [seriesId, Array.isArray(body.events) ? body.events : []] as const
+      })
+    )
+    setSavedBySeries(Object.fromEntries(loaded))
   }
 
   async function load() {
@@ -459,8 +466,10 @@ export default function WeeklySeries({
       {loadError ? <Text color="red.300">{loadError}</Text> : null}
       {series.map((item) => {
         const message = messages[item.id]
-        const rows = scheduleRows(item.dates, item.id === 'zwifty-fifty' ? saved : [])
-        const columns = item.id === 'zwifty-fifty' ? 5 : 4
+        const primeRoutes = item.primeRoutes || []
+        const showZwiftPower = item.id === 'zwifty-fifty' || primeRoutes.length > 0
+        const rows = scheduleRows(item.dates, savedBySeries[item.id] || [])
+        const columns = showZwiftPower ? 5 : 4
         return (
           <Box key={item.id} borderWidth="1px" borderColor="gray.700" rounded="md" p={4}>
             <Heading size="sm" mb={3}>
@@ -494,7 +503,7 @@ export default function WeeklySeries({
                     <Th color="gray.500">Route</Th>
                     <Th color="gray.500">Status</Th>
                     <Th color="gray.500" />
-                    {item.id === 'zwifty-fifty' ? <Th color="gray.500">ZwiftPower</Th> : null}
+                    {showZwiftPower ? <Th color="gray.500">ZwiftPower</Th> : null}
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -553,9 +562,9 @@ export default function WeeklySeries({
                               </Button>
                             )}
                           </Td>
-                          {item.id === 'zwifty-fifty' ? (
+                          {showZwiftPower ? (
                             <Td>
-                              {row.eventId ? (
+                              {row.eventId && (item.id === 'zwifty-fifty' || primeRoutes.includes(row.route)) ? (
                                 <Stack spacing={2}>
                                   <FiftyStatus
                                     event={{
@@ -568,15 +577,17 @@ export default function WeeklySeries({
                                     }}
                                   />
                                   <Flex gap={2} wrap="wrap">
-                                    <Button
-                                      {...readableOutline}
-                                      size="sm"
-                                      onClick={() =>
-                                        setFiftyOpen(open === 'categories' ? null : { id: row.eventId, panel: 'categories' })
-                                      }
-                                    >
-                                      Check categories
-                                    </Button>
+                                    {item.id === 'zwifty-fifty' ? (
+                                      <Button
+                                        {...readableOutline}
+                                        size="sm"
+                                        onClick={() =>
+                                          setFiftyOpen(open === 'categories' ? null : { id: row.eventId, panel: 'categories' })
+                                        }
+                                      >
+                                        Check categories
+                                      </Button>
+                                    ) : null}
                                     <Button
                                       {...readableOutline}
                                       size="sm"
@@ -592,7 +603,7 @@ export default function WeeklySeries({
                             </Td>
                           ) : null}
                         </Tr>
-                        {item.id === 'zwifty-fifty' && open ? (
+                        {showZwiftPower && open ? (
                           <Tr>
                             <Td colSpan={columns} borderTopWidth="0">
                               <FiftyDetail

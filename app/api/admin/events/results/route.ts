@@ -10,7 +10,9 @@ export async function GET(req: Request) {
   const auth = await requireEventEditor(req)
   if (auth.error) return auth.error
   try {
-    return NextResponse.json({ events: await listSavedEvents('zwifty-fifty') })
+    const series = new URL(req.url).searchParams.get('series')
+    const seriesId = series === 'after-party' || series === 'zwifty-fifty' ? series : 'zwifty-fifty'
+    return NextResponse.json({ events: await listSavedEvents(seriesId) })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not load saved races'
     const status = error instanceof SeriesError ? error.status : 500

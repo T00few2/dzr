@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Area, AreaChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, usePlotArea, XAxis, YAxis } from 'recharts'
 import { Box, HStack, Spinner, Stack, Text } from '@chakra-ui/react'
-import type { ProfileSegment, ProfileZoom, RaceProfile } from '@/packages/shared/routeProfile'
+import type { CustomClimbRange, ProfileSegment, ProfileZoom, RaceProfile } from '@/packages/shared/routeProfile'
 import { bonusNamesMatch, profileImageSrc } from '@/packages/shared/routeProfile'
 
 const COLORS = { sprint: '#56A845', climb: '#ed2324', segment: '#718096', bonus: '#C9A227' }
@@ -23,6 +23,7 @@ type ProfileRequest = {
   distance?: string
   finish?: string
   climbs?: string[]
+  customClimbs?: CustomClimbRange[]
 }
 
 function wantsReverse(value: string) {
@@ -510,7 +511,15 @@ export function RouteProfilePreview({
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const key = request
-    ? [request.world, request.route, request.laps, request.distance, request.finish, (request.climbs || []).join('|')].join('\n')
+    ? [
+        request.world,
+        request.route,
+        request.laps,
+        request.distance,
+        request.finish,
+        (request.climbs || []).join('|'),
+        JSON.stringify(request.customClimbs || []),
+      ].join('\n')
     : ''
 
   useEffect(() => {
@@ -529,6 +538,7 @@ export function RouteProfilePreview({
         distance: request.distance || '',
         finish: request.finish || '',
         climbs: (request.climbs || []).join(','),
+        ranges: JSON.stringify(request.customClimbs || []),
       })
       setLoading(true)
       setError('')

@@ -683,23 +683,30 @@ def _prime_points(bonus) -> str:
     return ",".join(parts)
 
 
-def _fifty_sprints(event_id: int):
-    schedule = firebase.get_document("series_schedules", "zwifty-fifty") or {}
-    route_name = ""
-    for row in (schedule.get("events") or {}).values():
-        if isinstance(row, dict) and str(row.get("id") or "").strip() == str(event_id):
-            route_name = str(row.get("route") or "").strip()
-            break
-    if not route_name:
-        raise ValueError("This event is not a saved Zwifty Fifty")
-    catalog = firebase.get_document("series_catalogs", "zwifty-fifty") or {}
-    entry = None
-    for row in catalog.get("routes") or []:
-        if isinstance(row, dict) and str(row.get("route") or "").strip().casefold() == route_name.casefold():
-            entry = row
-            break
-    if not entry:
-        raise ValueError(f"{route_name} is not in the route catalog")
+def _series_sprints(event_id: int):
+    found = None
+    for series_id in ("after-party", "zwifty-fifty"):
+        schedule = firebase.get_document("series_schedules", series_id) or {}
+        route_name = ""
+        for row in (schedule.get("events") or {}).values():
+            if isinstance(row, dict) and str(row.get("id") or "").strip() == str(event_id):
+                route_name = str(row.get("route") or "").strip()
+                break
+        if not route_name:
+            continue
+        catalog = firebase.get_document("series_catalogs", series_id) or {}
+        entry = None
+        for row in catalog.get("routes") or []:
+            if isinstance(row, dict) and str(row.get("route") or "").strip().casefold() == route_name.casefold():
+                entry = row
+                break
+        if not entry:
+            raise ValueError(f"{route_name} is not in the route catalog")
+        found = (series_id, route_name, entry)
+        break
+    if not found:
+        raise ValueError("This event is not a saved series race")
+    series_id, route_name, entry = found
     names = entry.get("sprints") if isinstance(entry.get("sprints"), list) else []
     laps = entry.get("sprintLaps") if isinstance(entry.get("sprintLaps"), list) else []
     sprints = []
@@ -708,16 +715,18 @@ def _fifty_sprints(event_id: int):
         cleaned = str(name).strip()
         if cleaned:
             sprints.append({"name": cleaned, "laps": str(lap).strip() or "1"})
-    points = _prime_points(entry.get("bonus") or []) if sprints else ""
-    return route_name, sprints, points
+    if not sprints:
+        raise ValueError(f"{route_name} has no bonus segments")
+    points = _prime_points(entry.get("bonus") or [])
+    return series_id, route_name, sprints, points
 
 
-def _mark_fifty_primes(event_id: int, updated: int, skipped: int):
-    doc = firebase.db.collection("series_schedules").document("zwifty-fifty").get()
+def _mark_series_primes(series_id: str, event_id: int, updated: int, skipped: int):
+    doc = firebase.db.collection("series_schedules").document(series_id).get()
     events = (doc.to_dict() or {}).get("events") or {}
     for date, row in events.items():
         if isinstance(row, dict) and str(row.get("id") or "").strip() == str(event_id):
-            firebase.db.collection("series_schedules").document("zwifty-fifty").update({
+            firebase.db.collection("series_schedules").document(series_id).update({
                 f"events.{date}.primesFix": {
                     "at": datetime.now(timezone.utc).isoformat(),
                     "updated": updated,
@@ -768,14 +777,14 @@ def _fix_due_fifty_sprints() -> dict:
     zp = get_organizer_zwiftpower()
     results = []
     for event_id in due:
-        _route_name, sprints, points = _fifty_sprints(event_id)
+        _series_id, _route_name, sprints, points = _series_sprints(event_id)
         preview = zp.sprint_preview(event_id, sprints, points)
         if preview.get("pending") or any(not row.get("matched") for row in preview.get("sprints") or []):
             results.append({"eventId": event_id, **preview})
             continue
         applied = zp.apply_sprints(event_id, sprints, points) if preview.get("sprints") else preview
         skipped = len([row for row in applied.get("sprints") or [] if not row.get("matched")])
-        _mark_fifty_primes(event_id, len(applied.get("updated") or []), skipped)
+        _mark_series_primes(_series_id, event_id, len(applied.get("updated") or []), skipped)
         results.append({"eventId": event_id, **applied})
     return {"checked": len(due), "results": results}
 
@@ -907,13 +916,13 @@ def zwiftpower_event_sprints(event_id: int):
     if unauthorized:
         return unauthorized
     try:
-        route_name, sprints, points = _fifty_sprints(event_id)
+        series_id, route_name, sprints, points = _series_sprints(event_id)
         zp = get_organizer_zwiftpower()
         if request.method == 'POST':
             result = zp.apply_sprints(event_id, sprints, points)
             ready = not result.get("pending") and all(row.get("matched") for row in result.get("sprints") or [])
             if ready:
-                _mark_fifty_primes(event_id, len(result.get("updated") or []), 0)
+                _mark_series_primes(series_id, event_id, len(result.get("updated") or []), 0)
         else:
             result = zp.sprint_preview(event_id, sprints, points)
         return jsonify({"eventId": event_id, "route": route_name, **result})

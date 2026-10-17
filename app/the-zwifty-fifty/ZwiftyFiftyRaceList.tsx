@@ -52,6 +52,7 @@ function RaceList() {
                         length: nextRace.catalog.distance || fileRoute?.length || '',
                         hm: nextRace.catalog.elevation || fileRoute?.hm || '',
                         climbs: nextRace.catalog.climbs.length ? nextRace.catalog.climbs : fileRoute?.climbs || [],
+                        customClimbs: nextRace.catalog.customClimbs || [],
                         sprints: nextRace.catalog.sprints.length ? nextRace.catalog.sprints : fileRoute?.sprints || [],
                         sprintLaps: nextRace.catalog.sprintLaps.length ? nextRace.catalog.sprintLaps : fileRoute?.sprintLaps || [],
                         bonus: nextRace.catalog.bonus.length ? nextRace.catalog.bonus : fileRoute?.bonus || [],
@@ -112,6 +113,7 @@ function RaceList() {
                                         laps: nextRouteDetails.laps,
                                         distance: nextRouteDetails.length,
                                         climbs: nextRouteDetails.climbs,
+                                        customClimbs: 'customClimbs' in nextRouteDetails ? nextRouteDetails.customClimbs : [],
                                     }}
                                     showClimbs
                                     bonusSprints={nextRouteDetails.sprints.map((name, sprintIndex) => ({

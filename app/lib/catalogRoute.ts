@@ -1,3 +1,9 @@
+export type CustomClimb = {
+  name: string
+  fromKm: number
+  toKm: number
+}
+
 export type CatalogRoute = {
   route: string
   world: string
@@ -7,6 +13,7 @@ export type CatalogRoute = {
   finish: string
   linkRoute: string
   climbs: string[]
+  customClimbs: CustomClimb[]
   sprints: string[]
   sprintLaps: string[]
   bonus: string[]
@@ -24,6 +31,7 @@ export function emptyCatalogRoute(): CatalogRoute {
     finish: '',
     linkRoute: '',
     climbs: [],
+    customClimbs: [],
     sprints: [],
     sprintLaps: [],
     bonus: [],
@@ -43,6 +51,19 @@ export function textToList(value: string) {
     .filter(Boolean)
 }
 
+function readCustomClimbs(value: unknown): CustomClimb[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const row = item as { name?: unknown; fromKm?: unknown; toKm?: unknown }
+    const name = String(row.name || '').trim()
+    const fromKm = Number(row.fromKm)
+    const toKm = Number(row.toKm)
+    if (!name || !Number.isFinite(fromKm) || !Number.isFinite(toKm) || !(toKm > fromKm)) return []
+    return [{ name, fromKm, toKm }]
+  })
+}
+
 export function asCatalogRoute(value: unknown): CatalogRoute | null {
   if (!value || typeof value !== 'object') return null
   const row = value as Partial<CatalogRoute>
@@ -57,7 +78,10 @@ export function asCatalogRoute(value: unknown): CatalogRoute | null {
     elevation: String(row.elevation || ''),
     finish: String(row.finish || ''),
     linkRoute: String(row.linkRoute || ''),
-    climbs: Array.isArray(row.climbs) ? row.climbs.map(String) : [],
+    climbs: Array.isArray(row.climbs)
+      ? row.climbs.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
+      : [],
+    customClimbs: readCustomClimbs(row.customClimbs),
     sprints: Array.isArray(row.sprints) ? row.sprints.map(String) : [],
     sprintLaps: Array.isArray(row.sprintLaps) ? row.sprintLaps.map(String) : [],
     bonus: Array.isArray(row.bonus) ? row.bonus.map(String) : [],

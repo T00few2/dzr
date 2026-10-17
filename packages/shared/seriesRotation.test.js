@@ -7,6 +7,7 @@ const {
   displayDate,
   parseSheetDate,
   courseLength,
+  usesLapCount,
 } = require("./seriesRotation");
 
 const routes = ["Alpha", "Bravo", "Charlie"];
@@ -47,4 +48,8 @@ test("whole laps set laps, and 1+ or <1 set distance", () => {
   assert.deepStrictEqual(courseLength("2", "50.09"), { laps: 2 });
   assert.deepStrictEqual(courseLength("1+", "36.767"), { distanceMeters: 36767 });
   assert.deepStrictEqual(courseLength("<1", "36.47"), { distanceMeters: 36470 });
+  assert.strictEqual(usesLapCount("3"), true);
+  assert.strictEqual(usesLapCount("1+"), false);
+  assert.strictEqual(usesLapCount("<1"), false);
+  assert.strictEqual(usesLapCount(""), false);
 });

@@ -48,8 +48,12 @@ export default function AfterPartyRaceList() {
                         elevation: nextRace.catalog.elevation || fileRoute?.elevation || '',
                         finish: nextRace.catalog.finish || fileRoute?.finish || '',
                         linkRoute: nextRace.catalog.linkRoute || fileRoute?.linkRoute || '',
+                        climbs: nextRace.catalog.climbs || [],
+                        customClimbs: nextRace.catalog.customClimbs || [],
                     }
                     : fileRoute
+                    ? { ...fileRoute, climbs: [] as string[], customClimbs: [] as { name: string; fromKm: number; toKm: number }[] }
+                    : null
                 if (!nextRouteDetails) return null
                 return (
                     
@@ -99,8 +103,10 @@ export default function AfterPartyRaceList() {
                                         laps: nextRouteDetails.laps,
                                         distance: nextRouteDetails.distance,
                                         finish: nextRouteDetails.finish,
+                                        climbs: nextRouteDetails.climbs,
+                                        customClimbs: nextRouteDetails.customClimbs,
                                     }}
-                                    showFinish
+                                    showClimbs={nextRouteDetails.climbs.length + nextRouteDetails.customClimbs.length > 0}
                                 />
                             }
                         >

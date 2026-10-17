@@ -45,6 +45,7 @@ export type SeriesView = {
   dates: SeriesDateView[]
   error: string
   feedUnavailable: boolean
+  primeRoutes: string[]
 }
 
 export class SeriesError extends Error {
@@ -262,6 +263,7 @@ function toView(
   stored: StoredSchedule,
   events: ZwiftEventSummary[] | null,
   names: string[],
+  primeRoutes: string[],
   error = ''
 ): SeriesView {
   const dates = listSeriesDates(stored.anchorDate, Object.keys(stored.events), DATE_COUNT).map((date) => {
@@ -283,6 +285,7 @@ function toView(
     dates,
     error,
     feedUnavailable: events == null,
+    primeRoutes,
   }
 }
 
@@ -299,7 +302,11 @@ export async function listSeriesViews(): Promise<SeriesView[]> {
     ids.map(async (seriesId) => {
       try {
         const stored = await ensureSeries(seriesId)
-        return toView(seriesId, stored, feedUnavailable ? null : events, await routeNames(seriesId))
+        const catalog = await ensureCatalog(seriesId)
+        const primeRoutes = catalog
+          .filter((route) => route.sprints.some((sprint) => sprint.trim()))
+          .map((route) => route.route)
+        return toView(seriesId, stored, feedUnavailable ? null : events, await routeNames(seriesId), primeRoutes)
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Could not load this series'
         return {
@@ -309,6 +316,7 @@ export async function listSeriesViews(): Promise<SeriesView[]> {
           dates: [],
           error: message,
           feedUnavailable,
+          primeRoutes: [],
         }
       }
     })

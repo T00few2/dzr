@@ -2,10 +2,29 @@ import { NextResponse } from 'next/server'
 import { elevationForSlug, segmentLatLng } from '@/app/lib/routeElevation'
 import { sauceSegmentsForRoute } from '@/app/lib/sauceRouteSegments'
 import { resolveCatalogRoute, segmentsToLocate } from '@/app/lib/zwiftCatalog'
-import { buildRaceProfile, mergePositionedSegments, placeOnRoute, prepareLap, raceDistanceKm, shiftProfileSegments, type ProfileSegment } from '@/packages/shared/routeProfile'
+import { buildRaceProfile, mergePositionedSegments, placeOnRoute, prepareLap, raceDistanceKm, shiftProfileSegments, type CustomClimbRange, type ProfileSegment } from '@/packages/shared/routeProfile'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+
+function parseRanges(value: string | null): CustomClimbRange[] {
+  if (!value) return []
+  try {
+    const rows = JSON.parse(value) as unknown
+    if (!Array.isArray(rows)) return []
+    return rows.flatMap((item) => {
+      if (!item || typeof item !== 'object') return []
+      const row = item as { name?: unknown; fromKm?: unknown; toKm?: unknown }
+      const name = String(row.name || '').trim()
+      const fromKm = Number(row.fromKm)
+      const toKm = Number(row.toKm)
+      if (!name || !Number.isFinite(fromKm) || !Number.isFinite(toKm)) return []
+      return [{ name, fromKm, toKm }]
+    })
+  } catch {
+    return []
+  }
+}
 
 function locatedSegments(world: string, placed: ProfileSegment[], distanceM: number[], latlng: number[][]) {
   if (latlng.length !== distanceM.length || latlng.length < 2) return []
@@ -55,6 +74,7 @@ export async function GET(req: Request) {
       raceKm,
       finishText: url.searchParams.get('finish') || '',
       climbNames: climbs,
+      customClimbs: parseRanges(url.searchParams.get('ranges')),
     })
     return NextResponse.json({ routeName: match.name, ...profile })
   } catch (error) {

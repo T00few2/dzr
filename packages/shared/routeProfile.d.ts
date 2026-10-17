@@ -19,8 +19,15 @@ export type SprintSuggestion = {
   laps: string
 }
 
+export type CustomClimbRange = {
+  name: string
+  fromKm: number
+  toKm: number
+}
+
 export type RaceProfile = {
   lapKm: number
+  lapGainM: number
   raceKm: number
   distanceKm: number[]
   altitudeM: number[]
@@ -68,6 +75,7 @@ export function buildRaceProfile(input: {
   raceKm: number
   finishText?: string
   climbNames?: string[]
+  customClimbs?: CustomClimbRange[]
 }): RaceProfile
 
 export function profileImageSrc(series: string, routeName: string): string

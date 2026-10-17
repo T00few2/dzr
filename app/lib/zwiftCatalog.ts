@@ -62,6 +62,27 @@ export type SegmentCandidate = {
   direction: 'forward' | 'reverse'
 }
 
+export type ListedRoute = { routeId: number; name: string; world: string }
+
+export function listWorldRoutes(): { world: string; routes: ListedRoute[] }[] {
+  const worlds = new Map<string, ListedRoute[]>()
+  for (const route of routes) {
+    const routeId = Number(route.id)
+    const world = String(route.world || '').trim()
+    const name = String(route.name || '').trim()
+    if (!world || !name || !Number.isInteger(routeId) || routeId <= 0) continue
+    const list = worlds.get(world) || []
+    list.push({ routeId, name, world })
+    worlds.set(world, list)
+  }
+  return [...worlds.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([world, listed]) => ({
+      world,
+      routes: listed.sort((left, right) => left.name.localeCompare(right.name)),
+    }))
+}
+
 export function resolveCatalogRoute(world: string, routeName: string): ResolvedRoute | null {
   const worldSlug = slugifyZwiftName(world)
   const routeSlug = slugifyZwiftName(routeName)

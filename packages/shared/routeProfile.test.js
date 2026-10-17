@@ -122,6 +122,33 @@ test("a KOM finish stays on the climb when a sprint shares the world name", () =
   assert.ok(profile.climbs[0].fromKm > 7)
 })
 
+test("a KOM close-up is drawn only for a chosen climb or a custom span", () => {
+  const profile = buildRaceProfile({
+    distanceM: [0, 5000, 10000],
+    altitudeM: [10, 40, 20],
+    segments: [{ name: "Box Hill", type: "climb", fromKm: 2, toKm: 4, direction: "forward" }],
+    raceKm: 10,
+    finishText: "Banner on Box Hill",
+    climbNames: [],
+  })
+  assert.deepStrictEqual(profile.climbs, [])
+  const chosen = buildRaceProfile({
+    distanceM: [0, 5000, 10000],
+    altitudeM: [10, 40, 20],
+    segments: [{ name: "Box Hill", type: "climb", fromKm: 2, toKm: 4, direction: "forward" }],
+    raceKm: 10,
+    climbNames: ["Box Hill"],
+    customClimbs: [{ name: "Governor stretch", fromKm: 6.2, toKm: 8.4 }],
+  })
+  assert.strictEqual(chosen.climbs.length, 2)
+  assert.strictEqual(chosen.climbs[0].matched, true)
+  assert.strictEqual(chosen.climbs[1].title, "Governor stretch")
+  assert.strictEqual(chosen.climbs[1].fromKm, 6.2)
+  assert.strictEqual(chosen.climbs[1].toKm, 8.4)
+  assert.strictEqual(chosen.climbs[1].climb, true)
+  assert.strictEqual(chosen.lapGainM, 30)
+})
+
 test("a ZwiftPower title with the world in front still marks the segment", () => {
   assert.strictEqual(bonusNamesMatch("Fox Hill", "London Fox Hill"), true)
   assert.strictEqual(bonusNamesMatch("Box Hill", "London Box Hill"), true)

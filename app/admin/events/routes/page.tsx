@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import AdminShell from '@/components/admin/AdminShell'
 import {
@@ -9,14 +9,17 @@ import {
   textToList,
   type CatalogRoute,
 } from '@/app/lib/catalogRoute'
-import { Box, Button, Flex, Heading, Input, Select, Stack, Text, Textarea } from '@chakra-ui/react'
+import { Box, Button, Flex, Heading, Input, Select, Stack, Text } from '@chakra-ui/react'
 import { RouteProfilePreview } from '@/components/route-profile/RouteProfilePreview'
-import { foldName, type ProfileSegment, type RaceProfile } from '@/packages/shared/routeProfile'
+import { foldName, slugifyZwiftName, type ProfileSegment, type RaceProfile } from '@/packages/shared/routeProfile'
+import { usesLapCount } from '@/packages/shared/seriesRotation'
 
 type SeriesId = 'after-party' | 'zwifty-fifty'
 type RouteHit = { routeId: number; name: string; world: string | null }
 type SegmentHit = { id: string; name: string; world: string }
 type Suggestion = { match: RouteHit | null; sameName: boolean; options: RouteHit[] }
+type WorldList = { world: string; routes: RouteHit[] }
+type LengthMode = 'laps' | 'distance'
 
 const readableOutline = {
   variant: 'outline' as const,
@@ -71,10 +74,18 @@ function savedSegmentName(segment: ProfileSegment, segments: ProfileSegment[]) {
 function worldLabel(world: string | null | undefined) {
   return String(world || '')
     .trim()
+    .replace(/-/g, ' ')
     .split(/\s+/)
     .filter(Boolean)
     .map((part) => `${part[0].toUpperCase()}${part.slice(1).toLowerCase()}`)
     .join(' ')
+}
+
+function lapCourse(count: number, stats: RaceProfile) {
+  return {
+    distance: String(Math.round(stats.lapKm * count * 10) / 10),
+    elevation: String(Math.round((stats.lapGainM || 0) * count)),
+  }
 }
 
 function segmentKind(segment: ProfileSegment) {
@@ -102,8 +113,15 @@ export default function RouteSetupPage() {
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState('')
   const [profile, setProfile] = useState<RaceProfile | null>(null)
+  const [lengthMode, setLengthMode] = useState<LengthMode>('distance')
+  const [worlds, setWorlds] = useState<WorldList[]>([])
+  const [customName, setCustomName] = useState('')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const fillLaps = useRef(false)
 
-  const fifty = series === 'zwifty-fifty'
+  const worldSlug = slugifyZwiftName(draft.world)
+  const worldRoutes = worlds.find((item) => item.world === worldSlug)?.routes || []
 
   async function load(nextSeries = series) {
     const res = await fetch(`/api/admin/events/catalog?series=${nextSeries}`, { cache: 'no-store' })
@@ -116,8 +134,28 @@ export default function RouteSetupPage() {
   }
 
   useEffect(() => {
+    void fetch('/api/admin/events/world-routes', { cache: 'no-store' })
+      .then(async (res) => {
+        if (!res.ok) return
+        const body = await res.json()
+        setWorlds(Array.isArray(body.worlds) ? body.worlds : [])
+      })
+      .catch(() => setWorlds([]))
+  }, [])
+
+  useEffect(() => {
+    if (!fillLaps.current || lengthMode !== 'laps' || !profile?.lapKm) return
+    const count = Number(draft.laps)
+    if (!Number.isInteger(count) || count <= 0) return
+    fillLaps.current = false
+    setDraft((current) => ({ ...current, ...lapCourse(count, profile) }))
+  }, [profile, draft.laps, lengthMode])
+
+  useEffect(() => {
     setIndex(null)
     setDraft(emptyCatalogRoute())
+    setLengthMode('distance')
+    fillLaps.current = false
     setOptions([])
     setSprintHits({})
     setNamedSearch({})
@@ -132,6 +170,11 @@ export default function RouteSetupPage() {
     if (!route) return
     setIndex(routeIndex)
     setDraft(route)
+    setLengthMode(usesLapCount(route.laps) ? 'laps' : 'distance')
+    fillLaps.current = false
+    setCustomName('')
+    setCustomFrom('')
+    setCustomTo('')
     setOptions([])
     setSprintHits({})
     setNamedSearch({})
@@ -145,6 +188,11 @@ export default function RouteSetupPage() {
   function startAdd() {
     setIndex(null)
     setDraft(emptyCatalogRoute())
+    setLengthMode('distance')
+    fillLaps.current = false
+    setCustomName('')
+    setCustomFrom('')
+    setCustomTo('')
     setOptions([])
     setSprintHits({})
     setNamedSearch({})
@@ -186,16 +234,63 @@ export default function RouteSetupPage() {
     }
   }
 
-  function applyZwiftRoute(hit: RouteHit, options?: { keepSearching?: boolean }) {
+  function queueLapFill(lapsText: string, wait: boolean) {
+    const count = Number(lapsText)
+    const laps = Number.isInteger(count) && count > 0 ? String(count) : lapsText
+    if (!wait && profile?.lapKm && Number.isInteger(count) && count > 0) {
+      fillLaps.current = false
+      setDraft((current) => ({ ...current, laps, ...lapCourse(count, profile) }))
+      return
+    }
+    fillLaps.current = true
+    setDraft((current) => ({ ...current, laps }))
+  }
+
+  function chooseLength(mode: LengthMode) {
+    setLengthMode(mode)
+    if (mode === 'distance') {
+      fillLaps.current = false
+      setDraft((current) => (usesLapCount(current.laps) ? { ...current, laps: '1+' } : current))
+      return
+    }
+    queueLapFill(usesLapCount(draft.laps) ? draft.laps.trim() : '1', false)
+  }
+
+  function applyZwiftRoute(hit: RouteHit, options?: { keepSearching?: boolean; world?: string }) {
     setRouteNameSearch(Boolean(options?.keepSearching))
     setQuery(hit.name)
     setDraft((current) => ({
       ...current,
       zwiftRouteId: hit.routeId,
       zwiftRouteName: hit.name,
-      world: current.world.trim() ? current.world : worldLabel(hit.world),
+      world: options?.world ? worldLabel(options.world) : current.world.trim() ? current.world : worldLabel(hit.world),
       route: current.route.trim() ? current.route : hit.name,
     }))
+    if (lengthMode === 'laps') {
+      fillLaps.current = true
+      setProfile(null)
+    }
+  }
+
+  function addClimb(name: string) {
+    const cleaned = name.trim()
+    if (!cleaned || draft.climbs.some((climb) => climb.toLowerCase() === cleaned.toLowerCase())) return
+    setField({ climbs: [...draft.climbs, cleaned] })
+  }
+
+  function addCustomClimb() {
+    const name = customName.trim()
+    const fromKm = Number(customFrom)
+    const toKm = Number(customTo)
+    if (!name || !(toKm > fromKm)) {
+      setError('A custom KOM needs a name, a start km, and a later end km')
+      return
+    }
+    setError('')
+    setField({ customClimbs: [...draft.customClimbs, { name, fromKm, toKm }] })
+    setCustomName('')
+    setCustomFrom('')
+    setCustomTo('')
   }
 
   function setSprint(sprintIndex: number, name: string) {
@@ -275,10 +370,18 @@ export default function RouteSetupPage() {
   }
 
   async function save() {
+    const lapCount = Number(draft.laps)
     const route: CatalogRoute = {
       ...draft,
       route: draft.route.trim(),
+      laps:
+        lengthMode === 'laps' && Number.isInteger(lapCount) && lapCount > 0
+          ? String(lapCount)
+          : usesLapCount(draft.laps)
+            ? '1+'
+            : draft.laps.trim(),
       climbs: draft.climbs,
+      customClimbs: draft.customClimbs,
       sprints: draft.sprints,
       sprintLaps: draft.sprintLaps,
       bonus: draft.bonus,
@@ -446,39 +549,174 @@ export default function RouteSetupPage() {
                 ) : null}
               </Box>
             )}
-            <Input placeholder="World" value={draft.world} onChange={(e) => setField({ world: e.target.value })} {...field} />
+            <Select
+              placeholder="Choose a Zwift world"
+              bg="gray.900"
+              borderColor="gray.700"
+              value={worlds.some((item) => item.world === worldSlug) ? worldSlug : ''}
+              onChange={(e) => setField({ world: e.target.value ? worldLabel(e.target.value) : '' })}
+            >
+              {worlds.map((item) => (
+                <option key={item.world} value={item.world}>
+                  {worldLabel(item.world)}
+                </option>
+              ))}
+            </Select>
+            <Select
+              placeholder={worldRoutes.length ? 'Choose a route in this world' : 'Choose a world first'}
+              bg="gray.900"
+              borderColor="gray.700"
+              value={worldRoutes.some((route) => route.routeId === draft.zwiftRouteId) ? String(draft.zwiftRouteId) : ''}
+              onChange={(e) => {
+                const hit = worldRoutes.find((route) => String(route.routeId) === e.target.value)
+                if (hit) applyZwiftRoute(hit, { world: worldSlug })
+              }}
+            >
+              {worldRoutes.map((route) => (
+                <option key={route.routeId} value={route.routeId}>
+                  {route.name}
+                </option>
+              ))}
+            </Select>
             <Flex gap={2}>
-              <Input placeholder="Laps" value={draft.laps} onChange={(e) => setField({ laps: e.target.value })} {...field} />
+              <Button
+                {...(lengthMode === 'laps' ? { colorScheme: 'red' as const } : readableOutline)}
+                onClick={() => chooseLength('laps')}
+              >
+                Laps
+              </Button>
+              <Button
+                {...(lengthMode === 'distance' ? { colorScheme: 'red' as const } : readableOutline)}
+                onClick={() => chooseLength('distance')}
+              >
+                Distance
+              </Button>
+            </Flex>
+            <Flex gap={2}>
+              {lengthMode === 'laps' ? (
+                <Input
+                  placeholder="Laps"
+                  value={draft.laps}
+                  onChange={(e) => {
+                    const laps = e.target.value
+                    if (usesLapCount(laps)) queueLapFill(laps, false)
+                    else {
+                      fillLaps.current = false
+                      setField({ laps })
+                    }
+                  }}
+                  {...field}
+                />
+              ) : (
+                <Input
+                  placeholder="1+ or <1"
+                  value={draft.laps}
+                  onChange={(e) => setField({ laps: e.target.value })}
+                  {...field}
+                />
+              )}
               <Input
                 placeholder="Distance (km)"
                 value={draft.distance}
+                isReadOnly={lengthMode === 'laps'}
                 onChange={(e) => setField({ distance: e.target.value })}
                 {...field}
               />
               <Input
                 placeholder="Elevation (hm)"
                 value={draft.elevation}
+                isReadOnly={lengthMode === 'laps'}
                 onChange={(e) => setField({ elevation: e.target.value })}
                 {...field}
               />
             </Flex>
-            {fifty ? null : (
-              <Input placeholder="Finish" value={draft.finish} onChange={(e) => setField({ finish: e.target.value })} {...field} />
-            )}
+            <Input placeholder="Finish" value={draft.finish} onChange={(e) => setField({ finish: e.target.value })} {...field} />
             <Input
               placeholder="Zwift Insider link"
               value={draft.linkRoute}
               onChange={(e) => setField({ linkRoute: e.target.value })}
               {...field}
             />
-            {fifty ? (
-              <>
-                <Textarea
-                  placeholder="Climbs, separated by commas"
-                  value={listToText(draft.climbs)}
-                  onChange={(e) => setField({ climbs: textToList(e.target.value) })}
+            <Box>
+              <Text fontSize="sm" color="gray.400" mb={2}>
+                KOM close-ups. The overview is always shown. Add a segment on this route, or a custom stretch by start and end km.
+              </Text>
+              <Stack spacing={2} mb={3}>
+                {draft.climbs.map((climb, climbIndex) => (
+                  <Flex key={`${climb}-${climbIndex}`} gap={2} align="center">
+                    <Text color="white" flex="1">
+                      {climb}
+                    </Text>
+                    <Button
+                      {...readableOutline}
+                      onClick={() => setField({ climbs: draft.climbs.filter((_, index) => index !== climbIndex) })}
+                    >
+                      Remove
+                    </Button>
+                  </Flex>
+                ))}
+                {draft.customClimbs.map((climb, climbIndex) => (
+                  <Flex key={`${climb.name}-${climb.fromKm}-${climbIndex}`} gap={2} align="center">
+                    <Text color="white" flex="1">
+                      {climb.name} · {climb.fromKm}–{climb.toKm} km
+                    </Text>
+                    <Button
+                      {...readableOutline}
+                      onClick={() =>
+                        setField({ customClimbs: draft.customClimbs.filter((_, index) => index !== climbIndex) })
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </Flex>
+                ))}
+              </Stack>
+              <Select
+                placeholder={profile ? 'Add a segment on this route' : 'Load the route profile first'}
+                bg="gray.900"
+                borderColor="gray.700"
+                value=""
+                mb={2}
+                onChange={(e) => {
+                  const segment = segmentChoices(profile?.segments || []).find((item) => choiceValue(item) === e.target.value)
+                  if (segment) addClimb(savedSegmentName(segment, profile?.segments || []))
+                }}
+              >
+                {segmentChoices(profile?.segments || []).map((segment) => (
+                  <option key={choiceValue(segment)} value={choiceValue(segment)}>
+                    {segment.name} · {segmentKind(segment)} · {segment.direction === 'reverse' ? 'Reverse' : 'Forward'} ·{' '}
+                    {segment.fromKm.toFixed(1)} km
+                  </option>
+                ))}
+              </Select>
+              <Flex gap={2} wrap="wrap">
+                <Input
+                  placeholder="Custom KOM name"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  flex="1"
+                  minW="160px"
                   {...field}
                 />
+                <Input
+                  placeholder="Start km"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  maxW="120px"
+                  {...field}
+                />
+                <Input
+                  placeholder="End km"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  maxW="120px"
+                  {...field}
+                />
+                <Button {...readableOutline} onClick={addCustomClimb}>
+                  Add custom KOM
+                </Button>
+              </Flex>
+            </Box>
                 <Box>
                   <Text fontSize="sm" color="gray.400" mb={2}>
                     Pick a segment on this route. A typed name is only for older rows: Find still searches ZwiftPower.
@@ -656,8 +894,6 @@ export default function RouteSetupPage() {
                   onChange={(e) => setField({ bonus: textToList(e.target.value) })}
                   {...field}
                 />
-              </>
-            ) : null}
             <Button colorScheme="red" alignSelf="flex-start" isLoading={busy === 'save'} onClick={() => void save()}>
               {index == null ? 'Add route' : 'Save route'}
             </Button>
@@ -670,16 +906,12 @@ export default function RouteSetupPage() {
                   distance: draft.distance,
                   finish: draft.finish,
                   climbs: draft.climbs,
+                  customClimbs: draft.customClimbs,
                 }}
-                showFinish={!fifty}
-                showClimbs={fifty}
-                bonusSprints={
-                  fifty
-                    ? draft.sprints
-                        .map((name, sprintIndex) => ({ name: name.trim(), laps: (draft.sprintLaps[sprintIndex] || '').trim() }))
-                        .filter((row) => row.name)
-                    : []
-                }
+                showClimbs={draft.climbs.length + draft.customClimbs.length > 0}
+                bonusSprints={draft.sprints
+                  .map((name, sprintIndex) => ({ name: name.trim(), laps: (draft.sprintLaps[sprintIndex] || '').trim() }))
+                  .filter((row) => row.name)}
                 onProfile={setProfile}
               />
             ) : (
