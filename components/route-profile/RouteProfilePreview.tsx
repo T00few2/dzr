@@ -37,6 +37,49 @@ function gradeColor(grade: number) {
   return GRADE_BANDS[3].color
 }
 
+function gradeBetween(
+  start: { distance: number; altitude: number },
+  end: { distance: number; altitude: number }
+) {
+  const run = (end.distance - start.distance) * 1000
+  if (!(Math.abs(run) > 0.05)) return 0
+  return ((end.altitude - start.altitude) / run) * 100
+}
+
+function gradeAt(points: { distance: number; altitude: number }[], distance: number) {
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index]
+    const end = points[index + 1]
+    if (distance >= start.distance && distance <= end.distance) return gradeBetween(start, end)
+  }
+  if (points.length < 2) return 0
+  return gradeBetween(points[points.length - 2], points[points.length - 1])
+}
+
+function ProfileHover({
+  distance,
+  altitude,
+  grade,
+}: {
+  distance: number
+  altitude: number
+  grade: number
+}) {
+  return (
+    <Box bg="#1A202C" borderWidth="1px" borderColor="#4A5568" px={3} py={2} rounded="md">
+      <Text color="white" fontSize="sm">
+        {distance.toFixed(1)} km
+      </Text>
+      <Text color="gray.300" fontSize="sm">
+        Elevation: {Math.round(altitude)} m
+      </Text>
+      <Text color="gray.300" fontSize="sm">
+        Gradient: {grade.toFixed(1)}%
+      </Text>
+    </Box>
+  )
+}
+
 function segmentId(segment: ProfileSegment) {
   return `${segment.name}|${segment.direction}|${segment.fromKm.toFixed(3)}`
 }
@@ -185,7 +228,7 @@ function RibbonChart({
   const frame = useRef<HTMLDivElement>(null)
   const clipId = useId().replace(/:/g, '')
   const [width, setWidth] = useState(0)
-  const [hover, setHover] = useState<{ distance: number; altitude: number } | null>(null)
+  const [hover, setHover] = useState<{ distance: number; altitude: number; grade: number; x: number; y: number } | null>(null)
   useEffect(() => {
     const node = frame.current
     if (!node) return
@@ -221,8 +264,7 @@ function RibbonChart({
   for (let index = 0; index < data.length - 1; index += 1) {
     const start = data[index]
     const end = data[index + 1]
-    const run = (end.distance - start.distance) * 1000
-    const grade = ((end.altitude - start.altitude) / Math.max(0.001, run)) * 100
+    const grade = gradeBetween(start, end)
     const color = gradeColor(grade)
     quads.push(
       <polygon
@@ -263,11 +305,21 @@ function RibbonChart({
         nearest = point
       }
     }
-    setHover(nearest || null)
+    if (!nearest) {
+      setHover(null)
+      return
+    }
+    setHover({
+      distance: nearest.distance,
+      altitude: nearest.altitude,
+      grade: gradeAt(data, nearest.distance),
+      x: fx(nearest.distance),
+      y: py(nearest.distance, nearest.altitude),
+    })
   }
 
   return (
-    <Box ref={frame} h={`${height}px`} w="100%">
+    <Box ref={frame} position="relative" h={`${height}px`} w="100%">
       {width > 0 && data.length > 1 ? (
         <svg width={width} height={height} role="img" onMouseMove={track} onMouseLeave={() => setHover(null)}>
           <polygon points={cap} fill="#E4E4E4" />
@@ -323,12 +375,20 @@ function RibbonChart({
                 stroke="#718096"
                 strokeDasharray="3 3"
               />
-              <text x={px(hover.distance) + 6} y={py(hover.distance, hover.altitude) - 8} fill="white" fontSize={12}>
-                {hover.distance.toFixed(1)} km · {Math.round(hover.altitude)} m
-              </text>
             </g>
           ) : null}
         </svg>
+      ) : null}
+      {hover ? (
+        <Box
+          position="absolute"
+          left={`${Math.min(hover.x + 12, Math.max(8, width - 148))}px`}
+          top={`${Math.max(8, hover.y - 78)}px`}
+          pointerEvents="none"
+          zIndex={2}
+        >
+          <ProfileHover distance={hover.distance} altitude={hover.altitude} grade={hover.grade} />
+        </Box>
       ) : null}
     </Box>
   )
@@ -388,9 +448,12 @@ function ProfileChart({
           />
           <YAxis type="number" stroke="#A0AEC0" tick={{ fill: '#A0AEC0', fontSize: 12 }} width={48} unit=" m" />
           <Tooltip
-            contentStyle={{ background: '#1A202C', border: '1px solid #4A5568' }}
-            labelFormatter={(label) => `${Number(label).toFixed(1)} km`}
-            formatter={(value) => [`${Math.round(Number(value))} m`, 'Elevation']}
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null
+              const distance = Number(label)
+              const altitude = Number(payload[0].value)
+              return <ProfileHover distance={distance} altitude={altitude} grade={gradeAt(data, distance)} />
+            }}
           />
           <Area type="monotone" dataKey="altitude" stroke="#E2E8F0" fill="#2D3748" fillOpacity={0.9} dot={false} />
           {named ? <SegmentNames bands={bands} bonusLabels={bonusLabels} xDomain={xDomain} /> : null}
