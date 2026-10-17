@@ -660,7 +660,7 @@ export default function RouteSetupPage() {
                     Extra KOM profiles
                   </Text>
                   <Text fontSize="sm" color="gray.400">
-                    Draw a close-up for each climb you add. The route profile is always shown. A custom stretch uses kilometres that include the lead-in.
+                    Draw a close-up for each climb you add. The route profile is always shown. Kilometre marks start at the lead-in.
                   </Text>
                 </Box>
                 <Switch colorScheme="red" isChecked={komProfiles} onChange={(e) => setKomProfiles(e.target.checked)} />

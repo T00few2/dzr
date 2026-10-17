@@ -19,6 +19,7 @@ test("an After Party finish names the segment and the pass", () => {
 test("a whole-number lap count uses the route length, and 1+ uses the distance", () => {
   assert.strictEqual(raceDistanceKm(9, "2", "50"), 18)
   assert.strictEqual(raceDistanceKm(9, "1+", "36.7"), 36.7)
+  assert.strictEqual(raceDistanceKm(20.149, "1+", "35.285", 2.28), 33.005)
 })
 
 test("the second pass of a climb is on the next lap", () => {
@@ -147,17 +148,24 @@ test("a KOM close-up is drawn only for a chosen climb or a custom span", () => {
   assert.strictEqual(chosen.climbs[1].toKm, 8.4)
   assert.strictEqual(chosen.climbs[1].climb, true)
   assert.strictEqual(chosen.lapGainM, 30)
-  const shifted = buildRaceProfile({
-    distanceM: [0, 5000, 10000],
-    altitudeM: [10, 40, 20],
-    segments: [],
-    raceKm: 10,
-    customClimbs: [{ name: "Finish ramp", fromKm: 8.2, toKm: 10.4 }],
-    leadInKm: 2.4,
+})
+
+test("kilometre marks start at the lead-in so a custom finish lands on the climb", () => {
+  const profile = buildRaceProfile({
+    distanceM: [0, 10251, 12859, 20149],
+    altitudeM: [15, 30, 82, 12],
+    segments: [{ name: "Titans Grove KOM", type: "climb", fromKm: 10.251, toKm: 12.859, direction: "forward" }],
+    raceKm: 33.005,
+    leadInKm: 2.28,
+    customClimbs: [{ name: "Second Titans Grove", fromKm: 32.68, toKm: 35.285 }],
   })
-  assert.strictEqual(shifted.climbs[0].fromKm, 5.8)
-  assert.strictEqual(shifted.climbs[0].toKm, 8)
-  assert.strictEqual(shifted.climbs[0].matched, true)
+  assert.strictEqual(profile.distanceKm[0], 2.28)
+  assert.strictEqual(profile.raceKm, 35.285)
+  assert.strictEqual(profile.distanceKm[profile.distanceKm.length - 1], 35.285)
+  const second = profile.segments.filter((segment) => segment.name === "Titans Grove KOM")[1]
+  assert.ok(Math.abs(second.toKm - 35.285) < 0.01)
+  assert.strictEqual(profile.climbs[0].toKm, 35.285)
+  assert.ok(profile.altitudeM[profile.altitudeM.length - 1] > 70)
 })
 
 test("a ZwiftPower title with the world in front still marks the segment", () => {

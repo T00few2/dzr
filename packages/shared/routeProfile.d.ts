@@ -28,6 +28,7 @@ export type CustomClimbRange = {
 export type RaceProfile = {
   lapKm: number
   lapGainM: number
+  leadInKm: number
   raceKm: number
   distanceKm: number[]
   altitudeM: number[]
@@ -66,7 +67,7 @@ export function placeOnRoute(
   segmentLatLng: number[][]
 ): { fromM: number; toM: number } | null
 
-export function raceDistanceKm(lapKm: number, lapsText: unknown, distanceText: unknown): number
+export function raceDistanceKm(lapKm: number, lapsText: unknown, distanceText: unknown, leadInKm?: number): number
 
 export function buildRaceProfile(input: {
   distanceM: number[]

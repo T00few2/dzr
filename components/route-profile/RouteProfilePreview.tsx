@@ -587,7 +587,7 @@ export function RouteProfilePreview({
             </Text>
             <ProfileChart
               profile={profile}
-              fromKm={0}
+              fromKm={profile.leadInKm || 0}
               toKm={profile.raceKm || profile.distanceKm[profile.distanceKm.length - 1]}
               bonusSprints={bonusSprints}
               named

@@ -57,7 +57,12 @@ export async function GET(req: Request) {
   try {
     const streams = await elevationForSlug(match.slug)
     const lap = prepareLap(streams.distance, streams.altitude, match.leadInKm, match.lapKm, streams.latlng)
-    const raceKm = raceDistanceKm(match.lapKm, url.searchParams.get('laps'), url.searchParams.get('distance'))
+    const raceKm = raceDistanceKm(
+      match.lapKm,
+      url.searchParams.get('laps'),
+      url.searchParams.get('distance'),
+      match.leadInKm,
+    )
     const climbs = (url.searchParams.get('climbs') || '')
       .split(',')
       .map((name) => name.trim())
