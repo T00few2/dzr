@@ -104,7 +104,11 @@ export async function GET(req: Request) {
       oauth: null,
     })
 
-    await syncAccessRoles(discordId, 'onboarding-discord-login')
+    try {
+      await syncAccessRoles(discordId, 'onboarding-discord-login')
+    } catch (err) {
+      console.error('[onboarding] role sync failed', err)
+    }
 
     const nextUrl = new URL('/join/payment', getBaseUrl(req))
     const res = NextResponse.redirect(nextUrl.toString())
