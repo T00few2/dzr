@@ -102,6 +102,8 @@ const handler = NextAuth({
 		DiscordProvider({
 			clientId: process.env.DISCORD_CLIENT_ID as string,
 			clientSecret: process.env.DISCORD_CLIENT_SECRET as string,
+			// Discord adds iss=https://discord.com on the callback. The OAuth client rejects it unless this matches.
+			issuer: "https://discord.com",
 			authorization: {
 				params: {
 					scope: "identify email guilds.members.read",
