@@ -61,11 +61,18 @@ function LoginContent() {
 
         <Stack spacing={4}>
           <Text color="white" width='xs' textAlign='left'>
-            Sign in with Discord. You must be a Verified Member on our Discord server to access the Members Zone.
+            Log ind med den Discord-konto, der er brugt til kontingent. Betalende klubmedlemmer kommer ind, også selvom Discord-rollen ikke er opdateret endnu.
           </Text>
           <Button onClick={handleSignInDiscord} leftIcon={<FaDiscord />} background="rgba(88, 101, 242, 0.95)" color={'white'} width='xs'>
             Sign in with Discord
           </Button>
+          {urlError ? (
+            <Text color="orange.200" width="xs" textAlign="left">
+              {showMissingRole
+                ? 'Discord godkendte dig, men den konto er ikke registreret som betalende medlem i år. Brug samme Discord-konto som på /join.'
+                : 'Discord-login blev afbrudt, før du kom ind. Prøv igen.'}
+            </Text>
+          ) : null}
           <Text color="white" width='xs' textAlign='left'>Not a member yet? Click the button below to join the DZR Discord server.</Text>
           <Button
             as='a'
@@ -87,25 +94,22 @@ function LoginContent() {
       <Modal isOpen={isRoleModalOpen} onClose={() => setRoleModalOpen(false)} isCentered>
         <ModalOverlay bg='blackAlpha.600' backdropFilter='blur(2px)' />
         <ModalContent bg='black' color='white' border='1px solid' borderColor='whiteAlpha.300' rounded='md'>
-          <ModalHeader color='white'>Access denied</ModalHeader>
+          <ModalHeader color='white'>Ikke lukket ind</ModalHeader>
           <ModalCloseButton color='white' _hover={{ bg: 'whiteAlpha.200' }} />
           <ModalBody pb={6} color='white'>
             <Stack spacing={4}>
               <Text>
-                You need the Verified Member role on our Discord server to access the Members Zone. <br /> <br /> Not a member yet? Click the button below to join the DZR Discord server.
+                Discord-kontoen blev godkendt, men den er ikke koblet til et betalt klubmedlemskab for i år. Log ind med den samme konto, som /join bruger til at vise dit medlemskab.
               </Text>
               <Button
                 as='a'
-                href={'https://discord.gg/FBtCsddbmU'}
-                target='_blank'
-                rel='noopener noreferrer'
-                leftIcon={<FaDiscord />}
-                background='rgba(88, 101, 242, 0.95)'
+                href='/join'
+                background='rgba(173, 26, 45, 0.95)'
                 color='white'
-                _hover={{ background: 'rgba(88, 101, 242, 1)' }}
+                _hover={{ background: 'rgba(173, 26, 45, 1)' }}
                 alignSelf='flex-start'
               >
-                Join the DZR Discord server
+                Se medlemskab på /join
               </Button>
             </Stack>
           </ModalBody>

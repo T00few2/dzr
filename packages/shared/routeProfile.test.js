@@ -147,6 +147,17 @@ test("a KOM close-up is drawn only for a chosen climb or a custom span", () => {
   assert.strictEqual(chosen.climbs[1].toKm, 8.4)
   assert.strictEqual(chosen.climbs[1].climb, true)
   assert.strictEqual(chosen.lapGainM, 30)
+  const shifted = buildRaceProfile({
+    distanceM: [0, 5000, 10000],
+    altitudeM: [10, 40, 20],
+    segments: [],
+    raceKm: 10,
+    customClimbs: [{ name: "Finish ramp", fromKm: 8.2, toKm: 10.4 }],
+    leadInKm: 2.4,
+  })
+  assert.strictEqual(shifted.climbs[0].fromKm, 5.8)
+  assert.strictEqual(shifted.climbs[0].toKm, 8)
+  assert.strictEqual(shifted.climbs[0].matched, true)
 })
 
 test("a ZwiftPower title with the world in front still marks the segment", () => {

@@ -55,7 +55,10 @@ export async function middleware(req: NextRequest) {
 		}
 	}
 
-	if (!roles.includes(requiredRoleId)) {
+	const membershipActive = Boolean((token as any)?.membershipActive);
+	const acceptedRoleIds = [requiredRoleId, VERIFIED_MEMBER_ROLE_ID].filter(Boolean);
+	const hasVerifiedRole = roles.some((role) => acceptedRoleIds.includes(role));
+	if (!hasVerifiedRole && !membershipActive) {
 		const url = req.nextUrl.clone();
 		url.pathname = '/login';
 		url.searchParams.set('error', 'AccessDenied');

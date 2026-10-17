@@ -332,7 +332,7 @@ const MobileNav = ({ onOpen, ...rest }: MobileProps) => {
               <>
                 <ProfileNavItem href="/about" icon={MdInfo}>About</ProfileNavItem>
                 <ProfileNavItem href="/about/racing" icon={FaTrophy}>Løb</ProfileNavItem>
-                <ProfileNavItem onClick={() => signIn()} icon={FiLogIn}>Log in</ProfileNavItem>
+                <ProfileNavItem onClick={() => signIn('discord', { callbackUrl: '/members-zone' })} icon={FiLogIn}>Log in</ProfileNavItem>
               </>
             )}
           </Box>

@@ -76,6 +76,7 @@ export function buildRaceProfile(input: {
   finishText?: string
   climbNames?: string[]
   customClimbs?: CustomClimbRange[]
+  leadInKm?: number
 }): RaceProfile
 
 export function profileImageSrc(series: string, routeName: string): string

@@ -3,6 +3,7 @@
 import React from 'react'
 import { Box, Button, Container, FormControl, FormLabel, Heading, Input, Stack, Text } from '@chakra-ui/react'
 import { track } from '@vercel/analytics'
+import { signIn } from 'next-auth/react'
 import StepProgressHeader from '@/components/onboarding/StepProgressHeader'
 
 type SessionState = {
@@ -114,7 +115,10 @@ export default function JoinZwiftIdPage() {
             Alt er i orden. Dit kontingent er allerede betalt, og dit Zwift ID er allerede sat.
           </Text>
           {message ? <Text color="green.300">{message}</Text> : null}
-          <Button as="a" href="/join/complete" colorScheme="red">
+          <Button colorScheme="red" onClick={() => signIn('discord', { callbackUrl: '/members-zone' })}>
+            Log ind på medlemsområdet
+          </Button>
+          <Button as="a" href="/join/complete" variant="outline" color="white" borderColor="whiteAlpha.400">
             Fortsæt
           </Button>
         </Stack>

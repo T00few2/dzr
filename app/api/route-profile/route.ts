@@ -75,6 +75,7 @@ export async function GET(req: Request) {
       finishText: url.searchParams.get('finish') || '',
       climbNames: climbs,
       customClimbs: parseRanges(url.searchParams.get('ranges')),
+      leadInKm: match.leadInKm,
     })
     return NextResponse.json({ routeName: match.name, ...profile })
   } catch (error) {

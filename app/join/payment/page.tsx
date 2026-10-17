@@ -24,6 +24,7 @@ import {
   Text,
 } from '@chakra-ui/react'
 import { track } from '@vercel/analytics'
+import { signIn } from 'next-auth/react'
 import StepProgressHeader from '@/components/onboarding/StepProgressHeader'
 
 type PaymentOption = { id: string; label?: string; coversYears?: number[] }
@@ -260,9 +261,16 @@ export default function JoinPaymentPage() {
         </Box>
 
         {paymentDone ? (
-          <Button as="a" href="/join/zwift-id" colorScheme="red" onClick={() => track('onboarding_step2_continue_to_step3')}>
-            Fortsæt til trin 3
-          </Button>
+          <Stack spacing={3}>
+            <Button as="a" href="/join/zwift-id" colorScheme="red" onClick={() => track('onboarding_step2_continue_to_step3')}>
+              Fortsæt til trin 3
+            </Button>
+            {alreadyPaid ? (
+              <Button variant="outline" color="white" borderColor="whiteAlpha.400" onClick={() => signIn('discord', { callbackUrl: '/members-zone' })}>
+                Log ind på medlemsområdet
+              </Button>
+            ) : null}
+          </Stack>
         ) : (
           <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" bg="gray.900" p={5}>
             <Stack spacing={4}>

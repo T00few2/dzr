@@ -9,7 +9,7 @@ import {
   textToList,
   type CatalogRoute,
 } from '@/app/lib/catalogRoute'
-import { Box, Button, Flex, Heading, Input, Select, Stack, Text } from '@chakra-ui/react'
+import { Box, Button, Flex, Heading, Input, Select, Stack, Switch, Text } from '@chakra-ui/react'
 import { RouteProfilePreview } from '@/components/route-profile/RouteProfilePreview'
 import { foldName, slugifyZwiftName, type ProfileSegment, type RaceProfile } from '@/packages/shared/routeProfile'
 import { usesLapCount } from '@/packages/shared/seriesRotation'
@@ -81,6 +81,14 @@ function worldLabel(world: string | null | undefined) {
     .join(' ')
 }
 
+function hasKomProfiles(route: CatalogRoute) {
+  return route.climbs.some((climb) => climb.trim()) || route.customClimbs.length > 0
+}
+
+function hasSegmentPoints(route: CatalogRoute) {
+  return route.sprints.some((sprint) => sprint.trim()) || route.bonus.some((seconds) => seconds.trim())
+}
+
 function lapCourse(count: number, stats: RaceProfile) {
   return {
     distance: String(Math.round(stats.lapKm * count * 10) / 10),
@@ -115,6 +123,8 @@ export default function RouteSetupPage() {
   const [profile, setProfile] = useState<RaceProfile | null>(null)
   const [lengthMode, setLengthMode] = useState<LengthMode>('distance')
   const [worlds, setWorlds] = useState<WorldList[]>([])
+  const [komProfiles, setKomProfiles] = useState(false)
+  const [segmentPoints, setSegmentPoints] = useState(false)
   const [customName, setCustomName] = useState('')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -155,6 +165,8 @@ export default function RouteSetupPage() {
     setIndex(null)
     setDraft(emptyCatalogRoute())
     setLengthMode('distance')
+    setKomProfiles(false)
+    setSegmentPoints(false)
     fillLaps.current = false
     setOptions([])
     setSprintHits({})
@@ -171,6 +183,8 @@ export default function RouteSetupPage() {
     setIndex(routeIndex)
     setDraft(route)
     setLengthMode(usesLapCount(route.laps) ? 'laps' : 'distance')
+    setKomProfiles(hasKomProfiles(route))
+    setSegmentPoints(hasSegmentPoints(route))
     fillLaps.current = false
     setCustomName('')
     setCustomFrom('')
@@ -189,6 +203,8 @@ export default function RouteSetupPage() {
     setIndex(null)
     setDraft(emptyCatalogRoute())
     setLengthMode('distance')
+    setKomProfiles(false)
+    setSegmentPoints(false)
     fillLaps.current = false
     setCustomName('')
     setCustomFrom('')
@@ -380,11 +396,11 @@ export default function RouteSetupPage() {
           : usesLapCount(draft.laps)
             ? '1+'
             : draft.laps.trim(),
-      climbs: draft.climbs,
-      customClimbs: draft.customClimbs,
-      sprints: draft.sprints,
-      sprintLaps: draft.sprintLaps,
-      bonus: draft.bonus,
+      climbs: komProfiles ? draft.climbs : [],
+      customClimbs: komProfiles ? draft.customClimbs : [],
+      sprints: segmentPoints ? draft.sprints : [],
+      sprintLaps: segmentPoints ? draft.sprintLaps : [],
+      bonus: segmentPoints ? draft.bonus : [],
     }
     if (!route.route) {
       setError('A route name is required')
@@ -637,11 +653,20 @@ export default function RouteSetupPage() {
               onChange={(e) => setField({ linkRoute: e.target.value })}
               {...field}
             />
-            <Box>
-              <Text fontSize="sm" color="gray.400" mb={2}>
-                KOM close-ups. The overview is always shown. Add a segment on this route, or a custom stretch by start and end km.
-              </Text>
-              <Stack spacing={2} mb={3}>
+            <Box borderWidth="1px" borderColor="gray.700" rounded="md" p={3}>
+              <Flex justify="space-between" align="center" gap={3}>
+                <Box>
+                  <Text color="white" fontWeight="semibold">
+                    Extra KOM profiles
+                  </Text>
+                  <Text fontSize="sm" color="gray.400">
+                    Draw a close-up for each climb you add. The route profile is always shown. A custom stretch uses kilometres that include the lead-in.
+                  </Text>
+                </Box>
+                <Switch colorScheme="red" isChecked={komProfiles} onChange={(e) => setKomProfiles(e.target.checked)} />
+              </Flex>
+              {komProfiles ? (
+              <Stack spacing={2} mt={3}>
                 {draft.climbs.map((climb, climbIndex) => (
                   <Flex key={`${climb}-${climbIndex}`} gap={2} align="center">
                     <Text color="white" flex="1">
@@ -670,9 +695,8 @@ export default function RouteSetupPage() {
                     </Button>
                   </Flex>
                 ))}
-              </Stack>
               <Select
-                placeholder={profile ? 'Add a segment on this route' : 'Load the route profile first'}
+                placeholder={profile ? 'Add a climb on this route' : 'Load the route profile first'}
                 bg="gray.900"
                 borderColor="gray.700"
                 value=""
@@ -713,13 +737,28 @@ export default function RouteSetupPage() {
                   {...field}
                 />
                 <Button {...readableOutline} onClick={addCustomClimb}>
-                  Add custom KOM
+                  Add climb
                 </Button>
               </Flex>
+              </Stack>
+              ) : null}
             </Box>
+            <Box borderWidth="1px" borderColor="gray.700" rounded="md" p={3}>
+              <Flex justify="space-between" align="center" gap={3}>
                 <Box>
+                  <Text color="white" fontWeight="semibold">
+                    Segment points
+                  </Text>
+                  <Text fontSize="sm" color="gray.400">
+                    Timed segments that award bonus seconds in the race and on ZwiftPower.
+                  </Text>
+                </Box>
+                <Switch colorScheme="red" isChecked={segmentPoints} onChange={(e) => setSegmentPoints(e.target.checked)} />
+              </Flex>
+              {segmentPoints ? (
+              <Box mt={3}>
                   <Text fontSize="sm" color="gray.400" mb={2}>
-                    Pick a segment on this route. A typed name is only for older rows: Find still searches ZwiftPower.
+                    Pick a timed segment on this route. A typed name is for an older row: Find still searches ZwiftPower.
                   </Text>
                   <Button
                     {...readableOutline}
@@ -887,13 +926,15 @@ export default function RouteSetupPage() {
                       Add segment
                     </Button>
                   </Stack>
-                </Box>
                 <Input
-                  placeholder="Bonus seconds, separated by commas"
+                  placeholder="Bonus seconds for each segment, separated by commas"
                   value={listToText(draft.bonus)}
                   onChange={(e) => setField({ bonus: textToList(e.target.value) })}
                   {...field}
                 />
+              </Box>
+              ) : null}
+            </Box>
             <Button colorScheme="red" alignSelf="flex-start" isLoading={busy === 'save'} onClick={() => void save()}>
               {index == null ? 'Add route' : 'Save route'}
             </Button>
@@ -905,13 +946,17 @@ export default function RouteSetupPage() {
                   laps: draft.laps,
                   distance: draft.distance,
                   finish: draft.finish,
-                  climbs: draft.climbs,
-                  customClimbs: draft.customClimbs,
+                  climbs: komProfiles ? draft.climbs : [],
+                  customClimbs: komProfiles ? draft.customClimbs : [],
                 }}
-                showClimbs={draft.climbs.length + draft.customClimbs.length > 0}
-                bonusSprints={draft.sprints
-                  .map((name, sprintIndex) => ({ name: name.trim(), laps: (draft.sprintLaps[sprintIndex] || '').trim() }))
-                  .filter((row) => row.name)}
+                showClimbs={komProfiles && draft.climbs.length + draft.customClimbs.length > 0}
+                bonusSprints={
+                  segmentPoints
+                    ? draft.sprints
+                        .map((name, sprintIndex) => ({ name: name.trim(), laps: (draft.sprintLaps[sprintIndex] || '').trim() }))
+                        .filter((row) => row.name)
+                    : []
+                }
                 onProfile={setProfile}
               />
             ) : (

@@ -1,6 +1,6 @@
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { vippsCapturePayment, vippsGetCheckoutSession } from '@/app/api/membership/vippsClient'
-import { syncClubMemberRole } from '@/app/utils/discordRoleSync'
+import { syncClubMemberRole, syncMemberRoleOnLogin } from '@/app/utils/discordRoleSync'
 import { updateOnboardingSession } from '@/app/api/onboarding/_lib/session'
 
 type ProcessPaymentResult =
@@ -109,7 +109,11 @@ export async function processOnboardingPayment(reference: string, expectedSessio
       coveredThroughYear,
       source: 'onboarding-payment',
     })
-    await docRef.set({ roleSync }, { merge: true })
+    const memberRoleSync = await syncMemberRoleOnLogin({
+      userId,
+      source: 'onboarding-payment',
+    })
+    await docRef.set({ roleSync, memberRoleSync }, { merge: true })
   }
 
   const onboardingSnap = await adminDb.collection('onboarding_sessions').doc(onboardingSessionId).get()

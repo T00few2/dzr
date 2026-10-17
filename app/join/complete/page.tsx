@@ -3,6 +3,7 @@
 import React from 'react'
 import { Button, Container, Heading, ListItem, OrderedList, Stack, Text } from '@chakra-ui/react'
 import { FaDiscord } from 'react-icons/fa'
+import { signIn } from 'next-auth/react'
 import { track } from '@vercel/analytics'
 import StepProgressHeader from '@/components/onboarding/StepProgressHeader'
 import { INTERVALS_SETUP_STEPS } from '@/app/lib/intervalsCoachLinks'
@@ -30,6 +31,9 @@ export default function JoinCompletePage() {
             <ListItem key={step}>{step}</ListItem>
           ))}
         </OrderedList>
+        <Button colorScheme="red" onClick={() => signIn('discord', { callbackUrl: '/members-zone' })}>
+          Log ind på medlemsområdet
+        </Button>
         <Button as="a" href="/intervals/connect" colorScheme="red">
           Forbind intervals.icu
         </Button>
