@@ -2,15 +2,13 @@ import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import { AfterPartyRacesData } from '@/app/dzr-after-party/AfterPartyRaces'
 import { ZwiftyFiftyRacesData } from '@/app/the-zwifty-fifty/ZwiftyFiftyRaces'
 import { asCatalogRoute, type CatalogRoute } from '@/app/lib/catalogRoute'
-import type { SeriesId } from '@/app/lib/seriesSchedule'
-
 const COLLECTION = 'series_catalogs'
 
-function refFor(seriesId: SeriesId) {
+function refFor(seriesId: string) {
   return adminDb.collection(COLLECTION).doc(seriesId)
 }
 
-function seedRoutes(seriesId: SeriesId): CatalogRoute[] {
+function seedRoutes(seriesId: string): CatalogRoute[] | null {
   if (seriesId === 'after-party') {
     return AfterPartyRacesData.map((race) => ({
       route: race.route,
@@ -29,6 +27,7 @@ function seedRoutes(seriesId: SeriesId): CatalogRoute[] {
       zwiftRouteName: '',
     }))
   }
+  if (seriesId !== 'zwifty-fifty') return null
   return ZwiftyFiftyRacesData.map((race) => ({
     route: race.route,
     world: race.world,
@@ -52,12 +51,16 @@ function readRoutes(data: Record<string, unknown> | undefined) {
   return rows.map(asCatalogRoute).filter((row): row is CatalogRoute => Boolean(row))
 }
 
-export async function ensureCatalog(seriesId: SeriesId): Promise<CatalogRoute[]> {
+export async function ensureCatalog(seriesId: string): Promise<CatalogRoute[]> {
   const ref = refFor(seriesId)
   const snap = await ref.get()
   const existing = snap.exists ? readRoutes(snap.data()) : []
   if (existing.length) return existing
   const seeded = seedRoutes(seriesId)
+  if (!seeded) {
+    if (!snap.exists) await ref.set({ routes: [] })
+    return []
+  }
   await adminDb.runTransaction(async (tx) => {
     const current = await tx.get(ref)
     const already = current.exists ? readRoutes(current.data()) : []
@@ -67,7 +70,7 @@ export async function ensureCatalog(seriesId: SeriesId): Promise<CatalogRoute[]>
   return readRoutes(saved.data())
 }
 
-export async function catalogRouteByName(seriesId: SeriesId, routeName: string) {
+export async function catalogRouteByName(seriesId: string, routeName: string) {
   const routes = await ensureCatalog(seriesId)
   const wanted = routeName.trim().toLowerCase()
   return routes.find((route) => route.route.toLowerCase() === wanted) || null
@@ -78,11 +81,14 @@ function uniqueName(routes: CatalogRoute[], route: string, ignoreIndex: number) 
   return routes.some((row, index) => index !== ignoreIndex && row.route.toLowerCase() === wanted)
 }
 
-async function renameScheduleRoute(seriesId: SeriesId, from: string, to: string) {
+async function renameScheduleRoute(seriesId: string, from: string, to: string) {
   if (!from || from === to) return
   const ref = adminDb.collection('series_schedules').doc(seriesId)
   const snap = await ref.get()
-  if (!snap.exists) return
+  if (!snap.exists) {
+    await renameEventSeriesRoute(seriesId, from, to)
+    return
+  }
   const data = snap.data() || {}
   const overrides = { ...(data.overrides || {}) }
   const events = { ...(data.events || {}) }
@@ -101,9 +107,34 @@ async function renameScheduleRoute(seriesId: SeriesId, from: string, to: string)
     }
   }
   if (changed) await ref.update({ overrides, events })
+  await renameEventSeriesRoute(seriesId, from, to)
 }
 
-export async function saveCatalogRoute(seriesId: SeriesId, index: number, route: CatalogRoute) {
+async function renameEventSeriesRoute(seriesId: string, from: string, to: string) {
+  const ref = adminDb.collection('event_series').doc(seriesId)
+  const snap = await ref.get()
+  if (!snap.exists) return
+  const data = snap.data() || {}
+  const overrides = { ...(data.overrides || {}) }
+  let changed = false
+  for (const [date, route] of Object.entries(overrides)) {
+    if (route === from) {
+      overrides[date] = to
+      changed = true
+    }
+  }
+  const races = Array.isArray(data.races)
+    ? data.races.map((race) => {
+        const row = race as { route?: string }
+        if (row?.route !== from) return race
+        changed = true
+        return { ...row, route: to }
+      })
+    : data.races
+  if (changed) await ref.update({ overrides, races })
+}
+
+export async function saveCatalogRoute(seriesId: string, index: number, route: CatalogRoute) {
   const routes = await ensureCatalog(seriesId)
   if (!Number.isInteger(index) || index < 0 || index >= routes.length) {
     throw new Error('That route is no longer in the list')
@@ -116,7 +147,7 @@ export async function saveCatalogRoute(seriesId: SeriesId, index: number, route:
   return routes
 }
 
-export async function addCatalogRoute(seriesId: SeriesId, route: CatalogRoute) {
+export async function addCatalogRoute(seriesId: string, route: CatalogRoute) {
   const routes = await ensureCatalog(seriesId)
   if (uniqueName(routes, route.route, -1)) throw new Error('That route name is already in this series')
   routes.push(route)

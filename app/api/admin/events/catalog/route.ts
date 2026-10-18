@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server'
 import { requireEventEditor } from '@/app/api/admin/_lib/auth'
 import { asCatalogRoute } from '@/app/lib/catalogRoute'
+import { readAdminSeries, seriesSlug } from '@/app/lib/eventSeries'
 import { parseSeriesId } from '@/app/lib/seriesSchedule'
 import { addCatalogRoute, ensureCatalog, saveCatalogRoute } from '@/app/lib/seriesCatalog'
+
+async function resolveSeries(value: unknown) {
+  const legacy = parseSeriesId(value)
+  if (legacy) return legacy
+  const slug = seriesSlug(String(value || ''))
+  if (!slug) return null
+  const series = await readAdminSeries(slug)
+  return series ? slug : null
+}
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -15,7 +25,7 @@ function errorResponse(error: unknown) {
 export async function GET(req: Request) {
   const auth = await requireEventEditor(req)
   if (auth.error) return auth.error
-  const seriesId = parseSeriesId(new URL(req.url).searchParams.get('series'))
+  const seriesId = await resolveSeries(new URL(req.url).searchParams.get('series'))
   if (!seriesId) return NextResponse.json({ error: 'Unknown series' }, { status: 400 })
   try {
     return NextResponse.json({ routes: await ensureCatalog(seriesId) })
@@ -28,7 +38,7 @@ export async function POST(req: Request) {
   const auth = await requireEventEditor(req)
   if (auth.error) return auth.error
   const body = await req.json().catch(() => ({}))
-  const seriesId = parseSeriesId(body?.series)
+  const seriesId = await resolveSeries(body?.series)
   const route = asCatalogRoute(body?.route)
   if (!seriesId) return NextResponse.json({ error: 'Unknown series' }, { status: 400 })
   if (!route) return NextResponse.json({ error: 'A route name is required' }, { status: 400 })

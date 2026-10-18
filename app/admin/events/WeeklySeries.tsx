@@ -459,9 +459,14 @@ export default function WeeklySeries({
     <Stack spacing={6} mb={10}>
       <Flex justify="space-between" align="center" gap={3} wrap="wrap">
         <Heading size="md">Weekly series</Heading>
-        <Button as={Link} href="/admin/events/routes" {...readableOutline} size="sm">
-          Route setup
-        </Button>
+        <Flex gap={2}>
+          <Button as={Link} href="/admin/events/series" {...readableOutline} size="sm">
+            Event series
+          </Button>
+          <Button as={Link} href="/admin/events/routes" {...readableOutline} size="sm">
+            Route setup
+          </Button>
+        </Flex>
       </Flex>
       {loadError ? <Text color="red.300">{loadError}</Text> : null}
       {series.map((item) => {

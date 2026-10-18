@@ -49,6 +49,7 @@ import { RiBoxingFill } from "react-icons/ri";
 import { MdOutlineTimer } from "react-icons/md";
 import { GiDevilMask } from "react-icons/gi";
 import Sparkles from 'react-sparkle'
+import { useEffect, useState } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { FaUser, FaUserCircle } from 'react-icons/fa'
 import { HOLDKAPTAJN_ROLE_ID } from '@/app/lib/sharedConstants'
@@ -92,6 +93,24 @@ const LinkItems: Array<LinkItemProps> = [
 ]
 
 const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
+  const [published, setPublished] = useState<{ slug: string; name: string }[]>([])
+  useEffect(() => {
+    void fetch('/api/series/published', { cache: 'no-store' })
+      .then(async (res) => {
+        if (!res.ok) return
+        const body = await res.json()
+        setPublished(Array.isArray(body.series) ? body.series : [])
+      })
+      .catch(() => setPublished([]))
+  }, [])
+  const links = [
+    ...LinkItems,
+    ...published.map((series) => ({
+      name: series.name,
+      href: `/series/${series.slug}`,
+      icon: LiaMountainSolid,
+    })),
+  ]
   return (
     <Box
       transition="3s ease"
@@ -113,7 +132,7 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
         </Link>
         <CloseButton display={'flex'} onClick={onClose} color='white' size={'s'} />
       </Flex>
-      {LinkItems.map((link) => (
+      {links.map((link) => (
         <Box key={link.name}>
           <NavItem icon={link.icon} href={link.href}>
             {link.name}

@@ -14,7 +14,7 @@ import { RouteProfilePreview } from '@/components/route-profile/RouteProfilePrev
 import { foldName, slugifyZwiftName, type ProfileSegment, type RaceProfile } from '@/packages/shared/routeProfile'
 import { usesLapCount } from '@/packages/shared/seriesRotation'
 
-type SeriesId = 'after-party' | 'zwifty-fifty'
+type SeriesId = string
 type RouteHit = { routeId: number; name: string; world: string | null }
 type SegmentHit = { id: string; name: string; world: string }
 type Suggestion = { match: RouteHit | null; sameName: boolean; options: RouteHit[] }
@@ -109,6 +109,7 @@ async function errorMessage(res: Response) {
 
 export default function RouteSetupPage() {
   const [series, setSeries] = useState<SeriesId>('after-party')
+  const [extraSeries, setExtraSeries] = useState<{ slug: string; name: string }[]>([])
   const [routes, setRoutes] = useState<CatalogRoute[]>([])
   const [index, setIndex] = useState<number | null>(null)
   const [draft, setDraft] = useState<CatalogRoute>(emptyCatalogRoute())
@@ -142,6 +143,18 @@ export default function RouteSetupPage() {
     const body = await res.json()
     setRoutes(Array.isArray(body.routes) ? body.routes : [])
   }
+
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('series')
+    if (requested) setSeries(requested)
+    void fetch('/api/admin/events/event-series', { cache: 'no-store' })
+      .then(async (res) => {
+        if (!res.ok) return
+        const body = await res.json()
+        setExtraSeries(Array.isArray(body.series) ? body.series : [])
+      })
+      .catch(() => setExtraSeries([]))
+  }, [])
 
   useEffect(() => {
     void fetch('/api/admin/events/world-routes', { cache: 'no-store' })
@@ -450,6 +463,15 @@ export default function RouteSetupPage() {
         >
           The Zwifty Fifty
         </Button>
+        {extraSeries.map((item) => (
+          <Button
+            key={item.slug}
+            {...(series === item.slug ? { colorScheme: 'red' as const } : readableOutline)}
+            onClick={() => setSeries(item.slug)}
+          >
+            {item.name}
+          </Button>
+        ))}
       </Flex>
       {error ? (
         <Text color="red.300" mb={3}>

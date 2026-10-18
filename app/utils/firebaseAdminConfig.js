@@ -17,6 +17,10 @@ if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(cert),
     databaseURL: `https://${cert.projectId}.firebaseio.com`,
+    storageBucket:
+      process.env.FIREBASE_STORAGE_BUCKET ||
+      process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+      `${cert.projectId}.appspot.com`,
   });
 }
 
