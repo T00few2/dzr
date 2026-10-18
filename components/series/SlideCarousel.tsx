@@ -1,21 +1,36 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Box, IconButton, useBreakpointValue } from '@chakra-ui/react'
 import { MdOutlineKeyboardArrowLeft, MdOutlineKeyboardArrowRight } from 'react-icons/md'
 
 export default function SlideCarousel({ slides }: { slides: ReactNode[] }) {
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
-  const [seen, setSeen] = useState<number[]>([0])
+  const [frame, setFrame] = useState(0)
+  const slideRefs = useRef<Array<HTMLDivElement | null>>([])
   const count = slides.length
   const current = count ? index % count : 0
   const top = useBreakpointValue({ base: '42%', md: '46%' })
   const side = useBreakpointValue({ base: '8px', md: '10px' })
 
-  useEffect(() => {
-    setSeen((values) => (values.includes(current) ? values : [...values, current]))
-  }, [current])
+  useLayoutEffect(() => {
+    slideRefs.current = slideRefs.current.slice(0, count)
+    const measure = () => {
+      const next = Math.ceil(Math.max(0, ...slideRefs.current.map((el) => el?.offsetHeight || 0)))
+      setFrame((value) => (Math.abs(value - next) < 2 ? value : next))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    slideRefs.current.forEach((el) => {
+      if (el) observer.observe(el)
+    })
+    window.addEventListener('resize', measure)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [count, slides])
 
   useEffect(() => {
     if (paused || count < 2) return
@@ -30,15 +45,15 @@ export default function SlideCarousel({ slides }: { slides: ReactNode[] }) {
 
   return (
     <Box position="relative" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <Box position="relative">
+      <Box position="relative" h={frame ? `${frame}px` : undefined}>
         {slides.map((slide, slideIndex) => {
           const active = slideIndex === current
-          if (!active && !seen.includes(slideIndex)) return null
           return (
             <Box
               key={slideIndex}
+              ref={(el) => { slideRefs.current[slideIndex] = el }}
               visibility={active ? 'visible' : 'hidden'}
-              position={active ? 'relative' : 'absolute'}
+              position="absolute"
               top={0}
               left={0}
               w="100%"
