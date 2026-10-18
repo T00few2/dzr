@@ -9,7 +9,7 @@ import { SeriesError } from '@/app/lib/seriesSchedule'
 import { courseLength, addDays, displayDate, parseIsoDate, routeForDate } from '@/packages/shared/seriesRotation'
 import { zwiftInsiderUrl } from '@/packages/shared/routeProfile'
 import type { CatalogRoute } from '@/app/lib/catalogRoute'
-import type { ZwiftEventSummary } from '@/packages/shared/zwiftEvents'
+import { eventIdFromInput, type ZwiftEventSummary } from '@/packages/shared/zwiftEvents'
 
 const COLLECTION = 'event_series'
 const LOGO_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || 'dzr-member-site-media'
@@ -125,9 +125,10 @@ function startsOf(value: unknown): RaceStart[] {
   return value.flatMap((item) => {
     if (!item || typeof item !== 'object') return []
     const row = item as { time?: unknown; eventId?: unknown }
-    const eventId = String(row.eventId || '').trim()
+    const eventId = eventIdFromInput(row.eventId)
+    if (eventId === null) throw new SeriesError('Event id must be the number from the Zwift event')
     const time = String(row.time || '').trim()
-    if (!eventId && !time) return []
+    if (!eventId) return []
     return [{ time, eventId }]
   })
 }
@@ -390,7 +391,6 @@ export async function applyEventSeries(slug: string, date: string, routeName: st
   if (!iso) throw new SeriesError('Date must be YYYY-MM-DD')
   const series = await readStored(slug)
   if (!series) throw new SeriesError('Series not found', 404)
-  if (!series.zwiftName) throw new SeriesError('Add the words used to recognise the Zwift event')
   const routes = await ensureCatalog(series.slug)
   const planned =
     series.kind === 'weekly'
@@ -406,32 +406,44 @@ export async function applyEventSeries(slug: string, date: string, routeName: st
   if (!chosen) throw new SeriesError('Choose a route for this race')
   const course = await courseFor(series.slug, chosen)
   const race = raceOn(series, iso, chosen)
-  let events: ZwiftEventSummary[]
-  try {
-    events = await loadUpcomingDzrEvents()
-  } catch {
-    throw new SeriesError('The public event list is unavailable', 502)
-  }
-  const named = events.filter((event) => event.eventDate === iso && nameHas(event.name, series.zwiftName))
-  const sameDay = series.races.filter((row) => row.date === iso)
-  let hits = named
-  if (race?.match) hits = named.filter((event) => nameHas(event.name, race.match))
-  else if (sameDay.length > 1 && race?.label) hits = named.filter((event) => nameHas(event.name, race.label))
-  else if (sameDay.length > 1) throw new SeriesError('Add words that identify this race in the Zwift event name')
-  if (!hits.length) throw new SeriesError('Zwift has not created this event yet', 409)
   const payload: { routeId: number; laps?: number; distanceMeters?: number } = { routeId: course.routeId }
   if ('laps' in course) payload.laps = course.laps
   else payload.distanceMeters = course.distanceMeters
-  for (const hit of hits) {
-    const updated = await flaskData(`/api/zwift/events/${hit.id}/course`, { method: 'POST', body: payload })
-    if (updated.status >= 400) {
-      throw new SeriesError(String(updated.body?.error || 'Zwift update failed'), updated.status)
+  const typed = (race?.starts || []).filter((start) => /^\d+$/.test(start.eventId))
+  let starts = typed
+  if (!typed.length) {
+    if (!series.zwiftName) throw new SeriesError('Add the words used to recognise the Zwift event, or type the event id')
+    let events: ZwiftEventSummary[]
+    try {
+      events = await loadUpcomingDzrEvents()
+    } catch {
+      throw new SeriesError('The public event list is unavailable', 502)
+    }
+    const named = events.filter((event) => event.eventDate === iso && nameHas(event.name, series.zwiftName))
+    const sameDay = series.races.filter((row) => row.date === iso)
+    let hits = named
+    if (race?.match) hits = named.filter((event) => nameHas(event.name, race.match))
+    else if (sameDay.length > 1 && race?.label) hits = named.filter((event) => nameHas(event.name, race.label))
+    else if (sameDay.length > 1) throw new SeriesError('Add words that identify this race in the Zwift event name')
+    if (!hits.length) throw new SeriesError('Zwift has not created this event yet. Type the event id when it is not on the public calendar.', 409)
+    for (const hit of hits) {
+      const updated = await flaskData(`/api/zwift/events/${hit.id}/course`, { method: 'POST', body: payload })
+      if (updated.status >= 400) {
+        throw new SeriesError(String(updated.body?.error || 'Zwift update failed'), updated.status)
+      }
+    }
+    starts = hits.map((hit) => ({
+      time: hit.subgroups[0]?.startTime || '',
+      eventId: String(hit.id),
+    }))
+  } else {
+    for (const start of typed) {
+      const updated = await flaskData(`/api/zwift/events/${start.eventId}/course`, { method: 'POST', body: payload })
+      if (updated.status >= 400) {
+        throw new SeriesError(String(updated.body?.error || 'Zwift update failed'), updated.status)
+      }
     }
   }
-  const starts = hits.map((hit) => ({
-    time: hit.subgroups[0]?.startTime || '',
-    eventId: String(hit.id),
-  }))
   const nextRaces = series.races.filter((row) => !(row.date === iso && row.route.toLowerCase() === chosen.toLowerCase()))
   nextRaces.push({
     date: iso,

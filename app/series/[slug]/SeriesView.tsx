@@ -79,7 +79,7 @@ function stageDate(iso: string, includeMonth: boolean) {
   return `${day} ${month}`
 }
 
-function CourseProfile({ route, carousel = false, showNote = true }: { route: CatalogRoute; carousel?: boolean; showNote?: boolean }) {
+function CourseProfile({ route, carousel = false }: { route: CatalogRoute; carousel?: boolean }) {
   const bonus = route.sprints
     .map((name, index) => ({
       name: name.trim(),
@@ -103,7 +103,6 @@ function CourseProfile({ route, carousel = false, showNote = true }: { route: Ca
         showFinish={carousel && Boolean(route.finish)}
         bonusSprints={bonus}
         carousel={carousel}
-        showNote={showNote}
       />
       {bonus.length ? (
         <TableContainer textAlign="center">
@@ -306,15 +305,12 @@ function LimitedSeries({ series }: { series: SeriesPageData }) {
       <Heading color="white" fontSize="2xl">Route Profiles</Heading>
       {series.carousel ? (
         <Stack spacing={3}>
-          <Text color="gray.400" fontSize="sm">
-            Profile preview. Green is a sprint, red is a climb, gold awards bonus seconds. A climb close-up is a 3D profile colored by gradient.
-          </Text>
           <SlideCarousel
             slides={series.schedule.flatMap((race) => (
               race.route ? [(
                 <Stack key={`${race.date}-${race.label}`} spacing={2}>
                   <Heading color="white" fontSize="lg">{[race.label, race.routeName].filter(Boolean).join(' · ')}</Heading>
-                  <CourseProfile route={race.route} showNote={false} />
+                  <CourseProfile route={race.route} />
                 </Stack>
               )] : []
             ))}

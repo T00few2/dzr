@@ -34,6 +34,9 @@ export function suggestedSubgroup(
 ): string | null
 
 export function localParts(iso: unknown): { eventDate: string; startTime: string } | null
+
+/** Digits from a typed id or a Zwift event URL. "" when empty, null when the text is not an id. */
+export function eventIdFromInput(value: unknown): string | null
 export const TZ: string
 /** Public upcoming feed for events tagged dzr. About the next week, not a season. */
 export const DZR_UPCOMING_EVENTS_URL: string

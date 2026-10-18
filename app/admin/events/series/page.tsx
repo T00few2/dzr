@@ -5,6 +5,7 @@ import Link from 'next/link'
 import AdminShell from '@/components/admin/AdminShell'
 import { Box, Button, Checkbox, Flex, Heading, Icon, Image, Input, Select, Stack, Switch, Text, Textarea } from '@chakra-ui/react'
 import { SERIES_RULES, orderedRules, ruleOption } from '@/components/series/SeriesRules'
+import { eventIdFromInput } from '@/packages/shared/zwiftEvents'
 
 type Kind = 'weekly' | 'limited'
 type PointsRow = { label: string; points: string }
@@ -95,7 +96,9 @@ function fromApi(series: Record<string, unknown>): SeriesDraft {
     anchorDate: String(series.anchorDate || ''),
     anchorIndex: Number(series.anchorIndex) || 0,
     overrides: (series.overrides || {}) as Record<string, string>,
-    races: Array.isArray(series.races) ? (series.races as SeriesRace[]) : [],
+    races: Array.isArray(series.races)
+      ? (series.races as SeriesRace[]).map((race) => ({ ...race, starts: Array.isArray(race.starts) ? race.starts : [] }))
+      : [],
     discordWebhookSet: Boolean(series.discordWebhookSet),
   }
 }
@@ -112,6 +115,43 @@ async function errorMessage(res: Response) {
     }
   }
   return typeof raw === 'string' && raw ? raw : `Request failed (${res.status})`
+}
+
+function EventIds({ starts, onChange }: { starts: RaceStart[]; onChange: (starts: RaceStart[]) => void }) {
+  const rows = starts.length ? starts : [{ time: '', eventId: '' }]
+  function edit(index: number, next: Partial<RaceStart>) {
+    onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...next } : row)))
+  }
+  return (
+    <Stack spacing={2}>
+      {rows.map((start, index) => (
+        <Flex key={index} gap={2} wrap="wrap">
+          <Input
+            placeholder="Zwift event id"
+            value={start.eventId}
+            {...field}
+            onChange={(e) => {
+              const parsed = eventIdFromInput(e.target.value)
+              edit(index, { eventId: parsed === null ? e.target.value : parsed })
+            }}
+          />
+          <Input
+            placeholder="Time"
+            value={start.time}
+            maxW="140px"
+            onChange={(e) => edit(index, { time: e.target.value })}
+            {...field}
+          />
+          {rows.length > 1 ? (
+            <Button onClick={() => onChange(rows.filter((_, rowIndex) => rowIndex !== index))}>Remove</Button>
+          ) : null}
+        </Flex>
+      ))}
+      <Button alignSelf="flex-start" size="sm" onClick={() => onChange([...rows, { time: '', eventId: '' }])}>
+        Add event
+      </Button>
+    </Stack>
+  )
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -207,6 +247,11 @@ export default function EventSeriesAdminPage() {
       setError('Every race needs a date and a route. Add the routes first, or remove the unfinished race.')
       return false
     }
+    if (draft.races.some((race) => (race.starts || []).some((start) => eventIdFromInput(start.eventId) === null))) {
+      setBusy('')
+      setError('Event id must be the number from the Zwift event, or the event page address.')
+      return false
+    }
     const res = await fetch('/api/admin/events/event-series', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -216,6 +261,13 @@ export default function EventSeriesAdminPage() {
         series: {
           ...draft,
           rules: orderedRules(draft.rules),
+          races: draft.races.map((race) => ({
+            ...race,
+            starts: (race.starts || []).flatMap((start) => {
+              const eventId = eventIdFromInput(start.eventId)
+              return eventId ? [{ time: start.time.trim(), eventId }] : []
+            }),
+          })),
         },
       }),
     })
@@ -306,6 +358,21 @@ export default function EventSeriesAdminPage() {
     patch({ races })
   }
 
+  function startsFor(date: string, route: string) {
+    return draft.races.find((race) => race.date === date && race.route.toLowerCase() === route.toLowerCase())?.starts || []
+  }
+
+  function setWeekStarts(date: string, route: string, starts: RaceStart[]) {
+    const index = draft.races.findIndex((race) => race.date === date && race.route.toLowerCase() === route.toLowerCase())
+    const meaningful = starts.some((start) => start.eventId.trim() || start.time.trim())
+    if (index < 0) {
+      if (!meaningful) return
+      patch({ races: [...draft.races, { date, route, label: '', match: '', starts }] })
+      return
+    }
+    updateRace(index, { starts: meaningful ? starts : [] })
+  }
+
   function routeChoices(current: string) {
     const names = routes.map((route) => route.route)
     if (current && !names.includes(current)) return [current, ...names]
@@ -374,7 +441,7 @@ export default function EventSeriesAdminPage() {
           <Field label="Time" hint="For example, Sundays 14:45 CET.">
             <Input value={draft.timeLabel} onChange={(e) => patch({ timeLabel: e.target.value })} {...field} />
           </Field>
-          <Field label="Words in the Zwift event name" hint="Apply finds the Zwift event on that date whose name contains these words. The series does not create the Zwift event.">
+          <Field label="Words in the Zwift event name" hint="Apply uses these words when the event id is empty. The series does not create the Zwift event.">
             <Input value={draft.zwiftName} onChange={(e) => patch({ zwiftName: e.target.value })} {...field} />
           </Field>
           <Field
@@ -529,6 +596,12 @@ export default function EventSeriesAdminPage() {
                     <Input placeholder="Stage name" value={race.label} onChange={(e) => updateRace(index, { label: e.target.value })} {...field} />
                     <Input placeholder="Extra words in the Zwift name" value={race.match} onChange={(e) => updateRace(index, { match: e.target.value })} {...field} />
                   </Flex>
+                  <Text color="gray.500" fontSize="sm" mt={2}>
+                    Leave the event id empty to find the race on the public calendar. Type the id when the event is not listed there. Save the series to show the race pass.
+                  </Text>
+                  <Box mt={2}>
+                    <EventIds starts={race.starts || []} onChange={(starts) => updateRace(index, { starts })} />
+                  </Box>
                   <Flex gap={2} mt={2}>
                     <Button onClick={() => patch({ races: draft.races.filter((_, raceIndex) => raceIndex !== index) })}>Remove</Button>
                     <Button
@@ -573,29 +646,39 @@ export default function EventSeriesAdminPage() {
               {!draft.anchorDate ? <Text color="gray.400">Choose the first race date and save.</Text> : null}
               {draft.anchorDate && !routes.length ? <Text color="gray.400">Add a route before the weeks can be filled in.</Text> : null}
               {schedule.map((row) => (
-                <Flex key={row.date} gap={2} wrap="wrap" align="center">
-                  <Text color="white" minW="180px">{row.label || row.date}</Text>
-                  <Select
-                    value={row.routeName}
-                    isDisabled={!routes.length}
-                    onChange={(e) => void changeWeek(row.date, e.target.value)}
-                    {...field}
-                  >
-                    {routeChoices(row.routeName).map((route) => (
-                      <option key={route} value={route}>{route}</option>
-                    ))}
-                  </Select>
-                  <Button
-                    colorScheme="red"
-                    size="sm"
-                    isDisabled={!row.routeName}
-                    isLoading={busy === `apply:${row.date}:${row.routeName}`}
-                    onClick={() => void apply(row.date, row.routeName)}
-                  >
-                    Apply
-                  </Button>
-                  {row.starts.length ? <Text color="gray.400">{row.starts.map((start) => `${start.time} ${start.eventId}`.trim()).join(', ')}</Text> : null}
-                </Flex>
+                <Box key={row.date} borderWidth="1px" borderColor="gray.700" borderRadius="md" p={3}>
+                  <Flex gap={2} wrap="wrap" align="center">
+                    <Text color="white" minW="180px">{row.label || row.date}</Text>
+                    <Select
+                      value={row.routeName}
+                      isDisabled={!routes.length}
+                      onChange={(e) => void changeWeek(row.date, e.target.value)}
+                      {...field}
+                    >
+                      {routeChoices(row.routeName).map((route) => (
+                        <option key={route} value={route}>{route}</option>
+                      ))}
+                    </Select>
+                    <Button
+                      colorScheme="red"
+                      size="sm"
+                      isDisabled={!row.routeName}
+                      isLoading={busy === `apply:${row.date}:${row.routeName}`}
+                      onClick={() => void apply(row.date, row.routeName)}
+                    >
+                      Apply
+                    </Button>
+                  </Flex>
+                  <Text color="gray.500" fontSize="sm" mt={2}>
+                    Leave the event id empty to find the race on the public calendar. Type the id when the event is not listed there. Save the series to show the race pass.
+                  </Text>
+                  <Box mt={2}>
+                    <EventIds
+                      starts={startsFor(row.date, row.routeName)}
+                      onChange={(starts) => setWeekStarts(row.date, row.routeName, starts)}
+                    />
+                  </Box>
+                </Box>
               ))}
             </Stack>
           ) : null}

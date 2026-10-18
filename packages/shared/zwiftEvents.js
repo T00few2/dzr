@@ -123,4 +123,16 @@ function suggestedSubgroup(event, racingScore) {
   return null;
 }
 
-module.exports = { compactZwiftEvents, suggestedSubgroup, localParts, TZ, DZR_UPCOMING_EVENTS_URL };
+/**
+ * The event id from a typed number or a Zwift event URL.
+ * Empty input is "". Anything else that is not an id is null.
+ */
+function eventIdFromInput(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const fromUrl = text.match(/events\/view\/(\d+)/i);
+  const id = fromUrl ? fromUrl[1] : text;
+  return /^\d+$/.test(id) ? id : null;
+}
+
+module.exports = { compactZwiftEvents, suggestedSubgroup, localParts, eventIdFromInput, TZ, DZR_UPCOMING_EVENTS_URL };

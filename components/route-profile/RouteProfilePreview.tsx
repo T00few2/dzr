@@ -488,6 +488,52 @@ function ProfileChart({
   )
 }
 
+function markerFill(color: string, alpha: number) {
+  const value = color.replace('#', '')
+  const red = parseInt(value.slice(0, 2), 16)
+  const green = parseInt(value.slice(2, 4), 16)
+  const blue = parseInt(value.slice(4, 6), 16)
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
+function legendMarks(profile: RaceProfile, bonusSprints: BonusSprint[]) {
+  const fromKm = profile.leadInKm || 0
+  const toKm = profile.raceKm || profile.distanceKm[profile.distanceKm.length - 1]
+  const bonusLabels = bonusNames(profile.segments, bonusSprints, profile.lapKm)
+  const bands = segmentsIn(profile.segments, fromKm, toKm, bonusLabels)
+  const bonus = (segment: ProfileSegment) => bonusLabels.has(segmentId(segment))
+  const marks = []
+  if (bands.some((segment) => segment.type === 'sprint' && !bonus(segment))) {
+    marks.push({ label: 'Sprint', color: COLORS.sprint, fill: 0.4 })
+  }
+  if (bands.some((segment) => segment.type === 'climb' && !bonus(segment))) {
+    marks.push({ label: 'KOM', color: COLORS.climb, fill: 0.4 })
+  }
+  if (bands.some(bonus)) marks.push({ label: 'Bonus', color: COLORS.bonus, fill: 0.72 })
+  return marks
+}
+
+function SegmentLegend({ marks }: { marks: ReturnType<typeof legendMarks> }) {
+  if (!marks.length) return null
+  return (
+    <HStack spacing={3} flexWrap="wrap" justify="flex-end" w="100%">
+      {marks.map((mark) => (
+        <HStack key={mark.label} spacing={1}>
+          <Box
+            w="14px"
+            h="14px"
+            bg={markerFill(mark.color, mark.fill)}
+            borderWidth="2px"
+            borderColor={mark.color}
+            flexShrink={0}
+          />
+          <Text color="gray.200" fontSize="sm">{mark.label}</Text>
+        </HStack>
+      ))}
+    </HStack>
+  )
+}
+
 function GradeLegend() {
   return (
     <HStack spacing={3} mb={1} flexWrap="wrap">
@@ -565,7 +611,6 @@ export function RouteProfilePreview({
   bonusSprints = [],
   onProfile,
   carousel = false,
-  showNote = true,
 }: {
   request: ProfileRequest | null
   showFinish?: boolean
@@ -573,7 +618,6 @@ export function RouteProfilePreview({
   bonusSprints?: BonusSprint[]
   onProfile?: (profile: RaceProfile | null) => void
   carousel?: boolean
-  showNote?: boolean
 }) {
   const [profile, setProfile] = useState<RaceProfile | null>(null)
   const [error, setError] = useState('')
@@ -642,7 +686,10 @@ export function RouteProfilePreview({
   if (!request?.route) return null
   const overview = profile && profile.distanceKm.length > 1 ? (
     <Box>
-      <Text color="white" fontWeight="semibold" mb={1}>Profile</Text>
+      <Box mb={1}>
+        <Text color="white" fontWeight="semibold" mb={1}>Profile</Text>
+        <SegmentLegend marks={legendMarks(profile, bonusSprints)} />
+      </Box>
       <ProfileChart
         profile={profile}
         fromKm={profile.leadInKm || 0}
@@ -668,11 +715,6 @@ export function RouteProfilePreview({
   const slides = [overview, ...zooms].filter(Boolean)
   return (
     <Stack spacing={4}>
-      {showNote ? (
-        <Text color="gray.400" fontSize="sm">
-          Profile preview. Green is a sprint, red is a climb, gold awards bonus seconds. A climb close-up is a 3D profile colored by gradient.
-        </Text>
-      ) : null}
       {loading ? <Text color="gray.400">Loading profile…</Text> : null}
       {error ? <Text color="red.300">{error}</Text> : null}
       {carousel && slides.length > 1 ? <SlideCarousel slides={slides} /> : slides}

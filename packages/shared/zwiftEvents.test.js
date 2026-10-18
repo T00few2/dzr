@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert");
 
-const { compactZwiftEvents, suggestedSubgroup } = require("./zwiftEvents");
+const { compactZwiftEvents, suggestedSubgroup, eventIdFromInput } = require("./zwiftEvents");
 
 /**
  * Trimmed from the live feed, 2026-09-07. The timestamps are verbatim: the whole point of these
@@ -100,6 +100,13 @@ test("suggestedSubgroup picks the band a racing score falls in", () => {
   // matching the feed's own accessExpression, which uses `< 520` for the band above.
   assert.strictEqual(suggestedSubgroup(afterParty, 350), "D");
   assert.strictEqual(suggestedSubgroup(afterParty, 520), "C");
+});
+
+test("an event id can be typed or pasted from the Zwift event page", () => {
+  assert.strictEqual(eventIdFromInput("5589078"), "5589078");
+  assert.strictEqual(eventIdFromInput("https://www.zwift.com/eu/events/view/5589078"), "5589078");
+  assert.strictEqual(eventIdFromInput(""), "");
+  assert.strictEqual(eventIdFromInput("not an event"), null);
 });
 
 test("suggestedSubgroup declines rather than guessing", () => {
