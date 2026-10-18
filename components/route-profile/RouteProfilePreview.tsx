@@ -652,10 +652,11 @@ export function RouteProfilePreview({
       />
     </Box>
   ) : null
-  const finish = profile?.finish
-  const finishSlide = showFinish && finish?.matched
-    ? <ZoomBlock key={`${finish.title}-finish`} profile={profile} zoom={finish} />
-    : null
+  let finishSlide: ReactNode = null
+  if (profile && showFinish && profile.finish && profile.finish.matched) {
+    const zoom = profile.finish
+    finishSlide = <ZoomBlock key={`${zoom.title}-finish`} profile={profile} zoom={zoom} />
+  }
   const zooms = profile && profile.distanceKm.length > 1
     ? [
         ...(finishSlide ? [finishSlide] : []),
