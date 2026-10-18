@@ -11,7 +11,7 @@ import {
 } from '@/app/lib/catalogRoute'
 import { Box, Button, Flex, Heading, Input, Select, Stack, Switch, Text } from '@chakra-ui/react'
 import { RouteProfilePreview } from '@/components/route-profile/RouteProfilePreview'
-import { foldName, slugifyZwiftName, type ProfileSegment, type RaceProfile } from '@/packages/shared/routeProfile'
+import { foldName, slugifyZwiftName, zwiftInsiderUrl, type ProfileSegment, type RaceProfile } from '@/packages/shared/routeProfile'
 import { usesLapCount } from '@/packages/shared/seriesRotation'
 
 type SeriesId = string
@@ -291,13 +291,18 @@ export default function RouteSetupPage() {
   function applyZwiftRoute(hit: RouteHit, options?: { keepSearching?: boolean; world?: string }) {
     setRouteNameSearch(Boolean(options?.keepSearching))
     setQuery(hit.name)
-    setDraft((current) => ({
-      ...current,
-      zwiftRouteId: hit.routeId,
-      zwiftRouteName: hit.name,
-      world: options?.world ? worldLabel(options.world) : current.world.trim() ? current.world : worldLabel(hit.world),
-      route: current.route.trim() ? current.route : hit.name,
-    }))
+    setDraft((current) => {
+      const link = current.linkRoute.trim()
+      const guessedAlready = !link || link === zwiftInsiderUrl(current.zwiftRouteName) || link === zwiftInsiderUrl(current.route)
+      return {
+        ...current,
+        zwiftRouteId: hit.routeId,
+        zwiftRouteName: hit.name,
+        world: options?.world ? worldLabel(options.world) : current.world.trim() ? current.world : worldLabel(hit.world),
+        route: current.route.trim() ? current.route : hit.name,
+        linkRoute: guessedAlready ? zwiftInsiderUrl(hit.name) : current.linkRoute,
+      }
+    })
     if (lengthMode === 'laps') {
       fillLaps.current = true
       setProfile(null)
@@ -685,6 +690,9 @@ export default function RouteSetupPage() {
               onChange={(e) => setField({ linkRoute: e.target.value })}
               {...field}
             />
+            <Text fontSize="sm" color="gray.400" mt={-2}>
+              Filled in from the route name. Change it when the article uses a different address.
+            </Text>
             <Box borderWidth="1px" borderColor="gray.700" rounded="md" p={3}>
               <Flex justify="space-between" align="center" gap={3}>
                 <Box>

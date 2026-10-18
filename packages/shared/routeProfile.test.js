@@ -1,6 +1,13 @@
 const test = require("node:test")
 const assert = require("node:assert")
-const { parseFinish, buildRaceProfile, raceDistanceKm, profileImageSrc, mergePositionedSegments, prepareLap, shiftProfileSegments, bonusNamesMatch } = require("./routeProfile")
+const { parseFinish, buildRaceProfile, raceDistanceKm, profileImageSrc, mergePositionedSegments, prepareLap, shiftProfileSegments, bonusNamesMatch, zwiftInsiderUrl } = require("./routeProfile")
+
+test("a Zwift Insider link is the route name", () => {
+  assert.strictEqual(zwiftInsiderUrl("Royal Pump Room 8"), "https://zwiftinsider.com/route/royal-pump-room-8/")
+  assert.strictEqual(zwiftInsiderUrl("Queen's Highway After Party"), "https://zwiftinsider.com/route/queens-highway-after-party/")
+  assert.strictEqual(zwiftInsiderUrl("Champs-Élysées"), "https://zwiftinsider.com/route/champs-elysees/")
+  assert.strictEqual(zwiftInsiderUrl(""), "")
+})
 
 test("an After Party finish names the segment and the pass", () => {
   assert.deepStrictEqual(parseFinish("Banner on Petit KOM Reverse"), { pass: 1, name: "Petit KOM Reverse" })

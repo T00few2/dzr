@@ -22,6 +22,7 @@ import {
 } from '@chakra-ui/react'
 import { RouteProfilePreview } from '@/components/route-profile/RouteProfilePreview'
 import { SeriesRulesList } from '@/components/series/SeriesRules'
+import { zwiftInsiderUrl } from '@/packages/shared/routeProfile'
 import SlideCarousel from '@/components/series/SlideCarousel'
 import type { CatalogRoute } from '@/app/lib/catalogRoute'
 
@@ -48,6 +49,10 @@ export type SeriesPageData = {
   pointsRows: { label: string; points: string }[]
   leagueUrl: string
   schedule: SeriesRaceView[]
+}
+
+function insiderLink(route: CatalogRoute) {
+  return route.linkRoute.trim() || zwiftInsiderUrl(route.zwiftRouteName || route.route)
 }
 
 function todayIso() {
@@ -177,10 +182,10 @@ function WeeklyRace({ series, race }: { series: SeriesPageData; race: SeriesRace
             <Text color="white">Distance: {route.distance} km</Text>
             <Text color="white">Elevation: {route.elevation} hm</Text>
             {route.finish ? <Text color="white">Finish: {route.finish}</Text> : null}
-            {route.linkRoute ? (
+            {insiderLink(route) ? (
               <Text color="white">
                 Route:{' '}
-                <ChakraLink color="orange" href={route.linkRoute} isExternal>
+                <ChakraLink color="orange" href={insiderLink(route)} isExternal>
                   {route.route}<ExternalLinkIcon mx="2px" />
                 </ChakraLink>
               </Text>
@@ -279,8 +284,8 @@ function LimitedSeries({ series }: { series: SeriesPageData }) {
                       <Td textAlign="center">{stageDate(race.date, includeMonth)}</Td>
                       <Td textAlign="center">{race.route?.world || ''}</Td>
                       <Td textAlign="center">
-                        {race.route?.linkRoute ? (
-                          <ChakraLink color="orange" href={race.route.linkRoute} isExternal>
+                        {race.route && insiderLink(race.route) ? (
+                          <ChakraLink color="orange" href={insiderLink(race.route)} isExternal>
                             {race.routeName}
                           </ChakraLink>
                         ) : (

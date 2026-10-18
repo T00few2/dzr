@@ -7,6 +7,7 @@ import { loadUpcomingDzrEvents } from '@/app/lib/zwiftPublicEvents'
 import { flaskData } from '@/app/api/admin/_lib/flask'
 import { SeriesError } from '@/app/lib/seriesSchedule'
 import { courseLength, addDays, displayDate, parseIsoDate, routeForDate } from '@/packages/shared/seriesRotation'
+import { zwiftInsiderUrl } from '@/packages/shared/routeProfile'
 import type { CatalogRoute } from '@/app/lib/catalogRoute'
 import type { ZwiftEventSummary } from '@/packages/shared/zwiftEvents'
 
@@ -459,7 +460,7 @@ async function postEventDiscord(series: StoredSeries, route: CatalogRoute, date:
   const lines = [
     `**Race details for ${displayDate(date)}**`,
     `**World:** ${route.world}`,
-    `**Route:** [${route.route}](${route.linkRoute || `https://www.dzrracingseries.com/series/${series.slug}`})`,
+    `**Route:** [${route.route}](${route.linkRoute.trim() || zwiftInsiderUrl(route.zwiftRouteName || route.route) || `https://www.dzrracingseries.com/series/${series.slug}`})`,
     `**Laps:** ${route.laps}`,
     `**Distance:** ${route.distance} km`,
     `**Elevation:** ${route.elevation} hm`,

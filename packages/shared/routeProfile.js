@@ -45,6 +45,11 @@ function slugifyZwiftName(value) {
     .replace(/^-|-$/g, "")
 }
 
+function zwiftInsiderUrl(name) {
+  const slug = slugifyZwiftName(name)
+  return slug ? `https://zwiftinsider.com/route/${slug}/` : ""
+}
+
 function parseFinish(value) {
   const text = String(value || "").trim()
   if (!text) return null
@@ -474,6 +479,7 @@ module.exports = {
   foldName,
   bonusNamesMatch,
   slugifyZwiftName,
+  zwiftInsiderUrl,
   parseFinish,
   prepareLap,
   raceDistanceKm,
