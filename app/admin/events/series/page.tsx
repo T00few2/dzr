@@ -386,9 +386,9 @@ export default function EventSeriesAdminPage() {
           </Field>
           <Flex align="center" gap={3}>
             <Switch colorScheme="red" isChecked={draft.published} onChange={(e) => patch({ published: e.target.checked })} />
-            <Text color="white">Show on the site</Text>
+            <Text color="white">Show in the menu</Text>
           </Flex>
-          <Text color="gray.500" fontSize="sm" mt={-2}>The menu link and the public page stay hidden until this is on.</Text>
+          <Text color="gray.500" fontSize="sm" mt={-2}>The page address works as soon as the series is saved. This adds it to the menu.</Text>
 
           <Heading size="sm" color="white">Rules</Heading>
           <Field label="One rule on each line">
@@ -522,7 +522,7 @@ export default function EventSeriesAdminPage() {
                 Edit routes
               </Button>
             ) : null}
-            {saved && draft.published ? (
+            {saved ? (
               <Button as={Link} href={`/series/${draft.slug}`}>
                 View page
               </Button>

@@ -345,7 +345,7 @@ export function plannedRaces(series: EventSeries, routes: CatalogRoute[], today 
 
 export async function publicSeries(slug: string): Promise<PublicSeries | null> {
   const stored = await readStored(slug)
-  if (!stored?.published) return null
+  if (!stored) return null
   const { discordWebhook: _webhook, ...series } = stored
   const routes = await ensureCatalog(stored.slug)
   return { ...series, routes, schedule: plannedRaces(series, routes) }
