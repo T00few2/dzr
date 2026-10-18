@@ -79,14 +79,25 @@ function stageDate(iso: string, includeMonth: boolean) {
   return `${day} ${month}`
 }
 
-function CourseProfile({ route, carousel = false }: { route: CatalogRoute; carousel?: boolean }) {
-  const bonus = route.sprints
+function sprintColumns(route: CatalogRoute) {
+  return route.sprints
     .map((name, index) => ({
       name: name.trim(),
       laps: (route.sprintLaps[index] || '').trim(),
-      seconds: (route.bonus[index] || '').trim(),
     }))
     .filter((row) => row.name)
+}
+
+function bonusValues(route: CatalogRoute) {
+  return route.bonus.map((value) => value.trim()).filter(Boolean)
+}
+
+function hasWeeklyPoints(route: CatalogRoute | null) {
+  return Boolean(route && (sprintColumns(route).length || bonusValues(route).length))
+}
+
+function CourseProfile({ route, carousel = false }: { route: CatalogRoute; carousel?: boolean }) {
+  const bonus = sprintColumns(route)
   return (
     <Stack spacing={4}>
       <RouteProfilePreview
@@ -104,28 +115,6 @@ function CourseProfile({ route, carousel = false }: { route: CatalogRoute; carou
         bonusSprints={bonus}
         carousel={carousel}
       />
-      {bonus.length ? (
-        <TableContainer textAlign="center">
-          <Table size="sm" color="white" borderColor="white" border="1px">
-            <Thead>
-              <Tr>
-                <Th textAlign="center" color="white">Segment</Th>
-                <Th textAlign="center" color="white">Laps</Th>
-                <Th textAlign="center" color="white">Bonus seconds</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {bonus.map((row) => (
-                <Tr key={`${row.name}-${row.laps}`}>
-                  <Td textAlign="center">{row.name}</Td>
-                  <Td textAlign="center">{row.laps}</Td>
-                  <Td textAlign="center">{row.seconds}</Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-        </TableContainer>
-      ) : null}
     </Stack>
   )
 }
@@ -151,19 +140,189 @@ function EventLinks({ starts }: { starts: RaceStart[] }) {
   )
 }
 
+function RulesBlock({ rules }: { rules: string[] }) {
+  if (!rules.length) return null
+  return (
+    <Stack spacing={3}>
+      <Heading color="white" fontSize="2xl">Rules</Heading>
+      <SeriesRulesList rules={rules} />
+    </Stack>
+  )
+}
+
+function ComingRaces({ series }: { series: SeriesPageData }) {
+  if (series.schedule.length < 2) return null
+  return (
+    <Stack spacing={3}>
+      <Heading color="white" fontSize="2xl">Coming races</Heading>
+      <TableContainer textAlign="center">
+        <Table size="sm" color="white" borderColor="white" border="1px">
+          <Thead>
+            <Tr>
+              <Th textAlign="center" color="white">Date</Th>
+              <Th textAlign="center" color="white">Route</Th>
+              <Th textAlign="center" color="white">Zwift</Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            {series.schedule.map((week) => {
+              const event = week.starts.find((start) => start.eventId)
+              return (
+                <Tr key={week.date}>
+                  <Td textAlign="center">{week.label || week.date}</Td>
+                  <Td textAlign="center">{week.routeName}</Td>
+                  <Td textAlign="center">
+                    {event ? (
+                      <ChakraLink color="orange" href={`https://www.zwift.com/eu/events/view/${event.eventId}`} isExternal>
+                        Zwift
+                      </ChakraLink>
+                    ) : '—'}
+                  </Td>
+                </Tr>
+              )
+            })}
+          </Tbody>
+        </Table>
+      </TableContainer>
+    </Stack>
+  )
+}
+
+function PointsSection({ route }: { route: CatalogRoute }) {
+  const sprints = sprintColumns(route)
+  const bonuses = bonusValues(route)
+  if (!sprints.length && !bonuses.length) return null
+  return (
+    <Stack spacing={4}>
+      <Heading color="white" fontSize="2xl">Points</Heading>
+      {sprints.length ? (
+        <>
+          <Heading color="white" fontSize="md">First across line (FAL) bonus seconds on segments below</Heading>
+          <TableContainer>
+            <Table size="sm" color="white" borderColor="white" border="1px">
+              <Thead>
+                <Tr>
+                  <Th textAlign="left" color="white" borderRight="1px solid white">Segment</Th>
+                  {sprints.map((sprint) => (
+                    <Th key={sprint.name} textAlign="center" color="white" borderRight="1px solid white">{sprint.name}</Th>
+                  ))}
+                </Tr>
+              </Thead>
+              <Tbody>
+                <Tr>
+                  <Td textAlign="left" borderRight="1px solid white" fontWeight="700">Laps</Td>
+                  {sprints.map((sprint) => (
+                    <Td key={sprint.name} textAlign="center" borderRight="1px solid white">{sprint.laps}</Td>
+                  ))}
+                </Tr>
+              </Tbody>
+            </Table>
+          </TableContainer>
+        </>
+      ) : null}
+      {bonuses.length ? (
+        <>
+          <Heading color="white" fontSize="md">Bonus seconds on each sprint are awarded according to</Heading>
+          <TableContainer>
+            <Table size="sm" color="white" borderColor="white" border="1px">
+              <Thead>
+                <Tr>
+                  <Th textAlign="left" color="white" borderRight="1px solid white">Position</Th>
+                  {bonuses.map((_, index) => (
+                    <Th key={index} textAlign="center" color="white" borderRight="1px solid white">{index + 1}</Th>
+                  ))}
+                </Tr>
+              </Thead>
+              <Tbody>
+                <Tr>
+                  <Td textAlign="left" borderRight="1px solid white" fontWeight="700">Bonus</Td>
+                  {bonuses.map((bonus, index) => (
+                    <Td key={index} textAlign="center" borderRight="1px solid white">{bonus}s</Td>
+                  ))}
+                </Tr>
+              </Tbody>
+            </Table>
+          </TableContainer>
+        </>
+      ) : null}
+    </Stack>
+  )
+}
+
+function WeeklyPointsRace({ series, race }: { series: SeriesPageData; race: SeriesRaceView }) {
+  const route = race.route
+  const start = race.starts.find((item) => item.eventId)
+  return (
+    <Stack spacing={6}>
+      {series.intro ? (
+        <Text color="white" fontSize="lg" whiteSpace="pre-line">{series.intro}</Text>
+      ) : null}
+      <Heading as="h1" color="white">{race.label || race.date}</Heading>
+      {series.timeLabel ? <Heading color="white" fontSize="md">{series.timeLabel}</Heading> : null}
+      {route ? (
+        <TableContainer>
+          <Table size="sm" color="white" borderColor="white" border="1px">
+            <Thead>
+              <Tr>
+                {['Race Pass', 'ZwiftPower', 'World', 'Route', 'Laps', 'Km', 'Hm'].map((heading) => (
+                  <Th key={heading} textAlign="center" color="white">{heading}</Th>
+                ))}
+              </Tr>
+            </Thead>
+            <Tbody>
+              <Tr>
+                <Td textAlign="center">
+                  {start ? (
+                    <ChakraLink color="orange" href={`https://www.zwift.com/eu/events/view/${start.eventId}`} isExternal>
+                      Zwift<ExternalLinkIcon mx="2px" />
+                    </ChakraLink>
+                  ) : '—'}
+                </Td>
+                <Td textAlign="center">
+                  {start ? (
+                    <ChakraLink color="orange" href={`https://zwiftpower.com/events.php?zid=${start.eventId}`} isExternal>
+                      ZwiftPower<ExternalLinkIcon mx="2px" />
+                    </ChakraLink>
+                  ) : '—'}
+                </Td>
+                <Td textAlign="center">{route.world}</Td>
+                <Td textAlign="center">
+                  {insiderLink(route) ? (
+                    <ChakraLink color="orange" href={insiderLink(route)} isExternal>
+                      {route.route}<ExternalLinkIcon mx="2px" />
+                    </ChakraLink>
+                  ) : route.route}
+                </Td>
+                <Td textAlign="center">{route.laps}</Td>
+                <Td textAlign="center">{route.distance}</Td>
+                <Td textAlign="center">{route.elevation}</Td>
+              </Tr>
+            </Tbody>
+          </Table>
+        </TableContainer>
+      ) : null}
+      <RulesBlock rules={series.rules} />
+      {route ? <PointsSection route={route} /> : null}
+      <Heading color="white" fontSize="2xl">Profile</Heading>
+      {route ? (
+        <CourseProfile route={route} carousel={series.carousel} />
+      ) : (
+        <Text color="gray.400">Add a route in the series setup to show the course here.</Text>
+      )}
+      <ComingRaces series={series} />
+    </Stack>
+  )
+}
+
 function WeeklyRace({ series, race }: { series: SeriesPageData; race: SeriesRaceView }) {
   const route = race.route
+  if (hasWeeklyPoints(route)) return <WeeklyPointsRace series={series} race={race} />
   return (
     <Stack spacing={6}>
       {series.intro ? (
         <Text color="white" fontSize="md" align="center" whiteSpace="pre-line">{series.intro}</Text>
       ) : null}
-      {series.rules.length ? (
-        <Stack spacing={3}>
-          <Heading color="white" fontSize="2xl">Rules</Heading>
-          <SeriesRulesList rules={series.rules} />
-        </Stack>
-      ) : null}
+      <RulesBlock rules={series.rules} />
       <Center><Divider width="50%" /></Center>
       <Center>
         <Stack spacing={2} align="center">
@@ -200,40 +359,7 @@ function WeeklyRace({ series, race }: { series: SeriesPageData; race: SeriesRace
       ) : (
         <Text color="gray.400" align="center">Add a route in the series setup to show the course here.</Text>
       )}
-      {series.schedule.length > 1 ? (
-        <Stack spacing={3}>
-          <Heading color="white" fontSize="2xl">Coming races</Heading>
-          <TableContainer textAlign="center">
-            <Table size="sm" color="white" borderColor="white" border="1px">
-              <Thead>
-                <Tr>
-                  <Th textAlign="center" color="white">Date</Th>
-                  <Th textAlign="center" color="white">Route</Th>
-                  <Th textAlign="center" color="white">Zwift</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {series.schedule.map((week) => {
-                  const event = week.starts.find((start) => start.eventId)
-                  return (
-                    <Tr key={week.date}>
-                      <Td textAlign="center">{week.label || week.date}</Td>
-                      <Td textAlign="center">{week.routeName}</Td>
-                      <Td textAlign="center">
-                        {event ? (
-                          <ChakraLink color="orange" href={`https://www.zwift.com/eu/events/view/${event.eventId}`} isExternal>
-                            Zwift
-                          </ChakraLink>
-                        ) : '—'}
-                      </Td>
-                    </Tr>
-                  )
-                })}
-              </Tbody>
-            </Table>
-          </TableContainer>
-        </Stack>
-      ) : null}
+      <ComingRaces series={series} />
     </Stack>
   )
 }
