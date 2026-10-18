@@ -30,6 +30,7 @@ export default async function SeriesPage({ params }: { params: { slug: string } 
     kind: series.kind,
     logoUrl: series.logoUrl,
     rules: series.rules,
+    carousel: series.carousel,
     pointsNote: series.pointsNote,
     pointsRows: series.pointsRows,
     leagueUrl: series.leagueUrl,

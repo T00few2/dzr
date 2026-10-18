@@ -3,7 +3,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import AdminShell from '@/components/admin/AdminShell'
-import { Box, Button, Flex, Heading, Image, Input, Select, Stack, Switch, Text, Textarea } from '@chakra-ui/react'
+import { Box, Button, Checkbox, Flex, Heading, Icon, Image, Input, Select, Stack, Switch, Text, Textarea } from '@chakra-ui/react'
+import { SERIES_RULES, orderedRules, ruleOption } from '@/components/series/SeriesRules'
 
 type Kind = 'weekly' | 'limited'
 type PointsRow = { label: string; points: string }
@@ -21,7 +22,8 @@ type SeriesDraft = {
   zwiftName: string
   published: boolean
   logoUrl: string
-  rulesText: string
+  rules: string[]
+  carousel: boolean
   pointsNote: string
   pointsRows: PointsRow[]
   leagueUrl: string
@@ -41,7 +43,8 @@ const emptyDraft = (): SeriesDraft => ({
   zwiftName: '',
   published: false,
   logoUrl: '',
-  rulesText: '',
+  rules: [],
+  carousel: false,
   pointsNote: '',
   pointsRows: [],
   leagueUrl: '',
@@ -84,7 +87,8 @@ function fromApi(series: Record<string, unknown>): SeriesDraft {
     zwiftName: String(series.zwiftName || ''),
     published: Boolean(series.published),
     logoUrl: String(series.logoUrl || ''),
-    rulesText: rules.join('\n'),
+    rules: orderedRules(rules),
+    carousel: Boolean(series.carousel),
     pointsNote: String(series.pointsNote || ''),
     pointsRows: Array.isArray(series.pointsRows) ? (series.pointsRows as PointsRow[]) : [],
     leagueUrl: String(series.leagueUrl || ''),
@@ -211,7 +215,7 @@ export default function EventSeriesAdminPage() {
         clearWebhook,
         series: {
           ...draft,
-          rules: draft.rulesText.split('\n').map((line) => line.trim()).filter(Boolean),
+          rules: orderedRules(draft.rules),
         },
       }),
     })
@@ -389,11 +393,45 @@ export default function EventSeriesAdminPage() {
             <Text color="white">Show in the menu</Text>
           </Flex>
           <Text color="gray.500" fontSize="sm" mt={-2}>The page address works as soon as the series is saved. This adds it to the menu.</Text>
+          <Flex align="center" gap={3}>
+            <Switch colorScheme="red" isChecked={draft.carousel} onChange={(e) => patch({ carousel: e.target.checked })} />
+            <Text color="white">Carousel</Text>
+          </Flex>
+          <Text color="gray.500" fontSize="sm" mt={-2}>
+            {draft.kind === 'weekly'
+              ? 'The next race moves through its profile, the finish close-up, and each extra climb.'
+              : 'The page moves through one profile for each stage.'}
+          </Text>
 
           <Heading size="sm" color="white">Rules</Heading>
-          <Field label="One rule on each line">
-            <Textarea minH="90px" value={draft.rulesText} onChange={(e) => patch({ rulesText: e.target.value })} {...field} />
-          </Field>
+          <Text color="gray.500" fontSize="sm">Tick the rules that apply. The page shows each one with its icon.</Text>
+          <Stack spacing={2}>
+            {SERIES_RULES.map((rule) => (
+              <Checkbox
+                key={rule.id}
+                colorScheme="red"
+                color="white"
+                isChecked={draft.rules.some((item) => item.toLowerCase() === rule.label.toLowerCase())}
+                onChange={(event) => patch({ rules: orderedRules(event.target.checked ? [...draft.rules, rule.label] : draft.rules.filter((item) => item.toLowerCase() !== rule.label.toLowerCase())) })}
+              >
+                <Flex as="span" align="center" gap={2}>
+                  <Icon as={rule.icon} color={rule.color} boxSize="18px" />
+                  <Text as="span" color="white">{rule.label}</Text>
+                </Flex>
+              </Checkbox>
+            ))}
+            {draft.rules.filter((item) => !ruleOption(item)).map((rule) => (
+              <Checkbox
+                key={rule}
+                colorScheme="red"
+                color="white"
+                isChecked
+                onChange={() => patch({ rules: draft.rules.filter((item) => item !== rule) })}
+              >
+                <Text as="span" color="white">{rule}</Text>
+              </Checkbox>
+            ))}
+          </Stack>
 
           <Heading size="sm" color="white">Logo</Heading>
           {draft.logoUrl ? <Image src={draft.logoUrl} alt="" maxH="120px" objectFit="contain" /> : null}

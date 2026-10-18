@@ -38,6 +38,7 @@ export type EventSeries = {
   published: boolean
   logoUrl: string
   rules: string[]
+  carousel: boolean
   pointsNote: string
   pointsRows: PointsRow[]
   leagueUrl: string
@@ -168,6 +169,7 @@ function asStored(id: string, data: Record<string, unknown> | undefined): Stored
     published: Boolean(data.published),
     logoUrl: String(data.logoUrl || ''),
     rules: textList(data.rules),
+    carousel: Boolean(data.carousel),
     pointsNote: String(data.pointsNote || ''),
     pointsRows: pointsRows(data.pointsRows),
     leagueUrl: String(data.leagueUrl || '').trim(),
@@ -239,6 +241,7 @@ export async function saveEventSeries(
     published: Boolean(input.published),
     logoUrl: String(input.logoUrl || existing?.logoUrl || ''),
     rules: textList(input.rules),
+    carousel: Boolean(input.carousel),
     pointsNote: String(input.pointsNote || ''),
     pointsRows: pointsRows(input.pointsRows),
     leagueUrl: String(input.leagueUrl || '').trim(),

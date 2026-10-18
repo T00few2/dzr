@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Area, AreaChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, usePlotArea, XAxis, YAxis } from 'recharts'
 import { Box, HStack, Spinner, Stack, Text } from '@chakra-ui/react'
+import SlideCarousel from '@/components/series/SlideCarousel'
 import type { CustomClimbRange, ProfileSegment, ProfileZoom, RaceProfile } from '@/packages/shared/routeProfile'
 import { bonusNamesMatch, profileImageSrc } from '@/packages/shared/routeProfile'
 
@@ -563,12 +564,16 @@ export function RouteProfilePreview({
   showClimbs,
   bonusSprints = [],
   onProfile,
+  carousel = false,
+  showNote = true,
 }: {
   request: ProfileRequest | null
   showFinish?: boolean
   showClimbs?: boolean
   bonusSprints?: BonusSprint[]
   onProfile?: (profile: RaceProfile | null) => void
+  carousel?: boolean
+  showNote?: boolean
 }) {
   const [profile, setProfile] = useState<RaceProfile | null>(null)
   const [error, setError] = useState('')
@@ -635,35 +640,41 @@ export function RouteProfilePreview({
   }, [key])
 
   if (!request?.route) return null
+  const overview = profile && profile.distanceKm.length > 1 ? (
+    <Box>
+      <Text color="white" fontWeight="semibold" mb={1}>Profile</Text>
+      <ProfileChart
+        profile={profile}
+        fromKm={profile.leadInKm || 0}
+        toKm={profile.raceKm || profile.distanceKm[profile.distanceKm.length - 1]}
+        bonusSprints={bonusSprints}
+        named
+      />
+    </Box>
+  ) : null
+  const finish = profile?.finish
+  const finishSlide = showFinish && finish?.matched
+    ? <ZoomBlock key={`${finish.title}-finish`} profile={profile} zoom={finish} />
+    : null
+  const zooms = profile && profile.distanceKm.length > 1
+    ? [
+        ...(finishSlide ? [finishSlide] : []),
+        ...(showClimbs ? profile.climbs.map((climb) => (
+          <ZoomBlock key={`${climb.title}-${climb.fromKm}`} profile={profile} zoom={climb} climb />
+        )) : []),
+      ]
+    : []
+  const slides = [overview, ...zooms].filter(Boolean)
   return (
     <Stack spacing={4}>
-      <Text color="gray.400" fontSize="sm">
-        Profile preview. Green is a sprint, red is a climb, gold awards bonus seconds. A climb close-up is a 3D profile colored by gradient.
-      </Text>
+      {showNote ? (
+        <Text color="gray.400" fontSize="sm">
+          Profile preview. Green is a sprint, red is a climb, gold awards bonus seconds. A climb close-up is a 3D profile colored by gradient.
+        </Text>
+      ) : null}
       {loading ? <Text color="gray.400">Loading profile…</Text> : null}
       {error ? <Text color="red.300">{error}</Text> : null}
-      {profile && profile.distanceKm.length > 1 ? (
-        <>
-          <Box>
-            <Text color="white" fontWeight="semibold" mb={1}>
-              Profile
-            </Text>
-            <ProfileChart
-              profile={profile}
-              fromKm={profile.leadInKm || 0}
-              toKm={profile.raceKm || profile.distanceKm[profile.distanceKm.length - 1]}
-              bonusSprints={bonusSprints}
-              named
-            />
-          </Box>
-          {showFinish && profile.finish ? <ZoomBlock profile={profile} zoom={profile.finish} /> : null}
-          {showClimbs
-            ? profile.climbs.map((climb) => (
-                <ZoomBlock key={`${climb.title}-${climb.fromKm}`} profile={profile} zoom={climb} climb />
-              ))
-            : null}
-        </>
-      ) : null}
+      {carousel && slides.length > 1 ? <SlideCarousel slides={slides} /> : slides}
     </Stack>
   )
 }
