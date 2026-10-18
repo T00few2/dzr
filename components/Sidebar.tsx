@@ -53,6 +53,7 @@ import { useEffect, useState } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { FaUser, FaUserCircle } from 'react-icons/fa'
 import { HOLDKAPTAJN_ROLE_ID } from '@/app/lib/sharedConstants'
+import { seriesMenuIcon } from '@/components/series/SeriesMenuIcons'
 
 interface LinkItemProps {
   name: string
@@ -93,7 +94,7 @@ const LinkItems: Array<LinkItemProps> = [
 ]
 
 const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
-  const [published, setPublished] = useState<{ slug: string; name: string }[]>([])
+  const [published, setPublished] = useState<{ slug: string; name: string; icon?: string }[]>([])
   useEffect(() => {
     void fetch('/api/series/published', { cache: 'no-store' })
       .then(async (res) => {
@@ -108,7 +109,7 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
     ...published.map((series) => ({
       name: series.name,
       href: `/series/${series.slug}`,
-      icon: LiaMountainSolid,
+      icon: seriesMenuIcon(series.icon),
     })),
   ]
   return (

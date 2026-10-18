@@ -3,8 +3,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import AdminShell from '@/components/admin/AdminShell'
-import { Box, Button, Checkbox, Flex, Heading, Icon, Image, Input, Select, Stack, Switch, Text, Textarea } from '@chakra-ui/react'
+import { Box, Button, Checkbox, Flex, Heading, Icon, Image, Input, Popover, PopoverBody, PopoverContent, PopoverTrigger, Select, Stack, Switch, Text, Textarea } from '@chakra-ui/react'
 import { SERIES_RULES, orderedRules, ruleOption } from '@/components/series/SeriesRules'
+import { SeriesIconChoices } from '@/components/series/SeriesMenuIcons'
+import { seriesMenuIconId } from '@/app/lib/seriesMenuIcons'
 import { eventIdFromInput } from '@/packages/shared/zwiftEvents'
 
 type Kind = 'weekly' | 'limited'
@@ -25,6 +27,7 @@ type SeriesDraft = {
   logoUrl: string
   rules: string[]
   carousel: boolean
+  icon: string
   pointsNote: string
   pointsRows: PointsRow[]
   leagueUrl: string
@@ -46,6 +49,7 @@ const emptyDraft = (): SeriesDraft => ({
   logoUrl: '',
   rules: [],
   carousel: false,
+  icon: 'mountain',
   pointsNote: '',
   pointsRows: [],
   leagueUrl: '',
@@ -62,8 +66,102 @@ const field = {
   color: 'white',
   sx: {
     option: { color: 'black' },
-    '::-webkit-calendar-picker-indicator': { filter: 'invert(1)' },
   },
+}
+
+function parseIsoDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return null
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function toIsoDate(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+function DateField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const selected = parseIsoDate(value)
+  const [open, setOpen] = useState(false)
+  const [visible, setVisible] = useState(() => selected ?? new Date())
+  const year = visible.getFullYear()
+  const month = visible.getMonth()
+  const lead = (new Date(year, month, 1).getDay() + 6) % 7
+  const days = new Date(year, month + 1, 0).getDate()
+  const cells: Array<Date | null> = [
+    ...Array.from({ length: lead }, () => null),
+    ...Array.from({ length: days }, (_, index) => new Date(year, month, index + 1)),
+  ]
+  const label = selected
+    ? selected.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+    : 'Choose a date'
+
+  return (
+    <Popover
+      isOpen={open}
+      onOpen={() => {
+        setVisible(selected ?? new Date())
+        setOpen(true)
+      }}
+      onClose={() => setOpen(false)}
+      placement="bottom-start"
+      isLazy
+    >
+      <PopoverTrigger>
+        <Button
+          w="full"
+          minW="11rem"
+          justifyContent="flex-start"
+          fontWeight="normal"
+          bg="gray.900"
+          borderWidth="1px"
+          borderColor="gray.700"
+          color={selected ? 'white' : 'gray.400'}
+          _hover={{ bg: 'gray.800' }}
+          _active={{ bg: 'gray.800' }}
+        >
+          {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent bg="gray.900" borderColor="gray.700" color="white" w="280px" zIndex={20}>
+        <PopoverBody>
+          <Flex align="center" justify="space-between" mb={2}>
+            <Button size="sm" variant="ghost" color="white" fontSize="xl" lineHeight="1" aria-label="Previous month" _hover={{ bg: 'gray.700' }} onClick={() => setVisible(new Date(year, month - 1, 1))}>‹</Button>
+            <Text fontSize="sm">{visible.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
+            <Button size="sm" variant="ghost" color="white" fontSize="xl" lineHeight="1" aria-label="Next month" _hover={{ bg: 'gray.700' }} onClick={() => setVisible(new Date(year, month + 1, 1))}>›</Button>
+          </Flex>
+          <Box display="grid" gridTemplateColumns="repeat(7, 1fr)" gap={1}>
+            {Array.from({ length: 7 }, (_, index) => (
+              <Text key={index} fontSize="xs" color="gray.500" textAlign="center">
+                {new Date(2024, 0, index + 1).toLocaleDateString(undefined, { weekday: 'narrow' })}
+              </Text>
+            ))}
+            {cells.map((date, index) => date ? (
+              <Button
+                key={toIsoDate(date)}
+                size="sm"
+                h="32px"
+                minW="0"
+                px={0}
+                color="white"
+                variant={value === toIsoDate(date) ? 'solid' : 'ghost'}
+                colorScheme={value === toIsoDate(date) ? 'red' : undefined}
+                _hover={{ bg: value === toIsoDate(date) ? 'red.600' : 'gray.700' }}
+                onClick={() => {
+                  onChange(toIsoDate(date))
+                  setOpen(false)
+                }}
+              >
+                {date.getDate()}
+              </Button>
+            ) : <Box key={`empty-${index}`} />)}
+          </Box>
+        </PopoverBody>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 function pageAddress(value: string) {
@@ -90,6 +188,7 @@ function fromApi(series: Record<string, unknown>): SeriesDraft {
     logoUrl: String(series.logoUrl || ''),
     rules: orderedRules(rules),
     carousel: Boolean(series.carousel),
+    icon: seriesMenuIconId(series.icon),
     pointsNote: String(series.pointsNote || ''),
     pointsRows: Array.isArray(series.pointsRows) ? (series.pointsRows as PointsRow[]) : [],
     leagueUrl: String(series.leagueUrl || ''),
@@ -460,6 +559,11 @@ export default function EventSeriesAdminPage() {
             <Text color="white">Show in the menu</Text>
           </Flex>
           <Text color="gray.500" fontSize="sm" mt={-2}>The page address works as soon as the series is saved. This adds it to the menu.</Text>
+          <Field label="Menu icon" hint="Shown next to the name when the series is in the menu.">
+            <Flex gap={2} wrap="wrap">
+              <SeriesIconChoices value={draft.icon} onChange={(icon) => patch({ icon })} />
+            </Flex>
+          </Field>
           <Flex align="center" gap={3}>
             <Switch colorScheme="red" isChecked={draft.carousel} onChange={(e) => patch({ carousel: e.target.checked })} />
             <Text color="white">Carousel</Text>
@@ -571,7 +675,7 @@ export default function EventSeriesAdminPage() {
 
           {draft.kind === 'weekly' ? (
             <Field label="First race" hint="The rotation starts on this date and repeats every seven days.">
-              <Input type="date" value={draft.anchorDate} onChange={(e) => patch({ anchorDate: e.target.value })} {...field} />
+              <DateField value={draft.anchorDate} onChange={(anchorDate) => patch({ anchorDate })} />
             </Field>
           ) : (
             <Stack spacing={3}>
@@ -584,9 +688,9 @@ export default function EventSeriesAdminPage() {
                 </Text>
               )}
               {draft.races.map((race, index) => (
-                <Box key={`${race.date}-${index}`} borderWidth="1px" borderColor="gray.700" borderRadius="md" p={3}>
+                <Box key={index} borderWidth="1px" borderColor="gray.700" borderRadius="md" p={3}>
                   <Flex gap={2} wrap="wrap">
-                    <Input type="date" value={race.date} onChange={(e) => updateRace(index, { date: e.target.value })} {...field} />
+                    <DateField value={race.date} onChange={(date) => updateRace(index, { date })} />
                     <Select value={race.route} onChange={(e) => updateRace(index, { route: e.target.value })} {...field}>
                       <option value="">Route</option>
                       {routeChoices(race.route).map((route) => (

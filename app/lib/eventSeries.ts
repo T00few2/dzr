@@ -10,6 +10,7 @@ import { courseLength, addDays, displayDate, parseIsoDate, routeForDate } from '
 import { zwiftInsiderUrl } from '@/packages/shared/routeProfile'
 import type { CatalogRoute } from '@/app/lib/catalogRoute'
 import { eventIdFromInput, type ZwiftEventSummary } from '@/packages/shared/zwiftEvents'
+import { seriesMenuIconId } from '@/app/lib/seriesMenuIcons'
 
 const COLLECTION = 'event_series'
 const LOGO_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || 'dzr-member-site-media'
@@ -40,6 +41,7 @@ export type EventSeries = {
   logoUrl: string
   rules: string[]
   carousel: boolean
+  icon: string
   pointsNote: string
   pointsRows: PointsRow[]
   leagueUrl: string
@@ -172,6 +174,7 @@ function asStored(id: string, data: Record<string, unknown> | undefined): Stored
     logoUrl: String(data.logoUrl || ''),
     rules: textList(data.rules),
     carousel: Boolean(data.carousel),
+    icon: seriesMenuIconId(data.icon),
     pointsNote: String(data.pointsNote || ''),
     pointsRows: pointsRows(data.pointsRows),
     leagueUrl: String(data.leagueUrl || '').trim(),
@@ -244,6 +247,7 @@ export async function saveEventSeries(
     logoUrl: String(input.logoUrl || existing?.logoUrl || ''),
     rules: textList(input.rules),
     carousel: Boolean(input.carousel),
+    icon: seriesMenuIconId(input.icon),
     pointsNote: String(input.pointsNote || ''),
     pointsRows: pointsRows(input.pointsRows),
     leagueUrl: String(input.leagueUrl || '').trim(),
@@ -361,7 +365,7 @@ export async function listPublishedSeries() {
   return snap.docs
     .map((doc) => asStored(doc.id, doc.data()))
     .filter((row): row is StoredSeries => Boolean(row))
-    .map((row) => ({ slug: row.slug, name: row.name }))
+    .map((row) => ({ slug: row.slug, name: row.name, icon: row.icon }))
     .sort((left, right) => left.name.localeCompare(right.name))
 }
 
