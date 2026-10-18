@@ -401,6 +401,10 @@ function pointsIn(profile: RaceProfile, fromKm: number, toKm: number) {
     .filter((point) => point.distance >= fromKm - 0.05 && point.distance <= toKm + 0.05)
 }
 
+function zoomHasChart(profile: RaceProfile, zoom: ProfileZoom) {
+  return Boolean(zoom.matched) && pointsIn(profile, zoom.fromKm, zoom.toKm).length >= 2
+}
+
 function segmentsIn(segments: ProfileSegment[], fromKm: number, toKm: number, bonusLabels: Map<string, string>) {
   return segments.filter(
     (segment) =>
@@ -704,20 +708,32 @@ export function RouteProfilePreview({
     const zoom = profile.finish
     finishSlide = <ZoomBlock key={`${zoom.title}-finish`} profile={profile} zoom={zoom} />
   }
+  const climbSlides = profile && showClimbs
+    ? profile.climbs.map((climb) => ({
+        chart: zoomHasChart(profile, climb),
+        node: <ZoomBlock key={`${climb.title}-${climb.fromKm}`} profile={profile} zoom={climb} climb />,
+      }))
+    : []
   const zooms = profile && profile.distanceKm.length > 1
     ? [
         ...(finishSlide ? [finishSlide] : []),
-        ...(showClimbs ? profile.climbs.map((climb) => (
-          <ZoomBlock key={`${climb.title}-${climb.fromKm}`} profile={profile} zoom={climb} climb />
-        )) : []),
+        ...climbSlides.map((slide) => slide.node),
       ]
     : []
   const slides = [overview, ...zooms].filter(Boolean)
+  const carouselSlides = [
+    overview,
+    ...(profile && showFinish && profile.finish && zoomHasChart(profile, profile.finish) ? [finishSlide] : []),
+    ...climbSlides.filter((slide) => slide.chart).map((slide) => slide.node),
+  ].filter(Boolean)
+  const shown = carousel
+    ? (carouselSlides.length > 1 ? <SlideCarousel slides={carouselSlides} /> : carouselSlides)
+    : slides
   return (
     <Stack spacing={4}>
       {loading ? <Text color="gray.400">Loading profile…</Text> : null}
       {error ? <Text color="red.300">{error}</Text> : null}
-      {carousel && slides.length > 1 ? <SlideCarousel slides={slides} /> : slides}
+      {shown}
     </Stack>
   )
 }
