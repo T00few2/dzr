@@ -130,12 +130,15 @@ export default function RouteSetupPage() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const fillLaps = useRef(false)
+  const catalogRequest = useRef(0)
 
   const worldSlug = slugifyZwiftName(draft.world)
   const worldRoutes = worlds.find((item) => item.world === worldSlug)?.routes || []
 
   async function load(nextSeries = series) {
+    const ticket = ++catalogRequest.current
     const res = await fetch(`/api/admin/events/catalog?series=${nextSeries}`, { cache: 'no-store' })
+    if (ticket !== catalogRequest.current) return
     if (!res.ok) {
       setError(await errorMessage(res))
       return
@@ -446,9 +449,16 @@ export default function RouteSetupPage() {
   return (
     <AdminShell title="Route setup">
       <Text color="gray.400" mb={4}>
-        These routes live in Firebase and drive the weekly rotation. The files in the site were copied in as the
-        starting list. Profile images still come from the site files, named from the route.{' '}
-        <Link href="/admin/events">Back to events</Link>
+        {series === 'after-party' || series === 'zwifty-fifty'
+          ? 'These routes live in Firebase and drive the weekly rotation. The files in the site were copied in as the starting list. Profile images still come from the site files, named from the route.'
+          : 'Add the routes for this series in the order a weekly series should rotate. The public page draws the course from the route you pick here.'}{' '}
+        <Link href="/admin/events" style={{ color: '#F6AD55' }}>Back to events</Link>
+        {series !== 'after-party' && series !== 'zwifty-fifty' ? (
+          <>
+            {' · '}
+            <Link href="/admin/events/series" style={{ color: '#F6AD55' }}>Back to series</Link>
+          </>
+        ) : null}
       </Text>
       <Flex gap={2} mb={6}>
         <Button

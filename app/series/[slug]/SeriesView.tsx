@@ -54,9 +54,9 @@ function todayIso() {
   }).format(new Date())
 }
 
-function RaceLinks({ starts }: { starts: RaceStart[] }) {
+function RaceLinks({ starts, quiet = false }: { starts: RaceStart[]; quiet?: boolean }) {
   const linked = starts.filter((start) => start.eventId)
-  if (!linked.length) return <Text color="white">Zwift event not published yet</Text>
+  if (!linked.length) return <Text color={quiet ? 'gray.400' : 'white'}>{quiet ? '—' : 'Zwift event not published yet'}</Text>
   return (
     <Stack spacing={1}>
       {linked.map((start) => (
@@ -141,7 +141,7 @@ export default function SeriesView({ series }: { series: SeriesPageData }) {
   return (
     <Container maxW={{ base: '90%', md: '5xl' }} py={0} mb={20}>
       <Stack spacing={6}>
-        {series.logoUrl ? <Image src={series.logoUrl} alt="" maxH="220px" objectFit="contain" /> : null}
+        {series.logoUrl ? <Image src={series.logoUrl} alt={`${series.name} logo`} maxH="220px" objectFit="contain" /> : null}
         <Heading color="white">{series.name}</Heading>
         {series.intro ? (
           <Text color="white" whiteSpace="pre-line">
@@ -155,6 +155,30 @@ export default function SeriesView({ series }: { series: SeriesPageData }) {
               <ListItem key={rule}>{rule}</ListItem>
             ))}
           </List>
+        ) : null}
+        {series.kind === 'weekly' && series.schedule.length ? (
+          <TableContainer>
+            <Table size="sm" color="white">
+              <Thead>
+                <Tr>
+                  <Th color="white">Date</Th>
+                  <Th color="white">Route</Th>
+                  <Th color="white">Zwift</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {series.schedule.map((race) => (
+                  <Tr key={race.date}>
+                    <Td>{race.label || race.date}</Td>
+                    <Td>{race.routeName}</Td>
+                    <Td>
+                      <RaceLinks starts={race.starts} quiet />
+                    </Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
+          </TableContainer>
         ) : null}
         {series.kind === 'limited' ? (
           <TableContainer>
@@ -188,7 +212,7 @@ export default function SeriesView({ series }: { series: SeriesPageData }) {
                     <Td>{race.route?.distance || ''}</Td>
                     <Td>{race.route?.elevation || ''}</Td>
                     <Td>
-                      <RaceLinks starts={race.starts} />
+                      <RaceLinks starts={race.starts} quiet />
                     </Td>
                   </Tr>
                 ))}
@@ -205,9 +229,9 @@ export default function SeriesView({ series }: { series: SeriesPageData }) {
             <RaceProfile route={next.route} />
           </Stack>
         ) : (
-          <Text color="gray.400">The next route has not been set.</Text>
+          <Text color="gray.400">Add a route in the series setup to show the course here.</Text>
         )}
-        {series.pointsRows.length ? (
+        {series.pointsRows.length || series.pointsNote || series.leagueUrl ? (
           <Stack spacing={2}>
             <Heading size="md" color="white">Points</Heading>
             {series.pointsNote ? <Text color="white">{series.pointsNote}</Text> : null}

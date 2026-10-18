@@ -11,6 +11,8 @@ import type { CatalogRoute } from '@/app/lib/catalogRoute'
 import type { ZwiftEventSummary } from '@/packages/shared/zwiftEvents'
 
 const COLLECTION = 'event_series'
+const LOGO_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || 'dzr-member-site-media'
+const LOGO_EXTENSIONS = ['png', 'jpg', 'webp'] as const
 
 export type SeriesKind = 'weekly' | 'limited'
 
@@ -130,13 +132,13 @@ function startsOf(value: unknown): RaceStart[] {
 
 function racesOf(value: unknown): SeriesRace[] {
   if (!Array.isArray(value)) return []
-  return value.flatMap((item) => {
-    if (!item || typeof item !== 'object') return []
+  return value.map((item) => {
+    if (!item || typeof item !== 'object') throw new SeriesError('Every race needs a date and a route')
     const row = item as { date?: unknown; route?: unknown; label?: unknown; match?: unknown; starts?: unknown }
     const date = parseIsoDate(row.date)
     const route = String(row.route || '').trim()
-    if (!date || !route) return []
-    return [{ date, route, label: String(row.label || '').trim(), match: String(row.match || '').trim(), starts: startsOf(row.starts) }]
+    if (!date || !route) throw new SeriesError('Every race needs a date and a route')
+    return { date, route, label: String(row.label || '').trim(), match: String(row.match || '').trim(), starts: startsOf(row.starts) }
   })
 }
 
@@ -251,22 +253,62 @@ export async function saveEventSeries(
   return withoutWebhook(stored)
 }
 
+function logoExtension(contentType: string) {
+  if (contentType === 'image/png') return 'png'
+  if (contentType === 'image/webp') return 'webp'
+  return 'jpg'
+}
+
+function storageError(error: unknown): never {
+  const raw = error instanceof Error ? error.message : ''
+  if (raw.includes('bucket does not exist') || raw.includes('notFound')) {
+    throw new SeriesError('Logo storage is not available', 502)
+  }
+  throw new SeriesError('Could not store the logo', 502)
+}
+
 export async function saveSeriesLogo(slug: string, bytes: Buffer, contentType: string) {
   const series = await readStored(slug)
   if (!series) throw new SeriesError('Save the series before adding a logo', 404)
-  const token = randomUUID()
-  const extension = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg'
+  const extension = logoExtension(contentType)
   const path = `event-series/${series.slug}/logo.${extension}`
-  const file = admin.storage().bucket().file(path)
-  await file.save(bytes, {
-    metadata: {
-      contentType,
-      metadata: { firebaseStorageDownloadTokens: token },
-    },
-  })
-  const logoUrl = `https://firebasestorage.googleapis.com/v0/b/${file.bucket.name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`
+  const bucket = admin.storage().bucket(LOGO_BUCKET)
+  try {
+    await bucket.file(path).save(bytes, {
+      metadata: { contentType, cacheControl: 'public, max-age=86400' },
+    })
+    await Promise.all(
+      LOGO_EXTENSIONS.filter((item) => item !== extension).map((item) =>
+        bucket.file(`event-series/${series.slug}/logo.${item}`).delete({ ignoreNotFound: true })
+      )
+    )
+  } catch (error) {
+    storageError(error)
+  }
+  const logoUrl = `/api/series/${series.slug}/logo?v=${randomUUID()}`
   await refFor(series.slug).update({ logoUrl })
   return logoUrl
+}
+
+export async function readSeriesLogo(slug: string) {
+  const series = await readStored(slug)
+  if (!series?.logoUrl) return null
+  const bucket = admin.storage().bucket(LOGO_BUCKET)
+  let chosen: { path: string; updated: string } | null = null
+  for (const extension of LOGO_EXTENSIONS) {
+    const path = `event-series/${series.slug}/logo.${extension}`
+    const file = bucket.file(path)
+    const [exists] = await file.exists()
+    if (!exists) continue
+    const [meta] = await file.getMetadata()
+    const updated = String(meta.updated || '')
+    if (!chosen || updated > chosen.updated) chosen = { path, updated }
+  }
+  if (!chosen) return null
+  const file = bucket.file(chosen.path)
+  const [bytes] = await file.download()
+  const [meta] = await file.getMetadata()
+  return { bytes, contentType: String(meta.contentType || 'image/png') }
 }
 
 function catalogByName(routes: CatalogRoute[], name: string) {
@@ -426,7 +468,12 @@ async function postEventDiscord(series: StoredSeries, route: CatalogRoute, date:
   if (passes) lines.push(`**Race pass:** ${passes}`)
   lines.push(`**More information:** https://www.dzrracingseries.com/series/${series.slug}`)
   const body: { content: string; embeds?: { image: { url: string } }[] } = { content: lines.join('\n') }
-  if (series.logoUrl.startsWith('https://')) body.embeds = [{ image: { url: series.logoUrl } }]
+  const logo = series.logoUrl.startsWith('https://')
+    ? series.logoUrl
+    : series.logoUrl.startsWith('/')
+      ? `https://www.dzrracingseries.com${series.logoUrl}`
+      : ''
+  if (logo) body.embeds = [{ image: { url: logo } }]
   await axios.post(series.discordWebhook, body)
 }
 
