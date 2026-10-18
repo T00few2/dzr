@@ -103,7 +103,7 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
       })
       .catch(() => setPublished([]))
   }, [])
-  const links = [
+  const links: LinkItemProps[] = [
     ...LinkItems,
     ...published.map((series) => ({
       name: series.name,
