@@ -142,8 +142,22 @@ export async function groupRideView(now = new Date()): Promise<GroupRideView> {
   const dates = stored.anchorDate && names.length ? listSeriesDates(stored.anchorDate, Object.keys(stored.events), 6) : []
   const rows = await Promise.all(
     dates.map(async (date) => {
+      const saved = stored.events[date]
       const planned = plannedRoute(names, stored, date)
       const natural = naturalRoute(names, stored, date)
+      if (saved) {
+        return {
+          date,
+          label: displayDate(date),
+          routeA: saved.routeA || planned,
+          overridden: false,
+          routeB: saved.routeB,
+          routeBUrl: '',
+          routeBWarning: '',
+          eventId: saved.id,
+          feedEventId: null,
+        }
+      }
       let routeB = ''
       let routeBUrl = ''
       let routeBWarning = ''
@@ -164,7 +178,7 @@ export async function groupRideView(now = new Date()): Promise<GroupRideView> {
         routeB,
         routeBUrl,
         routeBWarning,
-        eventId: stored.events[date]?.id || '',
+        eventId: '',
         feedEventId: hits.length === 1 ? hits[0].id : null,
       }
     })
