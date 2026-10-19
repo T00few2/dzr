@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'crypto'
 import { NextResponse } from 'next/server'
 import { runDueRouteUpdates } from '@/app/lib/seriesApply'
+import { runDueGroupRide } from '@/app/lib/groupRide'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,5 +17,6 @@ function authorized(req: Request) {
 export async function POST(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const jobs = await runDueRouteUpdates()
-  return NextResponse.json({ jobs })
+  const ride = await runDueGroupRide()
+  return NextResponse.json({ jobs: [...jobs, ride] })
 }

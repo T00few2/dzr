@@ -212,8 +212,10 @@ function jobErrorMessage(error) {
 
 function routeDm(job) {
   if (job?.status === "applied") {
+    const text = `${job.name} route updated: ${job.label || job.date}, ${job.route}.`;
+    if (job.channelPost === false) return text;
     const post = job.discordError ? `Discord post failed: ${job.discordError}` : "Discord post sent.";
-    return `${job.name} route updated: ${job.label || job.date}, ${job.route}. ${post}`;
+    return `${text} ${post}`;
   }
   if (job?.status === "error") return `${job.name || "Weekly series"} route update failed: ${job.message || "Route update failed"}`;
   return "";

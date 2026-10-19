@@ -8,7 +8,6 @@ import {
   Button,
   Flex,
   Heading,
-  Input,
   Select,
   Stack,
   Table,
@@ -19,8 +18,8 @@ import {
   Thead,
   Tr,
 } from '@chakra-ui/react'
-import type { ZwiftEventSummary } from '@/packages/shared/zwiftEvents'
 import { FiftyDetail, FiftyStatus, type FiftyPanel, type SavedEvent } from '@/app/admin/events/FiftyResults'
+import GroupRide from '@/app/admin/events/GroupRide'
 
 type SeriesDate = {
   date: string
@@ -43,34 +42,6 @@ type SeriesView = {
   automation?: string[]
 }
 
-type RouteHit = { routeId: number; name: string; world: string | null }
-
-type InspectedSubgroup = {
-  id: number | null
-  label: string | null
-  routeId: number | null
-  routeName: string | null
-}
-
-type InspectedEvent = {
-  id: number
-  name: string | null
-  subgroups: InspectedSubgroup[]
-}
-
-type CategoryPick = {
-  query: string
-  results: RouteHit[]
-  picked: RouteHit | null
-}
-
-type WeekRoute = {
-  name: string
-  url: string
-  route: RouteHit | null
-  warning: string
-}
-
 const readableOutline = {
   variant: 'outline' as const,
   color: 'white',
@@ -81,230 +52,6 @@ const readableOutline = {
 async function errorMessage(res: Response) {
   const body = await res.json().catch(() => ({}))
   return String(body?.error || body?.message || `Request failed (${res.status})`)
-}
-
-function GroupRide({ upcoming, feedDown }: { upcoming: ZwiftEventSummary[]; feedDown: boolean }) {
-  const rides = upcoming.filter((event) => /always a race/i.test(event.name))
-  const [event, setEvent] = useState<InspectedEvent | null>(null)
-  const [rideDate, setRideDate] = useState('')
-  const [week, setWeek] = useState<WeekRoute | null>(null)
-  const [picks, setPicks] = useState<Record<string, CategoryPick>>({})
-  const [busy, setBusy] = useState('')
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-
-  async function openRide(id: number, eventDate: string, keepNotice = false) {
-    setBusy('load')
-    setError('')
-    setWeek(null)
-    if (!keepNotice) setNotice('')
-    const res = await fetch(`/api/admin/events/${id}`)
-    if (!res.ok) {
-      setBusy('')
-      setEvent(null)
-      setError(await errorMessage(res))
-      return
-    }
-    const body = (await res.json()) as InspectedEvent
-    setEvent(body)
-    setRideDate(eventDate)
-    const next: Record<string, CategoryPick> = {}
-    for (const subgroup of body.subgroups || []) {
-      if (subgroup.id == null) continue
-      next[String(subgroup.id)] = { query: '', results: [], picked: null }
-    }
-    if (eventDate) {
-      const weekRes = await fetch(`/api/admin/events/route-of-the-week?date=${encodeURIComponent(eventDate)}`)
-      if (weekRes.ok) {
-        const listed = (await weekRes.json()) as WeekRoute
-        setWeek(listed)
-        if (listed.route) {
-          for (const subgroup of body.subgroups || []) {
-            if (subgroup.id == null || String(subgroup.label || '').trim().toUpperCase() !== 'B') continue
-            next[String(subgroup.id)] = {
-              query: listed.route.name,
-              results: [listed.route],
-              picked: listed.route,
-            }
-          }
-        }
-      } else {
-        setError(await errorMessage(weekRes))
-      }
-    }
-    setPicks(next)
-    setBusy('')
-  }
-
-  function updatePick(id: string, patch: Partial<CategoryPick>) {
-    setPicks((current) => ({ ...current, [id]: { ...current[id], ...patch } }))
-  }
-
-  async function search(id: string, query: string) {
-    const q = query.trim()
-    if (q.length < 2 && !/^\d+$/.test(q)) {
-      setError('Enter a route name, or a route id')
-      return
-    }
-    setBusy(`search-${id}`)
-    setError('')
-    const res = await fetch(`/api/admin/events/routes?q=${encodeURIComponent(q)}`)
-    setBusy('')
-    if (!res.ok) {
-      updatePick(id, { results: [] })
-      setError(await errorMessage(res))
-      return
-    }
-    const body = await res.json()
-    updatePick(id, { results: Array.isArray(body) ? body : [] })
-  }
-
-  async function apply() {
-    if (!event) return
-    const categories = event.subgroups.filter((subgroup) => subgroup.id != null)
-    const subgroupRoutes = categories.map((subgroup) => {
-      const picked = picks[String(subgroup.id)]?.picked
-      return picked ? { id: subgroup.id, routeId: picked.routeId, name: picked.name, label: subgroup.label } : null
-    })
-    if (subgroupRoutes.some((row) => !row)) {
-      setError('Pick a route for every category')
-      return
-    }
-    const chosen = subgroupRoutes.filter((row): row is NonNullable<typeof row> => Boolean(row))
-    const summary = chosen.map((row) => `${row.label || row.id}: ${row.name}`).join(', ')
-    if (!window.confirm(`Update ${event.name || 'this ride'} to ${summary}?`)) return
-    setBusy('apply')
-    setError('')
-    setNotice('')
-    const res = await fetch(`/api/admin/events/${event.id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'course',
-        subgroupRoutes: chosen.map((row) => ({ id: row.id, routeId: row.routeId })),
-      }),
-    })
-    if (!res.ok) {
-      setBusy('')
-      setError(await errorMessage(res))
-      return
-    }
-    await openRide(event.id, rideDate, true)
-    setNotice('Saved. Category routes reloaded.')
-    setBusy('')
-  }
-
-  return (
-    <Box borderWidth="1px" borderColor="gray.700" rounded="md" p={4}>
-      <Heading size="sm" mb={3}>
-        It&apos;s always a race
-      </Heading>
-      <Text color="gray.400" mb={4}>
-        Category B is the route of the week. Pick category A, then Apply.
-      </Text>
-      {feedDown ? <Text color="orange.300">The public event list is unavailable right now.</Text> : null}
-      {!feedDown && rides.length === 0 ? (
-        <Text color="gray.500">Zwift has not created the next It&apos;s always a race event yet.</Text>
-      ) : null}
-      <Stack spacing={2} mb={rides.length ? 4 : 0}>
-        {rides.map((ride) => (
-          <Button
-            key={ride.id}
-            {...readableOutline}
-            justifyContent="space-between"
-            borderColor={event?.id === ride.id ? 'red.400' : 'whiteAlpha.600'}
-            onClick={() => void openRide(ride.id, ride.eventDate)}
-            isLoading={busy === 'load'}
-          >
-            <Text as="span">{ride.name}</Text>
-            <Text as="span" color="gray.400" fontWeight="normal">
-              {ride.eventDate} · {ride.id}
-            </Text>
-          </Button>
-        ))}
-      </Stack>
-      {error ? (
-        <Text color="red.300" mb={3}>
-          {error}
-        </Text>
-      ) : null}
-      {notice ? (
-        <Text color="green.300" mb={3}>
-          {notice}
-        </Text>
-      ) : null}
-      {event ? (
-        <Stack spacing={4}>
-          {week ? (
-            <Text color="gray.300">
-              Route of the week: {week.name}.{' '}
-              <a href={week.url} target="_blank" rel="noreferrer">
-                Zwift Insider
-              </a>
-              {week.warning ? ` ${week.warning}` : ''}
-            </Text>
-          ) : null}
-          {event.subgroups.map((subgroup) => {
-            const id = String(subgroup.id)
-            const pick = picks[id]
-            if (!pick || subgroup.id == null) return null
-            return (
-              <Box key={id}>
-                <Text fontWeight="bold" mb={2}>
-                  {subgroup.label || 'Category'}
-                  {subgroup.routeName ? ` · now ${subgroup.routeName}` : ''}
-                </Text>
-                <Flex gap={2} mb={2} wrap="wrap">
-                  <Input
-                    value={pick.query}
-                    onChange={(e) => updatePick(id, { query: e.target.value })}
-                    placeholder="Route name or id"
-                    bg="gray.900"
-                    borderColor="gray.700"
-                  />
-                  <Button
-                    type="button"
-                    {...readableOutline}
-                    isLoading={busy === `search-${id}`}
-                    onClick={() => void search(id, pick.query)}
-                  >
-                    Search
-                  </Button>
-                </Flex>
-                {pick.picked ? (
-                  <Text mb={2}>
-                    Selected: {pick.picked.name} ({pick.picked.routeId}
-                    {pick.picked.world ? `, ${pick.picked.world}` : ''})
-                  </Text>
-                ) : null}
-                <Stack spacing={1}>
-                  {pick.results.map((route) => (
-                    <Button
-                      key={route.routeId}
-                      type="button"
-                      size="sm"
-                      justifyContent="flex-start"
-                      color="white"
-                      variant={pick.picked?.routeId === route.routeId ? 'solid' : 'ghost'}
-                      colorScheme={pick.picked?.routeId === route.routeId ? 'red' : undefined}
-                      _hover={{ bg: 'whiteAlpha.200' }}
-                      onClick={() => updatePick(id, { picked: route })}
-                    >
-                      {route.name} · {route.routeId}
-                      {route.world ? ` · ${route.world}` : ''}
-                    </Button>
-                  ))}
-                </Stack>
-              </Box>
-            )
-          })}
-          <Button type="button" colorScheme="red" isLoading={busy === 'apply'} alignSelf="flex-start" onClick={() => void apply()}>
-            Apply
-          </Button>
-        </Stack>
-      ) : null}
-    </Box>
-  )
 }
 
 type SeriesMessage = { error: string; notice: string }
@@ -358,13 +105,7 @@ function scheduleRows(dates: SeriesDate[], saved: SavedEvent[]): ScheduleRow[] {
   ]
 }
 
-export default function WeeklySeries({
-  upcoming,
-  feedDown,
-}: {
-  upcoming: ZwiftEventSummary[]
-  feedDown: boolean
-}) {
+export default function WeeklySeries() {
   const [series, setSeries] = useState<SeriesView[]>([])
   const [savedBySeries, setSavedBySeries] = useState<Record<string, SavedEvent[]>>({})
   const [loadError, setLoadError] = useState('')
@@ -638,7 +379,7 @@ export default function WeeklySeries({
           </Box>
         )
       })}
-      <GroupRide upcoming={upcoming} feedDown={feedDown} />
+      <GroupRide />
     </Stack>
   )
 }

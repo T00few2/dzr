@@ -307,7 +307,7 @@ export default function AdminEventsPage() {
         Upcoming DZR events, plus any event id the organizer account can read. Edits are saved on Zwift.
       </Text>
 
-      <WeeklySeries upcoming={upcoming} feedDown={feedDown} />
+      <WeeklySeries />
 
       <Heading size="md" mb={1}>
         Inspect an event
