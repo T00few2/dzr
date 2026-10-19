@@ -17,13 +17,14 @@ import {
   YAxis,
 } from 'recharts'
 import { CHART_HEIGHT } from './ChartCard'
-import type { DailyActivity, MemberPoint } from './types'
+import type { MemberPoint } from '@/app/lib/statsTypes'
+import type { ActivityPoint, ChartPoint } from '@/app/lib/statsSeries'
 
-export type GrowthChartPoint = {
-  day: string
+export type GrowthChartPoint = ChartPoint<{
+  date: string
   zwift: number | null
   zwiftpower: number | null
-}
+}>
 
 export const CHART_COLORS = {
   club: '#FC8181',
@@ -41,7 +42,7 @@ export const CHART_COLORS = {
 function fmtTick(iso: string) {
   const parts = String(iso || '').split('-')
   if (parts.length !== 3) return iso
-  return `${parts[2]}/${parts[1]}`
+  return `${parts[2]}/${parts[1]}/${parts[0].slice(2)}`
 }
 
 function DarkTooltip({
@@ -55,9 +56,11 @@ function DarkTooltip({
 }) {
   if (!active || !payload?.length) return null
   const estimated = payload[0]?.payload?.estimated
+  const point = payload[0]?.payload
+  const dateLabel = point?.weekStart && point?.weekEnd ? `${point.weekStart} – ${point.weekEnd}` : label
   return (
     <Box bg="gray.800" borderWidth="1px" borderColor="gray.600" rounded="md" px={3} py={2} fontSize="sm">
-      <Text color="gray.300" mb={1}>{label}{estimated ? ' · estimated' : ''}</Text>
+      <Text color="gray.300" mb={1}>{dateLabel}{estimated ? ' · estimated' : ''}</Text>
       {payload.filter((p) => p.value != null).map((p) => (
         <Text key={p.name} color={p.color || 'white'}>
           {p.name}: {Number(p.value || 0).toLocaleString()}
@@ -79,7 +82,7 @@ export function GrowthChart({ data }: { data: GrowthChartPoint[] }) {
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
-          <XAxis dataKey="day" tickFormatter={fmtTick} minTickGap={48} {...axis} />
+          <XAxis dataKey="date" tickFormatter={fmtTick} minTickGap={48} {...axis} />
           <YAxis width={44} tickFormatter={(v) => Number(v).toLocaleString()} {...axis} />
           <Tooltip content={<DarkTooltip />} />
           {hasZp ? <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} /> : null}
@@ -109,7 +112,7 @@ export function GrowthChart({ data }: { data: GrowthChartPoint[] }) {
   )
 }
 
-export function MembersChart({ data }: { data: MemberPoint[] }) {
+export function MembersChart({ data }: { data: ChartPoint<MemberPoint>[] }) {
   const hasClubRole = data.some((d) => d.clubMembers != null)
   return (
     <Box h={`${CHART_HEIGHT}px`}>
@@ -145,7 +148,7 @@ export function MembersChart({ data }: { data: MemberPoint[] }) {
   )
 }
 
-export function ActivityChart({ data }: { data: DailyActivity[] }) {
+export function ActivityChart({ data }: { data: ActivityPoint[] }) {
   return (
     <Box h={`${CHART_HEIGHT}px`}>
       <ResponsiveContainer width="100%" height="100%">

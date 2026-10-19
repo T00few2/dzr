@@ -1,3 +1,6 @@
+import type { PeriodWindow } from './statsPeriods'
+import type { ActivityPoint } from './statsSeries'
+
 export type GrowthSeriesPoint = {
   day: string
   added: number
@@ -14,15 +17,6 @@ export type GrowthResponse = {
     estimated?: boolean
     series: { day: string; cumulative: number }[]
   }
-}
-
-export type DailyActivity = {
-  date: string
-  messages: number
-  reactions: number
-  voice: number
-  interactions: number
-  total: number
 }
 
 export type TopUser = {
@@ -52,7 +46,7 @@ export type MemberPoint = {
 }
 
 export type StatsResponse = {
-    period: { days: number | 'all'; start: string; end: string }
+  period: PeriodWindow
   totals: {
     messages: number
     reactions: number
@@ -63,7 +57,7 @@ export type StatsResponse = {
     daysWithActivity: number
     avgDailyMessages: number
   }
-  daily: DailyActivity[]
+  activity: ActivityPoint[]
   topUsers: TopUser[]
   topChannels: TopChannel[]
   members: {
@@ -71,5 +65,3 @@ export type StatsResponse = {
     latest: MemberPoint | null
   }
 }
-
-export type PeriodDays = 7 | 30 | 90 | 'all'
