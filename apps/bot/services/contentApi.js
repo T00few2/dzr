@@ -197,11 +197,30 @@ async function refreshZwiftPowerRoster() {
 }
 
 /**
- * Move WKG Zwifty Fifty finishers to their Unfiltered pen, once a race is a couple of hours old.
+ * Move WKG Zwifty Fifty finishers from 1.5 to 4 hours after the start, and set sprints about a day after Apply.
  */
 async function fixDueFiftyResults() {
   const response = await axios.post(`${API_BASE_URL}/api/zwiftpower/results/fix-due`, {}, {
     headers: { Authorization: `Bearer ${API_KEY}` }
+  });
+  return response.data;
+}
+
+/**
+ * Apply the next After Party or Zwifty Fifty route once Zwift has created the event.
+ * The site decides whether a series is due.
+ */
+async function applyDueWeeklySeries() {
+  const secret = String(process.env.WEEKLY_SERIES_CRON_SECRET || "").trim();
+  if (!secret) {
+    const error = new Error("WEEKLY_SERIES_CRON_SECRET is not set");
+    error.code = "missing_cron_secret";
+    throw error;
+  }
+  const site = String(process.env.DZR_SITE_URL || "https://www.dzrracingseries.com").replace(/\/$/, "");
+  const response = await axios.post(`${site}/api/cron/weekly-series`, {}, {
+    headers: { Authorization: `Bearer ${secret}` },
+    timeout: 60000,
   });
   return response.data;
 }
@@ -215,4 +234,5 @@ module.exports = {
   refreshClubRoster,
   refreshZwiftPowerRoster,
   fixDueFiftyResults,
+  applyDueWeeklySeries,
 }; 

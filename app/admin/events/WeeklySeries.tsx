@@ -40,6 +40,7 @@ type SeriesView = {
   error: string
   feedUnavailable: boolean
   primeRoutes?: string[]
+  automation?: string[]
 }
 
 type RouteHit = { routeId: number; name: string; world: string | null }
@@ -480,6 +481,15 @@ export default function WeeklySeries({
             <Heading size="sm" mb={3}>
               {item.name}
             </Heading>
+            {item.automation?.length ? (
+              <Stack spacing={1} mb={3}>
+                {item.automation.map((line, index) => (
+                  <Text key={`${item.id}-${index}`} color="gray.300" fontSize="sm">
+                    {line}
+                  </Text>
+                ))}
+              </Stack>
+            ) : null}
             {item.error ? (
               <Text color="red.300" mb={3}>
                 {item.error}

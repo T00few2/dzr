@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { getDueScheduledMessages, getProbabilitySelectedMessages, markScheduledMessageSent, processMessageContent, refreshClubRoster, refreshZwiftPowerRoster, fixDueFiftyResults } = require("./contentApi");
+const { getDueScheduledMessages, getProbabilitySelectedMessages, markScheduledMessageSent, processMessageContent, refreshClubRoster, refreshZwiftPowerRoster, fixDueFiftyResults, applyDueWeeklySeries } = require("./contentApi");
 const { sweepGuildForNewMembers } = require("./newMemberService");
 const config = require("../config/config");
 const { getBotState, setBotState } = require("./firebase");
@@ -31,7 +31,8 @@ async function checkScheduledMessages(client) {
     // Refresh ZwiftPower club roster once per day (via backend Content API)
     await checkZwiftPowerRosterRefresh();
 
-    await checkFiftyResultsFix();
+    await checkWeeklySeriesApply(client);
+    await checkFiftyResultsFix(client);
 
     // Assign ZwiftPower pace-group roles once per day (add-only)
     await checkZpRoleSync(client);
@@ -178,18 +179,117 @@ async function checkZwiftPowerRosterRefresh() {
   }
 }
 
+function copenhagenClock() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Copenhagen" }));
+}
+
+function onTheHalfHour() {
+  return copenhagenClock().getMinutes() % 30 === 0;
+}
+
+async function dmEventEditor(client, text) {
+  const id = String(process.env.ZWIFT_EVENT_EDITOR_DISCORD_ID || "").trim();
+  if (!id) {
+    console.error("❌ ZWIFT_EVENT_EDITOR_DISCORD_ID is not set");
+    return false;
+  }
+  const user = await client.users.fetch(id);
+  await user.send(text);
+  return true;
+}
+
+async function dmOnce(client, key, text) {
+  const existing = await getBotState(key);
+  if (existing?.message === text) return;
+  const sent = await dmEventEditor(client, text);
+  if (!sent) return;
+  await setBotState(key, { message: text, updatedAt: new Date().toISOString() });
+}
+
+function jobErrorMessage(error) {
+  return error?.response?.data?.error || error?.message || "Request failed";
+}
+
+function routeDm(job) {
+  if (job?.status === "applied") {
+    const post = job.discordError ? `Discord post failed: ${job.discordError}` : "Discord post sent.";
+    return `${job.name} route updated: ${job.label || job.date}, ${job.route}. ${post}`;
+  }
+  if (job?.status === "error") return `${job.name || "Weekly series"} route update failed: ${job.message || "Route update failed"}`;
+  return "";
+}
+
 /**
- * Twice an hour, ask the API to fix a Zwifty Fifty that started a couple of hours ago.
- * The API itself decides whether a race is due, and does nothing the rest of the week.
+ * Twice an hour, apply a weekly route once 24 hours have passed and Zwift has created the event.
+ * A missing event stays quiet.
  */
-async function checkFiftyResultsFix() {
+async function checkWeeklySeriesApply(client) {
   try {
-    const local = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Copenhagen" }));
-    if (local.getMinutes() % 30 !== 0) return;
-    const result = await fixDueFiftyResults();
-    if (result?.checked) console.log("✅ Zwifty Fifty categories checked:", result);
+    if (!onTheHalfHour()) return;
+    const result = await applyDueWeeklySeries();
+    for (const job of result?.jobs || []) {
+      const text = routeDm(job);
+      if (!text) continue;
+      const key = `weekly_route_${job.series || "series"}_${job.date || "none"}`;
+      await dmOnce(client, key, text);
+    }
   } catch (error) {
-    console.error("❌ Error fixing Zwifty Fifty categories:", error?.message || error);
+    const message = jobErrorMessage(error);
+    console.error("❌ Error applying weekly series routes:", message);
+    await dmOnce(client, "weekly_route_error", `Weekly series route update failed: ${message}`).catch((dmError) => {
+      console.error("❌ Could not DM the event editor:", dmError?.message || dmError);
+    });
+  }
+}
+
+function sprintDm(row) {
+  if (!row || row.pending) return "";
+  const unmatched = (row.sprints || []).filter((sprint) => !sprint.matched).map((sprint) => sprint.name).filter(Boolean);
+  if (unmatched.length) return `The Zwifty Fifty sprint setup failed. ZwiftPower has no segment named ${unmatched.join(", ")}.`;
+  if (!row.updated) return "";
+  const count = row.updated.length;
+  return count
+    ? `The Zwifty Fifty sprints were set (${count}).`
+    : "The Zwifty Fifty sprints were checked. No sprints to set.";
+}
+
+function categoryDm(row) {
+  if (!row) return "";
+  if (row.expired && row.pending) return "The Zwifty Fifty categories were not moved. ZwiftPower had no results within 4 hours of the start.";
+  if (row.pending) return "";
+  const moved = Array.isArray(row.updated) ? row.updated.length : (row.changes || []).length;
+  return moved
+    ? `The Zwifty Fifty categories moved ${moved} rider${moved === 1 ? "" : "s"} off WKG.`
+    : "The Zwifty Fifty categories were checked. No WKG riders to move.";
+}
+
+/**
+ * Twice an hour, move WKG finishers from 1.5 to 4 hours after the Fifty starts,
+ * and set sprints about a day after Apply. The API decides whether a race is due.
+ */
+async function checkFiftyResultsFix(client) {
+  try {
+    if (!onTheHalfHour()) return;
+    const result = await fixDueFiftyResults();
+    for (const row of result?.categories?.results || []) {
+      const text = categoryDm(row);
+      if (!text) continue;
+      const key = row.expired ? `weekly_categories_expired_${row.eventId}` : `weekly_categories_${row.eventId}`;
+      await dmOnce(client, key, text);
+    }
+    for (const row of result?.sprints?.results || []) {
+      const text = sprintDm(row);
+      if (!text) continue;
+      const unmatched = (row.sprints || []).some((sprint) => !sprint.matched);
+      const key = unmatched ? `weekly_sprints_mismatch_${row.eventId}` : `weekly_sprints_${row.eventId}`;
+      await dmOnce(client, key, text);
+    }
+  } catch (error) {
+    const message = jobErrorMessage(error);
+    console.error("❌ Error fixing Zwifty Fifty categories:", message);
+    await dmOnce(client, "weekly_fix_due_error", `The Zwifty Fifty ZwiftPower update failed: ${message}`).catch((dmError) => {
+      console.error("❌ Could not DM the event editor:", dmError?.message || dmError);
+    });
   }
 }
 

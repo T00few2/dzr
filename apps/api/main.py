@@ -624,8 +624,15 @@ def _mark_fifty_results_fix(event_id: int, updated: int, skipped: int):
             return
 
 
+def _event_start(inspected: dict) -> datetime:
+    start = datetime.fromisoformat(str(inspected.get("eventStart") or "").replace("Z", "+00:00"))
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    return start
+
+
 def _fix_due_fifty_results() -> dict:
-    """Move WKG finishers for a Fifty that started a couple of hours ago."""
+    """Move WKG finishers from 1.5 hours after the start until 4 hours after."""
     doc = firebase.get_document("series_schedules", "zwifty-fifty") or {}
     events = doc.get("events") or {}
     now = datetime.now(timezone.utc)
@@ -633,6 +640,7 @@ def _fix_due_fifty_results() -> dict:
     today = now.astimezone(copenhagen).date()
     yesterday = today - timedelta(days=1)
     due = []
+    expired = []
     for date, row in events.items():
         if not isinstance(row, dict) or row.get("resultsFix"):
             continue
@@ -645,14 +653,12 @@ def _fix_due_fifty_results() -> dict:
         event_id = str(row.get("id") or "").strip()
         if not event_id.isdigit():
             continue
-        inspected = get_authenticated_organizer_api().inspect_event(int(event_id))
-        start = datetime.fromisoformat(str(inspected.get("eventStart") or "").replace("Z", "+00:00"))
-        if start.tzinfo is None:
-            start = start.replace(tzinfo=timezone.utc)
-        if not (start + timedelta(hours=2) <= now < start + timedelta(hours=12)):
-            continue
-        due.append(int(event_id))
-    if not due:
+        start = _event_start(get_authenticated_organizer_api().inspect_event(int(event_id)))
+        if start + timedelta(minutes=90) <= now < start + timedelta(hours=4):
+            due.append(int(event_id))
+        elif start + timedelta(hours=4) <= now < start + timedelta(hours=12):
+            expired.append(int(event_id))
+    if not due and not expired:
         return {"checked": 0, "results": []}
     zp = get_organizer_zwiftpower()
     results = []
@@ -664,7 +670,11 @@ def _fix_due_fifty_results() -> dict:
         applied = zp.apply_wkg_categories(event_id) if preview.get("changes") else preview
         _mark_fifty_results_fix(event_id, _updated_count(applied), len(applied.get("skipped") or []))
         results.append({"eventId": event_id, **applied})
-    return {"checked": len(due), "results": results}
+    for event_id in expired:
+        preview = zp.wkg_category_preview(event_id)
+        if preview.get("pending"):
+            results.append({"eventId": event_id, "pending": True, "expired": True, "changes": [], "skipped": []})
+    return {"checked": len(due) + len([row for row in results if row.get("expired")]), "results": results}
 
 
 def _prime_points(bonus) -> str:
@@ -757,9 +767,7 @@ def _fix_due_fifty_sprints() -> dict:
         if not event_id.isdigit():
             continue
         inspected = get_authenticated_organizer_api().inspect_event(int(event_id))
-        start = datetime.fromisoformat(str(inspected.get("eventStart") or "").replace("Z", "+00:00"))
-        if start.tzinfo is None:
-            start = start.replace(tzinfo=timezone.utc)
+        start = _event_start(inspected)
         if start <= now:
             continue
         published = row.get("publishedAt")
@@ -935,7 +943,7 @@ def zwiftpower_event_sprints(event_id: int):
 
 @app.route('/api/zwiftpower/results/fix-due', methods=['POST'])
 def zwiftpower_fix_due_results():
-    """Fix categories after the start, and set sprints about a day after Apply. Auth: Bearer CONTENT_API_KEY."""
+    """Move categories from 1.5 to 4 hours after the start, and set sprints about a day after Apply. Auth: Bearer CONTENT_API_KEY."""
     unauthorized = require_api_or_401()
     if unauthorized:
         return unauthorized

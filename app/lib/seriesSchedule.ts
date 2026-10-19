@@ -19,7 +19,13 @@ export type SeriesId = 'after-party' | 'zwifty-fifty'
 
 export type ResultsFix = { at: string; updated: number; skipped: number }
 
-type PublishedEvent = { id: string; route: string; resultsFix: ResultsFix | null; primesFix: ResultsFix | null }
+type PublishedEvent = {
+  id: string
+  route: string
+  resultsFix: ResultsFix | null
+  primesFix: ResultsFix | null
+  publishedAt: string | null
+}
 
 type StoredSchedule = {
   anchorDate: string
@@ -46,6 +52,7 @@ export type SeriesView = {
   error: string
   feedUnavailable: boolean
   primeRoutes: string[]
+  automation?: string[]
 }
 
 export class SeriesError extends Error {
@@ -120,11 +127,13 @@ function asStored(data: Record<string, any> | undefined): StoredSchedule | null 
     const id = String(row.id || '').trim()
     const route = String(row.route || '').trim()
     if (id && route) {
+      const publishedAt = String((value as { publishedAt?: unknown }).publishedAt || '').trim()
       events[date] = {
         id,
         route,
         resultsFix: asResultsFix((value as { resultsFix?: unknown }).resultsFix),
         primesFix: asResultsFix((value as { primesFix?: unknown }).primesFix),
+        publishedAt: publishedAt || null,
       }
     }
   }
@@ -168,7 +177,7 @@ async function seedFromSheet(seriesId: SeriesId): Promise<StoredSchedule> {
       anchorDate: date,
       anchorIndex: index >= 0 ? index : 0,
       overrides: index >= 0 ? {} : { [date]: route },
-      events: { [date]: { id: raceID, route: canonical, resultsFix: null, primesFix: null } },
+      events: { [date]: { id: raceID, route: canonical, resultsFix: null, primesFix: null, publishedAt: null } },
     }
   }
   throw new SeriesError(`No published ${spec.name} row to start the rotation`, 500)

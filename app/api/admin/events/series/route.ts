@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireEventEditor } from '@/app/api/admin/_lib/auth'
-import { listSeriesViews, parseSeriesId, setSeriesOverride, SeriesError } from '@/app/lib/seriesSchedule'
+import { listSeriesViewsWithAutomation } from '@/app/lib/seriesApply'
+import { parseSeriesId, setSeriesOverride, SeriesError } from '@/app/lib/seriesSchedule'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
   const auth = await requireEventEditor(req)
   if (auth.error) return auth.error
   try {
-    return NextResponse.json({ series: await listSeriesViews() })
+    return NextResponse.json({ series: await listSeriesViewsWithAutomation() })
   } catch (error) {
     return errorResponse(error)
   }
@@ -28,8 +29,8 @@ export async function POST(req: Request) {
   const seriesId = parseSeriesId(body?.series)
   if (!seriesId) return NextResponse.json({ error: 'Unknown series' }, { status: 400 })
   try {
-    const series = await setSeriesOverride(seriesId, String(body?.date || ''), String(body?.route || ''))
-    return NextResponse.json({ series })
+    await setSeriesOverride(seriesId, String(body?.date || ''), String(body?.route || ''))
+    return NextResponse.json({ series: await listSeriesViewsWithAutomation() })
   } catch (error) {
     return errorResponse(error)
   }

@@ -1,16 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireEventEditor } from '@/app/api/admin/_lib/auth'
-import { flaskData } from '@/app/api/admin/_lib/flask'
-import { postSeriesDiscord } from '@/app/lib/seriesDiscord'
-import {
-  courseForRoute,
-  listSeriesViews,
-  matchingFeedEvent,
-  parseSeriesId,
-  plannedSeriesRoute,
-  savePublishedEvent,
-  SeriesError,
-} from '@/app/lib/seriesSchedule'
+import { applySeriesDate, listSeriesViewsWithAutomation } from '@/app/lib/seriesApply'
+import { parseSeriesId, SeriesError } from '@/app/lib/seriesSchedule'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -30,41 +21,13 @@ export async function POST(req: Request) {
   if (!seriesId) return NextResponse.json({ error: 'Unknown series' }, { status: 400 })
 
   try {
-    const route = await plannedSeriesRoute(seriesId, date)
-    const event = await matchingFeedEvent(seriesId, date)
     const requested = Number(body?.routeId)
-    const course = await courseForRoute(
-      seriesId,
-      route,
-      Number.isInteger(requested) && requested > 0 ? requested : undefined
-    )
-    const payload: { routeId: number; laps?: number; distanceMeters?: number } = { routeId: course.routeId }
-    if ('laps' in course) payload.laps = course.laps
-    else payload.distanceMeters = course.distanceMeters
-
-    const updated = await flaskData(`/api/zwift/events/${event.id}/course`, { method: 'POST', body: payload })
-    if (updated.status >= 400) {
-      return NextResponse.json(
-        { error: String(updated.body?.error || 'Zwift update failed') },
-        { status: updated.status }
-      )
-    }
-
-    await savePublishedEvent(seriesId, date, String(event.id), course.route)
-
-    let discordError = ''
-    try {
-      await postSeriesDiscord(seriesId, date, course.route, String(event.id))
-    } catch (error) {
-      discordError = error instanceof Error ? error.message : 'Discord post failed'
-    }
-
+    const applied = await applySeriesDate(seriesId, date, Number.isInteger(requested) ? requested : undefined)
     return NextResponse.json({
-      series: await listSeriesViews(),
-      eventId: event.id,
-      route: course.route,
-      discordError,
-      event: updated.body,
+      series: await listSeriesViewsWithAutomation(),
+      eventId: applied.eventId,
+      route: applied.route,
+      discordError: applied.discordError,
     })
   } catch (error) {
     return errorResponse(error)
