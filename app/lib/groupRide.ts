@@ -1,10 +1,11 @@
 import { admin, adminDb } from '@/app/utils/firebaseAdminConfig'
 import { flaskData } from '@/app/api/admin/_lib/flask'
+import { catalogRouteByName, listCatalog } from '@/app/lib/seriesCatalog'
 import { routeOfTheWeek } from '@/app/lib/routeOfTheWeek'
+import { findZwiftRoute } from '@/app/lib/zwiftRouteLookup'
 import { loadUpcomingDzrEvents } from '@/app/lib/zwiftPublicEvents'
-import { groupRideRoute, type GroupRideRoute } from '@/packages/shared/groupRide'
 import { copenhagenDay, routeLine, routePhase } from '@/packages/shared/seriesAutomation'
-import { displayDate, listSeriesDates, parseIsoDate } from '@/packages/shared/seriesRotation'
+import { displayDate, listSeriesDates, parseIsoDate, routeForDate } from '@/packages/shared/seriesRotation'
 
 const COLLECTION = 'group_ride_schedules'
 const DOC = 'always-a-race'
@@ -23,8 +24,7 @@ type SavedRide = { id: string; routeA: string; routeB: string; publishedAt: stri
 type StoredRide = {
   anchorDate: string
   anchorIndex: number
-  routes: GroupRideRoute[]
-  overrides: Record<string, number>
+  overrides: Record<string, string>
   events: Record<string, SavedRide>
 }
 
@@ -32,7 +32,6 @@ export type GroupRideDate = {
   date: string
   label: string
   routeA: string
-  routeAId: number | null
   overridden: boolean
   routeB: string
   routeBUrl: string
@@ -43,7 +42,8 @@ export type GroupRideDate = {
 
 export type GroupRideView = {
   anchorDate: string
-  routes: GroupRideRoute[]
+  routes: string[]
+  started: boolean
   dates: GroupRideDate[]
   feedUnavailable: boolean
   automation: string[]
@@ -53,21 +53,12 @@ function ref() {
   return adminDb.collection(COLLECTION).doc(DOC)
 }
 
-function asRoute(value: unknown): GroupRideRoute | null {
-  if (!value || typeof value !== 'object') return null
-  const row = value as { routeId?: unknown; name?: unknown; world?: unknown }
-  const routeId = Number(row.routeId)
-  const name = String(row.name || '').trim()
-  if (!routeId || !name) return null
-  return { routeId, name, world: row.world ? String(row.world) : null }
-}
-
 function asStored(data: Record<string, unknown> | undefined): StoredRide {
-  const routes = Array.isArray(data?.routes) ? data.routes.map(asRoute).filter((route): route is GroupRideRoute => Boolean(route)) : []
-  const overrides: Record<string, number> = {}
+  const overrides: Record<string, string> = {}
   const rawOverrides = data?.overrides && typeof data.overrides === 'object' ? (data.overrides as Record<string, unknown>) : {}
-  for (const [date, routeId] of Object.entries(rawOverrides)) {
-    if (parseIsoDate(date) && Number(routeId) > 0) overrides[date] = Number(routeId)
+  for (const [date, route] of Object.entries(rawOverrides)) {
+    const name = String(route || '').trim()
+    if (parseIsoDate(date) && name) overrides[date] = name
   }
   const events: Record<string, SavedRide> = {}
   const rawEvents = data?.events && typeof data.events === 'object' ? (data.events as Record<string, unknown>) : {}
@@ -87,7 +78,6 @@ function asStored(data: Record<string, unknown> | undefined): StoredRide {
   return {
     anchorDate: parseIsoDate(data?.anchorDate) || '',
     anchorIndex: Number.isFinite(Number(data?.anchorIndex)) ? Number(data?.anchorIndex) : 0,
-    routes,
     overrides,
     events,
   }
@@ -98,8 +88,27 @@ async function readRide() {
   return asStored(snap.exists ? snap.data() : undefined)
 }
 
-function naturalRoute(stored: StoredRide, date: string) {
-  return groupRideRoute(stored.routes, stored.anchorDate, stored.anchorIndex, {}, date)
+async function categoryANames() {
+  return (await listCatalog(DOC)).map((route) => route.route)
+}
+
+function usableOverrides(names: string[], overrides: Record<string, string>) {
+  const keep: Record<string, string> = {}
+  for (const [date, route] of Object.entries(overrides)) {
+    const found = names.find((name) => name.toLowerCase() === route.toLowerCase())
+    if (found) keep[date] = found
+  }
+  return keep
+}
+
+function plannedRoute(names: string[], stored: StoredRide, date: string) {
+  if (!names.length || !stored.anchorDate) return ''
+  return routeForDate(names, stored.anchorDate, stored.anchorIndex, usableOverrides(names, stored.overrides), date)
+}
+
+function naturalRoute(names: string[], stored: StoredRide, date: string) {
+  if (!names.length || !stored.anchorDate) return ''
+  return routeForDate(names, stored.anchorDate, stored.anchorIndex, {}, date)
 }
 
 async function eventStart(eventId: string) {
@@ -128,12 +137,13 @@ function rideOn(events: { id: number; name: string; eventDate: string }[], date:
 
 export async function groupRideView(now = new Date()): Promise<GroupRideView> {
   const stored = await readRide()
+  const names = await categoryANames()
   const feed = await feedEvents()
-  const dates = stored.anchorDate ? listSeriesDates(stored.anchorDate, Object.keys(stored.events), 6) : []
+  const dates = stored.anchorDate && names.length ? listSeriesDates(stored.anchorDate, Object.keys(stored.events), 6) : []
   const rows = await Promise.all(
     dates.map(async (date) => {
-      const planned = groupRideRoute(stored.routes, stored.anchorDate, stored.anchorIndex, stored.overrides, date)
-      const natural = naturalRoute(stored, date)
+      const planned = plannedRoute(names, stored, date)
+      const natural = naturalRoute(names, stored, date)
       let routeB = ''
       let routeBUrl = ''
       let routeBWarning = ''
@@ -149,9 +159,8 @@ export async function groupRideView(now = new Date()): Promise<GroupRideView> {
       return {
         date,
         label: displayDate(date),
-        routeA: planned?.name || '',
-        routeAId: planned?.routeId || null,
-        overridden: Boolean(planned && natural && planned.routeId !== natural.routeId),
+        routeA: planned,
+        overridden: Boolean(planned && natural && planned !== natural),
         routeB,
         routeBUrl,
         routeBWarning,
@@ -162,34 +171,36 @@ export async function groupRideView(now = new Date()): Promise<GroupRideView> {
   )
   return {
     anchorDate: stored.anchorDate,
-    routes: stored.routes,
+    routes: names,
+    started: Object.keys(stored.events).length > 0,
     dates: rows,
     feedUnavailable: feed.unavailable,
-    automation: await automationLines(stored, rows, now),
+    automation: await automationLines(stored, names, rows, now),
   }
 }
 
-async function automationLines(stored: StoredRide, rows: GroupRideDate[], now: Date) {
-  if (!stored.routes.length || !stored.anchorDate) return ['Category A: add the route list and a start date.']
+async function automationLines(stored: StoredRide, names: string[], rows: GroupRideDate[], now: Date) {
+  if (!names.length) return ['Category A: add the routes in Route setup.']
+  if (!stored.anchorDate) return ['Category A: choose the date of the first route.']
   const today = copenhagenDay(now)
   const savedDates = Object.keys(stored.events).sort()
   const latest = savedDates[savedDates.length - 1] || ''
   const subject = !latest ? rows[0]?.date || stored.anchorDate : latest >= today ? latest : addWeek(latest)
   const row = rows.find((item) => item.date === subject)
-  const planned = groupRideRoute(stored.routes, stored.anchorDate, stored.anchorIndex, stored.overrides, subject)
+  const planned = plannedRoute(names, stored, subject)
   const saved = stored.events[subject]
   const previous = latest && latest !== subject ? stored.events[latest] : null
   const previousStart = !saved && previous ? await eventStart(previous.id) : null
   const categoryB = row?.routeB ? `Category B: ${row.routeB}.` : 'Category B: route of the week.'
   if (!latest) {
     return [
-      `Category A: ${displayDate(subject)}, ${planned?.name || 'the first route'}. Apply the first ride, then the next ones follow 24 hours after each start.`,
+      `Category A: ${displayDate(subject)}, ${planned || 'the first route'}. Apply the first ride, then the next ones follow 24 hours after each start.`,
       categoryB,
     ]
   }
   const route = routeLine({
     label: displayDate(subject),
-    route: saved?.routeA || planned?.name || 'Category A',
+    route: saved?.routeA || planned || 'Category A',
     saved: Boolean(saved),
     now,
     previousStart,
@@ -202,41 +213,39 @@ function addWeek(iso: string) {
   return listSeriesDates(iso, [iso], 2)[1]
 }
 
-export async function saveGroupRideRoutes(anchorDate: string, routes: unknown) {
+export async function saveGroupRideAnchor(anchorDate: string) {
   const iso = parseIsoDate(anchorDate)
-  if (!iso) throw new GroupRideError('Start date must be YYYY-MM-DD')
-  const list = Array.isArray(routes) ? routes.map(asRoute).filter((route): route is GroupRideRoute => Boolean(route)) : []
-  if (!list.length) throw new GroupRideError('Add at least one category A route')
+  if (!iso) throw new GroupRideError('First ride must be YYYY-MM-DD')
+  const names = await categoryANames()
+  if (!names.length) throw new GroupRideError('Add the category A routes in Route setup first')
   const stored = await readRide()
-  const keep: Record<string, number> = {}
-  for (const [date, routeId] of Object.entries(stored.overrides)) {
-    if (list.some((route) => route.routeId === routeId)) keep[date] = routeId
+  if (Object.keys(stored.events).length) throw new GroupRideError('The rotation has already started')
+  const snap = await ref().get()
+  const payload: Record<string, unknown> = {
+    anchorDate: iso,
+    anchorIndex: 0,
+    overrides: {},
+    events: stored.events,
   }
-  await ref().set(
-    {
-      anchorDate: iso,
-      anchorIndex: 0,
-      routes: list,
-      overrides: keep,
-      events: stored.events,
-    },
-    { merge: true }
-  )
+  if (snap.exists && Array.isArray(snap.data()?.routes)) payload.routes = admin.firestore.FieldValue.delete()
+  await ref().set(payload, { merge: true })
   return groupRideView()
 }
 
-export async function setGroupRideOverride(date: string, routeId: number) {
+export async function setGroupRideOverride(date: string, routeName: string) {
   const iso = parseIsoDate(date)
   if (!iso) throw new GroupRideError('Date must be YYYY-MM-DD')
-  const stored = await readRide()
-  const chosen = stored.routes.find((route) => route.routeId === routeId)
+  const names = await categoryANames()
+  const chosen = names.find((name) => name.toLowerCase() === routeName.trim().toLowerCase())
   if (!chosen) throw new GroupRideError('Route is not in the category A list')
-  const natural = naturalRoute(stored, iso)
+  const stored = await readRide()
+  if (!stored.anchorDate) throw new GroupRideError('Choose the date of the first route')
+  const natural = naturalRoute(names, stored, iso)
   const field = `overrides.${iso}`
-  if (natural && natural.routeId === chosen.routeId) {
+  if (natural === chosen) {
     await ref().update({ [field]: admin.firestore.FieldValue.delete() })
   } else {
-    await ref().update({ [field]: chosen.routeId })
+    await ref().update({ [field]: chosen })
   }
   return groupRideView()
 }
@@ -254,12 +263,27 @@ async function matchingRide(date: string) {
   return hits[0]
 }
 
+async function categoryARouteId(routeName: string) {
+  const entry = await catalogRouteByName(DOC, routeName)
+  if (!entry) throw new GroupRideError('Category A has no route for that date')
+  if (entry.zwiftRouteId) return entry.zwiftRouteId
+  try {
+    const hit = await findZwiftRoute(entry.zwiftRouteName || entry.route)
+    return hit.routeId
+  } catch (error) {
+    const message = error instanceof Error ? error.message : `${routeName} has no Zwift route`
+    throw new GroupRideError(message)
+  }
+}
+
 export async function applyGroupRide(date: string) {
   const iso = parseIsoDate(date)
   if (!iso) throw new GroupRideError('Date must be YYYY-MM-DD')
   const stored = await readRide()
-  const planned = groupRideRoute(stored.routes, stored.anchorDate, stored.anchorIndex, stored.overrides, iso)
+  const names = await categoryANames()
+  const planned = plannedRoute(names, stored, iso)
   if (!planned) throw new GroupRideError('Category A has no route for that date')
+  const routeId = await categoryARouteId(planned)
   let week
   try {
     week = await routeOfTheWeek(iso)
@@ -283,7 +307,7 @@ export async function applyGroupRide(date: string) {
     method: 'POST',
     body: {
       subgroupRoutes: [
-        { id: categoryA.id, routeId: planned.routeId },
+        { id: categoryA.id, routeId },
         { id: categoryB.id, routeId: week.route.routeId },
       ],
     },
@@ -297,7 +321,7 @@ export async function applyGroupRide(date: string) {
         ...stored.events,
         [iso]: {
           id: String(event.id),
-          routeA: planned.name,
+          routeA: planned,
           routeB: week.route.name,
           publishedAt: new Date().toISOString(),
         },
@@ -309,7 +333,7 @@ export async function applyGroupRide(date: string) {
     date: iso,
     label: displayDate(iso),
     eventId: event.id,
-    route: `A ${planned.name}, B ${week.route.name}`,
+    route: `A ${planned}, B ${week.route.name}`,
     channelPost: false as const,
   }
 }
@@ -318,9 +342,10 @@ export async function runDueGroupRide(now = new Date()) {
   const name = "It's always a race"
   try {
     const stored = await readRide()
+    const names = await categoryANames()
     const dates = Object.keys(stored.events).sort()
     const latest = dates[dates.length - 1] || ''
-    if (!latest || !stored.anchorDate || !stored.routes.length) {
+    if (!latest || !stored.anchorDate || !names.length) {
       return { series: 'always-a-race', name, status: 'idle' as const }
     }
     const today = copenhagenDay(now)

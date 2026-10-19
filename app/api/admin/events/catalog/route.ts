@@ -10,6 +10,7 @@ async function resolveSeries(value: unknown) {
   if (legacy) return legacy
   const slug = seriesSlug(String(value || ''))
   if (!slug) return null
+  if (slug === 'always-a-race') return slug
   const series = await readAdminSeries(slug)
   return series ? slug : null
 }

@@ -51,6 +51,11 @@ function readRoutes(data: Record<string, unknown> | undefined) {
   return rows.map(asCatalogRoute).filter((row): row is CatalogRoute => Boolean(row))
 }
 
+export async function listCatalog(seriesId: string): Promise<CatalogRoute[]> {
+  const snap = await refFor(seriesId).get()
+  return snap.exists ? readRoutes(snap.data()) : []
+}
+
 export async function ensureCatalog(seriesId: string): Promise<CatalogRoute[]> {
   const ref = refFor(seriesId)
   const snap = await ref.get()
@@ -81,8 +86,36 @@ function uniqueName(routes: CatalogRoute[], route: string, ignoreIndex: number) 
   return routes.some((row, index) => index !== ignoreIndex && row.route.toLowerCase() === wanted)
 }
 
+async function renameGroupRideRoute(from: string, to: string) {
+  const ref = adminDb.collection('group_ride_schedules').doc('always-a-race')
+  const snap = await ref.get()
+  if (!snap.exists) return
+  const data = snap.data() || {}
+  const overrides = { ...(data.overrides || {}) }
+  const events = { ...(data.events || {}) }
+  let changed = false
+  for (const [date, route] of Object.entries(overrides)) {
+    if (route === from) {
+      overrides[date] = to
+      changed = true
+    }
+  }
+  for (const [date, event] of Object.entries(events)) {
+    const row = event as { routeA?: string }
+    if (row?.routeA === from) {
+      events[date] = { ...row, routeA: to }
+      changed = true
+    }
+  }
+  if (changed) await ref.update({ overrides, events })
+}
+
 async function renameScheduleRoute(seriesId: string, from: string, to: string) {
   if (!from || from === to) return
+  if (seriesId === 'always-a-race') {
+    await renameGroupRideRoute(from, to)
+    return
+  }
   const ref = adminDb.collection('series_schedules').doc(seriesId)
   const snap = await ref.get()
   if (!snap.exists) {

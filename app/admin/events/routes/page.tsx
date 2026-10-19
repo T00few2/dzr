@@ -456,9 +456,11 @@ export default function RouteSetupPage() {
       <Text color="gray.400" mb={4}>
         {series === 'after-party' || series === 'zwifty-fifty'
           ? 'These routes live in Firebase and drive the weekly rotation. The files in the site were copied in as the starting list. Profile images still come from the site files, named from the route.'
-          : 'Add the routes for this series in the order a weekly series should rotate. The public page draws the course from the route you pick here.'}{' '}
+          : series === 'always-a-race'
+            ? 'Add the category A routes in the order the ride should rotate. Category B stays the route of the week. Match each route to its Zwift course.'
+            : 'Add the routes for this series in the order a weekly series should rotate. The public page draws the course from the route you pick here.'}{' '}
         <Link href="/admin/events" style={{ color: '#F6AD55' }}>Back to events</Link>
-        {series !== 'after-party' && series !== 'zwifty-fifty' ? (
+        {series !== 'after-party' && series !== 'zwifty-fifty' && series !== 'always-a-race' ? (
           <>
             {' · '}
             <Link href="/admin/events/series" style={{ color: '#F6AD55' }}>Back to series</Link>
@@ -477,6 +479,12 @@ export default function RouteSetupPage() {
           onClick={() => setSeries('zwifty-fifty')}
         >
           The Zwifty Fifty
+        </Button>
+        <Button
+          {...(series === 'always-a-race' ? { colorScheme: 'red' as const } : readableOutline)}
+          onClick={() => setSeries('always-a-race')}
+        >
+          It&apos;s always a race
         </Button>
         {extraSeries.map((item) => (
           <Button

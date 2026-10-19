@@ -4,7 +4,7 @@ import {
   applyGroupRide,
   GroupRideError,
   groupRideView,
-  saveGroupRideRoutes,
+  saveGroupRideAnchor,
   setGroupRideOverride,
 } from '@/app/lib/groupRide'
 
@@ -32,9 +32,9 @@ export async function POST(req: Request) {
   if (auth.error) return auth.error
   const body = await req.json().catch(() => ({}))
   try {
-    if (body?.action === 'routes') return NextResponse.json(await saveGroupRideRoutes(String(body.anchorDate || ''), body.routes))
+    if (body?.action === 'anchor') return NextResponse.json(await saveGroupRideAnchor(String(body.anchorDate || '')))
     if (body?.action === 'override') {
-      return NextResponse.json(await setGroupRideOverride(String(body.date || ''), Number(body.routeId)))
+      return NextResponse.json(await setGroupRideOverride(String(body.date || ''), String(body.route || '')))
     }
     if (body?.action === 'apply') {
       const applied = await applyGroupRide(String(body.date || ''))
