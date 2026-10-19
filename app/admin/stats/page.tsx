@@ -4,10 +4,12 @@ import { useCallback, useEffect, useState } from 'react'
 import AdminShell from '@/components/admin/AdminShell'
 import ChartCard from '@/components/admin/stats/ChartCard'
 import KpiCard from '@/components/admin/stats/KpiCard'
-import PeriodToggle, { periodLabel, sliceSeries } from '@/components/admin/stats/PeriodToggle'
+import PeriodToggle from '@/components/admin/stats/PeriodToggle'
+import { StatsPeriod, getPeriodWindow, periodLabel } from '@/app/lib/statsPeriods'
+import { buildSnapshotSeries } from '@/app/lib/statsSeries'
 import RankingTable from '@/components/admin/stats/RankingTable'
 import { ActivityChart, BreakdownDonut, GrowthChart, MembersChart, type GrowthChartPoint } from '@/components/admin/stats/charts'
-import type { GrowthResponse, PeriodDays, StatsResponse } from '@/components/admin/stats/types'
+import type { GrowthResponse, StatsResponse } from '@/app/lib/statsTypes'
 import { Box, Button, Flex, HStack, SimpleGrid, Text, useToast } from '@chakra-ui/react'
 
 function fmt(n: number | null | undefined) {
@@ -34,15 +36,15 @@ function mergeGrowthSeries(
   return days.map((day) => {
     if (zwiftByDay.has(day)) lastZwift = zwiftByDay.get(day) ?? null
     if (zpByDay.has(day)) lastZp = zpByDay.get(day) ?? null
-    return { day, zwift: lastZwift, zwiftpower: lastZp }
+    return { date: day, zwift: lastZwift, zwiftpower: lastZp }
   })
 }
 
 export default function StatsAdminPage() {
   const toast = useToast()
-  const [growthDays, setGrowthDays] = useState<PeriodDays>('all')
-  const [memberDays, setMemberDays] = useState<PeriodDays>('all')
-  const [days, setDays] = useState<PeriodDays>(30)
+  const [growthPeriod, setGrowthPeriod] = useState<StatsPeriod>(StatsPeriod.All)
+  const [memberPeriod, setMemberPeriod] = useState<StatsPeriod>(StatsPeriod.All)
+  const [activityPeriod, setActivityPeriod] = useState<StatsPeriod>(StatsPeriod.Last30Days)
   const [growth, setGrowth] = useState<GrowthResponse | null>(null)
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [growthError, setGrowthError] = useState<string | null>(null)
@@ -66,11 +68,11 @@ export default function StatsAdminPage() {
     }
   }, [])
 
-  const loadStats = useCallback(async (windowDays: PeriodDays) => {
+  const loadStats = useCallback(async (period: StatsPeriod) => {
     setLoadingStats(true)
     setStatsError(null)
     try {
-      const res = await fetch(`/api/admin/stats?days=${windowDays}`, { cache: 'no-store' })
+      const res = await fetch(`/api/admin/stats?period=${period}`, { cache: 'no-store' })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.error || 'Failed to load Discord stats')
       setStats(body)
@@ -82,7 +84,7 @@ export default function StatsAdminPage() {
   }, [])
 
   useEffect(() => { loadGrowth().catch(() => {}) }, [loadGrowth])
-  useEffect(() => { loadStats(days).catch(() => {}) }, [days, loadStats])
+  useEffect(() => { loadStats(activityPeriod).catch(() => {}) }, [activityPeriod, loadStats])
 
   async function refresh(kind: 'zwift' | 'zwiftpower') {
     setBusy(true)
@@ -95,12 +97,11 @@ export default function StatsAdminPage() {
 
   const totals = stats?.totals
   const hasActivity = (totals?.messages || 0) + (totals?.reactions || 0) + (totals?.voice || 0) + (totals?.interactions || 0) > 0
-  const memberSeries = sliceSeries(stats?.members?.series || [], (p) => p.date, memberDays)
+  const memberSeries = buildSnapshotSeries(stats?.members?.series || [], getPeriodWindow(memberPeriod))
   const latestMembers = stats?.members?.latest
-  const growthChart = sliceSeries(
+  const growthChart = buildSnapshotSeries(
     mergeGrowthSeries(growth?.series || [], growth?.zwiftpower?.series || []),
-    (p) => p.day,
-    growthDays,
+    getPeriodWindow(growthPeriod),
   )
   const zpTotal = growth?.zwiftpower?.total
   const clubRoleCount = latestMembers?.clubMembers
@@ -135,7 +136,7 @@ export default function StatsAdminPage() {
         <KpiCard
           label="Messages"
           value={fmt(totals?.messages)}
-          helper={`${fmt(totals?.avgDailyMessages)} / day · ${periodLabel(days)}`}
+          helper={`${fmt(totals?.avgDailyMessages)} / day · ${periodLabel(activityPeriod)}`}
           loading={loadingStats && !stats}
         />
         <KpiCard
@@ -154,7 +155,7 @@ export default function StatsAdminPage() {
           empty="No companion club members yet. Refresh the Zwift roster to sync."
           actions={(
             <HStack spacing={2} flexWrap="wrap" justify="flex-end">
-              <PeriodToggle value={growthDays} onChange={setGrowthDays} />
+              <PeriodToggle value={growthPeriod} onChange={setGrowthPeriod} />
               <Button size="xs" colorScheme="red" onClick={() => refresh('zwift')} isLoading={busy}>Refresh Zwift</Button>
               <Button
                 size="xs"
@@ -178,7 +179,7 @@ export default function StatsAdminPage() {
           loading={loadingStats && !stats}
           isEmpty={memberSeries.length < 1}
           empty="No member snapshots yet. Open this page again later to start the series."
-          actions={<PeriodToggle value={memberDays} onChange={setMemberDays} />}
+          actions={<PeriodToggle value={memberPeriod} onChange={setMemberPeriod} />}
         >
           <MembersChart data={memberSeries} />
         </ChartCard>
@@ -191,9 +192,9 @@ export default function StatsAdminPage() {
             loading={loadingStats && !stats}
             isEmpty={!hasActivity}
             empty="No activity in this window"
-            actions={<PeriodToggle value={days} onChange={setDays} />}
+            actions={<PeriodToggle value={activityPeriod} onChange={setActivityPeriod} />}
           >
-            <ActivityChart data={stats?.daily || []} />
+            <ActivityChart data={stats?.activity || []} />
           </ChartCard>
         </Box>
         <Box flex="1">
@@ -202,7 +203,7 @@ export default function StatsAdminPage() {
             loading={loadingStats && !stats}
             isEmpty={!hasActivity}
             empty="No activity in this window"
-            actions={<PeriodToggle value={days} onChange={setDays} />}
+            actions={<PeriodToggle value={activityPeriod} onChange={setActivityPeriod} />}
           >
             <BreakdownDonut
               messages={totals?.messages || 0}
@@ -219,7 +220,7 @@ export default function StatsAdminPage() {
           title="Top users"
           loading={loadingStats && !stats}
           empty="No active users in this window"
-          actions={<PeriodToggle value={days} onChange={setDays} />}
+          actions={<PeriodToggle value={activityPeriod} onChange={setActivityPeriod} />}
           rows={(stats?.topUsers || []).map((u) => ({
             id: u.user_id,
             name: u.username || u.user_id,
@@ -231,7 +232,7 @@ export default function StatsAdminPage() {
           title="Top channels"
           loading={loadingStats && !stats}
           empty="No channel activity in this window"
-          actions={<PeriodToggle value={days} onChange={setDays} />}
+          actions={<PeriodToggle value={activityPeriod} onChange={setActivityPeriod} />}
           rows={(stats?.topChannels || []).map((c) => ({
             id: c.channel_id,
             name: c.channel_name ? `#${c.channel_name}` : c.channel_id,

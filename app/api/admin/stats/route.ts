@@ -1,3 +1,6 @@
+import { getHistoryStart, getPeriodWindow, parseStatsPeriod } from '@/app/lib/statsPeriods'
+import { buildActivitySeries, type ActivityPoint } from '@/app/lib/statsSeries'
+import type { StatsResponse } from '@/app/lib/statsTypes'
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/admin/_lib/auth'
 import { discordGet, guildId, listGuildMembers } from '@/app/api/admin/_lib/discord'
@@ -29,17 +32,6 @@ type ActivityDoc = {
     }>
   }
 }
-
-type DailyRow = {
-  date: string
-  messages: number
-  reactions: number
-  voice: number
-  interactions: number
-  total: number
-}
-
-const ALLOWED_DAYS = new Set([7, 30, 90])
 
 function utcDateKey(date: Date): string {
   return date.toISOString().slice(0, 10)
@@ -201,14 +193,9 @@ export async function GET(req: Request) {
   if (auth.error) return auth.error
 
   const url = new URL(req.url)
-  const rawDays = url.searchParams.get('days') || '30'
-  const allTime = rawDays === 'all'
-  const requested = Number(rawDays)
-  const days: number | 'all' = allTime ? 'all' : (ALLOWED_DAYS.has(requested) ? requested : 30)
-
-  const end = new Date()
-  const endKey = utcDateKey(end)
-  const rangedStartKey = allTime ? null : utcDateKey(new Date(end.getTime() - ((days as number) - 1) * 24 * 60 * 60 * 1000))
+  const selection = parseStatsPeriod(url.searchParams.get('period'))
+  const window = getPeriodWindow(selection)
+  const { start: rangedStartKey, end: endKey } = window
 
   const [activities, memberCounts] = await Promise.all([
     loadActivities(rangedStartKey, endKey),
@@ -219,10 +206,12 @@ export async function GET(req: Request) {
     .map((a) => a.dateKey || String(a.timestamp || '').slice(0, 10))
     .filter(Boolean)
     .sort()
-  const startKey = rangedStartKey || activityDates[0] || endKey
+  const firstDay = activityDates[0]
+  const startKey = rangedStartKey ?? getHistoryStart(window, firstDay)
 
-  const byDay: Record<string, DailyRow> = {}
-  for (const day of eachDayInclusive(startKey, endKey)) {
+  const dates = startKey ? eachDayInclusive(startKey, endKey) : []
+  const byDay: Record<string, ActivityPoint> = {}
+  for (const day of dates) {
     byDay[day] = { date: day, messages: 0, reactions: 0, voice: 0, interactions: 0, total: 0 }
   }
 
@@ -301,7 +290,7 @@ export async function GET(req: Request) {
     }
   }
 
-  const daily = eachDayInclusive(startKey, endKey).map((day) => byDay[day])
+  const daily = dates.map((day) => byDay[day])
   const totalMessages = daily.reduce((s, d) => s + d.messages, 0)
   const totalReactions = daily.reduce((s, d) => s + d.reactions, 0)
   const totalVoice = daily.reduce((s, d) => s + d.voice, 0)
@@ -316,7 +305,7 @@ export async function GET(req: Request) {
     .slice(0, 10)
 
   return NextResponse.json({
-    period: { days, start: startKey, end: endKey },
+    period: { ...window, start: startKey },
     totals: {
       messages: totalMessages,
       reactions: totalReactions,
@@ -327,9 +316,9 @@ export async function GET(req: Request) {
       daysWithActivity,
       avgDailyMessages: Math.round((totalMessages / Math.max(daysWithActivity, 1)) * 10) / 10,
     },
-    daily,
+    activity: buildActivitySeries(daily, { ...window, start: startKey }),
     topUsers,
     topChannels,
     members: memberCounts,
-  })
+  } satisfies StatsResponse)
 }
