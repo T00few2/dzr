@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import NextLink from 'next/link'
-import { Badge, Box, Button, Flex, Heading, Input, Link, Select, Table, Tbody, Td, Text, Th, Thead, Tr } from '@chakra-ui/react'
-import { addDays, displayDate, parseIsoDate } from '@/packages/shared/seriesRotation'
+import { Badge, Box, Button, Flex, Heading, Link, Select, Table, Tbody, Td, Text, Th, Thead, Tr } from '@chakra-ui/react'
 
 type RideDate = {
   date: string
@@ -26,6 +25,8 @@ type RideView = {
   automation: string[]
 }
 
+type ScheduleRow = RideDate & { strong: boolean; past: boolean }
+
 const readableOutline = {
   variant: 'outline' as const,
   color: 'white',
@@ -38,34 +39,25 @@ async function errorMessage(res: Response) {
   return String(body?.error || body?.message || `Request failed (${res.status})`)
 }
 
-function previewWeeks(routes: string[], anchor: string): RideDate[] {
-  const start = parseIsoDate(anchor)
-  return Array.from({ length: 6 }, (_, index) => {
-    const date = start ? addDays(start, index * 7) : ''
-    return {
-      date: date || `week-${index + 1}`,
-      label: date ? displayDate(date) : `Week ${index + 1}`,
-      routeA: routes[index % routes.length] || '',
-      overridden: false,
-      routeB: '',
-      routeBUrl: '',
-      routeBWarning: '',
-      eventId: '',
-      feedEventId: null,
-    }
-  })
+function scheduleRows(dates: RideDate[]): ScheduleRow[] {
+  const pending = dates.filter((row) => !row.eventId).sort((a, b) => a.date.localeCompare(b.date))
+  const nextDate = pending[0]?.date
+  const upcoming = (nextDate ? dates.filter((row) => row.date >= nextDate) : dates).sort((a, b) => a.date.localeCompare(b.date))
+  const earlier = nextDate ? dates.filter((row) => row.date < nextDate) : []
+  return [
+    ...upcoming.map((row) => ({ ...row, strong: row.date === nextDate, past: false })),
+    ...earlier.sort((a, b) => b.date.localeCompare(a.date)).map((row) => ({ ...row, strong: false, past: true })),
+  ]
 }
 
 export default function GroupRide() {
   const [view, setView] = useState<RideView | null>(null)
-  const [anchorDate, setAnchorDate] = useState('')
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
   function adopt(next: RideView) {
     setView(next)
-    setAnchorDate(next.anchorDate)
   }
 
   async function load() {
@@ -80,24 +72,6 @@ export default function GroupRide() {
   useEffect(() => {
     void load()
   }, [])
-
-  async function saveAnchor(date: string) {
-    if (!parseIsoDate(date) || date === view?.anchorDate) return
-    setBusy('anchor')
-    setError('')
-    setNotice('')
-    const res = await fetch('/api/admin/events/group-ride', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'anchor', anchorDate: date }),
-    })
-    setBusy('')
-    if (!res.ok) {
-      setError(await errorMessage(res))
-      return
-    }
-    adopt((await res.json()) as RideView)
-  }
 
   async function override(date: string, route: string) {
     setBusy(date)
@@ -136,12 +110,7 @@ export default function GroupRide() {
   }
 
   const routes = view?.routes || []
-  const persisted = Boolean(view?.anchorDate) && anchorDate === view?.anchorDate
-  const rows = routes.length
-    ? persisted && view?.dates.length
-      ? view.dates
-      : previewWeeks(routes, anchorDate)
-    : []
+  const rows = scheduleRows(view?.dates || [])
 
   return (
     <Box borderWidth="1px" borderColor="gray.700" rounded="md" p={4}>
@@ -178,7 +147,7 @@ export default function GroupRide() {
         </Text>
       ) : null}
 
-      {routes.length ? (
+      {rows.length ? (
         <Box overflowX="auto" mt={5}>
           <Table size="sm" variant="unstyled">
             <Thead>
@@ -191,44 +160,32 @@ export default function GroupRide() {
               </Tr>
             </Thead>
             <Tbody>
-              {rows.map((row, index) => (
-                <Tr key={row.date} bg={index === 0 ? 'whiteAlpha.100' : undefined}>
-                  <Td color={index === 0 ? 'white' : 'gray.400'} fontWeight={index === 0 ? 'semibold' : 'normal'}>
-                    {index === 0 && !view?.started ? (
-                      <Input
-                        type="date"
-                        aria-label="First ride"
-                        value={anchorDate}
-                        bg="gray.900"
-                        borderColor="gray.700"
-                        maxW="11rem"
-                        isDisabled={busy === 'anchor'}
-                        onChange={(e) => {
-                          setAnchorDate(e.target.value)
-                          void saveAnchor(e.target.value)
-                        }}
-                      />
-                    ) : (
-                      row.label
-                    )}
+              {rows.map((row) => (
+                <Tr key={row.date} bg={row.strong ? 'whiteAlpha.100' : undefined}>
+                  <Td color={row.strong ? 'white' : 'gray.400'} fontWeight={row.strong ? 'semibold' : 'normal'}>
+                    {row.label}
                   </Td>
                   <Td>
-                    <Select
-                      value={row.routeA}
-                      bg="gray.900"
-                      borderColor="gray.700"
-                      color="white"
-                      maxW="320px"
-                      isDisabled={!persisted || busy === row.date || !routes.length}
-                      onChange={(e) => void override(row.date, e.target.value)}
-                    >
-                      {row.routeA && !routes.includes(row.routeA) ? <option value={row.routeA}>{row.routeA}</option> : null}
-                      {routes.map((route) => (
-                        <option key={route} value={route}>
-                          {route}
-                        </option>
-                      ))}
-                    </Select>
+                    {row.past ? (
+                      <Text color="gray.300">{row.routeA}</Text>
+                    ) : (
+                      <Select
+                        value={row.routeA}
+                        bg="gray.900"
+                        borderColor="gray.700"
+                        color="white"
+                        maxW="320px"
+                        isDisabled={busy === row.date || !routes.length}
+                        onChange={(e) => void override(row.date, e.target.value)}
+                      >
+                        {row.routeA && !routes.includes(row.routeA) ? <option value={row.routeA}>{row.routeA}</option> : null}
+                        {routes.map((route) => (
+                          <option key={route} value={route}>
+                            {route}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
                     {row.overridden ? (
                       <Badge colorScheme="orange" mt={1}>
                         Changed
@@ -256,16 +213,18 @@ export default function GroupRide() {
                     </Flex>
                   </Td>
                   <Td>
-                    <Button
-                      type="button"
-                      colorScheme="red"
-                      size="sm"
-                      isDisabled={!persisted || !row.routeA || !row.routeB || Boolean(row.routeBWarning)}
-                      isLoading={busy === `apply:${row.date}`}
-                      onClick={() => void apply(row)}
-                    >
-                      Apply
-                    </Button>
+                    {row.past ? null : (
+                      <Button
+                        type="button"
+                        colorScheme="red"
+                        size="sm"
+                        isDisabled={!row.routeA || !row.routeB || Boolean(row.routeBWarning)}
+                        isLoading={busy === `apply:${row.date}`}
+                        onClick={() => void apply(row)}
+                      >
+                        Apply
+                      </Button>
+                    )}
                   </Td>
                 </Tr>
               ))}
