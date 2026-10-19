@@ -181,7 +181,7 @@ export async function groupRideView(now = new Date()): Promise<GroupRideView> {
 
 async function automationLines(stored: StoredRide, names: string[], rows: GroupRideDate[], now: Date) {
   if (!names.length) return ['Category A: add the routes in Route setup.']
-  if (!stored.anchorDate) return ['Category A: choose the date of the first route.']
+  if (!stored.anchorDate) return [`Category A: ${names[0]}.`]
   const today = copenhagenDay(now)
   const savedDates = Object.keys(stored.events).sort()
   const latest = savedDates[savedDates.length - 1] || ''

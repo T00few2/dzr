@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import NextLink from 'next/link'
 import { Badge, Box, Button, Flex, Heading, Input, Link, Select, Table, Tbody, Td, Text, Th, Thead, Tr } from '@chakra-ui/react'
+import { addDays, displayDate, parseIsoDate } from '@/packages/shared/seriesRotation'
 
 type RideDate = {
   date: string
@@ -37,6 +38,24 @@ async function errorMessage(res: Response) {
   return String(body?.error || body?.message || `Request failed (${res.status})`)
 }
 
+function previewWeeks(routes: string[], anchor: string): RideDate[] {
+  const start = parseIsoDate(anchor)
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = start ? addDays(start, index * 7) : ''
+    return {
+      date: date || `week-${index + 1}`,
+      label: date ? displayDate(date) : `Week ${index + 1}`,
+      routeA: routes[index % routes.length] || '',
+      overridden: false,
+      routeB: '',
+      routeBUrl: '',
+      routeBWarning: '',
+      eventId: '',
+      feedEventId: null,
+    }
+  })
+}
+
 export default function GroupRide() {
   const [view, setView] = useState<RideView | null>(null)
   const [anchorDate, setAnchorDate] = useState('')
@@ -62,14 +81,15 @@ export default function GroupRide() {
     void load()
   }, [])
 
-  async function saveAnchor() {
+  async function saveAnchor(date: string) {
+    if (!parseIsoDate(date) || date === view?.anchorDate) return
     setBusy('anchor')
     setError('')
     setNotice('')
     const res = await fetch('/api/admin/events/group-ride', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'anchor', anchorDate }),
+      body: JSON.stringify({ action: 'anchor', anchorDate: date }),
     })
     setBusy('')
     if (!res.ok) {
@@ -77,7 +97,6 @@ export default function GroupRide() {
       return
     }
     adopt((await res.json()) as RideView)
-    setNotice('Schedule started.')
   }
 
   async function override(date: string, route: string) {
@@ -117,6 +136,12 @@ export default function GroupRide() {
   }
 
   const routes = view?.routes || []
+  const persisted = Boolean(view?.anchorDate) && anchorDate === view?.anchorDate
+  const rows = routes.length
+    ? persisted && view?.dates.length
+      ? view.dates
+      : previewWeeks(routes, anchorDate)
+    : []
 
   return (
     <Box borderWidth="1px" borderColor="gray.700" rounded="md" p={4}>
@@ -126,9 +151,6 @@ export default function GroupRide() {
           Category A routes
         </Button>
       </Flex>
-      <Text color="gray.400" mb={3}>
-        Category B is the route of the week. Category A follows the routes from Route setup, one route each week.
-      </Text>
       {view?.automation.map((line, index) => (
         <Text key={index} color="gray.300" fontSize="sm" mb={1}>
           {line}
@@ -150,21 +172,13 @@ export default function GroupRide() {
         </Text>
       ) : null}
 
-      {routes.length && !view?.started ? (
-        <Flex gap={2} mt={4} wrap="wrap" align="center">
-          <Input type="date" value={anchorDate} onChange={(e) => setAnchorDate(e.target.value)} bg="gray.900" borderColor="gray.700" maxW="12rem" />
-          <Button type="button" colorScheme="red" size="sm" isLoading={busy === 'anchor'} onClick={() => void saveAnchor()}>
-            {view?.anchorDate ? 'Update first ride' : 'Start the schedule'}
-          </Button>
-        </Flex>
-      ) : null}
       {!routes.length ? (
         <Text color="gray.400" mt={4}>
           Add the category A routes in Route setup, in the order they should rotate.
         </Text>
       ) : null}
 
-      {view?.dates.length ? (
+      {routes.length ? (
         <Box overflowX="auto" mt={5}>
           <Table size="sm" variant="unstyled">
             <Thead>
@@ -177,9 +191,27 @@ export default function GroupRide() {
               </Tr>
             </Thead>
             <Tbody>
-              {view.dates.map((row) => (
-                <Tr key={row.date}>
-                  <Td color="white">{row.label}</Td>
+              {rows.map((row, index) => (
+                <Tr key={row.date} bg={index === 0 ? 'whiteAlpha.100' : undefined}>
+                  <Td color={index === 0 ? 'white' : 'gray.400'} fontWeight={index === 0 ? 'semibold' : 'normal'}>
+                    {index === 0 && !view?.started ? (
+                      <Input
+                        type="date"
+                        aria-label="First ride"
+                        value={anchorDate}
+                        bg="gray.900"
+                        borderColor="gray.700"
+                        maxW="11rem"
+                        isDisabled={busy === 'anchor'}
+                        onChange={(e) => {
+                          setAnchorDate(e.target.value)
+                          void saveAnchor(e.target.value)
+                        }}
+                      />
+                    ) : (
+                      row.label
+                    )}
+                  </Td>
                   <Td>
                     <Select
                       value={row.routeA}
@@ -187,7 +219,7 @@ export default function GroupRide() {
                       borderColor="gray.700"
                       color="white"
                       maxW="320px"
-                      isDisabled={busy === row.date || !routes.length}
+                      isDisabled={!persisted || busy === row.date || !routes.length}
                       onChange={(e) => void override(row.date, e.target.value)}
                     >
                       {row.routeA && !routes.includes(row.routeA) ? <option value={row.routeA}>{row.routeA}</option> : null}
@@ -209,7 +241,7 @@ export default function GroupRide() {
                         {row.routeB || 'Zwift Insider'}
                       </Link>
                     ) : (
-                      <Text color="gray.300">{row.routeB || '—'}</Text>
+                      <Text color="gray.300">{row.routeB || 'Route of the week'}</Text>
                     )}
                     {row.routeBWarning ? (
                       <Text color="orange.300" fontSize="xs">
@@ -228,7 +260,7 @@ export default function GroupRide() {
                       type="button"
                       colorScheme="red"
                       size="sm"
-                      isDisabled={!row.routeA || !row.routeB || Boolean(row.routeBWarning)}
+                      isDisabled={!persisted || !row.routeA || !row.routeB || Boolean(row.routeBWarning)}
                       isLoading={busy === `apply:${row.date}`}
                       onClick={() => void apply(row)}
                     >
