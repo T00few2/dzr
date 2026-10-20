@@ -23,16 +23,6 @@ async function getPage(path) {
   }
 }
 
-// Route geometry never changes for a route id, so keep it for the lifetime of the process.
-const routeCache = new Map();
-
-async function getRoute(routeId) {
-  if (!routeCache.has(routeId)) {
-    routeCache.set(routeId, { data: JSON.parse(await getPage(`/path/${encodeURIComponent(routeId)}`)) });
-  }
-  return routeCache.get(routeId);
-}
-
 function fixturesPath(team) {
   return `/matchlist/fixtures/${encodeURIComponent(team)}`;
 }
@@ -62,4 +52,4 @@ async function getNextFixture(team) {
   return null;
 }
 
-module.exports = { getPage, getRoute, fixturesPath, getFixtures, getFixture, getFixtureStart, getNextFixture };
+module.exports = { getPage, fixturesPath, getFixtures, getFixture, getFixtureStart, getNextFixture };

@@ -1,6 +1,8 @@
 const { AttachmentBuilder, EmbedBuilder } = require("discord.js");
 const { buildLadderChart } = require("./ladderChart");
-const { describeRoute } = require("./routeInfo");
+const { describeProfile, loadMatchProfile } = require("./routeInfo");
+const { placePowerups } = require("./powerupPlaces");
+const { renderRouteProfile } = require("../routeProfileChart");
 const { enrichRiders } = require("./riderPower");
 
 const DURATIONS = [
@@ -51,10 +53,9 @@ function accentColor(fixture, ourTeam) {
 
 // Builds the ladder preview embed from a parsed fixture (see ladderParser.js).
 // With compact=true the rider/average text is left out because the chart image shows it.
-function buildLadderPreviewEmbed(fixture, { compact = false, ourTeam = null } = {}) {
+function buildLadderPreviewEmbed(fixture, { compact = false, ourTeam = null, info = null } = {}) {
   const { home, away } = fixture;
   const ts = Math.floor(new Date(fixture.start).getTime() / 1000);
-  const info = describeRoute(fixture.route, fixture.laps, fixture.distance);
   const route = fixture.route
     ? [
         `${fixture.route}${fixture.world ? ` (${fixture.world})` : ""}`,
@@ -88,16 +89,38 @@ function buildLadderPreviewEmbed(fixture, { compact = false, ourTeam = null } = 
   return embed;
 }
 
-// Message payload with the chart image; falls back to the text-only embed if rendering fails.
+// Two images when the site profile loads: the route (with powerup icons) and the W/kg chart.
+// A missing profile still posts the chart. A failed chart falls back to the text embed.
 async function buildLadderPreviewMessage(fixture, ourTeam = null) {
   await enrichRiders([...fixture.home.riders, ...fixture.away.riders]);
+  const profile = await loadMatchProfile(fixture);
+  const info = describeProfile(profile);
   try {
-    const png = await buildLadderChart(fixture, ourTeam);
-    const embed = buildLadderPreviewEmbed(fixture, { compact: true, ourTeam }).setImage("attachment://preview.png");
-    return { embeds: [embed], files: [new AttachmentBuilder(png, { name: "preview.png" })] };
+    const files = [];
+    const embed = buildLadderPreviewEmbed(fixture, { compact: true, ourTeam, info });
+    let routeImage = false;
+    if (profile) {
+      const subtitle = [fixture.world, info ? `${info.distKm.toFixed(1)} km · ${Math.round(info.elevM)} m` : null]
+        .filter(Boolean)
+        .join(" · ");
+      const routePng = await renderRouteProfile(profile, {
+        name: fixture.route || "",
+        subtitle,
+        powerups: placePowerups(profile, fixture),
+      });
+      if (routePng) {
+        files.push(new AttachmentBuilder(routePng, { name: "profile.png" }));
+        embed.setImage("attachment://profile.png");
+        routeImage = true;
+      }
+    }
+    const statsPng = await buildLadderChart(fixture, ourTeam, info);
+    files.push(new AttachmentBuilder(statsPng, { name: "preview.png" }));
+    if (!routeImage) embed.setImage("attachment://preview.png");
+    return { embeds: [embed], files };
   } catch (err) {
     console.error("[ladderEmbed] Chart rendering failed, using text embed:", err.message);
-    return { embeds: [buildLadderPreviewEmbed(fixture, { ourTeam })] };
+    return { embeds: [buildLadderPreviewEmbed(fixture, { ourTeam, info })] };
   }
 }
 

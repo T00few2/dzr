@@ -4,6 +4,7 @@ export type ProfileSegment = {
   fromKm: number
   toKm: number
   direction: "forward" | "reverse"
+  archId?: number
 }
 
 export type ProfileZoom = {

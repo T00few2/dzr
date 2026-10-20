@@ -78,12 +78,26 @@ test("Sauce positions fill gaps and leave an existing band in place", () => {
   const merged = mergePositionedSegments(
     [{ name: "Richmond Sprint", type: "sprint", fromKm: 3.7, toKm: 3.9, direction: "forward" }],
     [
-      { name: "Richmond Sprint", type: "sprint", fromKm: 3.74, toKm: 3.97, direction: "forward" },
-      { name: "Country Sprint", type: "sprint", fromKm: 13.995, toKm: 14.142, direction: "forward" },
+      { name: "Richmond Sprint", type: "sprint", fromKm: 3.74, toKm: 3.97, direction: "forward", archId: 4 },
+      { name: "Country Sprint", type: "sprint", fromKm: 13.995, toKm: 14.142, direction: "forward", archId: 2 },
     ]
   )
   assert.deepStrictEqual(merged.map((segment) => segment.name), ["Richmond Sprint", "Country Sprint"])
   assert.strictEqual(merged[0].fromKm, 3.7)
+  assert.strictEqual(merged[0].archId, 4)
+  assert.strictEqual(merged[1].archId, 2)
+})
+
+test("arch id stays on a segment through the race profile", () => {
+  const profile = buildRaceProfile({
+    distanceM: [0, 5000, 9000],
+    altitudeM: [10, 40, 12],
+    segments: [{ name: "Libby Hill", type: "climb", fromKm: 7, toKm: 8.2, direction: "forward", archId: 4 }],
+    raceKm: 9,
+    finishText: "",
+    climbNames: [],
+  })
+  assert.strictEqual(profile.segments[0].archId, 4)
 })
 
 test("a lead-in in the elevation stream is removed from the segment marks", () => {

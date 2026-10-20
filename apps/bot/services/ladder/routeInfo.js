@@ -1,4 +1,5 @@
-const { lookupRoute } = require("./ladderRoutes");
+const { totalGainM } = require("../routeProfileGeometry");
+const { getRouteProfile } = require("../routeProfileApi");
 
 // Same thresholds as the ZwiftEventViewer route classification (metres of climbing per km).
 function classify(elevPerKm) {
@@ -8,15 +9,26 @@ function classify(elevPerKm) {
   return "Bjergrig";
 }
 
-// Returns total distance/elevation incl. lead-in and laps (or up to a fixed distance in metres), or null for unknown routes.
-function describeRoute(routeName, laps, distanceM = null) {
-  const route = routeName ? lookupRoute(null, routeName) : null;
-  if (!route) return null;
-  let lapCount = laps || 1;
-  if (distanceM) lapCount = route.distKm > 0 ? Math.max(distanceM / 1000 - (route.leadInKm || 0), 0) / route.distKm : 0;
-  const distKm = distanceM ? distanceM / 1000 : (route.leadInKm || 0) + route.distKm * lapCount;
-  const elevM = (route.leadInElevM || 0) + route.elevM * lapCount;
+// Distance and climbing from the site profile (raceKm already includes the lead-in). Null when there is no profile.
+function describeProfile(profile) {
+  if (!profile || !(Number(profile.raceKm) > 0)) return null;
+  const distKm = Number(profile.raceKm);
+  const elevM = totalGainM(profile.altitudeM || []);
   return { distKm, elevM, kind: classify(distKm > 0 ? elevM / distKm : 0) };
 }
 
-module.exports = { describeRoute };
+async function loadMatchProfile(fixture, fetchProfile = getRouteProfile) {
+  const route = String(fixture?.route || "").trim();
+  if (!route) return null;
+  const distanceKm = Number(fixture.distance) > 0 ? Number(fixture.distance) / 1000 : 0;
+  const laps = distanceKm > 0 ? 1 : Math.max(1, Number(fixture.laps) || 1);
+  const loaded = await fetchProfile({
+    world: fixture.world || "",
+    route,
+    laps,
+    distanceKm,
+  });
+  return loaded && loaded.success ? loaded.profile : null;
+}
+
+module.exports = { describeProfile, loadMatchProfile, classify };

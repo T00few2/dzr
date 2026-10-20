@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require("discord.js");
-const { describeRoute } = require("./routeInfo");
+const { describeProfile, loadMatchProfile } = require("./routeInfo");
 const { enrichRiders } = require("./riderPower");
 const { cleanName } = require("./ladderChart");
 const { accentColor } = require("./ladderEmbed");
@@ -85,7 +85,7 @@ function buildTactics({ us, them, usStats, themStats, decisive, info, fixture })
 async function buildLadderAnalysisMessage(fixture, ourTeam = null) {
   await enrichRiders([...fixture.home.riders, ...fixture.away.riders]);
   const { us, them } = orient(fixture, ourTeam);
-  const info = describeRoute(fixture.route, fixture.laps, fixture.distance);
+  const info = describeProfile(await loadMatchProfile(fixture));
   const decisive = DECISIVE[info ? info.kind : "Let kuperet"];
 
   const usStats = {};

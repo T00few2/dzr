@@ -59,10 +59,8 @@ async function fetchZwiftPower(zwid) {
 
 async function fetchZrs(zwid) {
   const profile = await apiGet(`/zwift_profile/${zwid}`);
-  const metrics = profile && profile.competitionMetrics;
-  if (!metrics || metrics.racingScore == null) return null;
-  const category = profile.male === false ? metrics.categoryWomen : metrics.category;
-  return { score: metrics.racingScore, category: category || null };
+  if (!profile || profile.racingScore == null) return null;
+  return { score: profile.racingScore, category: profile.category || null };
 }
 
 async function fetchRider(zwid) {

@@ -1058,16 +1058,29 @@ def rider_data(rider_id: int):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def _racing_score_and_category(profile):
+    """Racing score and the rider's category. None when Zwift has no score."""
+    if not profile:
+        return None
+    metrics = profile.get("competitionMetrics") or {}
+    score = metrics.get("racingScore")
+    if score is None:
+        return None
+    women = profile.get("male") is False
+    category = metrics.get("categoryWomen") if women else metrics.get("category")
+    return {"racingScore": score, "category": category}
+
+
 @app.route('/zwift_profile/<int:rider_id>', methods=['GET'])
 def zwift_profile(rider_id: int):
-    """Zwift profile for a rider (competitionMetrics holds ZRS and category); null when the rider does not exist"""
+    """Racing score and category for a rider; null when the rider or the score does not exist"""
     try:
         unauthorized = require_api_or_401()
         if unauthorized:
             return unauthorized
         zwift_api = get_authenticated_zwift_api()
         zwift_api.ensure_valid_token()
-        return jsonify(zwift_api.get_profile(rider_id))
+        return jsonify(_racing_score_and_category(zwift_api.get_profile(rider_id)))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

@@ -179,10 +179,15 @@ function mergePositionedSegments(existing, extra) {
   const merged = Array.isArray(existing) ? [...existing] : []
   for (const segment of extra || []) {
     if (!segment || (segment.type !== "sprint" && segment.type !== "climb")) continue
-    const duplicate = merged.some(
+    const duplicate = merged.find(
       (current) => current.type === segment.type && rangesOverlap(current, segment)
     )
-    if (duplicate) continue
+    if (duplicate) {
+      if (duplicate.archId == null && segment.archId != null) {
+        merged[merged.indexOf(duplicate)] = { ...duplicate, archId: segment.archId }
+      }
+      continue
+    }
     merged.push(segment)
   }
   return merged

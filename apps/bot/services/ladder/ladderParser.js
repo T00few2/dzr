@@ -1,4 +1,5 @@
 // Regex parsers for ladder.cycleracing.club pages; the site has no public API.
+const { powerupName } = require("../powerupIcons");
 
 const POWER_SECONDS = [5, 10, 15, 30, 60, 120, 300, 600, 1200, 1800, 3600];
 
@@ -58,24 +59,45 @@ function parseSignups(sectionHtml) {
   return { name: teamName ? decodeEntities(teamName.trim()) : null, riders };
 }
 
-// Per-arch powerup choices from the fixture's tags: arch_powerup="archId,powerupId,..." (archId -> powerupId).
-function parseArchPowerups(html) {
-  const map = {};
+function parseTags(html) {
   const tagsMatch = html.match(/const tags = (\[[^\n]*\]);/);
-  if (!tagsMatch) return map;
-  let tags;
+  if (!tagsMatch) return [];
   try {
-    tags = JSON.parse(tagsMatch[1]);
+    const tags = JSON.parse(tagsMatch[1]);
+    return Array.isArray(tags) ? tags : [];
   } catch {
-    return map;
+    return [];
   }
+}
+
+// Per-arch powerup choices: arch_powerup="archId,powerupId,..." (archId -> powerupId).
+function parseArchPowerups(tags) {
+  const map = {};
   for (const tag of tags) {
     const m = String(tag).match(/arch_powerup="([^"]+)"/);
     if (!m) continue;
     const parts = m[1].split(",");
-    for (let i = 0; i < parts.length - 1; i += 2) map[parts[i].trim()] = parseInt(parts[i + 1].trim(), 10);
+    for (let i = 0; i < parts.length - 1; i += 2) {
+      const id = parseInt(parts[i + 1].trim(), 10);
+      if (Number.isInteger(id)) map[parts[i].trim()] = id;
+    }
   }
   return map;
+}
+
+// The random bag: powerup_percent="id,pct,id,pct,...". Ids are unique and keep first-seen order.
+function parsePowerupPercent(tags) {
+  const ids = [];
+  for (const tag of tags) {
+    const m = String(tag).match(/powerup_percent="([^"]+)"/);
+    if (!m) continue;
+    const parts = m[1].split(",");
+    for (let i = 0; i < parts.length - 1; i += 2) {
+      const id = parseInt(parts[i].trim(), 10);
+      if (Number.isInteger(id) && !ids.includes(id)) ids.push(id);
+    }
+  }
+  return ids;
 }
 
 // Club colours come from the clubPill(...) calls: the first is the home club, the second the away club.
@@ -100,18 +122,22 @@ function parseFixture(html) {
   const laps = (html.match(/laps\s*<span class="badge[^"]*">(\d+)</) || [])[1] || (html.match(/let laps\s*=\s*(\d+)/) || [])[1];
   // Race length in metres when the fixture ends at a distance instead of a lap count (same variable the ladder page uses).
   const distance = (html.match(/let distance\s*=\s*(\d+(?:\.\d+)?)/) || [])[1];
-  const powerups = [1, 2]
+  const named = [1, 2]
     .map((n) => (html.match(new RegExp(`const fixturePU${n} = '(\\w+)'`)) || [])[1])
     .filter(Boolean);
+  const tags = parseTags(html);
+  const powerupIds = parsePowerupPercent(tags);
+  const powerups = powerupIds.length ? powerupIds.map((id) => powerupName(id) || String(id)) : named;
   const routeId = (html.match(/let routeId\s*=\s*(\d+)/) || [])[1] || null;
   return {
     start,
     routeId,
-    archPowerups: parseArchPowerups(html),
+    archPowerups: parseArchPowerups(tags),
     route: routeName ? decodeEntities(routeName.trim()) : null,
     world: world ? decodeEntities(world.trim()) : null,
     laps: laps ? Number(laps) : null,
     distance: distance ? Number(distance) : null,
+    powerupIds,
     powerups,
     colors: parseClubColors(html),
     home: parseSignups(signupSection(html, "home")),

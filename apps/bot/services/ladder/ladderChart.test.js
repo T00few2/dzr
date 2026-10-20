@@ -22,7 +22,7 @@ function riders(prefix, base) {
   }));
 }
 
-// No routeId, so the chart is built without any network access.
+// The chart is the W/kg comparison only. Route distance is passed in and no profile is fetched.
 const fixture = {
   id: "1",
   start: "2026-10-05T17:30:00Z",

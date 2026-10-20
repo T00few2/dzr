@@ -83,7 +83,7 @@ async function buildRouteProfileImages(args = {}, deps = {}) {
 
   const details = facts(profile, resolved.world, laps);
   const text = `**${resolved.name}** · ${details}`;
-  const main = render.renderRouteProfile(profile, { name: resolved.name, subtitle: details });
+  const main = await render.renderRouteProfile(profile, { name: resolved.name, subtitle: details });
   if (!main) return { success: false, message: "Could not draw the profile image." };
   const files = [{ name: `${fileSlug(resolved.name)}-profile.png`, buffer: main }];
 

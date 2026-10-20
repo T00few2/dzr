@@ -1,7 +1,4 @@
-const https = require("https");
-const { describeRoute } = require("./routeInfo");
-const { buildRouteProfile } = require("./routeProfile");
-const ladderClient = require("./ladderClient");
+const { loadPowerupImage, powerupName } = require("../powerupIcons");
 
 // Loaded on first use so modules that only need cleanName() (and the unit tests) do not need the native canvas binary.
 let canvasLib;
@@ -73,37 +70,6 @@ function orient(fixture, ourTeam) {
     usColor: (distinct && readable(usHex)) || FALLBACK.us,
     themColor: (distinct && readable(themHex)) || FALLBACK.them,
   };
-}
-
-const iconCache = new Map();
-
-function fetchBuffer(url) {
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, (res) => {
-        if (res.statusCode !== 200) {
-          res.resume();
-          reject(new Error(`status ${res.statusCode}`));
-          return;
-        }
-        const chunks = [];
-        res.on("data", (c) => chunks.push(c));
-        res.on("end", () => resolve(Buffer.concat(chunks)));
-      })
-      .on("error", reject);
-  });
-}
-
-async function powerupIcon(name) {
-  if (!iconCache.has(name)) {
-    try {
-      const buf = await fetchBuffer(`https://ladder.cycleracing.club/img/powerups/${encodeURIComponent(name)}.png`);
-      iconCache.set(name, await canvasModule().loadImage(buf));
-    } catch {
-      iconCache.set(name, null);
-    }
-  }
-  return iconCache.get(name);
 }
 
 function panel(ctx, x, y, w, h, title) {
@@ -354,198 +320,6 @@ function drawRiderTable(ctx, x, y, w, h, o) {
   });
 }
 
-// Loads route geometry for a fixture; returns null when anything is unavailable.
-async function loadRouteView(fixture) {
-  if (!fixture.routeId) return null;
-  try {
-    const { data } = await ladderClient.getRoute(fixture.routeId);
-    return { profile: buildRouteProfile(data, { laps: fixture.laps, distance: fixture.distance }) };
-  } catch (err) {
-    console.error("[ladderChart] Route view unavailable:", err.message);
-    return null;
-  }
-}
-
-async function drawRoute(ctx, x, y, w, view, fixture) {
-  const { profile } = view;
-  const h = routePanelHeight();
-  panel(ctx, x, y, w, h, "Rute og powerups");
-
-  const bx = x + 20, bw = w - 40, by = y + 64;
-  const baseY = by + 250;
-  const topY = by + 96;
-  const px = (dist) => bx + 20 + (dist / profile.totalDist) * (bw - 40);
-
-  ctx.fillStyle = "#23252b";
-  ctx.beginPath();
-  ctx.roundRect(bx, by, bw, 340, 10);
-  ctx.fill();
-
-  // Lap structure (from the race length: laps or a fixed distance): alternating shading plus dashed dividers.
-  const lapSpans = profile.laps;
-  lapSpans.forEach((lap, i) => {
-    if (i % 2 === 0) return;
-    ctx.fillStyle = "rgba(255,255,255,0.04)";
-    ctx.fillRect(px(lap.from), by + 4, px(lap.to) - px(lap.from), baseY - by - 4);
-  });
-
-  // Elevation profile.
-  const elevs = profile.elevation.map((p) => p[1]);
-  const minE = Math.min(...elevs), maxE = Math.max(...elevs);
-  const scaleY = (baseY - topY) / Math.max(maxE - minE, 25);
-  const curve = profile.elevation.map(([d, e]) => [px(d), baseY - (e - minE) * scaleY]);
-  const grad = ctx.createLinearGradient(0, topY, 0, baseY);
-  grad.addColorStop(0, "rgba(150,170,210,0.85)");
-  grad.addColorStop(1, "rgba(150,170,210,0.2)");
-  ctx.beginPath();
-  ctx.moveTo(curve[0][0], baseY);
-  curve.forEach(([cx2, cy2]) => ctx.lineTo(cx2, cy2));
-  ctx.lineTo(curve[curve.length - 1][0], baseY);
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
-  ctx.beginPath();
-  curve.forEach(([cx2, cy2], i) => (i === 0 ? ctx.moveTo(cx2, cy2) : ctx.lineTo(cx2, cy2)));
-  ctx.strokeStyle = "#cdd6ee";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.lineWidth = 1;
-
-  // Dashed dividers at lead-in end and between laps.
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.setLineDash([5, 5]);
-  for (const d of [profile.leadInDist, ...lapSpans.slice(1).map((lap) => lap.from)]) {
-    if (d <= 0) continue;
-    ctx.beginPath();
-    ctx.moveTo(px(d), by + 4);
-    ctx.lineTo(px(d), baseY);
-    ctx.stroke();
-  }
-  ctx.setLineDash([]);
-
-  // Lead-in is not part of the race: red tint over the whole chart height plus a START tag at its end.
-  if (profile.leadInDist > 0) {
-    ctx.fillStyle = "rgba(255,70,70,0.22)";
-    ctx.fillRect(px(0) - 20, by + 4, px(profile.leadInDist) - px(0) + 20, baseY - by - 4);
-    ctx.font = `bold 16px ${FONT}`;
-    const tagW = ctx.measureText("START").width + 16;
-    const tagX = px(profile.leadInDist) + 4;
-    ctx.fillStyle = "rgba(235,70,70,0.95)";
-    ctx.beginPath();
-    ctx.roundRect(tagX, baseY - 34, tagW, 24, 6);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "left";
-    ctx.fillText("START", tagX + 8, baseY - 16);
-  }
-
-  // Finish: the route ends where the laps or the fixed race distance end.
-  {
-    ctx.font = `bold 16px ${FONT}`;
-    const finishW = ctx.measureText("MÅL").width + 16;
-    const finishX = px(profile.totalDist) - finishW - 4;
-    ctx.fillStyle = "rgba(40,170,90,0.95)";
-    ctx.beginPath();
-    ctx.roundRect(finishX, baseY - 34, finishW, 24, 6);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "left";
-    ctx.fillText("MÅL", finishX + 8, baseY - 16);
-    ctx.strokeStyle = "rgba(40,170,90,0.9)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(px(profile.totalDist), by + 4);
-    ctx.lineTo(px(profile.totalDist), baseY);
-    ctx.stroke();
-    ctx.lineWidth = 1;
-  }
-
-  // Powerup banners: thin stem plus the available powerups.
-  const bannerNames = (m) =>
-    fixture.archPowerups && fixture.archPowerups[m.archId] !== undefined ? [fixture.archPowerups[m.archId]] : fixture.powerups || [];
-  const icons = new Map();
-  for (const m of profile.markers.filter((mk) => mk.givesPowerUp)) {
-    for (const n of bannerNames(m)) if (!icons.has(n)) icons.set(n, await powerupIcon(n));
-  }
-  for (const m of profile.markers.filter((mk) => mk.givesPowerUp)) {
-    const mx = px(m.dist);
-    ctx.strokeStyle = "rgba(245,197,66,0.8)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(mx, by + 62);
-    ctx.lineTo(mx, baseY);
-    ctx.stroke();
-    ctx.lineWidth = 1;
-    bannerNames(m).forEach((n, i) => {
-      const img = icons.get(n);
-      const size = 26;
-      const iy = by + 8 + i * (size + 2);
-      ctx.fillStyle = "rgba(255,255,255,0.12)";
-      ctx.beginPath();
-      ctx.arc(mx, iy + size / 2, size / 2 + 1, 0, Math.PI * 2);
-      ctx.fill();
-      if (img) ctx.drawImage(img, mx - size / 2, iy, size, size);
-    });
-  }
-
-  // Distance axis with minor ticks every km.
-  ctx.fillStyle = C.muted;
-  ctx.font = `18px ${FONT}`;
-  ctx.textAlign = "center";
-  ctx.strokeStyle = C.grid;
-  for (let km = 0; km * 1000 <= profile.totalDist; km++) {
-    ctx.beginPath();
-    ctx.moveTo(px(km * 1000), baseY);
-    ctx.lineTo(px(km * 1000), baseY + (km % 5 === 0 ? 8 : 4));
-    ctx.stroke();
-    if (km % 5 === 0) ctx.fillText(km === 0 ? "0 km" : `${km}`, px(km * 1000), baseY + 28);
-  }
-
-  // Lap brackets under the axis.
-  const bracketY = baseY + 48;
-  ctx.font = `17px ${FONT}`;
-  const parts = [["Lead-in", 0, profile.leadInDist], ...lapSpans.map((lap, i) => [lap.partial ? `Omgang ${i + 1} (del)` : `Omgang ${i + 1}`, lap.from, lap.to])];
-  for (const [label, from, to] of parts) {
-    if (to - from <= 0) continue;
-    ctx.strokeStyle = "rgba(255,255,255,0.35)";
-    ctx.beginPath();
-    ctx.moveTo(px(from) + 3, bracketY);
-    ctx.lineTo(px(to) - 3, bracketY);
-    ctx.stroke();
-    ctx.fillStyle = label === "Lead-in" ? "rgb(255,120,120)" : C.muted;
-    ctx.textAlign = "center";
-    ctx.fillText(label, (px(from) + px(to)) / 2, bracketY + 20);
-  }
-
-  // Legend: powerups and lead-in.
-  const ly = by + 340 + 34;
-  ctx.textAlign = "left";
-  ctx.font = `20px ${FONT}`;
-  ctx.fillStyle = C.text;
-  const puLabel = `Powerups (${profile.markers.filter((m) => m.givesPowerUp).length} banner): `;
-  ctx.fillText(puLabel, bx, ly);
-  let lx = bx + ctx.measureText(puLabel).width + 6;
-  for (const n of fixture.powerups || []) {
-    const img = icons.get(n) || (await powerupIcon(n));
-    if (img) ctx.drawImage(img, lx, ly - 22, 28, 28);
-    ctx.fillStyle = C.text;
-    ctx.fillText(n, lx + 34, ly);
-    lx += 34 + ctx.measureText(n).width + 24;
-  }
-  if (profile.leadInDist > 0) {
-    ctx.fillStyle = "rgba(255,70,70,0.45)";
-    ctx.fillRect(lx + 12, ly - 17, 22, 22);
-    ctx.fillStyle = C.text;
-    ctx.fillText("Lead-in (ikke en del af løbet)", lx + 42, ly);
-  }
-
-  return h;
-}
-
-function routePanelHeight() {
-  return 64 + 340 + 50 + 20;
-}
-
 function formatStart(iso) {
   return new Date(iso).toLocaleString("da-DK", {
     timeZone: "Europe/Copenhagen",
@@ -557,7 +331,7 @@ function formatStart(iso) {
   });
 }
 
-async function drawHeader(ctx, fixture, o) {
+async function drawHeader(ctx, fixture, o, info) {
   ctx.textAlign = "left";
   let size = 46;
   const sep = "  mod  ";
@@ -586,7 +360,6 @@ async function drawHeader(ctx, fixture, o) {
   ctx.fillStyle = o.themColor;
   ctx.fillText(o.them.name, PAD + usW + sepW, baseY);
 
-  const info = describeRoute(fixture.route, fixture.laps, fixture.distance);
   const parts = [];
   if (fixture.route) parts.push(fixture.world ? `${fixture.route} (${fixture.world})` : fixture.route);
   if (fixture.laps && !fixture.distance) parts.push(`${fixture.laps} omgange`);
@@ -598,10 +371,12 @@ async function drawHeader(ctx, fixture, o) {
   ctx.fillStyle = C.muted;
   ctx.fillText(fixture.start ? formatStart(fixture.start) : "", PAD, 142);
 
-  // Powerups, right aligned.
+  // Powerups, right aligned. The route picture carries the banner placement.
+  const icons = fixture.powerupIds?.length ? fixture.powerupIds : fixture.powerups || [];
   let ix = WIDTH - PAD;
-  for (const name of [...(fixture.powerups || [])].reverse()) {
-    const img = await powerupIcon(name);
+  for (const item of [...icons].reverse()) {
+    const img = await loadPowerupImage(item);
+    const label = powerupName(item) || String(item);
     ix -= 64;
     if (img) {
       ctx.drawImage(img, ix, 80, 60, 60);
@@ -613,31 +388,26 @@ async function drawHeader(ctx, fixture, o) {
       ctx.fillStyle = C.text;
       ctx.font = `bold 16px ${FONT}`;
       ctx.textAlign = "center";
-      ctx.fillText(name, ix + 22, 116);
+      ctx.fillText(label, ix + 22, 116);
       ctx.textAlign = "left";
     }
   }
 }
 
-// Renders a fixture (see ladderParser.js) as a PNG buffer. ourTeam is the team drawn first.
-async function buildLadderChart(fixture, ourTeam) {
+// Renders the W/kg comparison for a fixture (see ladderParser.js) as a PNG buffer. ourTeam is the team drawn first.
+// info is the optional site-profile summary ({ distKm, elevM, kind }); the route itself is a separate image.
+async function buildLadderChart(fixture, ourTeam, info = null) {
   const o = orient(fixture, ourTeam);
-  const routeView = await loadRouteView(fixture);
-  const routeH = routeView ? routePanelHeight() + PAD : 0;
   const headerH = 170, barsH = 400, diffH = 110 + DURATIONS.length * 52, ridersH = riderTableHeight(o);
-  const height = headerH + routeH + barsH + diffH + ridersH + PAD * 4;
+  const height = headerH + barsH + diffH + ridersH + PAD * 4;
   const canvas = canvasModule().createCanvas(WIDTH, height);
   const ctx = canvas.getContext("2d");
 
   ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, WIDTH, height);
-  await drawHeader(ctx, fixture, o);
+  await drawHeader(ctx, fixture, o, info);
 
   let y = headerH;
-  if (routeView) {
-    await drawRoute(ctx, PAD, y, WIDTH - 2 * PAD, routeView, fixture);
-    y += routeH;
-  }
   drawBars(ctx, PAD, y, WIDTH - 2 * PAD, barsH, o);
   y += barsH + PAD;
   drawDiff(ctx, PAD, y, WIDTH - 2 * PAD, diffH, o);

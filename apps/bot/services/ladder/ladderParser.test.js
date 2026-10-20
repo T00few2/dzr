@@ -29,4 +29,25 @@ test("parseFixture reads start, laps, fixed distance and signups with Zwift ids"
   assert.equal(rider.wkg[300], 4.5);
   assert.equal(rider.wkg[1200], null);
   assert.deepEqual(fixture.away.riders, []);
+  assert.deepEqual(fixture.powerupIds, []);
+  assert.deepEqual(fixture.powerups, []);
+});
+
+test("parseFixture reads the powerup bag and arch overrides from the event tags", () => {
+  const html = `<script>
+    const tags = ["powerup_percent=\\"0,40,1,30,5,30\\"","arch_powerup=\\"0,3,4,5\\""];
+    const fixturePU1 = 'feather';
+    const fixturePU2 = 'aero';
+  </script>`;
+  const fixture = parseFixture(html);
+  assert.deepEqual(fixture.powerupIds, [0, 1, 5]);
+  assert.deepEqual(fixture.powerups, ["Feather", "Draft", "Aero"]);
+  assert.deepEqual(fixture.archPowerups, { 0: 3, 4: 5 });
+});
+
+test("parseFixture keeps the named powerups when the bag is missing", () => {
+  const html = `<script>const fixturePU1 = 'feather'; const fixturePU2 = 'aero';</script>`;
+  const fixture = parseFixture(html);
+  assert.deepEqual(fixture.powerupIds, []);
+  assert.deepEqual(fixture.powerups, ["feather", "aero"]);
 });

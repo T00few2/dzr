@@ -5,7 +5,7 @@ const ladderTeams = require("./ladderTeams");
 const ladderClient = require("./ladderClient");
 const ladderState = require("./ladderState");
 const { buildLadderPreviewMessage, accentColor } = require("./ladderEmbed");
-const { describeRoute } = require("./routeInfo");
+const { describeProfile, loadMatchProfile } = require("./routeInfo");
 
 const TICK_MS = 10 * 60 * 1000;
 const REMINDER_HOUR = 12;
@@ -34,9 +34,8 @@ function isReminderDue(startIso, now, tz) {
   return localDate(start, tz) === localDate(now, tz) && start > now && localHour(now, tz) >= REMINDER_HOUR;
 }
 
-function dayEmbed(fixture, ourTeam) {
+function dayEmbed(fixture, ourTeam, info = null) {
   const ts = Math.floor(new Date(fixture.start).getTime() / 1000);
-  const info = describeRoute(fixture.route, fixture.laps, fixture.distance);
   const route = [
     fixture.route ? `${fixture.route}${fixture.world ? ` (${fixture.world})` : ""}` : null,
     fixture.laps ? `${fixture.laps} omgange` : null,
@@ -71,7 +70,9 @@ async function syncTeam(client, team, now) {
       const windowMinutes = team.previewMinutes || config.ladder.previewMinutes;
 
       if (wantReminder && isReminderDue(start, now, config.ladder.tz)) {
-        await channel.send({ embeds: [dayEmbed(await ladderClient.getFixture(id), team.name)] });
+        const fixture = await ladderClient.getFixture(id);
+        const info = describeProfile(await loadMatchProfile(fixture));
+        await channel.send({ embeds: [dayEmbed(fixture, team.name, info)] });
         await ladderState.markPosted("postedLadderDayReminder", id);
       }
       if (wantPreview && isPreviewDue(start, windowMinutes, now)) {
