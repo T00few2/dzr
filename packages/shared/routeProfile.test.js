@@ -1,6 +1,6 @@
 const test = require("node:test")
 const assert = require("node:assert")
-const { parseFinish, buildRaceProfile, raceDistanceKm, profileImageSrc, mergePositionedSegments, prepareLap, shiftProfileSegments, bonusNamesMatch, zwiftInsiderUrl } = require("./routeProfile")
+const { parseFinish, buildRaceProfile, raceDistanceKm, profileImageSrc, mergePositionedSegments, prepareLap, shiftProfileSegments, bonusNamesMatch, zwiftInsiderUrl, placeOnRoute } = require("./routeProfile")
 
 test("a Zwift Insider link is the route name", () => {
   assert.strictEqual(zwiftInsiderUrl("Royal Pump Room 8"), "https://zwiftinsider.com/route/royal-pump-room-8/")
@@ -72,6 +72,17 @@ test("ZwiftPower names match the segment on the route", () => {
   assert.ok(profile.finish.fromKm > 16)
   assert.strictEqual(profile.climbs[0].matched, true)
   assert.strictEqual(profile.climbs[1].matched, true)
+})
+
+test("a segment ridden backwards is not placed on the route", () => {
+  const route = []
+  for (let index = 0; index <= 20; index += 1) route.push([51.5 + index * 0.0002, -0.1])
+  const distance = route.map((_, index) => index * 22.24)
+  const forward = [route[2], route[10], route[18]]
+  const hit = placeOnRoute(route, distance, forward)
+  assert.ok(hit)
+  assert.ok(hit.toM > hit.fromM)
+  assert.strictEqual(placeOnRoute(route, distance, [route[18], route[10], route[2]]), null)
 })
 
 test("Sauce positions fill gaps and leave an existing band in place", () => {
