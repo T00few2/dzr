@@ -59,3 +59,11 @@ test("segment search lists the routes that include it", () => {
 test("a missing route points the helper to the web", () => {
   assert.match(routes.routeDetails("Brand New Route 2027").message, /web/);
 });
+
+test("the shared tool runner dispatches every declared route tool", () => {
+  const { zwiftRouteToolDefinitions, runZwiftRouteTool } = require("./zwiftRoutes");
+  const args = { zwift_routes: {}, zwift_route_details: { route: "Road to Sky" }, zwift_segments: {} };
+  for (const tool of zwiftRouteToolDefinitions) {
+    assert.equal(runZwiftRouteTool(tool.function.name, args[tool.function.name], routes).success, true, tool.function.name);
+  }
+});

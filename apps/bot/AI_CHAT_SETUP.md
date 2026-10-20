@@ -289,6 +289,13 @@ If you encounter issues:
 
 **Enjoy your AI-powered Discord bot!** 🤖🚴
 
+## Zwift routes (`zwift_routes`, `zwift_route_details`, `zwift_segments`)
+
+The club bot answers route, climb and segment questions itself from the bundled `zwift-data`
+package (`services/zwiftRoutes.js`): distance, elevation, lead-in, and the climbs and sprints along
+each route. It is local, so these answers are instant and free. The package is a snapshot; bump
+`zwift-data` now and then, and a route newer than it is passed to DZR Helper's web search.
+
 ## DZR Helper (`ask_helper`)
 
 Both the club bot and DZR Coach can call `ask_helper` when none of their own tools fit. It runs a

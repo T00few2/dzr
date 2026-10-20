@@ -17,6 +17,7 @@ const { COACH_MODEL, createStatelessResponse, functionCallOutputs } = require(".
 const { extractTokenUsage } = require("./coachUsage");
 const zwiftPower = require("./zwiftPowerReader");
 const zwiftRoutes = require("./zwiftRoutes");
+const { zwiftRouteToolDefinitions, ZWIFT_ROUTE_TOOLS, runZwiftRouteTool } = zwiftRoutes;
 
 const HELPER_MODEL = process.env.HELPER_MODEL || COACH_MODEL;
 const HELPER_REASONING_EFFORT = process.env.HELPER_REASONING_EFFORT || "medium";
@@ -52,54 +53,7 @@ You only read. You cannot post messages, change roles, link IDs, save anything o
 6. Answer in the language of the question. Be concise: a few short paragraphs or a short list. No preamble.`;
 
 const helperToolDefinitions = [
-  {
-    type: "function",
-    function: {
-      name: "zwift_routes",
-      description: "Search and filter Zwift routes by name, world, distance and elevation. Returns name, world, km, elevation and lead-in. With no query, sorted shortest first.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: { type: "string", description: "Part of the route name, e.g. 'tempus' or 'Road to Sky'." },
-          world: { type: "string", description: "World name, e.g. 'Watopia', 'Makuri Islands', 'France'." },
-          min_km: { type: "number" },
-          max_km: { type: "number" },
-          min_elevation: { type: "number", description: "Metres." },
-          max_elevation: { type: "number", description: "Metres." },
-          include_event_only: { type: "boolean", description: "Include event-only routes. Default true." },
-          limit: { type: "number", description: "1-15. Default 10." },
-        },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "zwift_route_details",
-      description: "One Zwift route in detail: distance, elevation, lead-in, climbs/sprints/segments along it with km positions, lap/TT/level-lock flags, XP and links.",
-      parameters: {
-        type: "object",
-        properties: { route: { type: "string", description: "Route name." } },
-        required: ["route"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "zwift_segments",
-      description: "Search Zwift climbs, sprints and segments by name, world or type. Returns length, elevation, gradient and routes that include it.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: { type: "string", description: "Part of the segment name, e.g. 'Alpe' or 'Epic KOM'." },
-          world: { type: "string" },
-          type: { type: "string", enum: ["climb", "sprint", "segment"] },
-          limit: { type: "number", description: "1-15. Default 10." },
-        },
-      },
-    },
-  },
+  ...zwiftRouteToolDefinitions,
   {
     type: "function",
     function: {
@@ -249,16 +203,9 @@ async function executeHelperTool(call, run, deps) {
     return { success: false, message: "Invalid arguments." };
   }
 
+  if (ZWIFT_ROUTE_TOOLS.has(call.name)) return runZwiftRouteTool(call.name, args, deps.zwiftRoutes);
+
   switch (call.name) {
-    case "zwift_routes":
-      return deps.zwiftRoutes.searchRoutes(args);
-
-    case "zwift_route_details":
-      return deps.zwiftRoutes.routeDetails(args.route);
-
-    case "zwift_segments":
-      return deps.zwiftRoutes.searchSegments(args);
-
     case "search_club_knowledge": {
       const matches = knowledgeMatches(await deps.getAllBotKnowledge(), args.query);
       return matches.length

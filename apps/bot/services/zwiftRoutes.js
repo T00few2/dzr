@@ -171,4 +171,74 @@ function createZwiftRoutes(data = zwiftData) {
   return { searchRoutes, routeDetails, searchSegments };
 }
 
-module.exports = { createZwiftRoutes, ...createZwiftRoutes() };
+// Shared by the club bot and DZR Helper. Local and instant, so the club bot calls them itself
+// instead of asking the helper.
+const zwiftRouteToolDefinitions = [
+  {
+    type: "function",
+    function: {
+      name: "zwift_routes",
+      description: "Search and filter Zwift routes by name, world, distance and elevation. Returns name, world, km, elevation and lead-in. With no query, sorted shortest first.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Part of the route name, e.g. 'tempus' or 'Road to Sky'." },
+          world: { type: "string", description: "World name, e.g. 'Watopia', 'Makuri Islands', 'France'." },
+          min_km: { type: "number" },
+          max_km: { type: "number" },
+          min_elevation: { type: "number", description: "Metres." },
+          max_elevation: { type: "number", description: "Metres." },
+          include_event_only: { type: "boolean", description: "Include event-only routes. Default true." },
+          limit: { type: "number", description: "1-15. Default 10." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "zwift_route_details",
+      description: "One Zwift route in detail: distance, elevation, lead-in, climbs/sprints/segments along it with km positions, lap/TT/level-lock flags, XP and links.",
+      parameters: {
+        type: "object",
+        properties: { route: { type: "string", description: "Route name." } },
+        required: ["route"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "zwift_segments",
+      description: "Search Zwift climbs, sprints and segments by name, world or type. Returns length, elevation, gradient and routes that include it.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Part of the segment name, e.g. 'Alpe' or 'Epic KOM'." },
+          world: { type: "string" },
+          type: { type: "string", enum: ["climb", "sprint", "segment"] },
+          limit: { type: "number", description: "1-15. Default 10." },
+        },
+      },
+    },
+  },
+];
+
+const ZWIFT_ROUTE_TOOLS = new Set(zwiftRouteToolDefinitions.map((tool) => tool.function.name));
+
+function runZwiftRouteTool(name, args = {}, routes = defaultRoutes) {
+  if (name === "zwift_routes") return routes.searchRoutes(args);
+  if (name === "zwift_route_details") return routes.routeDetails(args.route);
+  if (name === "zwift_segments") return routes.searchSegments(args);
+  return { success: false, message: `Unknown tool ${name}.` };
+}
+
+const defaultRoutes = createZwiftRoutes();
+
+module.exports = {
+  createZwiftRoutes,
+  ...defaultRoutes,
+  zwiftRouteToolDefinitions,
+  ZWIFT_ROUTE_TOOLS,
+  runZwiftRouteTool,
+};
