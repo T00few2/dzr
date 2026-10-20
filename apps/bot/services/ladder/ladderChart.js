@@ -1,5 +1,3 @@
-const { loadPowerupImage, powerupName } = require("../powerupIcons");
-
 // Loaded on first use so modules that only need cleanName() (and the unit tests) do not need the native canvas binary.
 let canvasLib;
 function canvasModule() {
@@ -331,7 +329,7 @@ function formatStart(iso) {
   });
 }
 
-async function drawHeader(ctx, fixture, o, info) {
+function drawHeader(ctx, fixture, o, info) {
   ctx.textAlign = "left";
   let size = 46;
   const sep = "  mod  ";
@@ -370,33 +368,11 @@ async function drawHeader(ctx, fixture, o, info) {
   ctx.fillText(parts.length ? parts.join("  |  ") : "Rute ikke oplyst", PAD, 108);
   ctx.fillStyle = C.muted;
   ctx.fillText(fixture.start ? formatStart(fixture.start) : "", PAD, 142);
-
-  // Powerups, right aligned. The route picture carries the banner placement.
-  const icons = fixture.powerupIds?.length ? fixture.powerupIds : fixture.powerups || [];
-  let ix = WIDTH - PAD;
-  for (const item of [...icons].reverse()) {
-    const img = await loadPowerupImage(item);
-    const label = powerupName(item) || String(item);
-    ix -= 64;
-    if (img) {
-      ctx.drawImage(img, ix, 80, 60, 60);
-    } else {
-      ctx.fillStyle = C.panel;
-      ctx.beginPath();
-      ctx.roundRect(ix - 20, 90, 84, 40, 10);
-      ctx.fill();
-      ctx.fillStyle = C.text;
-      ctx.font = `bold 16px ${FONT}`;
-      ctx.textAlign = "center";
-      ctx.fillText(label, ix + 22, 116);
-      ctx.textAlign = "left";
-    }
-  }
 }
 
 // Renders the W/kg comparison for a fixture (see ladderParser.js) as a PNG buffer. ourTeam is the team drawn first.
 // info is the optional site-profile summary ({ distKm, elevM, kind }); the route itself is a separate image.
-async function buildLadderChart(fixture, ourTeam, info = null) {
+function buildLadderChart(fixture, ourTeam, info = null) {
   const o = orient(fixture, ourTeam);
   const headerH = 170, barsH = 400, diffH = 110 + DURATIONS.length * 52, ridersH = riderTableHeight(o);
   const height = headerH + barsH + diffH + ridersH + PAD * 4;
@@ -405,7 +381,7 @@ async function buildLadderChart(fixture, ourTeam, info = null) {
 
   ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, WIDTH, height);
-  await drawHeader(ctx, fixture, o, info);
+  drawHeader(ctx, fixture, o, info);
 
   let y = headerH;
   drawBars(ctx, PAD, y, WIDTH - 2 * PAD, barsH, o);

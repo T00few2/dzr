@@ -82,6 +82,33 @@ function title(ctx, text, sub, width) {
   }
 }
 
+function drawDashedGuide(ctx, xOf, km, top, bottom) {
+  ctx.strokeStyle = AXIS_TEXT;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(xOf(km), top);
+  ctx.lineTo(xOf(km), bottom);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// Lap and finish arches have no coloured band, so the icon needs the same dashed guide as the lead-in.
+function flyingPowerupKm(profile, markers) {
+  const segments = profile?.segments || [];
+  const km = [];
+  for (const marker of markers || []) {
+    if (!(marker?.atKm >= 0) || !(marker.powerupIds || []).length) continue;
+    if (Number(profile?.leadInKm) > 0 && Math.abs(marker.atKm - profile.leadInKm) < 0.02) continue;
+    const onBand = segments.some(
+      (segment) =>
+        (segment.type === "sprint" || segment.type === "climb") &&
+        Math.abs(Number(segment.toKm) - marker.atKm) < 0.02
+    );
+    if (!onBand) km.push(marker.atKm);
+  }
+  return km;
+}
+
 async function drawPowerupIcons(ctx, xOf, markers, plotTop) {
   const size = 22;
   for (const marker of markers || []) {
@@ -160,15 +187,8 @@ async function renderRouteProfile(profile, { name = "", subtitle = "", powerups 
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    if (profile.leadInKm > 0) {
-      ctx.strokeStyle = AXIS_TEXT;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(x(profile.leadInKm), pad.top);
-      ctx.lineTo(x(profile.leadInKm), bottom);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
+    if (profile.leadInKm > 0) drawDashedGuide(ctx, x, profile.leadInKm, pad.top, bottom);
+    for (const km of flyingPowerupKm(profile, powerups)) drawDashedGuide(ctx, x, km, pad.top, bottom);
 
     if (powerups.length) await drawPowerupIcons(ctx, x, powerups, pad.top);
     title(ctx, name, subtitle, width);
