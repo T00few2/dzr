@@ -296,6 +296,14 @@ package (`services/zwiftRoutes.js`): distance, elevation, lead-in, and the climb
 each route. It is local, so these answers are instant and free. The package is a snapshot; bump
 `zwift-data` now and then, and a route newer than it is passed to DZR Helper's web search.
 
+## Route profile images (`route_profile_image`)
+
+The club bot can post a route's elevation profile as a PNG, with climbs and sprints banded, and
+close-ups of climbs coloured by gradient (the site's `<4% / 4–7% / 7–10% / 10%+` bands). The data
+comes from the site's public `/api/route-profile`, the same profile the series pages draw, so laps,
+lead-in and segment positions match the site. The bot only draws (`services/routeProfileChart.js`,
+using `canvas`). Profiles are cached for an hour.
+
 ## DZR Helper (`ask_helper`)
 
 Both the club bot and DZR Coach can call `ask_helper` when none of their own tools fit. It runs a

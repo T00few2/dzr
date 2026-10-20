@@ -61,6 +61,7 @@ const { proposeCoachGoal } = require("../services/coachGoalConfirm");
 const { buildZwo, describeWorkout } = require("../services/zwoBuilder");
 const { runHelper, askHelperToolDefinition } = require("../services/helperAgent");
 const { zwiftRouteToolDefinitions, ZWIFT_ROUTE_TOOLS, runZwiftRouteTool } = require("../services/zwiftRoutes");
+const { buildRouteProfileImages } = require("../services/routeProfileImages");
 const { claimChatTurn } = require("../services/turnClaim");
 const { renderWorkoutChart } = require("../services/workoutChart");
 const { buildCoachPromptText } = require("../services/coachPrompt");
@@ -134,6 +135,7 @@ const TOOLS_THAT_REPLY_DIRECTLY = new Set([
   "my_zwiftid",
   "set_zwiftid",
   "start_quiz",
+  "route_profile_image",
 ]);
 
 function safeStringify(value) {
@@ -507,6 +509,24 @@ const toolDefinitions = [
     }
   },
   ...zwiftRouteToolDefinitions,
+  {
+    type: "function",
+    function: {
+      name: "route_profile_image",
+      description: "Post an elevation profile image of a Zwift route in the chat, with climbs and sprints marked, the same profile as on the DZR site. Can add close-up images of climbs (KOMs) coloured by gradient. Use when they want to see a route, its profile, or a climb.",
+      parameters: {
+        type: "object",
+        properties: {
+          route: { type: "string", description: "Route name, e.g. 'Road to Sky'." },
+          world: { type: "string", description: "World, only if the route name exists in several worlds." },
+          laps: { type: "number", description: "Number of laps for a race, default 1." },
+          closeups: { type: "boolean", description: "Also post close-ups of the route's climbs." },
+          climbs: { type: "array", items: { type: "string" }, description: "Specific climbs or KOMs to close up, e.g. ['Epic KOM']. Implies close-ups." }
+        },
+        required: ["route"]
+      }
+    }
+  },
   askHelperToolDefinition
 ];
 
@@ -1040,6 +1060,23 @@ async function executeSingleToolCall(toolCall, message, turn) {
           tags: best.tags,
           matches
         };
+      }
+
+      case "route_profile_image": {
+        const built = await buildRouteProfileImages(args);
+        if (!built.success) {
+          const candidates = Array.isArray(built.candidates) && built.candidates.length
+            ? `\nMente du: ${built.candidates.slice(0, 6).join(", ")}?`
+            : "";
+          await safeReply(message, `❌ ${built.message}${candidates}`);
+          return { tool_call_id: toolCall.id, success: false, message: built.message };
+        }
+        const missing = built.missing?.length ? `\n(Fandt ikke: ${built.missing.join(", ")})` : "";
+        await safeReply(message, {
+          content: `${built.caption}${missing}`,
+          files: built.files.map((file) => new AttachmentBuilder(file.buffer, { name: file.name })),
+        });
+        return { tool_call_id: toolCall.id, success: true, message: "The profile images are posted." };
       }
 
       case "ask_helper": {
@@ -1775,6 +1812,7 @@ You can help users with:
 - Determining Zwift Racing League (ZRL) category from rider watts + official limits via zrl_category
 - Starting a Zwift route quiz (guess the route from the map shape) via start_quiz
 - Zwift routes, climbs, sprints and worlds (distance, elevation, lead-in, what is on a route) via zwift_routes, zwift_route_details and zwift_segments
+- Posting a route's elevation profile image, with close-ups of its climbs, via route_profile_image
 - Researching anything else with ask_helper: general Zwift or cycling questions (web search), a DZR rider's ZwiftPower race history, DZR's recent ZwiftPower results
 
 ## Important Rules
