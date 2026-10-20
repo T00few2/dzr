@@ -37,15 +37,6 @@ function utcDateKey(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
 
-function berlinDateKey(date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Berlin',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
-}
-
 function nextUtcDateKey(day: string): string {
   const dt = new Date(`${day}T00:00:00.000Z`)
   dt.setUTCDate(dt.getUTCDate() + 1)
@@ -113,7 +104,7 @@ async function clubMemberRoleId() {
 
 async function snapshotTodayMemberCount() {
   try {
-    const dateKey = berlinDateKey()
+    const dateKey = utcDateKey(new Date())
     const docRef = adminDb.collection(COLLECTIONS.serverMemberCounts).doc(dateKey)
     const [guildRes, members, roleId, existing] = await Promise.all([
       discordGet(`/guilds/${guildId()}?with_counts=true`),

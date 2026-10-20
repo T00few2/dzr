@@ -77,7 +77,7 @@ export function getPeriodWindow(period: StatsPeriod, now = new Date()): PeriodWi
   }
 }
 
-// Weekly histories begin with the first complete Monday–Sunday week.
+// Activity sums skip a leading partial week and start on the next Monday.
 export function getHistoryStart(window: PeriodWindow, firstDate: string | undefined): string | null {
   if (!firstDate) return null
 
@@ -86,6 +86,16 @@ export function getHistoryStart(window: PeriodWindow, firstDate: string | undefi
     const monday = weekStart(firstDate)
     start = monday === firstDate ? monday : shiftDay(monday, 7)
   }
+  if (window.start && window.start > start) start = window.start
+  return start <= window.end ? start : null
+}
+
+// Snapshot charts keep the latest count at each finished Sunday, including the
+// week that contains the first observation. Weeks before that, and the current
+// week, stay out of the series.
+export function getSnapshotStart(window: PeriodWindow, firstDate: string | undefined): string | null {
+  if (!firstDate) return null
+  let start = weekStart(firstDate)
   if (window.start && window.start > start) start = window.start
   return start <= window.end ? start : null
 }
