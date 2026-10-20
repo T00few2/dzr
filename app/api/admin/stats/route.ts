@@ -1,6 +1,7 @@
+import { normalizeMemberSnapshot } from '@/app/lib/statsMemberHistory'
 import { getHistoryStart, getPeriodWindow, parseStatsPeriod } from '@/app/lib/statsPeriods'
 import { buildActivitySeries, type ActivityPoint } from '@/app/lib/statsSeries'
-import type { StatsResponse } from '@/app/lib/statsTypes'
+import type { MemberPoint, StatsResponse } from '@/app/lib/statsTypes'
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/admin/_lib/auth'
 import { discordGet, guildId, listGuildMembers } from '@/app/api/admin/_lib/discord'
@@ -138,44 +139,17 @@ async function snapshotTodayMemberCount() {
 async function loadMemberCounts() {
   try {
     const [snap, roleId] = await Promise.all([
-      adminDb.collection(COLLECTIONS.serverMemberCounts).orderBy('dateKey').get().catch(async () => {
-        return adminDb.collection(COLLECTIONS.serverMemberCounts).get()
-      }),
+      adminDb.collection(COLLECTIONS.serverMemberCounts).get(),
       clubMemberRoleId().catch(() => ''),
     ])
     const series = snap.docs
-      .map((d) => {
-        const data = d.data() as {
-          dateKey?: string
-          memberCount?: number
-          presenceCount?: number
-          estimated?: boolean
-          clubMemberCount?: number
-          clubMemberRoleId?: string
-          roleCounts?: Record<string, number>
-        }
-        const date = data.dateKey || d.id
-        if (!date || typeof data.memberCount !== 'number' || data.memberCount < 0) return null
-        const members = data.memberCount
-        const fromField = typeof data.clubMemberCount === 'number' ? data.clubMemberCount : null
-        const fromMap = roleId && data.roleCounts && typeof data.roleCounts[roleId] === 'number'
-          ? data.roleCounts[roleId]
-          : null
-        const clubMembers = fromField ?? fromMap
-        return {
-          date,
-          members,
-          clubMembers: typeof clubMembers === 'number' ? clubMembers : null,
-          presence: typeof data.presenceCount === 'number' ? data.presenceCount : null,
-          estimated: Boolean(data.estimated),
-        }
-      })
-      .filter((row): row is { date: string; members: number; clubMembers: number | null; presence: number | null; estimated: boolean } => Boolean(row))
+      .map(d => normalizeMemberSnapshot(d.id, d.data(), roleId))
+      .filter((row): row is MemberPoint => Boolean(row))
       .sort((a, b) => a.date.localeCompare(b.date))
     const latest = series.length ? series[series.length - 1] : null
     return { series, latest }
   } catch {
-    return { series: [] as { date: string; members: number; clubMembers: number | null; presence: number | null; estimated: boolean }[], latest: null }
+    return { series: [] as MemberPoint[], latest: null, error: 'Failed to load member history' }
   }
 }
 

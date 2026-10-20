@@ -63,5 +63,6 @@ export type StatsResponse = {
   members: {
     series: MemberPoint[]
     latest: MemberPoint | null
+    error?: string
   }
 }

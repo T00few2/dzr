@@ -6,7 +6,9 @@ import ChartCard from '@/components/admin/stats/ChartCard'
 import KpiCard from '@/components/admin/stats/KpiCard'
 import PeriodToggle from '@/components/admin/stats/PeriodToggle'
 import { StatsPeriod, getPeriodWindow, periodLabel } from '@/app/lib/statsPeriods'
-import { buildSnapshotSeries } from '@/app/lib/statsSeries'
+import { buildChartTimeline, buildSnapshotTimeline } from '@/app/lib/statsTimeline'
+import { findMissingMemberObservations } from '@/app/lib/statsMemberHistory'
+import MissingObservations from '@/components/admin/stats/MissingObservations'
 import RankingTable from '@/components/admin/stats/RankingTable'
 import { ActivityChart, BreakdownDonut, GrowthChart, MembersChart, type GrowthChartPoint } from '@/components/admin/stats/charts'
 import type { GrowthResponse, StatsResponse } from '@/app/lib/statsTypes'
@@ -97,20 +99,26 @@ export default function StatsAdminPage() {
 
   const totals = stats?.totals
   const hasActivity = (totals?.messages || 0) + (totals?.reactions || 0) + (totals?.voice || 0) + (totals?.interactions || 0) > 0
-  const memberSeries = buildSnapshotSeries(stats?.members?.series || [], getPeriodWindow(memberPeriod))
+  const now = new Date()
+  const memberTimeline = buildSnapshotTimeline(stats?.members?.series || [], getPeriodWindow(memberPeriod, now), now)
+  const missingObservations = !loadingStats && !statsError && !stats?.members.error
+    ? findMissingMemberObservations(stats?.members.series || [], memberTimeline, now)
+    : []
+  const activityTimeline = buildChartTimeline(stats?.activity || [], stats?.period || getPeriodWindow(activityPeriod, now))
   const latestMembers = stats?.members?.latest
-  const growthChart = buildSnapshotSeries(
+  const growthTimeline = buildSnapshotTimeline(
     mergeGrowthSeries(growth?.series || [], growth?.zwiftpower?.series || []),
-    getPeriodWindow(growthPeriod),
+    getPeriodWindow(growthPeriod, now),
+    now,
   )
   const zpTotal = growth?.zwiftpower?.total
   const clubRoleCount = latestMembers?.clubMembers
 
   return (
     <AdminShell title="Stats">
-      {(growthError || statsError) && (
+      {(growthError || statsError || stats?.members.error) && (
         <Text color="red.300" mb={4} fontSize="sm">
-          {[growthError, statsError].filter(Boolean).join(' · ')}
+          {[growthError, statsError, stats?.members.error].filter(Boolean).join(' · ')}
         </Text>
       )}
 
@@ -151,7 +159,7 @@ export default function StatsAdminPage() {
         <ChartCard
           title="Club growth"
           loading={loadingGrowth && !growth}
-          isEmpty={!growthChart.length}
+          isEmpty={!growthTimeline.points.length}
           empty="No companion club members yet. Refresh the Zwift roster to sync."
           actions={(
             <HStack spacing={2} flexWrap="wrap" justify="flex-end">
@@ -172,16 +180,16 @@ export default function StatsAdminPage() {
             </HStack>
           )}
         >
-          <GrowthChart data={growthChart} />
+          <GrowthChart timeline={growthTimeline} />
         </ChartCard>
         <ChartCard
           title="Discord members"
           loading={loadingStats && !stats}
-          isEmpty={memberSeries.length < 1}
+          isEmpty={memberTimeline.points.length < 1}
           empty="No member snapshots yet. Open this page again later to start the series."
           actions={<PeriodToggle value={memberPeriod} onChange={setMemberPeriod} />}
         >
-          <MembersChart data={memberSeries} />
+          <MembersChart timeline={memberTimeline} />
         </ChartCard>
       </SimpleGrid>
 
@@ -194,7 +202,7 @@ export default function StatsAdminPage() {
             empty="No activity in this window"
             actions={<PeriodToggle value={activityPeriod} onChange={setActivityPeriod} />}
           >
-            <ActivityChart data={stats?.activity || []} />
+            <ActivityChart timeline={activityTimeline} />
           </ChartCard>
         </Box>
         <Box flex="1">
@@ -241,6 +249,7 @@ export default function StatsAdminPage() {
           }))}
         />
       </SimpleGrid>
+      <MissingObservations ranges={missingObservations} />
     </AdminShell>
   )
 }

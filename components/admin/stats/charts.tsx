@@ -19,6 +19,7 @@ import {
 import { CHART_HEIGHT } from './ChartCard'
 import type { MemberPoint } from '@/app/lib/statsTypes'
 import type { ActivityPoint, ChartPoint } from '@/app/lib/statsSeries'
+import { formatChartDate, type ChartTimeline } from '@/app/lib/statsTimeline'
 
 export type GrowthChartPoint = ChartPoint<{
   date: string
@@ -39,10 +40,20 @@ export const CHART_COLORS = {
   axis: '#A0AEC0',
 }
 
-function fmtTick(iso: string) {
-  const parts = String(iso || '').split('-')
-  if (parts.length !== 3) return iso
-  return `${parts[2]}/${parts[1]}/${parts[0].slice(2)}`
+function fmtTick(timestamp: number) {
+  return formatChartDate(new Date(timestamp).toISOString().slice(0, 10))
+}
+
+function timelineTicks(domain: [number, number]) {
+  const day = 86400000
+  return [...new Set(Array.from({ length: 4 }, (_, index) =>
+    Math.round((domain[0] + (domain[1] - domain[0]) * index / 3) / day) * day,
+  ))]
+}
+
+function DisplayedRange({ timeline }: { timeline: { start: string; end: string; extended: boolean } }) {
+  if (!timeline.extended) return null
+  return <Text fontSize="xs" color="gray.400" mt={2}>Displayed: {formatChartDate(timeline.start)}–{formatChartDate(timeline.end)} · includes boundary observations</Text>
 }
 
 function DarkTooltip({
@@ -52,15 +63,19 @@ function DarkTooltip({
 }: {
   active?: boolean
   payload?: { name?: string; value?: number; color?: string; payload?: Record<string, unknown> }[]
-  label?: string
+  label?: string | number
 }) {
   if (!active || !payload?.length) return null
   const estimated = payload[0]?.payload?.estimated
   const point = payload[0]?.payload
-  const dateLabel = point?.weekStart && point?.weekEnd ? `${point.weekStart} – ${point.weekEnd}` : label
+  const dateLabel = point?.weekStart && point?.weekEnd ? `${point.weekStart} – ${point.weekEnd}` : typeof point?.date === 'string' ? point.date : label
   return (
     <Box bg="gray.800" borderWidth="1px" borderColor="gray.600" rounded="md" px={3} py={2} fontSize="sm">
       <Text color="gray.300" mb={1}>{dateLabel}{estimated ? ' · estimated' : ''}</Text>
+      {typeof point?.sourceDate === 'string' && Boolean(point?.weekStart) && (
+        <Text color="gray.400" fontSize="xs">Value from {point.sourceDate}</Text>
+      )}
+      {Boolean(point?.boundary) && <Text color="yellow.200" fontSize="xs">Observation outside the selected period</Text>}
       {payload.filter((p) => p.value != null).map((p) => (
         <Text key={p.name} color={p.color || 'white'}>
           {p.name}: {Number(p.value || 0).toLocaleString()}
@@ -75,95 +90,121 @@ const axis = {
   stroke: CHART_COLORS.grid,
 }
 
-export function GrowthChart({ data }: { data: GrowthChartPoint[] }) {
-  const hasZp = data.some((d) => d.zwiftpower != null)
-  return (
-    <Box h={`${CHART_HEIGHT}px`}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
-          <XAxis dataKey="date" tickFormatter={fmtTick} minTickGap={48} {...axis} />
-          <YAxis width={44} tickFormatter={(v) => Number(v).toLocaleString()} {...axis} />
-          <Tooltip content={<DarkTooltip />} />
-          {hasZp ? <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} /> : null}
-          <Line
-            type="monotone"
-            dataKey="zwift"
-            name="Zwift"
-            stroke={CHART_COLORS.club}
-            strokeWidth={2}
-            dot={false}
-            connectNulls
-          />
-          {hasZp ? (
-            <Line
-              type="monotone"
-              dataKey="zwiftpower"
-              name="ZwiftPower"
-              stroke={CHART_COLORS.zwiftpower}
-              strokeWidth={2}
-              dot={false}
-              connectNulls
-            />
-          ) : null}
-        </LineChart>
-      </ResponsiveContainer>
-    </Box>
-  )
+function timeAxis(domain: [number, number]) {
+  return {
+    ...axis,
+    dataKey: 'timestamp',
+    type: 'number' as const,
+    scale: 'utc' as const,
+    domain,
+    ticks: timelineTicks(domain),
+    tickFormatter: fmtTick,
+    minTickGap: 16,
+    interval: 'preserveStartEnd' as const,
+  }
 }
 
-export function MembersChart({ data }: { data: ChartPoint<MemberPoint>[] }) {
-  const hasClubRole = data.some((d) => d.clubMembers != null)
+export function GrowthChart({ timeline }: { timeline: ChartTimeline<GrowthChartPoint> }) {
+  const data = timeline.points
+  const hasZp = data.some((d) => d.zwiftpower != null)
   return (
-    <Box h={`${CHART_HEIGHT}px`}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
-          <XAxis dataKey="date" tickFormatter={fmtTick} minTickGap={48} {...axis} />
-          <YAxis width={44} tickFormatter={(v) => Number(v).toLocaleString()} {...axis} />
-          <Tooltip content={<DarkTooltip />} />
-          {hasClubRole ? <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} /> : null}
-          <Line
-            type="monotone"
-            dataKey="members"
-            name="Discord"
-            stroke={CHART_COLORS.members}
-            strokeWidth={2}
-            dot={false}
-          />
-          {hasClubRole ? (
+    <Box>
+      <Box h={`${CHART_HEIGHT}px`}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
+            <XAxis {...timeAxis(timeline.domain)} />
+            <YAxis width={44} tickFormatter={(v) => Number(v).toLocaleString()} {...axis} />
+            <Tooltip content={<DarkTooltip />} />
+            {hasZp ? <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} /> : null}
             <Line
-              type="monotone"
-              dataKey="clubMembers"
-              name="Club member role"
-              stroke={CHART_COLORS.clubRole}
+              type="linear"
+              dataKey="zwift"
+              name="Zwift"
+              stroke={CHART_COLORS.club}
               strokeWidth={2}
               dot={{ r: 2 }}
               connectNulls
             />
-          ) : null}
-        </LineChart>
-      </ResponsiveContainer>
+            {hasZp ? (
+              <Line
+                type="linear"
+                dataKey="zwiftpower"
+                name="ZwiftPower"
+                stroke={CHART_COLORS.zwiftpower}
+                strokeWidth={2}
+                dot={{ r: 2 }}
+                connectNulls
+              />
+            ) : null}
+          </LineChart>
+        </ResponsiveContainer>
+      </Box>
+      <DisplayedRange timeline={timeline} />
     </Box>
   )
 }
 
-export function ActivityChart({ data }: { data: ActivityPoint[] }) {
+export function MembersChart({ timeline }: { timeline: ChartTimeline<MemberPoint> }) {
+  const data = timeline.points
+  const hasClubRole = data.some((d) => d.clubMembers != null)
   return (
-    <Box h={`${CHART_HEIGHT}px`}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
-          <XAxis dataKey="date" tickFormatter={fmtTick} minTickGap={32} {...axis} />
-          <YAxis width={36} {...axis} />
-          <Tooltip content={<DarkTooltip />} />
-          <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} />
-          <Area type="monotone" dataKey="messages" name="Messages" stackId="1" stroke={CHART_COLORS.messages} fill={CHART_COLORS.messages} fillOpacity={0.7} strokeWidth={1} dot={false} />
-          <Area type="monotone" dataKey="reactions" name="Reactions" stackId="1" stroke={CHART_COLORS.reactions} fill={CHART_COLORS.reactions} fillOpacity={0.7} strokeWidth={1} dot={false} />
-          <Area type="monotone" dataKey="voice" name="Voice" stackId="1" stroke={CHART_COLORS.voice} fill={CHART_COLORS.voice} fillOpacity={0.7} strokeWidth={1} dot={false} />
-          <Area type="monotone" dataKey="interactions" name="Commands" stackId="1" stroke={CHART_COLORS.interactions} fill={CHART_COLORS.interactions} fillOpacity={0.7} strokeWidth={1} dot={false} />
-        </AreaChart>
-      </ResponsiveContainer>
+    <Box>
+      <Box h={`${CHART_HEIGHT}px`}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
+            <XAxis {...timeAxis(timeline.domain)} />
+            <YAxis width={44} tickFormatter={(v) => Number(v).toLocaleString()} {...axis} />
+            <Tooltip content={<DarkTooltip />} />
+            {hasClubRole ? <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} /> : null}
+            <Line
+              type="linear"
+              dataKey="members"
+              name="Discord"
+              stroke={CHART_COLORS.members}
+              strokeWidth={2}
+              dot={{ r: 2 }}
+            />
+            {hasClubRole ? (
+              <Line
+                type="linear"
+                dataKey="clubMembers"
+                name="Club member role"
+                stroke={CHART_COLORS.clubRole}
+                strokeWidth={2}
+                dot={{ r: 2 }}
+                connectNulls
+              />
+            ) : null}
+          </LineChart>
+        </ResponsiveContainer>
+      </Box>
+      <DisplayedRange timeline={timeline} />
+    </Box>
+  )
+}
+
+export function ActivityChart({ timeline }: { timeline: ChartTimeline<ActivityPoint> }) {
+  const data = timeline.points
+  return (
+    <Box>
+      <Box h={`${CHART_HEIGHT}px`}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
+            <XAxis {...timeAxis(timeline.domain)} />
+            <YAxis width={36} {...axis} />
+            <Tooltip content={<DarkTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} />
+            <Area type="linear" dataKey="messages" name="Messages" stackId="1" stroke={CHART_COLORS.messages} fill={CHART_COLORS.messages} fillOpacity={0.7} strokeWidth={1} dot={false} />
+            <Area type="linear" dataKey="reactions" name="Reactions" stackId="1" stroke={CHART_COLORS.reactions} fill={CHART_COLORS.reactions} fillOpacity={0.7} strokeWidth={1} dot={false} />
+            <Area type="linear" dataKey="voice" name="Voice" stackId="1" stroke={CHART_COLORS.voice} fill={CHART_COLORS.voice} fillOpacity={0.7} strokeWidth={1} dot={false} />
+            <Area type="linear" dataKey="interactions" name="Commands" stackId="1" stroke={CHART_COLORS.interactions} fill={CHART_COLORS.interactions} fillOpacity={0.7} strokeWidth={1} dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </Box>
+      <DisplayedRange timeline={timeline} />
     </Box>
   )
 }

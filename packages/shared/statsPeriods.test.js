@@ -8,7 +8,7 @@ const ts = require("typescript");
 // Exercise the production TypeScript helpers with the existing Node test runner.
 const outputDir = mkdtempSync(path.join(tmpdir(), "dzr-stats-tests-"));
 test.after(() => rmSync(outputDir, { recursive: true, force: true }));
-for (const name of ["statsPeriods", "statsSeries"]) {
+for (const name of ["statsPeriods", "statsSeries", "statsTimeline", "statsMemberHistory"]) {
   const source = readFileSync(path.join(__dirname, "../../app/lib", `${name}.ts`), "utf8");
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
@@ -182,4 +182,102 @@ test("empty histories produce no chart points for any selection", () => {
     assert.deepEqual(buildSnapshotSeries([], window), []);
     assert.deepEqual(buildActivitySeries([], window), []);
   }
+});
+
+const { buildChartTimeline, buildSnapshotTimeline, dateTimestamp, isDateKey } = require(path.join(outputDir, "statsTimeline.js"));
+const { normalizeMemberSnapshot, findMissingMemberObservations } = require(path.join(outputDir, "statsMemberHistory.js"));
+const now = new Date("2026-10-20T12:00:00Z");
+const member = (date, members = 700, clubMembers = 100) => ({ date, members, clubMembers, presence: null, estimated: false });
+const dailyWindow = (start, end) => ({ selection: StatsPeriod.Last30Days, granularity: "day", start, end });
+
+test("screenshot dates are sorted without losing observations and spaced in a 3:30:1 ratio", () => {
+  const rows = Object.freeze([member("2026-10-20"), member("2026-09-16"), member("2026-10-19"), member("2026-09-19")]);
+  const timeline = buildSnapshotTimeline(rows, getPeriodWindow(StatsPeriod.Last90Days, now), now);
+  assert.deepEqual(timeline.points.map(p => p.date), ["2026-09-16", "2026-09-19", "2026-10-19", "2026-10-20"]);
+  assert.deepEqual(timeline.points.slice(1).map((p, i) => (p.timestamp - timeline.points[i].timestamp) / 86400000), [3, 30, 1]);
+  assert.equal(timeline.start, "2026-07-23");
+  assert.equal(rows[0].date, "2026-10-20");
+});
+
+test("missing daily observations occupy time without inventing counts", () => {
+  const timeline = buildSnapshotTimeline([member("2026-10-10"), member("2026-10-16")], dailyWindow("2026-10-10", "2026-10-16"), now);
+  assert.equal(timeline.points.length, 2);
+  assert.equal(timeline.domain[1] - timeline.domain[0], 6 * 86400000);
+  assert.equal(timeline.extended, false);
+});
+
+test("nearest boundary observations expand the domain and exact boundaries need no extras", () => {
+  const rows = ["2026-10-01", "2026-10-05", "2026-10-10", "2026-10-15", "2026-10-19"].map(date => member(date));
+  const timeline = buildSnapshotTimeline(rows, dailyWindow("2026-10-07", "2026-10-13"), now);
+  assert.deepEqual(timeline.points.map(p => [p.date, p.boundary]), [["2026-10-05", "before"], ["2026-10-10", undefined], ["2026-10-15", "after"]]);
+  assert.equal(timeline.start, "2026-10-05");
+  assert.equal(timeline.end, "2026-10-15");
+  assert.equal(timeline.extended, true);
+  const exact = buildSnapshotTimeline(rows, dailyWindow("2026-10-05", "2026-10-15"), now);
+  assert.equal(exact.points.length, 3);
+  assert.equal(exact.extended, false);
+});
+
+test("empty and singleton timelines have finite, nonzero domains; invalid and future dates are excluded", () => {
+  const window = dailyWindow(null, "2026-10-20");
+  for (const rows of [[], [member("2026-10-20")]]) {
+    const timeline = buildSnapshotTimeline(rows, window, now);
+    assert.ok(timeline.domain.every(Number.isFinite));
+    assert.ok(timeline.domain[1] > timeline.domain[0]);
+    assert.equal(timeline.points.length, rows.length);
+  }
+  assert.equal(buildSnapshotTimeline([member("2026-10-21"), member("2026-02-30")], window, now).points.length, 0);
+  assert.equal(isDateKey("2024-02-29"), true);
+  assert.equal(isDateKey("2025-02-29"), false);
+});
+
+test("weekly points preserve source dates and exclude the unfinished week", () => {
+  const window = getPeriodWindow(StatsPeriod.All, now);
+  const rows = [member("2026-09-23", 100), member("2026-10-09", 120), member("2026-10-19", 999)];
+  const timeline = buildSnapshotTimeline(rows, window, now);
+  assert.deepEqual(timeline.points.map(p => [p.date, p.sourceDate, p.members]), [
+    ["2026-09-27", "2026-09-23", 100], ["2026-10-04", "2026-09-23", 100],
+    ["2026-10-11", "2026-10-09", 120], ["2026-10-18", "2026-10-09", 120],
+  ]);
+  assert.equal(timeline.points[0].weekStart, "2026-09-21");
+  const gaps = findMissingMemberObservations(rows, timeline, now);
+  assert.ok(gaps.some(gap => gap.start === "2026-09-27" && gap.end === "2026-10-08"));
+});
+
+test("activity timestamps retain daily zero values and full selected domain", () => {
+  const timeline = buildChartTimeline([activity("2026-10-19", 0), activity("2026-10-15", 2)], dailyWindow("2026-10-01", "2026-10-20"));
+  assert.deepEqual(timeline.domain, [dateTimestamp("2026-10-01"), dateTimestamp("2026-10-20")]);
+  assert.deepEqual(timeline.points.map(p => p.messages), [2, 0]);
+});
+
+test("raw missing ranges distinguish each series, accept zero, and exclude dates before collection and today", () => {
+  const rows = [member("2026-10-17", 0, 0), member("2026-10-15", 600, null), member("2026-10-19", 700, null)];
+  assert.deepEqual(findMissingMemberObservations(rows, { start: "2026-10-01", end: "2026-10-20" }, now), [
+    { series: "members", start: "2026-10-16", end: "2026-10-16", days: 1 },
+    { series: "members", start: "2026-10-18", end: "2026-10-18", days: 1 },
+    { series: "clubMembers", start: "2026-10-18", end: "2026-10-19", days: 2 },
+  ]);
+});
+
+test("warnings include trailing days and respect displayed boundaries even outside the selection", () => {
+  const rows = [member("2026-10-10"), member("2026-10-16")];
+  const timeline = buildSnapshotTimeline(rows, dailyWindow("2026-10-12", "2026-10-20"), now);
+  const gaps = findMissingMemberObservations(rows, timeline, now).filter(gap => gap.series === "members");
+  assert.deepEqual(gaps, [
+    { series: "members", start: "2026-10-11", end: "2026-10-15", days: 5 },
+    { series: "members", start: "2026-10-17", end: "2026-10-19", days: 3 },
+  ]);
+  assert.deepEqual(findMissingMemberObservations([], timeline, now), []);
+  assert.deepEqual(findMissingMemberObservations([member("2026-10-20")], timeline, now), []);
+});
+
+test("legacy date IDs and role count maps are normalized without losing zero counts", () => {
+  assert.deepEqual(normalizeMemberSnapshot("2026-10-19", { memberCount: 0, roleCounts: { club: 0 } }, "club"), member("2026-10-19", 0, 0));
+  assert.equal(normalizeMemberSnapshot("2026-10-19", { dateKey: "invalid", memberCount: 5 }, "").date, "2026-10-19");
+  assert.equal(normalizeMemberSnapshot("legacy", { dateKey: "2026-10-18", memberCount: 5 }, "").date, "2026-10-18");
+  for (const memberCount of [undefined, -1, NaN, Infinity, "1"]) {
+    assert.equal(normalizeMemberSnapshot("2026-10-19", { memberCount }, ""), null);
+  }
+  assert.equal(normalizeMemberSnapshot("2026-02-30", { memberCount: 5 }, ""), null);
+  assert.equal(normalizeMemberSnapshot("2026-10-19", { memberCount: 5, clubMemberCount: NaN, roleCounts: { club: 4 } }, "club").clubMembers, 4);
 });
