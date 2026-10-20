@@ -27,6 +27,7 @@ function fakeDeps(overrides = {}) {
       return { success: true, zwift_id: Number(id), rider: { name: "x", recent_races: [] } };
     },
     getClubResults: async () => ({ success: true, events: [] }),
+    zwiftRoutes: require("./zwiftRoutes"),
     ...overrides,
   };
 }
@@ -190,4 +191,12 @@ test("never throws when the model call fails", async () => {
   const result = await runHelper({ openai: broken, question: "q", asker: { discordId: "d4" } }, deps);
   assert.equal(result.success, false);
   assert.equal(deps.logged[0].outcome, "error");
+});
+
+test("answers route questions from zwift-data", async () => {
+  const deps = fakeDeps();
+  const details = await executeHelperTool({ name: "zwift_route_details", arguments: '{"route":"road to sky"}' }, run(), deps);
+  assert.equal(details.success, true);
+  assert.equal(details.route.world, "Watopia");
+  assert.ok(details.route.segments_on_route.some((s) => s.name === "Alpe du Zwift"));
 });
