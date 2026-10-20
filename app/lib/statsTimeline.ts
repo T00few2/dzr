@@ -5,6 +5,7 @@ export type TimelinePoint<T extends DatedPoint> = ChartPoint<T> & {
   timestamp: number
   sourceDate?: string
   boundary?: 'before' | 'after'
+  openWeek?: boolean
 }
 
 export type ChartTimeline<T extends DatedPoint> = {

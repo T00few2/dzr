@@ -64,6 +64,7 @@ type TooltipPoint = {
   sourceDates?: Partial<Record<string, string>>
   estimated?: boolean
   boundary?: 'before' | 'after'
+  openWeek?: boolean
 }
 
 function DarkTooltip({
@@ -78,7 +79,8 @@ function DarkTooltip({
   if (!active || !payload?.length) return null
   const point = payload[0].payload
   let dateLabel = point?.date ?? label
-  if (point?.weekStart && point.weekEnd) dateLabel = `${point.weekStart} – ${point.weekEnd}`
+  if (point?.openWeek && point.weekStart && point.date) dateLabel = `${point.weekStart} – ${point.date} · this week`
+  else if (point?.weekStart && point.weekEnd) dateLabel = `${point.weekStart} – ${point.weekEnd}`
 
   return (
     <Box bg="gray.800" borderWidth="1px" borderColor="gray.600" rounded="md" px={3} py={2} fontSize="sm">

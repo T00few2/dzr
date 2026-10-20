@@ -1,6 +1,6 @@
 import type { MemberPoint } from './statsTypes'
-import { buildSnapshotTimeline, isDateKey } from './statsTimeline'
-import { shiftDay, type PeriodWindow } from './statsPeriods'
+import { buildSnapshotTimeline, dateTimestamp, isDateKey, type ChartTimeline } from './statsTimeline'
+import { shiftDay, weekStart, type PeriodWindow } from './statsPeriods'
 
 const MEMBER_SERIES = ['members', 'clubMembers'] as const
 type MemberSeries = typeof MEMBER_SERIES[number]
@@ -50,7 +50,34 @@ export function buildMemberTimeline(rows: MemberPoint[], window: PeriodWindow, n
       if (isCount(row.members)) estimated = row.estimated
       return { ...row, ...latest, estimated, sourceDates: { ...sourceDates } }
     })
-  return buildSnapshotTimeline(snapshots, window, now)
+  return withCurrentMemberSnapshot(buildSnapshotTimeline(snapshots, window, now), snapshots, window, now)
+}
+
+// Completed weeks stay Sunday samples. The newest snapshot this week is added
+// on its own date so the line reaches the same counts as the member cards.
+function withCurrentMemberSnapshot<T extends MemberPoint>(
+  timeline: ChartTimeline<T>,
+  snapshots: T[],
+  window: PeriodWindow,
+  now: Date,
+): ChartTimeline<T> {
+  const today = now.toISOString().slice(0, 10)
+  const current = snapshots.filter(row => row.date > window.end && row.date <= today).at(-1)
+  if (!current) return timeline
+
+  const domainEnd = dateTimestamp(current.date)
+  return {
+    ...timeline,
+    points: [...timeline.points, {
+      ...current,
+      weekStart: weekStart(current.date),
+      weekEnd: current.date,
+      timestamp: domainEnd,
+      openWeek: true,
+    }],
+    end: current.date,
+    domain: [timeline.domain[0], Math.max(timeline.domain[1], domainEnd)] as [number, number],
+  }
 }
 
 export type MissingObservationRange = {

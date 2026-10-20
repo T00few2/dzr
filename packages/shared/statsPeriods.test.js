@@ -336,15 +336,37 @@ test("weekly member totals and roles retain independent values and source dates 
     Object.freeze(member("2026-10-19", 999, 999)),
   ]);
   const timeline = buildMemberTimeline(rows, getPeriodWindow(StatsPeriod.All, now), now);
-  assert.equal(timeline.points.length, 1);
+  assert.equal(timeline.points.length, 2);
   assert.equal(timeline.points[0].date, "2026-10-18");
   assert.equal(timeline.points[0].members, 700);
   assert.equal(timeline.points[0].clubMembers, 0);
   assert.equal(timeline.points[0].estimated, true);
   assert.deepEqual(timeline.points[0].sourceDates, { members: "2026-10-12", clubMembers: "2026-10-16" });
+  assert.equal(timeline.points[1].date, "2026-10-19");
+  assert.equal(timeline.points[1].openWeek, true);
+  assert.equal(timeline.points[1].members, 999);
+  assert.equal(timeline.points[1].clubMembers, 999);
+  assert.equal(timeline.end, "2026-10-19");
   assert.ok(findMissingMemberObservations(rows, timeline, now).some(gap => gap.series === "members" && gap.start === "2026-10-13" && gap.end === "2026-10-18"));
   assert.equal(rows[0].members, null);
   assert.equal(rows[0].date, "2026-10-16");
+});
+
+test("the current week shows the latest member and role counts past the last Sunday", () => {
+  const rows = [member("2026-09-19", 686, 151), member("2026-10-20", 721, 184)];
+  const timeline = buildMemberTimeline(rows, getPeriodWindow(StatsPeriod.All, now), now);
+  const closed = timeline.points.find(point => point.date === "2026-10-18");
+  const open = timeline.points.at(-1);
+  assert.equal(closed.members, 686);
+  assert.equal(closed.clubMembers, 151);
+  assert.deepEqual(closed.sourceDates, { members: "2026-09-19", clubMembers: "2026-09-19" });
+  assert.equal(open.date, "2026-10-20");
+  assert.equal(open.openWeek, true);
+  assert.equal(open.members, 721);
+  assert.equal(open.clubMembers, 184);
+  assert.deepEqual(open.sourceDates, { members: "2026-10-20", clubMembers: "2026-10-20" });
+  assert.equal(timeline.end, "2026-10-20");
+  assert.equal(timeline.domain[1], dateTimestamp("2026-10-20"));
 });
 
 test("a newer total does not erase an earlier role value or change its source date", () => {
