@@ -15,6 +15,7 @@ const {
   listCalendarEntries,
   addCalendarEntry,
   deleteCalendarEntry,
+  db,
 } = require("../services/firebase");
 const { lookupZrlCategory } = require("../services/zrlCategory");
 const {
@@ -59,6 +60,7 @@ const { MY_PAGES_COACH_URL, CALENDAR_URL, noEmbedUrl, coachHowItWorksText } = re
 const { proposeCoachGoal } = require("../services/coachGoalConfirm");
 const { buildZwo, describeWorkout } = require("../services/zwoBuilder");
 const { runHelper, askHelperToolDefinition } = require("../services/helperAgent");
+const { claimChatTurn } = require("../services/turnClaim");
 const { renderWorkoutChart } = require("../services/workoutChart");
 const { buildCoachPromptText } = require("../services/coachPrompt");
 const {
@@ -2099,6 +2101,9 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     const repliedToMe = await isReplyToBot(message, client);
     if (!mentioned && !repliedToMe) return;
   }
+
+  // During a deploy two instances receive the same message; only the one that claims it answers.
+  if (!(await claimChatTurn(db, { botId: client.user.id, messageId: message.id }))) return;
 
   const queueKey = getConversationKey(message);
   const queued = chatTurnQueue.tryEnqueue(queueKey, () => runChatTurn(message, client, { coachOnly }));
