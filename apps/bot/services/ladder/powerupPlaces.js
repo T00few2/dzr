@@ -6,6 +6,28 @@ function bagIds(fixture) {
   return (fixture?.powerups || []).map(resolvePowerupId).filter((id) => id != null);
 }
 
+function altitudeAt(profile, km) {
+  const distance = profile.distanceKm || [];
+  const altitude = profile.altitudeM || [];
+  if (distance.length < 2 || altitude.length < 2) return null;
+  let index = 0;
+  while (index < distance.length - 1 && distance[index + 1] < km) index += 1;
+  const next = Math.min(index + 1, distance.length - 1);
+  const span = distance[next] - distance[index];
+  if (!(span > 0)) return altitude[index];
+  const along = Math.min(1, Math.max(0, (km - distance[index]) / span));
+  return altitude[index] + along * (altitude[next] - altitude[index]);
+}
+
+// A banner only pays out in one direction. Riding a climb downhill is the other direction.
+function riddenUp(profile, segment) {
+  if (segment.type !== "climb") return true;
+  const from = altitudeAt(profile, segment.fromKm);
+  const to = altitudeAt(profile, segment.toKm);
+  if (from == null || to == null) return true;
+  return to - from > 0;
+}
+
 function put(groups, km, ids, replace) {
   const known = (ids || []).filter((id) => Number.isInteger(id));
   if (!(Number(km) >= 0) || !known.length) return;
@@ -27,6 +49,7 @@ function placePowerups(profile, fixture) {
 
   for (const segment of profile.segments || []) {
     if (segment.type !== "sprint" && segment.type !== "climb") continue;
+    if (!riddenUp(profile, segment)) continue;
     const override = segment.archId != null ? resolvePowerupId(arch[String(segment.archId)]) : null;
     put(groups, segment.toKm, override != null ? [override] : bag, override != null);
   }
