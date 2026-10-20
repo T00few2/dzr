@@ -1763,7 +1763,7 @@ You can help users with:
 - Answering questions using the admin-maintained knowledge base
 - Determining Zwift Racing League (ZRL) category from rider watts + official limits via zrl_category
 - Starting a Zwift route quiz (guess the route from the map shape) via start_quiz
-- Researching anything else with ask_helper: general Zwift or cycling questions (web search), a DZR rider's ZwiftPower race history, DZR's recent ZwiftPower results
+- Researching anything else with ask_helper: Zwift routes, climbs and segments, general Zwift or cycling questions (web search), a DZR rider's ZwiftPower race history, DZR's recent ZwiftPower results
 
 ## Important Rules
 1. **ALWAYS use a tool call** when the user wants to take an action (fetch stats, link ID, search, ZRL category, etc.)

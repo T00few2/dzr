@@ -16,6 +16,7 @@
 const { COACH_MODEL, createStatelessResponse, functionCallOutputs } = require("./coachLlm");
 const { extractTokenUsage } = require("./coachUsage");
 const zwiftPower = require("./zwiftPowerReader");
+const zwiftRoutes = require("./zwiftRoutes");
 
 const HELPER_MODEL = process.env.HELPER_MODEL || COACH_MODEL;
 const HELPER_REASONING_EFFORT = process.env.HELPER_REASONING_EFFORT || "medium";
@@ -36,6 +37,7 @@ Another bot (the club bot or DZR Coach) asks you a question it could not answer 
 ## What you can do
 - Search the web for general facts: Zwift updates, routes, events, rules, equipment, training science.
 - Read the club's own knowledge base (search_club_knowledge). Prefer it for anything about DZR itself.
+- Look up Zwift routes, segments and worlds offline (zwift_routes, zwift_route_details, zwift_segments): distance, elevation, lead-in, climbs and sprints along a route, event-only status. Use these before the web for route questions. The data is a snapshot, so a very new route can be missing; then use the web.
 - Look up DZR riders and their ZwiftPower race history (find_club_rider, zp_rider_races), and DZR's recent ZwiftPower results (zp_club_results).
 
 ## What you cannot do
@@ -50,6 +52,54 @@ You only read. You cannot post messages, change roles, link IDs, save anything o
 6. Answer in the language of the question. Be concise: a few short paragraphs or a short list. No preamble.`;
 
 const helperToolDefinitions = [
+  {
+    type: "function",
+    function: {
+      name: "zwift_routes",
+      description: "Search and filter Zwift routes by name, world, distance and elevation. Returns name, world, km, elevation and lead-in. With no query, sorted shortest first.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Part of the route name, e.g. 'tempus' or 'Road to Sky'." },
+          world: { type: "string", description: "World name, e.g. 'Watopia', 'Makuri Islands', 'France'." },
+          min_km: { type: "number" },
+          max_km: { type: "number" },
+          min_elevation: { type: "number", description: "Metres." },
+          max_elevation: { type: "number", description: "Metres." },
+          include_event_only: { type: "boolean", description: "Include event-only routes. Default true." },
+          limit: { type: "number", description: "1-15. Default 10." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "zwift_route_details",
+      description: "One Zwift route in detail: distance, elevation, lead-in, climbs/sprints/segments along it with km positions, lap/TT/level-lock flags, XP and links.",
+      parameters: {
+        type: "object",
+        properties: { route: { type: "string", description: "Route name." } },
+        required: ["route"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "zwift_segments",
+      description: "Search Zwift climbs, sprints and segments by name, world or type. Returns length, elevation, gradient and routes that include it.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Part of the segment name, e.g. 'Alpe' or 'Epic KOM'." },
+          world: { type: "string" },
+          type: { type: "string", enum: ["climb", "sprint", "segment"] },
+          limit: { type: "number", description: "1-15. Default 10." },
+        },
+      },
+    },
+  },
   {
     type: "function",
     function: {
@@ -115,6 +165,7 @@ function defaultDeps() {
     recordHelperRun: firebase.recordHelperRun,
     getRiderRaces: zwiftPower.getRiderRaces,
     getClubResults: zwiftPower.getClubResults,
+    zwiftRoutes,
   };
 }
 
@@ -199,6 +250,15 @@ async function executeHelperTool(call, run, deps) {
   }
 
   switch (call.name) {
+    case "zwift_routes":
+      return deps.zwiftRoutes.searchRoutes(args);
+
+    case "zwift_route_details":
+      return deps.zwiftRoutes.routeDetails(args.route);
+
+    case "zwift_segments":
+      return deps.zwiftRoutes.searchSegments(args);
+
     case "search_club_knowledge": {
       const matches = knowledgeMatches(await deps.getAllBotKnowledge(), args.query);
       return matches.length
@@ -389,7 +449,7 @@ const askHelperToolDefinition = {
   type: "function",
   function: {
     name: "ask_helper",
-    description: "Ask DZR Helper, a slower research assistant, when none of your other tools can answer: general Zwift or cycling questions that need a web search, a DZR rider's ZwiftPower race history, or DZR's recent ZwiftPower results. It only reads; it cannot take actions. Do not use it when one of your own tools fits, or for small talk. Takes 10-60 seconds.",
+    description: "Ask DZR Helper, a slower research assistant, when none of your other tools can answer: Zwift routes, climbs and segments (distance, elevation, lead-in, what is on a route), general Zwift or cycling questions that need a web search, a DZR rider's ZwiftPower race history, or DZR's recent ZwiftPower results. It only reads; it cannot take actions. Do not use it when one of your own tools fits, or for small talk. Takes 10-60 seconds.",
     parameters: {
       type: "object",
       properties: {

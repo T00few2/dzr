@@ -298,6 +298,9 @@ links, which the calling bot rewords for the member.
 What the helper can read:
 
 - The web (OpenAI's built-in `web_search` tool)
+- Zwift routes, segments and worlds from the bundled `zwift-data` package (`services/zwiftRoutes.js`):
+  distance, elevation, lead-in and the climbs and sprints along each route. It is a snapshot, so
+  routes released after the package version fall back to web search
 - The `bot_knowledge` articles
 - The latest `club_stats` roster
 - ZwiftPower via the API's existing GET routes `/rider_data/<id>` and `/team_results/<club>`
