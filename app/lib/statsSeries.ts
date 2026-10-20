@@ -1,4 +1,4 @@
-import { getHistoryStart, shiftDay, weekStart, type PeriodWindow } from './statsPeriods'
+import { getHistoryStart, getSnapshotStart, shiftDay, weekStart, type PeriodWindow } from './statsPeriods'
 
 export type DatedPoint = { date: string }
 export type WeekRange = { weekStart: string; weekEnd: string }
@@ -17,12 +17,12 @@ function isInWindow(date: string, window: PeriodWindow): boolean {
   return (!window.start || date >= window.start) && date <= window.end
 }
 
-// Counts are snapshots: use the last known count at each week end, never sum them.
+// Counts are snapshots: use the last known count at each finished Sunday, never sum them.
 export function buildSnapshotSeries<T extends DatedPoint>(rows: T[], window: PeriodWindow): ChartPoint<T>[] {
   const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date))
   if (window.granularity === 'day') return sorted.filter(row => isInWindow(row.date, window))
 
-  const start = getHistoryStart(window, sorted[0]?.date)
+  const start = getSnapshotStart(window, sorted[0]?.date)
   if (!start) return []
 
   const result: ChartPoint<T>[] = []

@@ -102,6 +102,7 @@ test("weekly snapshots carry the latest count across sparse data without summing
   const original = JSON.stringify(rows);
   const window = getPeriodWindow(StatsPeriod.All, new Date("2026-10-21T12:00:00Z"));
   assert.deepEqual(buildSnapshotSeries(rows, window), [
+    { date: "2026-09-27", count: 100, active: 10, weekStart: "2026-09-21", weekEnd: "2026-09-27" },
     { date: "2026-10-04", count: 100, active: 10, weekStart: "2026-09-28", weekEnd: "2026-10-04" },
     { date: "2026-10-11", count: 112, active: 12, weekStart: "2026-10-05", weekEnd: "2026-10-11" },
     { date: "2026-10-18", count: 130, active: 13, weekStart: "2026-10-12", weekEnd: "2026-10-18" },
@@ -109,12 +110,12 @@ test("weekly snapshots carry the latest count across sparse data without summing
   assert.equal(JSON.stringify(rows), original);
 });
 
-test("weekly snapshots never invent points before history and require a complete first week", () => {
+test("weekly snapshots plot the finished week of the first count and skip the current week", () => {
   const window = getPeriodWindow(StatsPeriod.LastYear, new Date("2026-10-19T12:00:00Z"));
-  assert.deepEqual(buildSnapshotSeries([{ date: "2026-10-12", count: 5 }], window), [
-    { date: "2026-10-18", count: 5, weekStart: "2026-10-12", weekEnd: "2026-10-18" },
-  ]);
-  assert.deepEqual(buildSnapshotSeries([{ date: "2026-10-14", count: 5 }], window), []);
+  const week = { date: "2026-10-18", count: 5, weekStart: "2026-10-12", weekEnd: "2026-10-18" };
+  assert.deepEqual(buildSnapshotSeries([{ date: "2026-10-12", count: 5 }], window), [week]);
+  assert.deepEqual(buildSnapshotSeries([{ date: "2026-10-14", count: 5 }], window), [week]);
+  assert.deepEqual(buildSnapshotSeries([{ date: "2026-10-18", count: 5 }], window), [week]);
   assert.deepEqual(buildSnapshotSeries([{ date: "2026-10-19", count: 5 }], window), []);
 });
 
@@ -128,7 +129,7 @@ test("daily snapshots preserve observed values and sort dates without modifying 
   assert.equal(rows[0].date, "2026-10-19");
 });
 
-test("weekly activity sums each field on the same Sunday keys as snapshots and omits partial weeks", () => {
+test("weekly activity omits a partial opening week while snapshots keep that finished Sunday", () => {
   const rows = Object.freeze([
     activity("2026-10-19", 100),
     activity("2026-10-11", 4),
@@ -147,7 +148,8 @@ test("weekly activity sums each field on the same Sunday keys as snapshots and o
     { ...activity("2026-10-18", 5), weekStart: "2026-10-12", weekEnd: "2026-10-18" },
   ]);
   const snapshotDates = buildSnapshotSeries(rows.map(row => ({ date: row.date, count: 5 })), window).map(row => row.date);
-  assert.deepEqual(series.map(row => row.date), snapshotDates);
+  assert.deepEqual(snapshotDates, ["2026-09-27", "2026-10-04", "2026-10-11", "2026-10-18"]);
+  assert.deepEqual(series.map(row => row.date), snapshotDates.slice(1));
   assert.equal(JSON.stringify(rows), original);
 });
 
