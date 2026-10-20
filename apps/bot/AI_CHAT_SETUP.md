@@ -288,3 +288,36 @@ If you encounter issues:
 ---
 
 **Enjoy your AI-powered Discord bot!** 🤖🚴
+
+## DZR Helper (`ask_helper`)
+
+Both the club bot and DZR Coach can call `ask_helper` when none of their own tools fit. It runs a
+separate, read-only research loop (`services/helperAgent.js`) and returns an answer with source
+links, which the calling bot rewords for the member.
+
+What the helper can read:
+
+- The web (OpenAI's built-in `web_search` tool)
+- The `bot_knowledge` articles
+- The latest `club_stats` roster
+- ZwiftPower via the API's existing GET routes `/rider_data/<id>` and `/team_results/<club>`
+  (`services/zwiftPowerReader.js`). The ZwiftPower logins never leave `apps/api`, and the
+  organizer account is never used.
+
+Limits: club members only; ZwiftPower lookups only for DZR club riders or the asking member; 5 tool
+rounds and 4 ZwiftPower calls per run; results cached for 10 minutes; a per-member daily run cap.
+Helper tokens inside a Coach turn count against that athlete's daily coach budget.
+
+Every run is logged to the Firestore collection `helper_runs` (tools used, ZwiftPower lookups and
+refusals, tokens, latency, outcome). Club questions are logged; Coach questions are not.
+
+Optional env:
+
+| Variable | Default |
+|---|---|
+| `HELPER_MODEL` | `COACH_MODEL` |
+| `HELPER_REASONING_EFFORT` | `medium` |
+| `HELPER_MAX_OUTPUT_TOKENS` | `6000` |
+| `HELPER_WEB_SEARCH` | `on` (`off` disables web search) |
+| `HELPER_DAILY_RUNS_PER_USER` | `15` (`0` = no cap) |
+| `ZWIFTPOWER_CLUB_ID` | `11939` |

@@ -5,6 +5,7 @@
  * without Firebase or OpenAI credentials. Execution lives in aiChatHandler.
  */
 const { EPISODE_NOTE_KINDS } = require("./coachChatNotes");
+const { askHelperToolDefinition } = require("./helperAgent");
 
 const coachToolDefinitions = [
   {
@@ -329,7 +330,8 @@ const coachToolDefinitions = [
         }
       }
     }
-  }
+  },
+  askHelperToolDefinition
 ];
 
 // Tools that read or write conversation-derived memory. Only offered when chat notes are on.

@@ -170,10 +170,16 @@ async function createStatelessResponse(client, {
   reasoningEffort = COACH_BASE_EFFORT,
   cacheKey = "dzr-coach",
   allowTools = true,
+  // Built-in Responses tools such as { type: "web_search" }. They run on OpenAI's side, so the
+  // caller's executor never sees them; only function tools come back as toolCalls.
+  hostedTools = [],
+  include = [],
   retry,
 } = {}) {
   if (!client?.responses?.create) throw new Error("OpenAI Responses API client is unavailable.");
-  const responseTools = allowTools ? toResponsesTools(tools) : [];
+  const responseTools = allowTools
+    ? [...toResponsesTools(tools), ...(Array.isArray(hostedTools) ? hostedTools : [])]
+    : [];
   const params = {
     model,
     instructions: String(instructions || ""),
@@ -181,7 +187,7 @@ async function createStatelessResponse(client, {
     max_output_tokens: maxOutputTokens,
     reasoning: { effort: reasoningEffort },
     store: false,
-    include: ["reasoning.encrypted_content"],
+    include: ["reasoning.encrypted_content", ...include],
     prompt_cache_key: cacheKey,
     ...(responseTools.length
       ? { tools: responseTools, tool_choice: "auto", parallel_tool_calls: true }
