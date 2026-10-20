@@ -83,13 +83,13 @@ function DarkTooltip({
   return (
     <Box bg="gray.800" borderWidth="1px" borderColor="gray.600" rounded="md" px={3} py={2} fontSize="sm">
       <Text color="gray.300" mb={1}>{dateLabel}{point?.estimated ? ' · estimated' : ''}</Text>
-      {point?.boundary && <Text color="yellow.200" fontSize="xs">Observation outside the selected period</Text>}
       {payload.filter(entry => entry.value != null).map(entry => {
         const sourceDate = entry.payload?.sourceDates?.[entry.dataKey ?? ''] ?? entry.payload?.sourceDate
+        const showSource = Boolean(sourceDate && (point?.weekStart || sourceDate !== point?.date))
         return (
           <Box key={entry.name}>
             <Text color={entry.color || 'white'}>{entry.name}: {Number(entry.value).toLocaleString()}</Text>
-            {point?.weekStart && sourceDate && <Text color="gray.400" fontSize="xs">Value from {sourceDate}</Text>}
+            {showSource && <Text color="gray.400" fontSize="xs">Value from {sourceDate}</Text>}
           </Box>
         )
       })}
@@ -118,9 +118,10 @@ function timeAxis(domain: [number, number]) {
 
 type CountSeries<T> = { key: keyof T & string; name: string; color: string }
 
-function CountChart<T extends DatedPoint>({ timeline, series }: {
+function CountChart<T extends DatedPoint>({ timeline, series, curve = 'linear' }: {
   timeline: ChartTimeline<T>
   series: CountSeries<T>[]
+  curve?: 'linear' | 'stepAfter'
 }) {
   const visibleSeries = series.filter(({ key }) => timeline.points.some(point => point[key] != null))
   const showLegend = visibleSeries.some(({ key }) => key !== series[0].key)
@@ -140,7 +141,7 @@ function CountChart<T extends DatedPoint>({ timeline, series }: {
                 dataKey={key}
                 name={name}
                 stroke={color}
-                type="linear"
+                type={curve}
                 strokeWidth={2}
                 dot={{ r: 2 }}
                 connectNulls
@@ -165,10 +166,14 @@ export function GrowthChart({ timeline }: { timeline: ChartTimeline<GrowthChartP
 
 export function MembersChart({ timeline }: { timeline: ChartTimeline<MemberPoint> }) {
   return (
-    <CountChart timeline={timeline} series={[
-      { key: 'members', name: 'Discord', color: CHART_COLORS.members },
-      { key: 'clubMembers', name: 'Club member role', color: CHART_COLORS.clubRole },
-    ]} />
+    <CountChart
+      timeline={timeline}
+      curve="stepAfter"
+      series={[
+        { key: 'members', name: 'Discord', color: CHART_COLORS.members },
+        { key: 'clubMembers', name: 'Club member role', color: CHART_COLORS.clubRole },
+      ]}
+    />
   )
 }
 

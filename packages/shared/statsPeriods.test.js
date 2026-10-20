@@ -206,15 +206,18 @@ test("missing daily observations occupy time without inventing counts", () => {
   assert.equal(timeline.extended, false);
 });
 
-test("nearest boundary observations expand the domain and exact boundaries need no extras", () => {
-  const rows = ["2026-10-01", "2026-10-05", "2026-10-10", "2026-10-15", "2026-10-19"].map(date => member(date));
+test("daily edges hold the nearest count inside the selected window", () => {
+  const rows = ["2026-10-01", "2026-10-05", "2026-10-10", "2026-10-15", "2026-10-19"].map(date => member(date, 700));
   const timeline = buildSnapshotTimeline(rows, dailyWindow("2026-10-07", "2026-10-13"), now);
-  assert.deepEqual(timeline.points.map(p => [p.date, p.boundary]), [["2026-10-05", "before"], ["2026-10-10", undefined], ["2026-10-15", "after"]]);
-  assert.equal(timeline.start, "2026-10-05");
-  assert.equal(timeline.end, "2026-10-15");
-  assert.equal(timeline.extended, true);
+  assert.deepEqual(timeline.points.map(p => [p.date, p.sourceDate, p.boundary, p.members]), [
+    ["2026-10-07", "2026-10-05", "before", 700],
+    ["2026-10-10", "2026-10-10", undefined, 700],
+    ["2026-10-13", "2026-10-10", "after", 700],
+  ]);
+  assert.deepEqual(timeline.domain, [dateTimestamp("2026-10-07"), dateTimestamp("2026-10-13")]);
+  assert.equal(timeline.extended, false);
   const exact = buildSnapshotTimeline(rows, dailyWindow("2026-10-05", "2026-10-15"), now);
-  assert.equal(exact.points.length, 3);
+  assert.deepEqual(exact.points.map(p => p.date), ["2026-10-05", "2026-10-10", "2026-10-15"]);
   assert.equal(exact.extended, false);
 });
 
@@ -259,12 +262,19 @@ test("raw missing ranges distinguish each series, accept zero, and exclude dates
   ]);
 });
 
-test("warnings include trailing days and respect displayed boundaries even outside the selection", () => {
-  const rows = [member("2026-10-10"), member("2026-10-16")];
+test("missing days stay inside the selected window and run through yesterday", () => {
+  const rows = [member("2026-10-10", 650), member("2026-10-16", 700)];
   const timeline = buildSnapshotTimeline(rows, dailyWindow("2026-10-12", "2026-10-20"), now);
+  assert.deepEqual(timeline.points.map(p => [p.date, p.sourceDate, p.members]), [
+    ["2026-10-12", "2026-10-10", 650],
+    ["2026-10-16", "2026-10-16", 700],
+    ["2026-10-20", "2026-10-16", 700],
+  ]);
+  assert.equal(timeline.start, "2026-10-12");
+  assert.equal(timeline.end, "2026-10-20");
   const gaps = findMissingMemberObservations(rows, timeline, now).filter(gap => gap.series === "members");
   assert.deepEqual(gaps, [
-    { series: "members", start: "2026-10-11", end: "2026-10-15", days: 5 },
+    { series: "members", start: "2026-10-12", end: "2026-10-15", days: 4 },
     { series: "members", start: "2026-10-17", end: "2026-10-19", days: 3 },
   ]);
   assert.deepEqual(findMissingMemberObservations([], timeline, now), []);

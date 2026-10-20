@@ -38,15 +38,13 @@ export function buildChartTimeline<T extends DatedPoint>(
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(row => ({ ...row, timestamp: dateTimestamp(row.date) }))
   const first = points[0]?.weekStart ?? points[0]?.date
-  const last = points[points.length - 1]?.date
-  let start = window.start ?? first ?? window.end
-  if (first && first < start) start = first
-  const end = last && last > window.end ? last : window.end
+  const start = window.start ?? first ?? window.end
+  const end = window.end
   // A lone observation still needs a non-zero axis domain.
   const domain: [number, number] = [dateTimestamp(start === end ? shiftDay(start, -1) : start), dateTimestamp(end)]
   return {
     points, start, end, domain,
-    extended: Boolean((window.start && start < window.start) || end > window.end),
+    extended: points.some(point => (window.start && point.date < window.start) || point.date > window.end),
   }
 }
 
@@ -71,15 +69,17 @@ export function buildSnapshotTimeline<T extends DatedPoint>(
 
   const available = observations.sort((a, b) => a.date.localeCompare(b.date))
   const selected = available.filter(row => (!window.start || row.date >= window.start) && row.date <= window.end)
-  const start = window.start
-  const before = start && selected[0]?.date !== start
-    ? available.filter(row => row.date < start).pop()
-    : undefined
-  const after = selected[selected.length - 1]?.date !== window.end
-    ? available.find(row => row.date > window.end)
-    : undefined
   const points: (ChartPoint<T> & { sourceDate: string; boundary?: 'before' | 'after' })[] = [...selected]
-  if (before) points.unshift({ ...before, boundary: 'before' })
-  if (after) points.push({ ...after, boundary: 'after' })
+  // Hold the nearest known count on the window edges. The axis stays on the
+  // selected period instead of stretching out to that observation's real date.
+  const windowStart = window.start
+  if (windowStart && points[0]?.date !== windowStart) {
+    const before = available.filter(row => row.date < windowStart).at(-1)
+    if (before) points.unshift({ ...before, date: windowStart, boundary: 'before' })
+  }
+  const last = points.at(-1)
+  if (last && last.date !== window.end && window.end <= availableEnd) {
+    points.push({ ...last, date: window.end, boundary: 'after' })
+  }
   return buildChartTimeline(points, window)
 }
