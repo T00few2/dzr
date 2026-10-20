@@ -63,5 +63,9 @@ service cloud.firestore {
     match /onboarding_sessions/{id} {
       allow read, write: if false;
     }
+    // Ladder bot state (teams, posted matches, rider cache); only the Discord bot's Admin SDK touches it.
+    match /ladder_bot/{id} {
+      allow read, write: if false;
+    }
   }
 }

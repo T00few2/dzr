@@ -108,6 +108,7 @@ for (const route of sauceRoutes) {
       fromKm: Math.round(fromKm * 1000) / 1000,
       toKm: Math.round(Math.max(fromKm, toKm) * 1000) / 1000,
       direction: found.direction,
+      archId: found.segment.archId,
     })
     kept += 1
   }

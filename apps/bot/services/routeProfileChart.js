@@ -13,6 +13,7 @@ const {
   zoomSegment,
   profileBands,
 } = require("./routeProfileGeometry");
+const { loadPowerupImage } = require("./powerupIcons");
 
 const BG = "#1A202C";
 const GRID = "#2D3748";
@@ -81,8 +82,30 @@ function title(ctx, text, sub, width) {
   }
 }
 
-/** Full race profile with climbs and sprints banded and labelled. */
-function renderRouteProfile(profile, { name = "", subtitle = "" } = {}) {
+async function drawPowerupIcons(ctx, xOf, markers, plotTop) {
+  const size = 22;
+  for (const marker of markers || []) {
+    const ids = marker?.powerupIds || [];
+    if (!ids.length || !(marker.atKm >= 0)) continue;
+    const cx = xOf(marker.atKm);
+    let top = Math.max(64, plotTop - 4 - ids.length * (size + 2));
+    for (const id of ids) {
+      try {
+        const img = await loadPowerupImage(id);
+        if (!img) continue;
+        ctx.drawImage(img, cx - size / 2, top, size, size);
+        top += size + 2;
+      } catch (err) {
+        console.warn("route profile: powerup icon skipped:", err?.message || err);
+      }
+    }
+  }
+}
+
+/** Full race profile with climbs and sprints banded and labelled.
+ * powerups is an optional list of { atKm, powerupIds }. Omit it and the picture is unchanged.
+ */
+async function renderRouteProfile(profile, { name = "", subtitle = "", powerups = [] } = {}) {
   const createCanvas = loadCanvas();
   if (!createCanvas) return null;
   try {
@@ -147,6 +170,7 @@ function renderRouteProfile(profile, { name = "", subtitle = "" } = {}) {
       ctx.setLineDash([]);
     }
 
+    if (powerups.length) await drawPowerupIcons(ctx, x, powerups, pad.top);
     title(ctx, name, subtitle, width);
     return canvas.toBuffer("image/png");
   } catch (err) {

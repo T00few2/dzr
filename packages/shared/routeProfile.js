@@ -179,10 +179,15 @@ function mergePositionedSegments(existing, extra) {
   const merged = Array.isArray(existing) ? [...existing] : []
   for (const segment of extra || []) {
     if (!segment || (segment.type !== "sprint" && segment.type !== "climb")) continue
-    const duplicate = merged.some(
+    const duplicate = merged.find(
       (current) => current.type === segment.type && rangesOverlap(current, segment)
     )
-    if (duplicate) continue
+    if (duplicate) {
+      if (duplicate.archId == null && segment.archId != null) {
+        merged[merged.indexOf(duplicate)] = { ...duplicate, archId: segment.archId }
+      }
+      continue
+    }
     merged.push(segment)
   }
   return merged
@@ -195,11 +200,14 @@ function placeOnRoute(routeLatLng, routeDistanceM, segmentLatLng) {
   const hits = sampleAt.map((index) => nearestRoutePoint(routeLatLng, segmentLatLng[index]))
   if (hits.some((hit) => hit.meters > 40)) return null
   const fromM = routeDistanceM[hits[0].index]
+  const midM = routeDistanceM[hits[1].index]
   const toM = routeDistanceM[hits[2].index]
-  const along = Math.abs(toM - fromM)
+  // Riding the segment backwards still lies on the road, but that direction has no banner.
+  if (!(toM > fromM) || midM < fromM || midM > toM) return null
+  const along = toM - fromM
   const length = pathLength(segmentLatLng)
   if (!(along > 30) || along > length * 2.5 || along < length * 0.35) return null
-  return { fromM: Math.min(fromM, toM), toM: Math.max(fromM, toM) }
+  return { fromM, toM }
 }
 
 function pathLength(points) {
