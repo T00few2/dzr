@@ -127,6 +127,8 @@ function zoomWindows(profile, { max = 3 } = {}) {
  * point-to-point routes, the stream jumping back to the start) does not skew the average.
  */
 function zoomSegment(profile, zoom) {
+  // A custom KOM is exactly the stretch they asked for; only padded windows hide a segment.
+  if (zoom.exact) return { fromKm: zoom.fromKm, toKm: zoom.toKm };
   const inside = (profile?.segments || []).filter(
     (s) => s.type === "climb" && s.fromKm >= zoom.fromKm - 1e-6 && s.toKm <= zoom.toKm + 1e-6
   );

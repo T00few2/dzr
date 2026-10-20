@@ -25,6 +25,34 @@ function resolveRoute(route, world) {
   return { success: true, name: details.route.name, world: details.route.world };
 }
 
+/** Custom KOMs as the site expects them, dropping any that cannot be drawn. */
+function customRanges(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((kom) => ({
+      name: String(kom?.name || "").trim().slice(0, 60) || "Custom KOM",
+      fromKm: Number(kom?.from_km ?? kom?.fromKm),
+      toKm: Number(kom?.to_km ?? kom?.toKm),
+    }))
+    .filter((kom) => Number.isFinite(kom.fromKm) && Number.isFinite(kom.toKm) && kom.toKm > kom.fromKm && kom.fromKm >= 0)
+    .slice(0, MAX_CLOSEUPS);
+}
+
+/**
+ * Close-up windows in the order asked: named climbs, then custom KOMs (marked exact, so their stats
+ * cover exactly the given stretch), then the finish. With only `closeups`, every climb on the route.
+ */
+function closeupWindows(profile, nameCount) {
+  const asked = (profile.climbs || []).map((zoom, index) => ({ ...zoom, exact: index >= nameCount }));
+  const windows = asked.filter((zoom) => zoom.matched && zoom.toKm > zoom.fromKm);
+  if (!asked.length) windows.push(...zoomWindows(profile, { max: MAX_CLOSEUPS }));
+  const finish = profile.finish;
+  if (finish?.matched && finish.toKm > finish.fromKm) windows.push({ ...finish, title: `Finish: ${finish.title}` });
+  return {
+    windows: windows.slice(0, MAX_CLOSEUPS + 1),
+    missing: [...asked, ...(finish ? [finish] : [])].filter((zoom) => !zoom.matched).map((zoom) => zoom.title),
+  };
+}
+
 function facts(profile, world, laps) {
   const parts = [world, `${Number(profile.raceKm).toFixed(1)} km`, `${Math.round(totalGainM(profile.altitudeM))} m`];
   if (laps > 1) parts.push(`${laps} laps`);
@@ -33,7 +61,8 @@ function facts(profile, world, laps) {
 }
 
 /**
- * args: { route, world?, laps?, climbs?: string[], closeups?: boolean }
+ * args: { route, world?, laps?, distance_km?, climbs?: string[], custom_koms?: [{ name, from_km, to_km }],
+ *         finish?, closeups?: boolean }
  * Returns { success, files: [{ name, buffer }], caption } or { success:false, message }.
  */
 async function buildRouteProfileImages(args = {}, deps = {}) {
@@ -43,9 +72,12 @@ async function buildRouteProfileImages(args = {}, deps = {}) {
   const resolved = resolveRoute(String(args.route || "").trim(), String(args.world || "").trim());
   if (!resolved.success) return { success: false, message: resolved.message, candidates: resolved.candidates };
 
-  const laps = Math.max(1, Math.min(20, Number.parseInt(args.laps, 10) || 1));
+  const distanceKm = Number(args.distance_km) > 0 ? Number(args.distance_km) : 0;
+  const laps = distanceKm ? 1 : Math.max(1, Math.min(20, Number.parseInt(args.laps, 10) || 1));
   const climbs = Array.isArray(args.climbs) ? args.climbs.filter(Boolean).slice(0, MAX_CLOSEUPS) : [];
-  const loaded = await fetchProfile({ world: resolved.world, route: resolved.name, laps, climbs });
+  const ranges = customRanges(args.custom_koms);
+  const finish = String(args.finish || "").trim();
+  const loaded = await fetchProfile({ world: resolved.world, route: resolved.name, laps, distanceKm, climbs, ranges, finish });
   if (!loaded.success) return { success: false, message: loaded.message };
   const profile = loaded.profile;
 
@@ -56,16 +88,19 @@ async function buildRouteProfileImages(args = {}, deps = {}) {
   const files = [{ name: `${fileSlug(resolved.name)}-profile.png`, buffer: main }];
 
   const missing = [];
-  if (climbs.length || args.closeups === true) {
-    for (const zoom of zoomWindows(profile, { max: MAX_CLOSEUPS })) {
+  if (climbs.length || ranges.length || finish || args.closeups === true) {
+    const planned = closeupWindows(profile, climbs.length);
+    for (const zoom of planned.windows) {
       const png = render.renderClimbZoom(profile, zoom);
       if (png) files.push({ name: `${fileSlug(zoom.title)}-closeup.png`, buffer: png });
     }
-    for (const zoom of profile.climbs || []) if (!zoom.matched) missing.push(zoom.title);
-    if (!climbs.length && files.length === 1) missing.push("(no climbs on this route)");
+    missing.push(...planned.missing);
+    if (args.closeups === true && !climbs.length && !ranges.length && !profile.segments?.some((s) => s.type === "climb")) {
+      missing.push("(no climbs on this route)");
+    }
   }
 
   return { success: true, files, caption: text, missing };
 }
 
-module.exports = { buildRouteProfileImages, resolveRoute };
+module.exports = { buildRouteProfileImages, resolveRoute, customRanges, closeupWindows };

@@ -10,12 +10,23 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 100;
 const cache = new Map();
 
-function profileUrl({ world = "", route, laps, climbs } = {}, origin = config.intervals.siteOrigin) {
+/**
+ * The site's query: laps or a total distance (km including the lead-in), named climbs, custom KOM
+ * ranges (km from the start of the lead-in, as on the profile axis) and a finish such as
+ * "banner on top of Epic KOM".
+ */
+function profileUrl({ world = "", route, laps, distanceKm, climbs, ranges, finish } = {}, origin = config.intervals.siteOrigin) {
   const params = new URLSearchParams({ world: String(world || ""), route: String(route || "") });
+  const distance = Number(distanceKm);
   const lapCount = Number.parseInt(laps, 10);
-  if (lapCount > 1) params.set("laps", String(Math.min(lapCount, 20)));
+  if (distance > 0) params.set("distance", String(Math.min(distance, 500)));
+  else if (lapCount > 1) params.set("laps", String(Math.min(lapCount, 20)));
   const names = (Array.isArray(climbs) ? climbs : []).map((c) => String(c).trim()).filter(Boolean).slice(0, 3);
   if (names.length) params.set("climbs", names.join(","));
+  const customs = (Array.isArray(ranges) ? ranges : []).slice(0, 3);
+  if (customs.length) params.set("ranges", JSON.stringify(customs));
+  const finishText = String(finish || "").trim().slice(0, 120);
+  if (finishText) params.set("finish", finishText);
   return `${String(origin).replace(/\/$/, "")}/api/route-profile?${params}`;
 }
 

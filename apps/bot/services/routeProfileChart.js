@@ -190,7 +190,7 @@ function renderClimbZoom(profile, zoom) {
       ctx.lineWidth = 1;
       ctx.stroke();
       const barW = x(bin.toKm) - x(bin.fromKm);
-      if (barW >= 26) {
+      if (barW >= 38) {
         ctx.fillStyle = TITLE;
         ctx.fillText(`${bin.grade.toFixed(1)}%`, (x(bin.fromKm) + x(bin.toKm)) / 2, Math.min(y(bin.altFrom), y(bin.altTo)) - 3);
       }

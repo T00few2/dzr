@@ -79,3 +79,8 @@ test("close-up stats use the climb itself, not the teleport after the banner", (
   const stats = stretchStats(gradeBins(profile.distanceKm, profile.altitudeM, climb.fromKm, climb.toKm));
   assert.ok(Math.abs(stats.avgGrade - 8) < 1e-9);
 });
+
+test("a custom KOM's stats cover exactly its stretch", () => {
+  const zoom = { title: "Custom", fromKm: 0.5, toKm: 2.05, exact: true };
+  assert.deepEqual(zoomSegment(profile, zoom), { fromKm: 0.5, toKm: 2.05 });
+});
