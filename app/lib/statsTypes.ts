@@ -39,7 +39,7 @@ export type TopChannel = {
 
 export type MemberPoint = {
   date: string
-  members: number
+  members: number | null
   clubMembers: number | null
   presence: number | null
   estimated: boolean

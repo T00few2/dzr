@@ -18,7 +18,7 @@ import {
 } from 'recharts'
 import { CHART_HEIGHT } from './ChartCard'
 import type { MemberPoint } from '@/app/lib/statsTypes'
-import type { ActivityPoint, ChartPoint } from '@/app/lib/statsSeries'
+import type { ActivityPoint, ChartPoint, DatedPoint } from '@/app/lib/statsSeries'
 import { formatChartDate, type ChartTimeline } from '@/app/lib/statsTimeline'
 
 export type GrowthChartPoint = ChartPoint<{
@@ -56,31 +56,43 @@ function DisplayedRange({ timeline }: { timeline: { start: string; end: string; 
   return <Text fontSize="xs" color="gray.400" mt={2}>Displayed: {formatChartDate(timeline.start)}–{formatChartDate(timeline.end)} · includes boundary observations</Text>
 }
 
+type TooltipPoint = {
+  date?: string
+  weekStart?: string
+  weekEnd?: string
+  sourceDate?: string
+  sourceDates?: Partial<Record<string, string>>
+  estimated?: boolean
+  boundary?: 'before' | 'after'
+}
+
 function DarkTooltip({
   active,
   payload,
   label,
 }: {
   active?: boolean
-  payload?: { name?: string; value?: number; color?: string; payload?: Record<string, unknown> }[]
+  payload?: { dataKey?: string | number; name?: string; value?: number; color?: string; payload?: TooltipPoint }[]
   label?: string | number
 }) {
   if (!active || !payload?.length) return null
-  const estimated = payload[0]?.payload?.estimated
-  const point = payload[0]?.payload
-  const dateLabel = point?.weekStart && point?.weekEnd ? `${point.weekStart} – ${point.weekEnd}` : typeof point?.date === 'string' ? point.date : label
+  const point = payload[0].payload
+  let dateLabel = point?.date ?? label
+  if (point?.weekStart && point.weekEnd) dateLabel = `${point.weekStart} – ${point.weekEnd}`
+
   return (
     <Box bg="gray.800" borderWidth="1px" borderColor="gray.600" rounded="md" px={3} py={2} fontSize="sm">
-      <Text color="gray.300" mb={1}>{dateLabel}{estimated ? ' · estimated' : ''}</Text>
-      {typeof point?.sourceDate === 'string' && Boolean(point?.weekStart) && (
-        <Text color="gray.400" fontSize="xs">Value from {point.sourceDate}</Text>
-      )}
-      {Boolean(point?.boundary) && <Text color="yellow.200" fontSize="xs">Observation outside the selected period</Text>}
-      {payload.filter((p) => p.value != null).map((p) => (
-        <Text key={p.name} color={p.color || 'white'}>
-          {p.name}: {Number(p.value || 0).toLocaleString()}
-        </Text>
-      ))}
+      <Text color="gray.300" mb={1}>{dateLabel}{point?.estimated ? ' · estimated' : ''}</Text>
+      {point?.boundary && <Text color="yellow.200" fontSize="xs">Observation outside the selected period</Text>}
+      {payload.filter(entry => entry.value != null).map(entry => {
+        const sourceDate = entry.payload?.sourceDates?.[entry.dataKey ?? ''] ?? entry.payload?.sourceDate
+        return (
+          <Box key={entry.name}>
+            <Text color={entry.color || 'white'}>{entry.name}: {Number(entry.value).toLocaleString()}</Text>
+            {point?.weekStart && sourceDate && <Text color="gray.400" fontSize="xs">Value from {sourceDate}</Text>}
+          </Box>
+        )
+      })}
     </Box>
   )
 }
@@ -104,39 +116,36 @@ function timeAxis(domain: [number, number]) {
   }
 }
 
-export function GrowthChart({ timeline }: { timeline: ChartTimeline<GrowthChartPoint> }) {
-  const data = timeline.points
-  const hasZp = data.some((d) => d.zwiftpower != null)
+type CountSeries<T> = { key: keyof T & string; name: string; color: string }
+
+function CountChart<T extends DatedPoint>({ timeline, series }: {
+  timeline: ChartTimeline<T>
+  series: CountSeries<T>[]
+}) {
+  const visibleSeries = series.filter(({ key }) => timeline.points.some(point => point[key] != null))
+  const showLegend = visibleSeries.some(({ key }) => key !== series[0].key)
   return (
     <Box>
       <Box h={`${CHART_HEIGHT}px`}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <LineChart data={timeline.points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
             <XAxis {...timeAxis(timeline.domain)} />
             <YAxis width={44} tickFormatter={(v) => Number(v).toLocaleString()} {...axis} />
             <Tooltip content={<DarkTooltip />} />
-            {hasZp ? <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} /> : null}
-            <Line
-              type="linear"
-              dataKey="zwift"
-              name="Zwift"
-              stroke={CHART_COLORS.club}
-              strokeWidth={2}
-              dot={{ r: 2 }}
-              connectNulls
-            />
-            {hasZp ? (
+            {showLegend && <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} />}
+            {visibleSeries.map(({ key, name, color }) => (
               <Line
+                key={key}
+                dataKey={key}
+                name={name}
+                stroke={color}
                 type="linear"
-                dataKey="zwiftpower"
-                name="ZwiftPower"
-                stroke={CHART_COLORS.zwiftpower}
                 strokeWidth={2}
                 dot={{ r: 2 }}
                 connectNulls
               />
-            ) : null}
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </Box>
@@ -145,43 +154,21 @@ export function GrowthChart({ timeline }: { timeline: ChartTimeline<GrowthChartP
   )
 }
 
-export function MembersChart({ timeline }: { timeline: ChartTimeline<MemberPoint> }) {
-  const data = timeline.points
-  const hasClubRole = data.some((d) => d.clubMembers != null)
+export function GrowthChart({ timeline }: { timeline: ChartTimeline<GrowthChartPoint> }) {
   return (
-    <Box>
-      <Box h={`${CHART_HEIGHT}px`}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
-            <XAxis {...timeAxis(timeline.domain)} />
-            <YAxis width={44} tickFormatter={(v) => Number(v).toLocaleString()} {...axis} />
-            <Tooltip content={<DarkTooltip />} />
-            {hasClubRole ? <Legend wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} /> : null}
-            <Line
-              type="linear"
-              dataKey="members"
-              name="Discord"
-              stroke={CHART_COLORS.members}
-              strokeWidth={2}
-              dot={{ r: 2 }}
-            />
-            {hasClubRole ? (
-              <Line
-                type="linear"
-                dataKey="clubMembers"
-                name="Club member role"
-                stroke={CHART_COLORS.clubRole}
-                strokeWidth={2}
-                dot={{ r: 2 }}
-                connectNulls
-              />
-            ) : null}
-          </LineChart>
-        </ResponsiveContainer>
-      </Box>
-      <DisplayedRange timeline={timeline} />
-    </Box>
+    <CountChart timeline={timeline} series={[
+      { key: 'zwift', name: 'Zwift', color: CHART_COLORS.club },
+      { key: 'zwiftpower', name: 'ZwiftPower', color: CHART_COLORS.zwiftpower },
+    ]} />
+  )
+}
+
+export function MembersChart({ timeline }: { timeline: ChartTimeline<MemberPoint> }) {
+  return (
+    <CountChart timeline={timeline} series={[
+      { key: 'members', name: 'Discord', color: CHART_COLORS.members },
+      { key: 'clubMembers', name: 'Club member role', color: CHART_COLORS.clubRole },
+    ]} />
   )
 }
 

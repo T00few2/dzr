@@ -37,9 +37,10 @@ export function buildChartTimeline<T extends DatedPoint>(
     .filter(row => isDateKey(row.date))
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(row => ({ ...row, timestamp: dateTimestamp(row.date) }))
-  const first = points[0]?.date
+  const first = points[0]?.weekStart ?? points[0]?.date
   const last = points[points.length - 1]?.date
-  const start = window.start ? (first && first < window.start ? first : window.start) : first ?? window.end
+  let start = window.start ?? first ?? window.end
+  if (first && first < start) start = first
   const end = last && last > window.end ? last : window.end
   // A lone observation still needs a non-zero axis domain.
   const domain: [number, number] = [dateTimestamp(start === end ? shiftDay(start, -1) : start), dateTimestamp(end)]
@@ -61,14 +62,20 @@ export function buildSnapshotTimeline<T extends DatedPoint>(
   const observations = rows
     .filter(row => isDateKey(row.date) && row.date <= availableEnd)
     .map(row => ({ ...row, sourceDate: row.date }))
-  // Sample the available history first, so a preceding observation is not lost.
-  const available = buildSnapshotSeries(observations, { ...window, start: null, end: availableEnd })
+
+  // Weekly sampling already carries earlier observations into the first Sunday.
+  // Adding a boundary week here would turn 53/157 weeks into 54/158.
+  if (window.granularity === 'week') {
+    return buildChartTimeline(buildSnapshotSeries(observations, window), window)
+  }
+
+  const available = observations.sort((a, b) => a.date.localeCompare(b.date))
   const selected = available.filter(row => (!window.start || row.date >= window.start) && row.date <= window.end)
   const start = window.start
-  const before = start && !selected.some(row => row.date === start)
+  const before = start && selected[0]?.date !== start
     ? available.filter(row => row.date < start).pop()
     : undefined
-  const after = !selected.some(row => row.date === window.end)
+  const after = selected[selected.length - 1]?.date !== window.end
     ? available.find(row => row.date > window.end)
     : undefined
   const points: (ChartPoint<T> & { sourceDate: string; boundary?: 'before' | 'after' })[] = [...selected]

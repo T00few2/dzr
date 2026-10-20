@@ -7,7 +7,7 @@ import KpiCard from '@/components/admin/stats/KpiCard'
 import PeriodToggle from '@/components/admin/stats/PeriodToggle'
 import { StatsPeriod, getPeriodWindow, periodLabel } from '@/app/lib/statsPeriods'
 import { buildChartTimeline, buildSnapshotTimeline } from '@/app/lib/statsTimeline'
-import { findMissingMemberObservations } from '@/app/lib/statsMemberHistory'
+import { buildMemberTimeline, findMissingMemberObservations } from '@/app/lib/statsMemberHistory'
 import MissingObservations from '@/components/admin/stats/MissingObservations'
 import RankingTable from '@/components/admin/stats/RankingTable'
 import { ActivityChart, BreakdownDonut, GrowthChart, MembersChart, type GrowthChartPoint } from '@/components/admin/stats/charts'
@@ -100,7 +100,7 @@ export default function StatsAdminPage() {
   const totals = stats?.totals
   const hasActivity = (totals?.messages || 0) + (totals?.reactions || 0) + (totals?.voice || 0) + (totals?.interactions || 0) > 0
   const now = new Date()
-  const memberTimeline = buildSnapshotTimeline(stats?.members?.series || [], getPeriodWindow(memberPeriod, now), now)
+  const memberTimeline = buildMemberTimeline(stats?.members.series || [], getPeriodWindow(memberPeriod, now), now)
   const missingObservations = !loadingStats && !statsError && !stats?.members.error
     ? findMissingMemberObservations(stats?.members.series || [], memberTimeline, now)
     : []
@@ -136,6 +136,7 @@ export default function StatsAdminPage() {
           label="Discord members"
           value={fmt(latestMembers?.members)}
           helper={[
+            latestMembers?.members === null ? 'Discord total unavailable for this snapshot' : null,
             latestMembers?.presence != null ? `${fmt(latestMembers.presence)} online` : null,
             clubRoleCount != null ? `${fmt(clubRoleCount)} club member role` : null,
           ].filter(Boolean).join(' · ') || (latestMembers?.date ? `Snapshot ${fmtDay(latestMembers.date)}` : 'Server member count')}

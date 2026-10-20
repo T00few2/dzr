@@ -1,8 +1,11 @@
 import type { MemberPoint } from './statsTypes'
-import { isDateKey } from './statsTimeline'
-import { shiftDay } from './statsPeriods'
+import { buildSnapshotTimeline, isDateKey } from './statsTimeline'
+import { shiftDay, type PeriodWindow } from './statsPeriods'
 
-export function isCount(value: unknown): value is number {
+const MEMBER_SERIES = ['members', 'clubMembers'] as const
+type MemberSeries = typeof MEMBER_SERIES[number]
+
+function isCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
 }
 
@@ -11,21 +14,47 @@ export function normalizeMemberSnapshot(
   data: Record<string, unknown>,
   roleId: string,
 ): MemberPoint | null {
-  const date = isDateKey(data.dateKey) ? data.dateKey : isDateKey(id) ? id : null
-  if (!date || !isCount(data.memberCount)) return null
+  const date = [data.dateKey, id].find(isDateKey)
   const roleCounts = data.roleCounts as Record<string, unknown> | undefined
-  const roleCount = roleId && roleCounts ? roleCounts[roleId] : undefined
+  const members = isCount(data.memberCount) ? data.memberCount : null
+  const clubMembers = [data.clubMemberCount, roleCounts?.[roleId]].find(isCount) ?? null
+  if (!date || (members === null && clubMembers === null)) return null
+
   return {
     date,
-    members: data.memberCount,
-    clubMembers: isCount(data.clubMemberCount) ? data.clubMemberCount : isCount(roleCount) ? roleCount : null,
+    members,
+    clubMembers,
     presence: isCount(data.presenceCount) ? data.presenceCount : null,
     estimated: Boolean(data.estimated),
   }
 }
 
+// Weekly counts are independent: a missing role count must not erase its last
+// known value when a newer Discord total is sampled (or vice versa).
+export function buildMemberTimeline(rows: MemberPoint[], window: PeriodWindow, now = new Date()) {
+  if (window.granularity === 'day') return buildSnapshotTimeline(rows, window, now)
+
+  const latest: Record<MemberSeries, number | null> = { members: null, clubMembers: null }
+  const sourceDates: Partial<Record<MemberSeries, string>> = {}
+  let estimated = false
+  const snapshots = rows
+    .filter(row => isDateKey(row.date))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(row => {
+      for (const series of MEMBER_SERIES) {
+        if (isCount(row[series])) {
+          latest[series] = row[series]
+          sourceDates[series] = row.date
+        }
+      }
+      if (isCount(row.members)) estimated = row.estimated
+      return { ...row, ...latest, estimated, sourceDates: { ...sourceDates } }
+    })
+  return buildSnapshotTimeline(snapshots, window, now)
+}
+
 export type MissingObservationRange = {
-  series: 'members' | 'clubMembers'
+  series: MemberSeries
   start: string
   end: string
   days: number
@@ -40,7 +69,7 @@ export function findMissingMemberObservations(
   const yesterday = shiftDay(now.toISOString().slice(0, 10), -1)
   const end = displayed.end < yesterday ? displayed.end : yesterday
   const gaps: MissingObservationRange[] = []
-  for (const series of ['members', 'clubMembers'] as const) {
+  for (const series of MEMBER_SERIES) {
     const dates = rows.filter(row => isDateKey(row.date) && isCount(row[series])).map(row => row.date).sort()
     const first = dates[0]
     if (!first) continue

@@ -185,7 +185,7 @@ test("empty histories produce no chart points for any selection", () => {
 });
 
 const { buildChartTimeline, buildSnapshotTimeline, dateTimestamp, isDateKey } = require(path.join(outputDir, "statsTimeline.js"));
-const { normalizeMemberSnapshot, findMissingMemberObservations } = require(path.join(outputDir, "statsMemberHistory.js"));
+const { normalizeMemberSnapshot, buildMemberTimeline, findMissingMemberObservations } = require(path.join(outputDir, "statsMemberHistory.js"));
 const now = new Date("2026-10-20T12:00:00Z");
 const member = (date, members = 700, clubMembers = 100) => ({ date, members, clubMembers, presence: null, estimated: false });
 const dailyWindow = (start, end) => ({ selection: StatsPeriod.Last30Days, granularity: "day", start, end });
@@ -241,7 +241,7 @@ test("weekly points preserve source dates and exclude the unfinished week", () =
   ]);
   assert.equal(timeline.points[0].weekStart, "2026-09-21");
   const gaps = findMissingMemberObservations(rows, timeline, now);
-  assert.ok(gaps.some(gap => gap.start === "2026-09-27" && gap.end === "2026-10-08"));
+  assert.ok(gaps.some(gap => gap.start === "2026-09-24" && gap.end === "2026-10-08"));
 });
 
 test("activity timestamps retain daily zero values and full selected domain", () => {
@@ -280,4 +280,70 @@ test("legacy date IDs and role count maps are normalized without losing zero cou
   }
   assert.equal(normalizeMemberSnapshot("2026-02-30", { memberCount: 5 }, ""), null);
   assert.equal(normalizeMemberSnapshot("2026-10-19", { memberCount: 5, clubMemberCount: NaN, roleCounts: { club: 4 } }, "club").clubMembers, 4);
+});
+
+for (const [period, weeks] of [[StatsPeriod.LastYear, 53], [StatsPeriod.LastThreeYears, 157]]) {
+  test(`${period} timeline keeps exactly ${weeks} completed weeks even with older observations`, () => {
+    const window = getPeriodWindow(period, now);
+    const timeline = buildSnapshotTimeline([member("2020-01-01", 10)], window, now);
+    assert.equal(timeline.points.length, weeks);
+    assert.equal(timeline.points[0].weekStart, window.start);
+    assert.equal(timeline.points.at(-1).weekEnd, window.end);
+    assert.equal(timeline.points[0].sourceDate, "2020-01-01");
+    assert.equal(timeline.extended, false);
+    assert.ok(timeline.points.every(p => p.boundary === undefined));
+  });
+}
+
+test("all shows the full first completed week and reports gaps before its Sunday", () => {
+  const rows = [member("2026-10-12"), member("2026-10-16")];
+  const timeline = buildMemberTimeline(rows, getPeriodWindow(StatsPeriod.All, now), now);
+  assert.equal(timeline.start, "2026-10-12");
+  assert.equal(timeline.end, "2026-10-18");
+  assert.equal(timeline.points.length, 1);
+  assert.deepEqual(findMissingMemberObservations(rows, timeline, now).filter(gap => gap.series === "members"), [
+    { series: "members", start: "2026-10-13", end: "2026-10-15", days: 3 },
+    { series: "members", start: "2026-10-17", end: "2026-10-18", days: 2 },
+  ]);
+});
+
+test("role-only snapshots survive normalization, and missing totals stay unknown rather than zero", () => {
+  for (const data of [{ clubMemberCount: 0 }, { memberCount: NaN, roleCounts: { club: 0 } }]) {
+    assert.deepEqual(normalizeMemberSnapshot("2026-10-16", data, "club"), member("2026-10-16", null, 0));
+  }
+  const rows = [member("2026-10-15", 700, 10), member("2026-10-16", null, 0)];
+  const timeline = buildMemberTimeline(rows, dailyWindow("2026-10-15", "2026-10-16"), now);
+  assert.deepEqual(timeline.points.map(p => [p.members, p.clubMembers]), [[700, 10], [null, 0]]);
+  assert.deepEqual(findMissingMemberObservations(rows, timeline, now), [
+    { series: "members", start: "2026-10-16", end: "2026-10-16", days: 1 },
+  ]);
+});
+
+test("weekly member totals and roles retain independent values and source dates without altering raw observations", () => {
+  const rows = Object.freeze([
+    Object.freeze(member("2026-10-16", null, 0)),
+    Object.freeze({ ...member("2026-10-12", 700, 10), estimated: true }),
+    Object.freeze(member("2026-10-19", 999, 999)),
+  ]);
+  const timeline = buildMemberTimeline(rows, getPeriodWindow(StatsPeriod.All, now), now);
+  assert.equal(timeline.points.length, 1);
+  assert.equal(timeline.points[0].date, "2026-10-18");
+  assert.equal(timeline.points[0].members, 700);
+  assert.equal(timeline.points[0].clubMembers, 0);
+  assert.equal(timeline.points[0].estimated, true);
+  assert.deepEqual(timeline.points[0].sourceDates, { members: "2026-10-12", clubMembers: "2026-10-16" });
+  assert.ok(findMissingMemberObservations(rows, timeline, now).some(gap => gap.series === "members" && gap.start === "2026-10-13" && gap.end === "2026-10-18"));
+  assert.equal(rows[0].members, null);
+  assert.equal(rows[0].date, "2026-10-16");
+});
+
+test("a newer total does not erase an earlier role value or change its source date", () => {
+  const rows = [member("2026-10-12", 700, 10), member("2026-10-16", 710, null)];
+  const timeline = buildMemberTimeline(rows, getPeriodWindow(StatsPeriod.All, now), now);
+  assert.equal(timeline.points[0].clubMembers, 10);
+  assert.deepEqual(timeline.points[0].sourceDates, { members: "2026-10-16", clubMembers: "2026-10-12" });
+  const roleOnly = buildMemberTimeline([member("2026-10-16", null, 0)], getPeriodWindow(StatsPeriod.All, now), now);
+  assert.equal(roleOnly.points[0].members, null);
+  assert.equal(roleOnly.points[0].clubMembers, 0);
+  assert.deepEqual(roleOnly.points[0].sourceDates, { clubMembers: "2026-10-16" });
 });
