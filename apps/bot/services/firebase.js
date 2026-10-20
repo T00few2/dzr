@@ -802,6 +802,19 @@ async function clearPendingGoal(discordId) {
   }
 }
 
+const HELPER_RUNS_COLLECTION = "helper_runs";
+
+/**
+ * One DZR Helper run: who asked, which tools ran, which riders were looked up on ZwiftPower and
+ * how it ended. Read it to see which questions the bots cannot answer with their own tools.
+ */
+async function recordHelperRun(run) {
+  await db.collection(HELPER_RUNS_COLLECTION).add({
+    ...run,
+    at: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
 module.exports = {
   db,
   checkCoachKeyCanary,
@@ -836,4 +849,5 @@ module.exports = {
   listCalendarEntries,
   addCalendarEntry,
   deleteCalendarEntry,
+  recordHelperRun,
 }; 
