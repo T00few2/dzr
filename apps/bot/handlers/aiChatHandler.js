@@ -513,15 +513,26 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "route_profile_image",
-      description: "Post an elevation profile image of a Zwift route in the chat, with climbs and sprints marked, the same profile as on the DZR site. Can add close-up images of climbs (KOMs) coloured by gradient. Use when they want to see a route, its profile, or a climb.",
+      description: "Post an elevation profile image of a Zwift route in the chat, with climbs and sprints marked, the same profile as on the DZR site. Supports a custom race distance, custom KOM stretches given in km, and a finish close-up, like the DZR site's route tool. Can add close-up images of climbs (KOMs) coloured by gradient. Use when they want to see a route, its profile, or a climb.",
       parameters: {
         type: "object",
         properties: {
           route: { type: "string", description: "Route name, e.g. 'Road to Sky'." },
           world: { type: "string", description: "World, only if the route name exists in several worlds." },
-          laps: { type: "number", description: "Number of laps for a race, default 1." },
+          laps: { type: "number", description: "Number of laps for a race, default 1. Ignored when distance_km is given." },
+          distance_km: { type: "number", description: "Custom total race distance in km, including the lead-in, e.g. 23.4. The profile is cut there, mid-lap if needed." },
           closeups: { type: "boolean", description: "Also post close-ups of the route's climbs." },
-          climbs: { type: "array", items: { type: "string" }, description: "Specific climbs or KOMs to close up, e.g. ['Epic KOM']. Implies close-ups." }
+          climbs: { type: "array", items: { type: "string" }, description: "Specific climbs or KOMs to close up, e.g. ['Epic KOM']. Implies close-ups." },
+          custom_koms: {
+            type: "array",
+            description: "Custom KOM stretches to close up, in km from the start of the lead-in as on the profile, e.g. [{name:'Final ramp', from_km:21.9, to_km:23.4}].",
+            items: {
+              type: "object",
+              properties: { name: { type: "string" }, from_km: { type: "number" }, to_km: { type: "number" } },
+              required: ["from_km", "to_km"]
+            }
+          },
+          finish: { type: "string", description: "Where the race finishes, for a finish close-up. Use the site's wording: 'banner on top of Epic KOM', '2nd time banner on Fox Hill', or 'Epic KOM banner'." }
         },
         required: ["route"]
       }
