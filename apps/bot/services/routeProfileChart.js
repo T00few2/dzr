@@ -174,7 +174,7 @@ async function renderRouteProfile(profile, { name = "", subtitle = "", powerups 
       ctx.fillStyle = band.color;
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
-      ctx.fillText(label, left + 2, pad.top - 16 - row * 15);
+      ctx.fillText(label, left + 2, pad.top - 28 - row * 15);
     }
 
     ctx.beginPath();
