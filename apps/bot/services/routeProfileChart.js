@@ -109,19 +109,29 @@ function flyingPowerupKm(profile, markers) {
   return km;
 }
 
-async function drawPowerupIcons(ctx, xOf, markers, plotTop) {
+function powerupStackHeight(markers) {
   const size = 22;
+  const gap = 2;
+  let count = 0;
+  for (const marker of markers || []) count = Math.max(count, (marker?.powerupIds || []).length);
+  if (!count) return 0;
+  return count * size + (count - 1) * gap;
+}
+
+async function drawPowerupIcons(ctx, xOf, markers, labelTop) {
+  const size = 22;
+  const gap = 2;
   for (const marker of markers || []) {
     const ids = marker?.powerupIds || [];
     if (!ids.length || !(marker.atKm >= 0)) continue;
     const cx = xOf(marker.atKm);
-    let top = Math.max(64, plotTop - 4 - ids.length * (size + 2));
+    let top = labelTop - 4 - (ids.length * size + (ids.length - 1) * gap);
     for (const id of ids) {
       try {
         const img = await loadPowerupImage(id);
         if (!img) continue;
         ctx.drawImage(img, cx - size / 2, top, size, size);
-        top += size + 2;
+        top += size + gap;
       } catch (err) {
         console.warn("route profile: powerup icon skipped:", err?.message || err);
       }
@@ -141,8 +151,9 @@ async function renderRouteProfile(profile, { name = "", subtitle = "", powerups 
     if (km.length < 2 || alt.length < 2) return null;
 
     const width = 1200;
-    const height = 420;
-    const pad = { top: 112, right: 24, bottom: 34, left: 60 };
+    const iconBand = powerups.length ? powerupStackHeight(powerups) + 8 : 0;
+    const height = 420 + iconBand;
+    const pad = { top: 112 + iconBand, right: 24, bottom: 34, left: 60 };
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext("2d");
     const { yMin, yMax } = yRange(alt);
@@ -190,7 +201,7 @@ async function renderRouteProfile(profile, { name = "", subtitle = "", powerups 
     if (profile.leadInKm > 0) drawDashedGuide(ctx, x, profile.leadInKm, pad.top, bottom);
     for (const km of flyingPowerupKm(profile, powerups)) drawDashedGuide(ctx, x, km, pad.top, bottom);
 
-    if (powerups.length) await drawPowerupIcons(ctx, x, powerups, pad.top);
+    if (powerups.length) await drawPowerupIcons(ctx, x, powerups, pad.top - 48);
     title(ctx, name, subtitle, width);
     return canvas.toBuffer("image/png");
   } catch (err) {
