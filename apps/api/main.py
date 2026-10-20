@@ -17,6 +17,7 @@ import pytz
 from bisect import bisect_right
 from typing import Optional
 from zwiftpower import ZwiftPower
+import ladder
 from zwiftcommentator import ZwiftCommentator
 
 # Load environment variables from .env file
@@ -1056,7 +1057,36 @@ def rider_data(rider_id: int):
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+@app.route('/zwift_profile/<int:rider_id>', methods=['GET'])
+def zwift_profile(rider_id: int):
+    """Zwift profile for a rider (competitionMetrics holds ZRS and category); null when the rider does not exist"""
+    try:
+        unauthorized = require_api_or_401()
+        if unauthorized:
+            return unauthorized
+        zwift_api = get_authenticated_zwift_api()
+        zwift_api.ensure_valid_token()
+        return jsonify(zwift_api.get_profile(rider_id))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/ladder_page', methods=['GET'])
+def ladder_page():
+    """Read-only page from ladder.cycleracing.club, fetched with the club's ladder login (allow-listed paths only)"""
+    unauthorized = require_api_or_401()
+    if unauthorized:
+        return unauthorized
+    path = request.args.get('path', '')
+    if not ladder.is_allowed_path(path):
+        return jsonify({"error": "Path not allowed"}), 400
+    try:
+        body, content_type = ladder.get_client().get_page(path)
+        return app.response_class(body, mimetype=content_type.split(';')[0].strip())
+    except Exception as e:
+        logging.error(f"Ladder page {path} failed: {e}")
+        return jsonify({"error": str(e)}), 502
+
 @app.route('/generate_and_post_commentary/<int:club_id>', methods=['POST'])
 def generate_and_post_commentary(club_id):
     """Generate weekly commentary on team results and post to Discord"""

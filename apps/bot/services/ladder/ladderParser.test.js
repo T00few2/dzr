@@ -1,0 +1,32 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { parseFixtureList, parseFixture } = require("./ladderParser");
+
+test("parseFixtureList reads id, teams and route from a fixture row", () => {
+  const html = `<table><tr class="x" data-id="17200"><td>
+    <span class="teamOpener a" data-team-id="1">Mad Dogs (DBR)</span>
+    <span class="teamOpener b" data-team-id="2">Chonky Chaser</span>
+    <span class="route-detail"> Croissant </span></td></tr></table>`;
+  assert.deepEqual(parseFixtureList(html), [{ id: "17200", home: "Mad Dogs (DBR)", away: "Chonky Chaser", route: "Croissant" }]);
+});
+
+test("parseFixture reads start, laps, fixed distance and signups with Zwift ids", () => {
+  const html = `<script>let forTime = '2026-10-05T17:30:00Z'; let routeId = 99; let laps = 2; let distance = 15000;</script>
+    <section class="homeTeamSignins"><h2 class="px-2">Home</h2><table><tr>
+      <td data-goto=/profile/42 class="c"><div class="sticky-truncate">Rider [DZR]</div></td>
+      <td data-format="wkg" data-time="90" data-power-time="300">4.5</td>
+      <td data-format="wkg" data-time="90" data-power-time="1200">0</td>
+    </tr></table></section>
+    <section class="awayTeamSignins"><h2 class="px-2">Away</h2></section>`;
+  const fixture = parseFixture(html);
+  assert.equal(fixture.start, "2026-10-05T17:30:00Z");
+  assert.equal(fixture.laps, 2);
+  assert.equal(fixture.distance, 15000);
+  assert.equal(fixture.home.name, "Home");
+  assert.equal(fixture.home.riders.length, 1);
+  const rider = fixture.home.riders[0];
+  assert.equal(rider.zwiftId, 42);
+  assert.equal(rider.wkg[300], 4.5);
+  assert.equal(rider.wkg[1200], null);
+  assert.deepEqual(fixture.away.riders, []);
+});

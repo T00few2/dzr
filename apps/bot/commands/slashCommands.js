@@ -713,6 +713,60 @@ const commands = [
   new SlashCommandBuilder()
     .setName("quiz")
     .setDescription("Post a Zwift route quiz — guess the route from the map shape"),
+  // Ladder match previews (team list is stored in Firestore collection ladder_bot)
+  new SlashCommandBuilder()
+    .setName("ladder_link")
+    .setDescription("Add or remove a ladder team that gets previews and match-day reminders")
+    .addStringOption(option =>
+      option
+        .setName("team")
+        .setDescription("Team name or a link to the team on ladder.cycleracing.club")
+        .setRequired(true)
+    )
+    .addBooleanOption(option =>
+      option
+        .setName("remove")
+        .setDescription("Remove the team instead of adding it")
+        .setRequired(false)
+    )
+    .addIntegerOption(option =>
+      option
+        .setName("minutes")
+        .setDescription("Minutes before start the preview is posted (default 65)")
+        .setMinValue(5)
+        .setMaxValue(1440)
+        .setRequired(false)
+    ),
+  new SlashCommandBuilder()
+    .setName("ladder_preview")
+    .setDescription("Post a ladder match preview now (image with route, powerups and riders)")
+    .addStringOption(option =>
+      option
+        .setName("team")
+        .setDescription("Team name or link (default: the only added team)")
+        .setRequired(false)
+    )
+    .addIntegerOption(option =>
+      option
+        .setName("match")
+        .setDescription("Ladder match id (default: the team's next match)")
+        .setRequired(false)
+    ),
+  new SlashCommandBuilder()
+    .setName("ladder_analysis")
+    .setDescription("Rule-based strength comparison and tactics for a ladder match")
+    .addStringOption(option =>
+      option
+        .setName("team")
+        .setDescription("Team name or link (default: the only added team)")
+        .setRequired(false)
+    )
+    .addIntegerOption(option =>
+      option
+        .setName("match")
+        .setDescription("Ladder match id (default: the team's next match)")
+        .setRequired(false)
+    ),
 ].map(cmd => cmd.toJSON());
 
 module.exports = commands; 

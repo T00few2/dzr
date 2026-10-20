@@ -21,6 +21,7 @@ const {
   handleRepostSignupBoard,
 } = require("./commandHandlers");
 const { handleCoach } = require("../services/coachDm");
+const { handleLadderLink, handleLadderPreview, handleLadderAnalysis } = require("./ladderHandlers");
 const {
   handleSetupRoles,
   handleAddSelfRole,
@@ -560,6 +561,9 @@ async function handleInteractions(interaction) {
       "disable_verification": handleDisableVerification,
       "quiz": startQuizFromInteraction,
       "coach": handleCoach,
+      "ladder_link": handleLadderLink,
+      "ladder_preview": handleLadderPreview,
+      "ladder_analysis": handleLadderAnalysis,
     };
 
     const handler = commandHandlers[commandName];

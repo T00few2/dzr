@@ -55,6 +55,12 @@ module.exports = {
     connectSecret: process.env.COACH_CONNECT_SECRET,
     siteOrigin: process.env.INTERVALS_CONNECT_BASE_URL || shared.siteOrigin,
   },
+  ladder: {
+    // Previews and match-day reminders for ladder matches are posted here.
+    channelId: process.env.LADDER_CHANNEL_ID || "1382817917984313404",
+    previewMinutes: Number.parseInt(process.env.LADDER_PREVIEW_MINUTES || "65", 10),
+    tz: process.env.LADDER_TZ || "Europe/Copenhagen",
+  },
   quiz: {
     channelId: process.env.QUIZ_CHANNEL_ID || "1353477785674453104",
     tz: process.env.QUIZ_TZ || "Europe/Paris",
