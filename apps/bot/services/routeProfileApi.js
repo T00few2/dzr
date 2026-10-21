@@ -21,9 +21,9 @@ function profileUrl({ world = "", route, laps, distanceKm, climbs, ranges, finis
   const lapCount = Number.parseInt(laps, 10);
   if (distance > 0) params.set("distance", String(Math.min(distance, 500)));
   else if (lapCount > 1) params.set("laps", String(Math.min(lapCount, 20)));
-  const names = (Array.isArray(climbs) ? climbs : []).map((c) => String(c).trim()).filter(Boolean).slice(0, 3);
+  const names = (Array.isArray(climbs) ? climbs : []).map((c) => String(c).trim()).filter(Boolean).slice(0, 8);
   if (names.length) params.set("climbs", names.join(","));
-  const customs = (Array.isArray(ranges) ? ranges : []).slice(0, 3);
+  const customs = (Array.isArray(ranges) ? ranges : []).slice(0, 8);
   if (customs.length) params.set("ranges", JSON.stringify(customs));
   const finishText = String(finish || "").trim().slice(0, 120);
   if (finishText) params.set("finish", finishText);

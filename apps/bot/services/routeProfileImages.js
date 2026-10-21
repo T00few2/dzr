@@ -6,7 +6,8 @@ const { routeDetails, searchRoutes } = require("./zwiftRoutes");
 const { getRouteProfile } = require("./routeProfileApi");
 const { zoomWindows, totalGainM } = require("./routeProfileGeometry");
 
-const MAX_CLOSEUPS = 3;
+// Discord allows 10 attachments: the profile, up to 8 climbs, and the finish.
+const MAX_CLOSEUPS = 8;
 
 function fileSlug(value) {
   return String(value || "route").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "route";

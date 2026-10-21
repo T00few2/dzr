@@ -88,3 +88,15 @@ test("passes a custom distance, custom KOMs and a finish to the site, and closes
   assert.deepEqual(zooms.map((z) => [z.title, z.exact]), [["Alpe du Zwift", false], ["Final ramp", true], ["Finish: Alpe du Zwift", undefined]]);
   assert.deepEqual(result.missing, ["Nowhere"]);
 });
+
+test("closes up every climb on a long route, not just the first three", async () => {
+  const climbs = ["Zwift KOM", "Titans Grove KOM Rev.", "Mayan Mountainside KOM", "Itza KOM"].map((name, i) => ({
+    name, type: "climb", fromKm: 5 + i * 10, toKm: 7 + i * 10,
+  }));
+  const result = await buildRouteProfileImages({ route: "Road to Sky", closeups: true }, {
+    render,
+    getRouteProfile: async () => ({ success: true, profile: { ...profile, raceKm: 46, segments: climbs } }),
+  });
+  assert.equal(result.files.length, 5);
+  assert.equal(result.files.at(-1).name, "itza-kom-closeup.png");
+});

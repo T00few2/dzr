@@ -19,6 +19,7 @@ Reading an ID back, linking or changing an ID, showing a rider's stats, deciding
 
 Reply with only JSON: {"fulfills": true} or {"fulfills": false}.
 fulfills is true when this call does something they asked for. It can be true even if another tool is also needed.
+A lookup that finds what the requested action needs is part of that action: for example asking the helper which route an event uses, so its profile can be posted.
 fulfills is false only when this call would do a different action than the one they asked for.`;
 
 function fulfillmentUserContent({ userText, name, description, args }) {
