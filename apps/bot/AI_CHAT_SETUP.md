@@ -317,6 +317,11 @@ What the helper can read:
   distance, elevation, lead-in and the climbs and sprints along each route. It is a snapshot, so
   routes released after the package version fall back to web search
 - The `bot_knowledge` articles
+- Any public https page, via `read_web_page` (`services/webPage.js`), so it can open a race calendar a
+  search found. Private and local addresses are refused, redirects included
+- Zwift events via Zwift's public events API (`services/zwiftEvents.js`): route, world, laps or distance,
+  start time and categories on another course. Zwift event pages are drawn by JavaScript, so this is
+  the only way to read an event's route. The club bot has `zwift_event` too, for pasted event links
 - The latest `club_stats` roster
 - ZwiftPower via the API's existing GET routes `/rider_data/<id>` and `/team_results/<club>`
   (`services/zwiftPowerReader.js`). The ZwiftPower logins never leave `apps/api`, and the

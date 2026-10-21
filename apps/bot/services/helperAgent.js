@@ -17,6 +17,8 @@ const { COACH_MODEL, createStatelessResponse, functionCallOutputs } = require(".
 const { extractTokenUsage } = require("./coachUsage");
 const zwiftPower = require("./zwiftPowerReader");
 const zwiftRoutes = require("./zwiftRoutes");
+const { getZwiftEvent } = require("./zwiftEvents");
+const { readWebPage } = require("./webPage");
 const { zwiftRouteToolDefinitions, ZWIFT_ROUTE_TOOLS, runZwiftRouteTool } = zwiftRoutes;
 
 const HELPER_MODEL = process.env.HELPER_MODEL || COACH_MODEL;
@@ -25,7 +27,7 @@ const HELPER_MAX_OUTPUT_TOKENS = Number.parseInt(process.env.HELPER_MAX_OUTPUT_T
 const HELPER_WEB_SEARCH = String(process.env.HELPER_WEB_SEARCH || "on").toLowerCase() !== "off";
 const HELPER_DAILY_RUNS_PER_USER = Number.parseInt(process.env.HELPER_DAILY_RUNS_PER_USER || "15", 10);
 // Tool rounds before the helper must answer from what it has.
-const MAX_ROUNDS = 5;
+const MAX_ROUNDS = 6;
 // ZwiftPower calls are scrapes on a shared account, so one run gets a small allowance.
 const MAX_ZP_CALLS_PER_RUN = 4;
 const MAX_QUESTION_CHARS = 1500;
@@ -39,6 +41,8 @@ Another bot (the club bot or DZR Coach) asks you a question it could not answer 
 - Search the web for general facts: Zwift updates, routes, events, rules, equipment, training science.
 - Read the club's own knowledge base (search_club_knowledge). Prefer it for anything about DZR itself.
 - Look up Zwift routes, segments and worlds offline (zwift_routes, zwift_route_details, zwift_segments): distance, elevation, lead-in, climbs and sprints along a route, event-only status. Use these before the web for route questions. The data is a snapshot, so a very new route can be missing; then use the web.
+- Open a web page a search found (read_web_page) to read it properly, for example a race calendar. It lists any Zwift event links on the page.
+- Read a Zwift event's course (zwift_event): route, world, laps or distance, start time, and categories that ride a different course. Zwift event pages are drawn by JavaScript, so search snippets and read_web_page cannot see the route; always use zwift_event for it.
 - Look up DZR riders and their ZwiftPower race history (find_club_rider, zp_rider_races), and DZR's recent ZwiftPower results (zp_club_results).
 
 ## What you cannot do
@@ -50,11 +54,35 @@ You only read. You cannot post messages, change roles, link IDs, save anything o
 3. ZwiftPower lookups are limited to DZR club riders and the member asking. Do not try to work around a refusal.
 4. Use the fewest tool calls that answer the question. Stop as soon as you can answer.
 5. Give web facts with their source URL. Say when sources disagree or you are unsure, and how recent the information is.
-6. When asked which route a race or event uses, give the route name, world, date, and the laps or distance and finish if a source states them. Say plainly when you could not confirm it.
+6. When asked which route a race or event uses: search for the race calendar, open it with read_web_page, find the event for the date asked, and call zwift_event on its Zwift event link. Give the route name, world, date, start time, and laps or distance from zwift_event, and the finish if a source states it. Only say you could not confirm it after trying this.
 7. Answer in the language of the question. Be concise: a few short paragraphs or a short list. No preamble.`;
 
 const helperToolDefinitions = [
   ...zwiftRouteToolDefinitions,
+  {
+    type: "function",
+    function: {
+      name: "read_web_page",
+      description: "Read one public https web page as text, with its title and any Zwift event links found on it. Use it to open a page a search found.",
+      parameters: {
+        type: "object",
+        properties: { url: { type: "string", description: "Full https URL." } },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "zwift_event",
+      description: "A Zwift event's course from Zwift's own data: route, world, laps or distance, start time (UTC), and categories with a different course. Takes an event id or a zwift.com/events/view/<id> link.",
+      parameters: {
+        type: "object",
+        properties: { event: { type: "string", description: "Event id or Zwift event link." } },
+        required: ["event"],
+      },
+    },
+  },
   {
     type: "function",
     function: {
@@ -121,6 +149,8 @@ function defaultDeps() {
     getRiderRaces: zwiftPower.getRiderRaces,
     getClubResults: zwiftPower.getClubResults,
     zwiftRoutes,
+    getZwiftEvent,
+    readWebPage,
   };
 }
 
@@ -207,6 +237,12 @@ async function executeHelperTool(call, run, deps) {
   if (ZWIFT_ROUTE_TOOLS.has(call.name)) return runZwiftRouteTool(call.name, args, deps.zwiftRoutes);
 
   switch (call.name) {
+    case "read_web_page":
+      return deps.readWebPage(args.url);
+
+    case "zwift_event":
+      return deps.getZwiftEvent(args.event);
+
     case "search_club_knowledge": {
       const matches = knowledgeMatches(await deps.getAllBotKnowledge(), args.query);
       return matches.length

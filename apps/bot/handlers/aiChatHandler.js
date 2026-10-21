@@ -62,6 +62,7 @@ const { buildZwo, describeWorkout } = require("../services/zwoBuilder");
 const { runHelper, askHelperToolDefinition } = require("../services/helperAgent");
 const { zwiftRouteToolDefinitions, ZWIFT_ROUTE_TOOLS, runZwiftRouteTool } = require("../services/zwiftRoutes");
 const { buildRouteProfileImages } = require("../services/routeProfileImages");
+const { getZwiftEvent } = require("../services/zwiftEvents");
 const { claimChatTurn } = require("../services/turnClaim");
 const { renderWorkoutChart } = require("../services/workoutChart");
 const { buildCoachPromptText } = require("../services/coachPrompt");
@@ -224,6 +225,7 @@ function compactToolResult(result) {
   if (typeof result.answer === "string") base.answer = result.answer.slice(0, 4000);
   if (Array.isArray(result.sources)) base.sources = result.sources.slice(0, 8);
   if (result.route && typeof result.route === "object") base.route = result.route;
+  if (result.event && typeof result.event === "object") base.event = result.event;
   if (Array.isArray(result.routes)) base.routes = result.routes.slice(0, 15);
   if (Array.isArray(result.segments)) base.segments = result.segments.slice(0, 15);
   if (Array.isArray(result.candidates)) base.candidates = result.candidates.slice(0, 8);
@@ -509,6 +511,18 @@ const toolDefinitions = [
     }
   },
   ...zwiftRouteToolDefinitions,
+  {
+    type: "function",
+    function: {
+      name: "zwift_event",
+      description: "Read a Zwift event's course when they give an event link or id: route, world, laps or distance, start time (UTC), and categories with a different course. Use the result for route_profile_image or to answer about the event.",
+      parameters: {
+        type: "object",
+        properties: { event: { type: "string", description: "Event id or zwift.com/events/view/<id> link." } },
+        required: ["event"]
+      }
+    }
+  },
   {
     type: "function",
     function: {
@@ -1071,6 +1085,10 @@ async function executeSingleToolCall(toolCall, message, turn) {
           tags: best.tags,
           matches
         };
+      }
+
+      case "zwift_event": {
+        return { tool_call_id: toolCall.id, ...(await getZwiftEvent(args.event)) };
       }
 
       case "route_profile_image": {
