@@ -4,10 +4,12 @@ const { buildLadderPreviewMessage } = require("../services/ladder/ladderEmbed");
 const { buildLadderAnalysisMessage } = require("../services/ladder/ladderAnalysis");
 const config = require("../config/config");
 
-// The team from the option, or the only linked team when the option is left out.
+// The team from the option, else the team added from this channel, else the only added team.
 async function resolveTeam(interaction) {
   const input = interaction.options.getString("team");
   if (input) return ladderTeams.parseTeamName(input);
+  const inChannel = await ladderTeams.findByChannel(interaction.channelId);
+  if (inChannel) return inChannel.name;
   const teams = await ladderTeams.list();
   return teams.length === 1 ? teams[0].name : null;
 }
@@ -16,7 +18,7 @@ async function resolveTeam(interaction) {
 async function missingTeamMessage() {
   const names = (await ladderTeams.list()).map((team) => team.name);
   return names.length
-    ? `Vælg et hold i feltet team. Tilføjede hold: ${names.join(", ")}.`
+    ? `Vælg et hold i feltet team, eller kør /ladder_link i denne kanal for at gøre holdet til standard her. Tilføjede hold: ${names.join(", ")}.`
     : "Der er ingen hold endnu. Tilføj et med /ladder_link.";
 }
 
@@ -54,13 +56,13 @@ async function handleLadderLink(interaction) {
     }
 
     const minutes = interaction.options.getInteger("minutes");
-    if (!(await ladderTeams.link(teamName))) {
+    if (!(await ladderTeams.link(teamName, interaction.channelId))) {
       await interaction.editReply({ content: `Der kan højst tilføjes ${ladderTeams.MAX_TEAMS} hold. Fjern et hold først.` });
       return;
     }
     if (minutes) await ladderTeams.setPreviewMinutes(teamName, minutes);
     await interaction.editReply({
-      content: `${teamName} får nu preview og løbsdag-besked i <#${config.ladder.channelId}>${minutes ? `, preview ${minutes} minutter før start` : ""}.`,
+      content: `${teamName} får nu preview og løbsdag-besked i <#${config.ladder.channelId}>${minutes ? `, preview ${minutes} minutter før start` : ""}. Kommandoer i denne kanal bruger holdet som standard.`,
     });
   } catch (error) {
     await replyError(interaction, "ladder_link", error);
