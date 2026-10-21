@@ -20,6 +20,14 @@ async function missingTeamMessage() {
     : "Der er ingen hold endnu. Tilføj et med /ladder_link.";
 }
 
+// Tells a team name the ladder does not know (no matches at all) from matches that have all started.
+async function noFixtureMessage(teamName) {
+  const count = (await ladderClient.getFixtures(teamName)).length;
+  return count
+    ? `Fandt ingen kommende kamp for ${teamName}. Ladder-siden viser ${count} kamp(e), men ingen med en starttid forude.`
+    : `Ladder-siden viser ingen kampe for "${teamName}". Tjek, at holdnavnet er stavet som på ladder-siden.`;
+}
+
 async function findFixture(interaction, teamName) {
   const fixtureId = interaction.options.getInteger("match");
   const fixture = fixtureId ? await ladderClient.getFixture(fixtureId) : await ladderClient.getNextFixture(teamName);
@@ -68,7 +76,7 @@ async function handleLadderPreview(interaction) {
     }
     const fixture = await findFixture(interaction, teamName);
     if (!fixture) {
-      await interaction.editReply({ content: `Fandt ingen kommende kamp for ${teamName}.` });
+      await interaction.editReply({ content: await noFixtureMessage(teamName) });
       return;
     }
     // Deliberately does not mark the match as posted, so the scheduled preview is unaffected.
@@ -88,7 +96,7 @@ async function handleLadderAnalysis(interaction) {
     }
     const fixture = await findFixture(interaction, teamName);
     if (!fixture) {
-      await interaction.editReply({ content: `Fandt ingen kommende kamp for ${teamName}.` });
+      await interaction.editReply({ content: await noFixtureMessage(teamName) });
       return;
     }
     await interaction.editReply(await buildLadderAnalysisMessage(fixture, teamName));
