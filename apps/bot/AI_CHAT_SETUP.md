@@ -317,6 +317,9 @@ What the helper can read:
   distance, elevation, lead-in and the climbs and sprints along each route. It is a snapshot, so
   routes released after the package version fall back to web search
 - The `bot_knowledge` articles
+- DCU E-serien's race calendar via `dcu_eserien_races` (`services/dcuESerien.js`), read from the
+  public API behind dansk-ecykling.dk/schedule: date, route, world, laps, distance, point segments,
+  division groups and Zwift event ids. The club bot has it too, so "DZR løbet" resolves directly
 - Any public https page, via `read_web_page` (`services/webPage.js`), so it can open a race calendar a
   search found. Private and local addresses are refused, redirects included
 - Zwift events via Zwift's public events API (`services/zwiftEvents.js`): route, world, laps or distance,
