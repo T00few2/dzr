@@ -12,6 +12,14 @@ async function resolveTeam(interaction) {
   return teams.length === 1 ? teams[0].name : null;
 }
 
+// Shown when no team was given and more (or fewer) than one team is added, so there is nothing to default to.
+async function missingTeamMessage() {
+  const names = (await ladderTeams.list()).map((team) => team.name);
+  return names.length
+    ? `Angiv et hold med valgmuligheden team. Tilføjede hold: ${names.join(", ")}.`
+    : "Der er ingen hold endnu. Tilføj et med /ladder_link.";
+}
+
 async function findFixture(interaction, teamName) {
   const fixtureId = interaction.options.getInteger("match");
   const fixture = fixtureId ? await ladderClient.getFixture(fixtureId) : await ladderClient.getNextFixture(teamName);
@@ -55,7 +63,7 @@ async function handleLadderPreview(interaction) {
   try {
     const teamName = await resolveTeam(interaction);
     if (!teamName) {
-      await interaction.editReply({ content: "Angiv et hold." });
+      await interaction.editReply({ content: await missingTeamMessage() });
       return;
     }
     const fixture = await findFixture(interaction, teamName);
@@ -75,7 +83,7 @@ async function handleLadderAnalysis(interaction) {
   try {
     const teamName = await resolveTeam(interaction);
     if (!teamName) {
-      await interaction.editReply({ content: "Angiv et hold." });
+      await interaction.editReply({ content: await missingTeamMessage() });
       return;
     }
     const fixture = await findFixture(interaction, teamName);
