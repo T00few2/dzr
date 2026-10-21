@@ -1,0 +1,200 @@
+{
+ "races": [
+  {
+   "date": "2026-09-17T19:00",
+   "name": "eCKD løbet",
+   "routeName": "La Boucle",
+   "routeId": "870135081",
+   "map": "PARIS",
+   "laps": 3,
+   "totalDistance": 51.1,
+   "totalElevation": 361,
+   "type": "points",
+   "eventId": "",
+   "linkedEventIds": [
+    "5701604",
+    "5701607"
+   ],
+   "sprints": [],
+   "finalizedAt": "Wed, 23 Sep 2026 06:56:12 GMT",
+   "raceGroups": [
+    {
+     "name": "Division 1-3",
+     "eventId": "5701604",
+     "laps": 3,
+     "categories": [
+      {
+       "category": "1. Division"
+      },
+      {
+       "category": "2. Division"
+      },
+      {
+       "category": "3. Division"
+      }
+     ],
+     "sprints": [
+      {
+       "name": "Montmartre KOM",
+       "lap": 1
+      },
+      {
+       "name": "Montmartre KOM",
+       "lap": 2
+      },
+      {
+       "name": "Montmartre KOM",
+       "lap": 3
+      }
+     ]
+    },
+    {
+     "name": "Division 4-6",
+     "eventId": "5701607",
+     "laps": 3,
+     "categories": [
+      {
+       "category": "4. Division"
+      },
+      {
+       "category": "5. Division"
+      },
+      {
+       "category": "6. Division"
+      }
+     ],
+     "sprints": []
+    }
+   ]
+  },
+  {
+   "date": "2026-10-22T19:00",
+   "name": "DZR løbet",
+   "routeName": "Itza Party",
+   "routeId": "4131664304",
+   "map": "WATOPIA",
+   "laps": 1,
+   "totalDistance": 46.2,
+   "totalElevation": 507,
+   "type": "points",
+   "eventId": "",
+   "linkedEventIds": [
+    "5731001",
+    "5731002"
+   ],
+   "sprints": [],
+   "raceGroups": [
+    {
+     "name": "Division 1-3",
+     "eventId": "5731001",
+     "laps": null,
+     "categories": [
+      {
+       "category": "1. Division"
+      },
+      {
+       "category": "2. Division"
+      },
+      {
+       "category": "3. Division"
+      }
+     ],
+     "sprints": [
+      {
+       "name": "Titans Grove KOM Reverse",
+       "lap": 1
+      },
+      {
+       "name": "Woodland Sprint Reverse",
+       "lap": 1
+      },
+      {
+       "name": "Sasquatch Sprint Reverse",
+       "lap": 1
+      }
+     ]
+    },
+    {
+     "name": "Division 4-6",
+     "eventId": "5731002",
+     "laps": null,
+     "categories": [
+      {
+       "category": "4. Division"
+      },
+      {
+       "category": "5. Division"
+      },
+      {
+       "category": "6. Division"
+      }
+     ],
+     "sprints": [
+      {
+       "name": "Titans Grove KOM Reverse",
+       "lap": 1
+      },
+      {
+       "name": "Woodland Sprint Reverse",
+       "lap": 1
+      },
+      {
+       "name": "Sasquatch Sprint Reverse",
+       "lap": 1
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "date": "2027-01-07T19:00",
+   "name": "DBM løbet",
+   "routeName": "Bon Voyage",
+   "routeId": "2143464829",
+   "map": "FRANCE",
+   "laps": 1,
+   "totalDistance": 31.4,
+   "totalElevation": 155,
+   "type": "points",
+   "eventId": "",
+   "linkedEventIds": [],
+   "sprints": [],
+   "raceGroups": [
+    {
+     "name": "Division 1-3",
+     "eventId": "",
+     "laps": null,
+     "categories": [
+      {
+       "category": "1. Division"
+      },
+      {
+       "category": "2. Division"
+      },
+      {
+       "category": "3. Division"
+      }
+     ],
+     "sprints": []
+    },
+    {
+     "name": "Division 4-6",
+     "eventId": "",
+     "laps": null,
+     "categories": [
+      {
+       "category": "4. Division"
+      },
+      {
+       "category": "5. Division"
+      },
+      {
+       "category": "6. Division"
+      }
+     ],
+     "sprints": []
+    }
+   ]
+  }
+ ]
+}
