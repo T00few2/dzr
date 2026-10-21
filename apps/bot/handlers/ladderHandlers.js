@@ -2,6 +2,7 @@ const ladderTeams = require("../services/ladder/ladderTeams");
 const ladderClient = require("../services/ladder/ladderClient");
 const { buildLadderPreviewMessage } = require("../services/ladder/ladderEmbed");
 const { buildLadderAnalysisMessage } = require("../services/ladder/ladderAnalysis");
+const { buildLadderAiMessage } = require("../services/ladder/ladderAi");
 const config = require("../config/config");
 
 // The team from the option, else the team added from this channel, else the only added team.
@@ -107,4 +108,22 @@ async function handleLadderAnalysis(interaction) {
   }
 }
 
-module.exports = { handleLadderLink, handleLadderPreview, handleLadderAnalysis };
+async function handleLadderAi(interaction) {
+  try {
+    const teamName = await resolveTeam(interaction);
+    if (!teamName) {
+      await interaction.editReply({ content: await missingTeamMessage() });
+      return;
+    }
+    const fixture = await findFixture(interaction, teamName);
+    if (!fixture) {
+      await interaction.editReply({ content: await noFixtureMessage(teamName) });
+      return;
+    }
+    await interaction.editReply(await buildLadderAiMessage(fixture, teamName, { userId: interaction.user.id }));
+  } catch (error) {
+    await replyError(interaction, "ladder_ai", error);
+  }
+}
+
+module.exports = { handleLadderLink, handleLadderPreview, handleLadderAnalysis, handleLadderAi };
