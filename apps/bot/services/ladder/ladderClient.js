@@ -28,7 +28,11 @@ function fixturesPath(team) {
 }
 
 async function getFixtures(team) {
-  return parseFixtureList(await getPage(fixturesPath(team)));
+  const html = await getPage(fixturesPath(team));
+  const fixtures = parseFixtureList(html);
+  // Shows up in the Render logs when a team page comes back without any parsable match.
+  if (!fixtures.length) console.warn(`[ladder] No matches parsed for team "${team}" (page ${html.length} bytes, ${(html.match(/data-id="/g) || []).length} rows with a match id)`);
+  return fixtures;
 }
 
 async function getFixture(id) {
