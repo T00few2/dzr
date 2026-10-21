@@ -744,6 +744,7 @@ const commands = [
       option
         .setName("team")
         .setDescription("Team name or link (default: the only added team)")
+        .setAutocomplete(true)
         .setRequired(false)
     )
     .addIntegerOption(option =>
@@ -759,6 +760,7 @@ const commands = [
       option
         .setName("team")
         .setDescription("Team name or link (default: the only added team)")
+        .setAutocomplete(true)
         .setRequired(false)
     )
     .addIntegerOption(option =>

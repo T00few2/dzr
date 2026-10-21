@@ -16,7 +16,7 @@ async function resolveTeam(interaction) {
 async function missingTeamMessage() {
   const names = (await ladderTeams.list()).map((team) => team.name);
   return names.length
-    ? `Angiv et hold med valgmuligheden team. Tilføjede hold: ${names.join(", ")}.`
+    ? `Vælg et hold i feltet team. Tilføjede hold: ${names.join(", ")}.`
     : "Der er ingen hold endnu. Tilføj et med /ladder_link.";
 }
 
