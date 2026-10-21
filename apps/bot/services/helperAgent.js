@@ -50,7 +50,8 @@ You only read. You cannot post messages, change roles, link IDs, save anything o
 3. ZwiftPower lookups are limited to DZR club riders and the member asking. Do not try to work around a refusal.
 4. Use the fewest tool calls that answer the question. Stop as soon as you can answer.
 5. Give web facts with their source URL. Say when sources disagree or you are unsure, and how recent the information is.
-6. Answer in the language of the question. Be concise: a few short paragraphs or a short list. No preamble.`;
+6. When asked which route a race or event uses, give the route name, world, date, and the laps or distance and finish if a source states them. Say plainly when you could not confirm it.
+7. Answer in the language of the question. Be concise: a few short paragraphs or a short list. No preamble.`;
 
 const helperToolDefinitions = [
   ...zwiftRouteToolDefinitions,
@@ -396,7 +397,7 @@ const askHelperToolDefinition = {
   type: "function",
   function: {
     name: "ask_helper",
-    description: "Ask DZR Helper, a slower research assistant, when none of your other tools can answer: Zwift routes, climbs and segments (distance, elevation, lead-in, what is on a route), general Zwift or cycling questions that need a web search, a DZR rider's ZwiftPower race history, or DZR's recent ZwiftPower results. It only reads; it cannot take actions. Do not use it when one of your own tools fits, or for small talk. Takes 10-60 seconds.",
+    description: "Ask DZR Helper, a slower research assistant, when none of your other tools can answer: Zwift routes, climbs and segments (distance, elevation, lead-in, what is on a route), which route an upcoming race or event uses (so you can then post its profile), general Zwift or cycling questions that need a web search, a DZR rider's ZwiftPower race history, or DZR's recent ZwiftPower results. It only reads; it cannot take actions. Do not use it when one of your own tools fits, or for small talk. Takes 10-60 seconds.",
     parameters: {
       type: "object",
       properties: {
