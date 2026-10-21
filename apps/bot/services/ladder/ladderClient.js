@@ -59,7 +59,9 @@ async function refreshSignups(eventId, { fetchPage = getPage, now = Date.now() }
 }
 
 // Returns the fixture with up-to-date signups when the refresh went through, otherwise the fixture as given.
-async function refreshFixture(fixture) {
+// A match that has started is left alone: its signups are final and the refresh is only meant for upcoming matches.
+async function refreshFixture(fixture, now = Date.now()) {
+  if (!fixture.start || new Date(fixture.start).getTime() <= now) return fixture;
   return (await refreshSignups(fixture.zwiftEventId)) ? getFixture(fixture.id) : fixture;
 }
 

@@ -35,6 +35,11 @@ test("refreshSignups reports a failure instead of throwing and does not retry wi
 });
 
 test("refreshFixture returns the fixture unchanged when there is no event id", async () => {
-  const fixture = { id: "1", zwiftEventId: null };
+  const fixture = { id: "1", zwiftEventId: null, start: "2999-01-01T00:00:00Z" };
   assert.equal(await refreshFixture(fixture), fixture);
+});
+
+test("refreshFixture leaves a match that has already started alone", async () => {
+  const fixture = { id: "2", zwiftEventId: "7100001", start: "2026-10-05T17:30:00Z" };
+  assert.equal(await refreshFixture(fixture, Date.parse("2026-10-21T12:00:00Z")), fixture);
 });
