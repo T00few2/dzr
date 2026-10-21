@@ -26,13 +26,21 @@ function parseTeamName(input) {
   return text;
 }
 
+// channelId is the channel /ladder_link was used in: commands run there default to this team.
 // Returns false when the team is new and the team limit has been reached.
-async function link(teamName) {
+async function link(teamName, channelId) {
   const teams = await load();
   if (!teams[key(teamName)] && Object.keys(teams).length >= MAX_TEAMS) return false;
-  teams[key(teamName)] = { ...teams[key(teamName)], name: teamName.trim() };
+  if (channelId) {
+    for (const other of Object.values(teams)) if (other.channelId === String(channelId)) delete other.channelId;
+  }
+  teams[key(teamName)] = { ...teams[key(teamName)], name: teamName.trim(), ...(channelId ? { channelId: String(channelId) } : {}) };
   store.persist();
   return true;
+}
+
+async function findByChannel(channelId) {
+  return Object.values(await load()).find((team) => team.channelId === String(channelId)) || null;
 }
 
 // Returns false when the team is not linked yet.
@@ -60,4 +68,4 @@ async function getTeam(teamName) {
   return (await load())[key(teamName)] || null;
 }
 
-module.exports = { MAX_TEAMS, parseTeamName, link, unlink, list, getTeam, setPreviewMinutes };
+module.exports = { MAX_TEAMS, parseTeamName, link, unlink, list, getTeam, findByChannel, setPreviewMinutes };

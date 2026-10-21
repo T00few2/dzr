@@ -2,20 +2,39 @@ const ladderTeams = require("../services/ladder/ladderTeams");
 const ladderClient = require("../services/ladder/ladderClient");
 const { buildLadderPreviewMessage } = require("../services/ladder/ladderEmbed");
 const { buildLadderAnalysisMessage } = require("../services/ladder/ladderAnalysis");
+const { buildLadderAiMessage } = require("../services/ladder/ladderAi");
 const config = require("../config/config");
 
-// The team from the option, or the only linked team when the option is left out.
+// The team from the option, else the team added from this channel, else the only added team.
 async function resolveTeam(interaction) {
   const input = interaction.options.getString("team");
   if (input) return ladderTeams.parseTeamName(input);
+  const inChannel = await ladderTeams.findByChannel(interaction.channelId);
+  if (inChannel) return inChannel.name;
   const teams = await ladderTeams.list();
   return teams.length === 1 ? teams[0].name : null;
+}
+
+// Shown when no team was given and more (or fewer) than one team is added, so there is nothing to default to.
+async function missingTeamMessage() {
+  const names = (await ladderTeams.list()).map((team) => team.name);
+  return names.length
+    ? `Vælg et hold i feltet team, eller kør /ladder_link i denne kanal for at gøre holdet til standard her. Tilføjede hold: ${names.join(", ")}.`
+    : "Der er ingen hold endnu. Tilføj et med /ladder_link.";
+}
+
+// Tells a team name the ladder does not know (no matches at all) from matches that have all started.
+async function noFixtureMessage(teamName) {
+  const count = (await ladderClient.getFixtures(teamName)).length;
+  return count
+    ? `Fandt ingen kommende kamp for ${teamName}. Ladder-siden viser ${count} kamp(e), men ingen med en starttid forude.`
+    : `Ladder-siden viser ingen kampe for "${teamName}". Tjek, at holdnavnet er stavet som på ladder-siden.`;
 }
 
 async function findFixture(interaction, teamName) {
   const fixtureId = interaction.options.getInteger("match");
   const fixture = fixtureId ? await ladderClient.getFixture(fixtureId) : await ladderClient.getNextFixture(teamName);
-  return fixture && fixture.start ? fixture : null;
+  return fixture && fixture.start ? ladderClient.refreshFixture(fixture) : null;
 }
 
 async function replyError(interaction, name, error) {
@@ -38,13 +57,13 @@ async function handleLadderLink(interaction) {
     }
 
     const minutes = interaction.options.getInteger("minutes");
-    if (!(await ladderTeams.link(teamName))) {
+    if (!(await ladderTeams.link(teamName, interaction.channelId))) {
       await interaction.editReply({ content: `Der kan højst tilføjes ${ladderTeams.MAX_TEAMS} hold. Fjern et hold først.` });
       return;
     }
     if (minutes) await ladderTeams.setPreviewMinutes(teamName, minutes);
     await interaction.editReply({
-      content: `${teamName} får nu preview og løbsdag-besked i <#${config.ladder.channelId}>${minutes ? `, preview ${minutes} minutter før start` : ""}.`,
+      content: `${teamName} får nu preview og løbsdag-besked i <#${config.ladder.channelId}>${minutes ? `, preview ${minutes} minutter før start` : ""}. Kommandoer i denne kanal bruger holdet som standard.`,
     });
   } catch (error) {
     await replyError(interaction, "ladder_link", error);
@@ -55,12 +74,12 @@ async function handleLadderPreview(interaction) {
   try {
     const teamName = await resolveTeam(interaction);
     if (!teamName) {
-      await interaction.editReply({ content: "Angiv et hold." });
+      await interaction.editReply({ content: await missingTeamMessage() });
       return;
     }
     const fixture = await findFixture(interaction, teamName);
     if (!fixture) {
-      await interaction.editReply({ content: `Fandt ingen kommende kamp for ${teamName}.` });
+      await interaction.editReply({ content: await noFixtureMessage(teamName) });
       return;
     }
     // Deliberately does not mark the match as posted, so the scheduled preview is unaffected.
@@ -75,12 +94,12 @@ async function handleLadderAnalysis(interaction) {
   try {
     const teamName = await resolveTeam(interaction);
     if (!teamName) {
-      await interaction.editReply({ content: "Angiv et hold." });
+      await interaction.editReply({ content: await missingTeamMessage() });
       return;
     }
     const fixture = await findFixture(interaction, teamName);
     if (!fixture) {
-      await interaction.editReply({ content: `Fandt ingen kommende kamp for ${teamName}.` });
+      await interaction.editReply({ content: await noFixtureMessage(teamName) });
       return;
     }
     await interaction.editReply(await buildLadderAnalysisMessage(fixture, teamName));
@@ -89,4 +108,22 @@ async function handleLadderAnalysis(interaction) {
   }
 }
 
-module.exports = { handleLadderLink, handleLadderPreview, handleLadderAnalysis };
+async function handleLadderAi(interaction) {
+  try {
+    const teamName = await resolveTeam(interaction);
+    if (!teamName) {
+      await interaction.editReply({ content: await missingTeamMessage() });
+      return;
+    }
+    const fixture = await findFixture(interaction, teamName);
+    if (!fixture) {
+      await interaction.editReply({ content: await noFixtureMessage(teamName) });
+      return;
+    }
+    await interaction.editReply(await buildLadderAiMessage(fixture, teamName, { userId: interaction.user.id }));
+  } catch (error) {
+    await replyError(interaction, "ladder_ai", error);
+  }
+}
+
+module.exports = { handleLadderLink, handleLadderPreview, handleLadderAnalysis, handleLadderAi };

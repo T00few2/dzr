@@ -129,9 +129,12 @@ function parseFixture(html) {
   const powerupIds = parsePowerupPercent(tags);
   const powerups = powerupIds.length ? powerupIds.map((id) => powerupName(id) || String(id)) : named;
   const routeId = (html.match(/let routeId\s*=\s*(\d+)/) || [])[1] || null;
+  // Event id the ladder reads signups from: a hidden form field, or the "Sign-in link (event N)" button.
+  const zwiftEventId = (html.match(/name="zwiftEventId"[^>]*value="(\d+)"/) || html.match(/Sign-in link \(event (\d+)\)/) || [])[1] || null;
   return {
     start,
     routeId,
+    zwiftEventId,
     archPowerups: parseArchPowerups(tags),
     route: routeName ? decodeEntities(routeName.trim()) : null,
     world: world ? decodeEntities(world.trim()) : null,

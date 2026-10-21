@@ -744,6 +744,7 @@ const commands = [
       option
         .setName("team")
         .setDescription("Team name or link (default: the only added team)")
+        .setAutocomplete(true)
         .setRequired(false)
     )
     .addIntegerOption(option =>
@@ -759,6 +760,23 @@ const commands = [
       option
         .setName("team")
         .setDescription("Team name or link (default: the only added team)")
+        .setAutocomplete(true)
+        .setRequired(false)
+    )
+    .addIntegerOption(option =>
+      option
+        .setName("match")
+        .setDescription("Ladder match id (default: the team's next match)")
+        .setRequired(false)
+    ),
+  new SlashCommandBuilder()
+    .setName("ladder_ai")
+    .setDescription("AI analysis of how to ride a ladder match (limited uses per day)")
+    .addStringOption(option =>
+      option
+        .setName("team")
+        .setDescription("Team name or link (default: this channel's team)")
+        .setAutocomplete(true)
         .setRequired(false)
     )
     .addIntegerOption(option =>

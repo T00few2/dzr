@@ -21,7 +21,8 @@ const {
   handleRepostSignupBoard,
 } = require("./commandHandlers");
 const { handleCoach } = require("../services/coachDm");
-const { handleLadderLink, handleLadderPreview, handleLadderAnalysis } = require("./ladderHandlers");
+const { handleLadderLink, handleLadderPreview, handleLadderAnalysis, handleLadderAi } = require("./ladderHandlers");
+const ladderTeams = require("../services/ladder/ladderTeams");
 const {
   handleSetupRoles,
   handleAddSelfRole,
@@ -84,6 +85,15 @@ async function handleAutocomplete(interaction) {
         .slice(0, 25);
 
       await interaction.respond(filtered);
+    } else if (focusedOption.name === 'team' && (commandName === "ladder_preview" || commandName === "ladder_analysis" || commandName === "ladder_ai")) {
+      const typed = focusedOption.value.toLowerCase();
+      const names = (await ladderTeams.list()).map(team => team.name);
+      await interaction.respond(
+        names
+          .filter(name => name.toLowerCase().includes(typed))
+          .slice(0, 25)
+          .map(name => ({ name: name.slice(0, 100), value: name.slice(0, 100) }))
+      );
     } else {
       // Default empty response for unhandled autocomplete options
       await interaction.respond([]);
@@ -564,6 +574,7 @@ async function handleInteractions(interaction) {
       "ladder_link": handleLadderLink,
       "ladder_preview": handleLadderPreview,
       "ladder_analysis": handleLadderAnalysis,
+      "ladder_ai": handleLadderAi,
     };
 
     const handler = commandHandlers[commandName];
