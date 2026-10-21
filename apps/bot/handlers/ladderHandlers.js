@@ -15,7 +15,7 @@ async function resolveTeam(interaction) {
 async function findFixture(interaction, teamName) {
   const fixtureId = interaction.options.getInteger("match");
   const fixture = fixtureId ? await ladderClient.getFixture(fixtureId) : await ladderClient.getNextFixture(teamName);
-  return fixture && fixture.start ? fixture : null;
+  return fixture && fixture.start ? ladderClient.refreshFixture(fixture) : null;
 }
 
 async function replyError(interaction, name, error) {

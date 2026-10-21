@@ -76,8 +76,8 @@ async function syncTeam(client, team, now) {
         await ladderState.markPosted("postedLadderDayReminder", id);
       }
       if (wantPreview && isPreviewDue(start, windowMinutes, now)) {
-        // Re-fetch inside the window so signups are current.
-        const fixture = await ladderClient.getFixture(id);
+        // Re-fetch inside the window so signups are current; this also presses the ladder's refresh button.
+        const fixture = await ladderClient.refreshFixture(await ladderClient.getFixture(id));
         await channel.send(await buildLadderPreviewMessage(fixture, team.name));
         await ladderState.markPosted("postedLadderPreview", id);
       }

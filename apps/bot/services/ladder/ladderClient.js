@@ -35,6 +35,30 @@ async function getFixture(id) {
   return { id: String(id), ...parseFixture(await getPage(`/fixture/${encodeURIComponent(id)}`)) };
 }
 
+// The ladder only re-reads signups from Zwift when someone presses "Refresh Signups" (GET /rSignups/{eventId}),
+// at most once per 30 minutes, so a preview can miss late signups until then. Failures are not fatal.
+const REFRESH_COOLDOWN_MS = 30 * 60 * 1000;
+const lastRefresh = new Map();
+
+async function refreshSignups(eventId, { fetchPage = getPage, now = Date.now() } = {}) {
+  if (!eventId) return false;
+  const last = lastRefresh.get(String(eventId));
+  if (last !== undefined && now - last < REFRESH_COOLDOWN_MS) return false;
+  lastRefresh.set(String(eventId), now);
+  try {
+    await fetchPage(`/rSignups/${encodeURIComponent(eventId)}`);
+    return true;
+  } catch (err) {
+    console.warn(`[ladder] Signup refresh for event ${eventId} failed:`, err.message);
+    return false;
+  }
+}
+
+// Returns the fixture with up-to-date signups when the refresh went through, otherwise the fixture as given.
+async function refreshFixture(fixture) {
+  return (await refreshSignups(fixture.zwiftEventId)) ? getFixture(fixture.id) : fixture;
+}
+
 // Start times never change once read, so each fixture page is fetched at most once per process for this.
 const startCache = new Map();
 
@@ -52,4 +76,4 @@ async function getNextFixture(team) {
   return null;
 }
 
-module.exports = { getPage, fixturesPath, getFixtures, getFixture, getFixtureStart, getNextFixture };
+module.exports = { getPage, fixturesPath, getFixtures, getFixture, getFixtureStart, getNextFixture, refreshSignups, refreshFixture };

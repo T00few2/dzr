@@ -51,3 +51,10 @@ test("parseFixture keeps the named powerups when the bag is missing", () => {
   assert.deepEqual(fixture.powerupIds, []);
   assert.deepEqual(fixture.powerups, ["feather", "aero"]);
 });
+
+test("parseFixture reads the Zwift event id from the hidden field or the sign-in link button", () => {
+  const field = `<input type="hidden" name="zwiftEventId" id="fixture_zid" value="5729795" />`;
+  assert.equal(parseFixture(field).zwiftEventId, "5729795");
+  assert.equal(parseFixture("<a>Sign-in link (event 5748317)</a>").zwiftEventId, "5748317");
+  assert.equal(parseFixture(`<input name="zwiftEventId" value="">`).zwiftEventId, null);
+});
