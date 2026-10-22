@@ -12,8 +12,9 @@ import {
 
 export async function PUT(
   req: Request,
-  { params }: { params: { panelId: string; roleId: string } }
+  props: { params: Promise<{ panelId: string; roleId: string }> }
 ) {
+  const params = await props.params;
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
   try {
@@ -69,8 +70,9 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { panelId: string; roleId: string } }
+  props: { params: Promise<{ panelId: string; roleId: string }> }
 ) {
+  const params = await props.params;
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
   try {

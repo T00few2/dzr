@@ -17,12 +17,12 @@ import {
   PopoverContent,
   PopoverHeader,
   PopoverArrow,
-  keyframes,
   Link,
   Image,
   Button,
 } from '@chakra-ui/react'
 
+import { keyframes } from '@emotion/react'
 import { FaFacebook, FaTwitter, FaYoutube } from 'react-icons/fa'
 import { ReactNode } from 'react'
 

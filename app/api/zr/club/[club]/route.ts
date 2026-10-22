@@ -14,10 +14,8 @@ import { adminDb } from '@/app/utils/firebaseAdminConfig';
  * ZRS is taken from ZwiftRacing (`zrs.score`) and copied to `racingScore`
  * so existing consumers do not need the Zwift profile queue.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { club: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ club: string }> }) {
+  const params = await props.params;
   // Explicitly disable any caching at the edge or intermediate proxies
   (request as any).headers?.set?.('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
   const { club } = params;

@@ -10,7 +10,8 @@ function eventId(raw: string) {
   return raw
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireEventEditor(req)
   if (auth.error) return auth.error
   const id = eventId(params.id)
@@ -18,7 +19,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return flaskJson(`/api/zwift/events/${id}`)
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireEventEditor(req)
   if (auth.error) return auth.error
   const id = eventId(params.id)

@@ -15,7 +15,8 @@ function coerceAdminFields(data: Record<string, any>) {
   return data
 }
 
-export async function GET(req: Request, { params }: { params: { name: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ name: string }> }) {
+  const params = await props.params;
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
   const name = params.name
@@ -25,7 +26,8 @@ export async function GET(req: Request, { params }: { params: { name: string } }
   return NextResponse.json({ docs })
 }
 
-export async function POST(req: Request, { params }: { params: { name: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ name: string }> }) {
+  const params = await props.params;
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
   const name = params.name

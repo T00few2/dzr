@@ -8,7 +8,8 @@ import {
   saveSelfRolesDoc,
 } from '@/app/api/admin/_lib/selfRoles'
 
-export async function PUT(req: Request, { params }: { params: { panelId: string } }) {
+export async function PUT(req: Request, props: { params: Promise<{ panelId: string }> }) {
+  const params = await props.params;
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
   try {

@@ -14,8 +14,8 @@ import {
   Icon,
   Stack,
   Text,
-  keyframes,
 } from '@chakra-ui/react'
+import { keyframes } from '@emotion/react'
 import { FaDiscord, FaRoad, FaUsers } from 'react-icons/fa'
 import { FaTrophy } from 'react-icons/fa6'
 import { MdCardMembership, MdDirectionsBike, MdHowToVote, MdPayment } from 'react-icons/md'

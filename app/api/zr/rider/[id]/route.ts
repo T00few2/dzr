@@ -7,10 +7,8 @@ import { fetchRiderdata, RiderData } from '@/app/utils/fetchZPdata';
  * Example: GET /api/zr/15690
  * Dynamically fetch rider data for the provided "id"
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { id } = params;
 
   if (!id) {

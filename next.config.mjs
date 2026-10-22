@@ -1,4 +1,8 @@
+import path from 'path'
+import { fileURLToPath } from 'url'
+
 /** @type {import('next').NextConfig} */
+const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 const elevationFiles = [
   './node_modules/zwift-data/lib/streams/routes/**/*',
   './node_modules/zwift-data/lib/streams/segments/**/*',
@@ -6,13 +10,19 @@ const elevationFiles = [
 ]
 
 const nextConfig = {
-  // The profile API reads one route file by name. Next cannot see that path, so the files never reach Vercel.
-  experimental: {
-    outputFileTracingIncludes: {
-      '/api/route-profile': elevationFiles,
-      '/api/route-profile/route': elevationFiles,
-    },
+  // A package-lock.json in a parent folder would otherwise become the Turbopack root.
+  turbopack: {
+    root: projectRoot,
   },
+  // Next writes an AGENTS.md on dev startup unless this is off.
+  agentRules: false,
+  // The profile API reads one route file by name. Next cannot see that path, so the files never reach Vercel.
+  outputFileTracingIncludes: {
+    '/api/route-profile': elevationFiles,
+    '/api/route-profile/route': elevationFiles,
+  },
+  // `next dev` uses Turbopack and ignores this hook. The dev script passes --webpack so
+  // edits under apps/ (the bot and API) do not rebuild the site.
   webpack: (config) => {
     config.watchOptions = {
       ...config.watchOptions,

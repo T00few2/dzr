@@ -5,7 +5,8 @@ import SeriesView, { type SeriesPageData } from './SeriesView'
 
 export const dynamic = 'force-dynamic'
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const series = await publicSeries(params.slug).catch(() => null)
   if (!series) return { title: 'Series' }
   return {
@@ -19,7 +20,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 }
 
-export default async function SeriesPage({ params }: { params: { slug: string } }) {
+export default async function SeriesPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const series = await publicSeries(params.slug).catch(() => null)
   if (!series) notFound()
   const page: SeriesPageData = {

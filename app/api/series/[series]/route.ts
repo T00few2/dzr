@@ -5,7 +5,8 @@ import { parseSeriesId, publishedRaces } from '@/app/lib/seriesSchedule'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET(_req: Request, { params }: { params: { series: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ series: string }> }) {
+  const params = await props.params;
   const seriesId = parseSeriesId(params.series)
   if (!seriesId) return NextResponse.json({ error: 'Unknown series' }, { status: 404 })
   try {

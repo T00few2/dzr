@@ -22,9 +22,9 @@ import {
   CardHeader,
   SimpleGrid,
   SimpleGridProps,
-  keyframes,
   VStack,
 } from '@chakra-ui/react'
+import { keyframes } from '@emotion/react'
 import { IconType } from 'react-icons';
 
 import { motion } from 'framer-motion';

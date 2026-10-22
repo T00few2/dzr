@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/admin/_lib/auth'
 import { deleteSignupBoard } from '@/app/api/admin/_lib/signupBoards'
 
-export async function DELETE(req: Request, { params }: { params: { boardId: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ boardId: string }> }) {
+  const params = await props.params;
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
   const boardId = decodeURIComponent(String(params.boardId || '')).trim()

@@ -15,7 +15,8 @@ function coerceAdminFields(data: Record<string, any>) {
   return data
 }
 
-export async function PUT(req: Request, { params }: { params: { name: string; id: string } }) {
+export async function PUT(req: Request, props: { params: Promise<{ name: string; id: string }> }) {
+  const params = await props.params;
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
   if (isBlockedAdminCollection(params.name)) return NextResponse.json({ error: 'Collection is not available here' }, { status: 403 })
@@ -27,7 +28,8 @@ export async function PUT(req: Request, { params }: { params: { name: string; id
   return NextResponse.json({ id: params.id, ...data })
 }
 
-export async function DELETE(req: Request, { params }: { params: { name: string; id: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ name: string; id: string }> }) {
+  const params = await props.params;
   const auth = await requireAdmin(req)
   if (auth.error) return auth.error
   if (isBlockedAdminCollection(params.name)) return NextResponse.json({ error: 'Collection is not available here' }, { status: 403 })
