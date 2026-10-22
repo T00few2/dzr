@@ -47,6 +47,10 @@
     "undici": "^6.20.1",
     "zwift-data": "^2.1.0"
   },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.6",
+    "glob": "10.5.0"
+  },
   "devDependencies": {
     "@types/papaparse": "^5.3.14",
     "@types/react": "^19.3.0",

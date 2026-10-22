@@ -16,6 +16,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # Production dependencies only. braces has no patched release and is pulled in by the
+      # ESLint toolchain, so a full audit would stay red after the runtime fixes.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Typecheck
         run: npx tsc --noEmit
       - name: Lint site
@@ -46,6 +50,8 @@ jobs:
       # scripts to avoid compiling the native canvas dependency; no bot test needs its binary.
       - name: Install dependencies
         run: npm ci --ignore-scripts
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Unit tests
         run: npm test
       # Structure-only pass over the coach prompt: no API calls, no cost. The full golden set
