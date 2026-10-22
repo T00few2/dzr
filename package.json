@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -30,7 +30,7 @@
     "dotenv": "^16.4.5",
     "feed": "^4.2.2",
     "firebase": "^12.5.0",
-    "firebase-admin": "^13.0.2",
+    "firebase-admin": "^14.5.0",
     "framer-motion": "^11.0.8",
     "googleapis": "^142.0.0",
     "gsap": "^3.12.5",

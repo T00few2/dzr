@@ -1,6 +1,15 @@
 /* eslint-disable no-console */
 const path = require('path')
-const admin = require('firebase-admin')
+const { initializeApp, cert, getApps } = require('firebase-admin/app')
+const { getFirestore } = require('firebase-admin/firestore')
+const admin = {
+  get apps() {
+    return getApps()
+  },
+  initializeApp,
+  credential: { cert },
+  firestore: getFirestore,
+}
 const dotenv = require('dotenv')
 
 dotenv.config({ path: path.join(process.cwd(), '.env.local') })

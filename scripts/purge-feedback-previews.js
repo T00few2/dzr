@@ -14,7 +14,13 @@
  * Needs the same Firebase Admin credentials as the site (FIREBASE_PROJECT_ID,
  * FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).
  */
-const admin = require("firebase-admin");
+const { initializeApp, cert } = require("firebase-admin/app");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const admin = {
+  initializeApp,
+  credential: { cert },
+  firestore: Object.assign(getFirestore, { FieldValue }),
+};
 
 const DRY_RUN = process.argv.includes("--dry-run");
 

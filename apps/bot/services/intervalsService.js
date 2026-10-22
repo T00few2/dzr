@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const admin = require("firebase-admin");
+const { FieldValue } = require("firebase-admin/firestore");
 const config = require("../config/config");
 const shared = require("../constants.json");
 const { db, getUserZwiftId, getLatestClubStats, isPaidClubMember } = require("./firebase");
@@ -87,8 +87,8 @@ async function getConnection(discordId) {
 async function persistEncryptedTokens(discordId, accessToken) {
   const patch = encryptedTokenFields(accessToken, "");
   if (canEncryptTokens()) {
-    patch.accessToken = admin.firestore.FieldValue.delete();
-    patch.refreshToken = admin.firestore.FieldValue.delete();
+    patch.accessToken = FieldValue.delete();
+    patch.refreshToken = FieldValue.delete();
   }
   patch.updatedAt = new Date();
   await db.collection(COLLECTION).doc(String(discordId)).set(patch, { merge: true });

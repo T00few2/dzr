@@ -1,4 +1,17 @@
-const admin = require("firebase-admin");
+const { initializeApp, cert } = require("firebase-admin/app");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+
+function firestore() {
+  return getFirestore();
+}
+firestore.FieldValue = FieldValue;
+firestore.Timestamp = Timestamp;
+
+const admin = {
+  initializeApp,
+  credential: { cert },
+  firestore,
+};
 const config = require("../config/config");
 const shared = require("../constants.json");
 const { isPaidClubMember: sharedIsPaidClubMember } = require("./membership");
