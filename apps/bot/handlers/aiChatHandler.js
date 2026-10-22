@@ -24,6 +24,7 @@ const {
   parseFulfillment,
   partitionByFulfillment,
   unmetToolOutput,
+  recentConversation,
 } = require("../services/toolFulfillment");
 const { trimConversation } = require("../services/conversationTrim");
 const { fromDiscordMessage, dmRecordsToHistory, stripSentStamp, DM_READBACK_MAX_AGE_MS } = require("../services/dmHistory");
@@ -2235,7 +2236,7 @@ function latestUserText(input) {
  * neighbouring tool (an ID lookup when they asked for stats, stats when they asked for a category)
  * never reaches Discord. An inconclusive check allows the call.
  */
-async function screenClubToolCalls(userText, toolCalls, rejectedNames) {
+async function screenClubToolCalls(userText, toolCalls, rejectedNames, context = "") {
   if (!userText) {
     return partitionByFulfillment(toolCalls, new Map());
   }
@@ -2247,12 +2248,12 @@ async function screenClubToolCalls(userText, toolCalls, rejectedNames) {
       verdictById.set(toolCall.id, false);
       return;
     }
-    verdictById.set(toolCall.id, await toolCallFulfills(userText, toolCall, toolDescription(name)));
+    verdictById.set(toolCall.id, await toolCallFulfills(userText, toolCall, toolDescription(name), context));
   }));
   return partitionByFulfillment(toolCalls, verdictById);
 }
 
-async function toolCallFulfills(userText, toolCall, description) {
+async function toolCallFulfills(userText, toolCall, description, context) {
   try {
     const response = await createStatelessResponse(openai, {
       instructions: FULFILLMENT_INSTRUCTIONS,
@@ -2263,6 +2264,7 @@ async function toolCallFulfills(userText, toolCall, description) {
           name: toolCall.name,
           description,
           args: toolCall.arguments || toolCall.function?.arguments || "{}",
+          context,
         }),
       }],
       tools: [],
@@ -2326,7 +2328,7 @@ async function runClubResponsesTurn({
   const rejectedToolNames = new Set();
   let currentToolCalls = response.toolCalls;
   for (let iteration = 0; currentToolCalls.length && iteration < maxIters; iteration++) {
-    const screened = await screenClubToolCalls(latestUserText(input), currentToolCalls, rejectedToolNames);
+    const screened = await screenClubToolCalls(latestUserText(input), currentToolCalls, rejectedToolNames, recentConversation(input));
     for (const name of screened.newlyRejected) rejectedToolNames.add(name);
 
     if (screened.rejected.length) {
