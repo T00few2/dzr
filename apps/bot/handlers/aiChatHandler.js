@@ -27,6 +27,7 @@ const {
   recentConversation,
 } = require("../services/toolFulfillment");
 const { trimConversation } = require("../services/conversationTrim");
+const { discordMessageText, addRepliedMessage } = require("../services/replyContext");
 const { fromDiscordMessage, dmRecordsToHistory, stripSentStamp, DM_READBACK_MAX_AGE_MS } = require("../services/dmHistory");
 const { createTurnQueue } = require("../services/turnQueue");
 const { coachToolsForTurn, reasoningEffortAfterTools } = require("../services/coachTools");
@@ -278,21 +279,24 @@ function isCoachingIntent(text) {
   return patterns.some((p) => p.test(t));
 }
 
-async function isReplyToBot(message, client) {
+async function fetchReferencedMessage(message) {
   const refId = message?.reference?.messageId;
-  if (!refId) return false;
+  if (!refId) return null;
 
   try {
     const cached = message.channel?.messages?.cache?.get(refId);
-    if (cached) return cached.author?.id === client.user.id;
+    if (cached) return cached;
 
     // Fallback: fetch referenced message (may fail if missing perms / deleted)
-    const fetched = await message.channel.messages.fetch(refId).catch(() => null);
-    if (!fetched) return false;
-    return fetched.author?.id === client.user.id;
+    return await message.channel.messages.fetch(refId).catch(() => null);
   } catch {
-    return false;
+    return null;
   }
+}
+
+async function isReplyToBot(message, client) {
+  const referenced = await fetchReferencedMessage(message);
+  return Boolean(referenced) && referenced.author?.id === client.user.id;
 }
 
 /**
@@ -2756,6 +2760,13 @@ async function runChatTurn(message, client, { coachOnly }) {
       };
     }
     
+    // A reply to one of our messages: make sure the model has that message, even when another
+    // user wrote the reply or the history has expired since.
+    const referenced = await fetchReferencedMessage(message);
+    if (referenced && referenced.author?.id === client.user.id) {
+      addRepliedMessage(conversation, discordMessageText(referenced));
+    }
+
     // Add user message to conversation
     conversation.push({
       role: "user",
