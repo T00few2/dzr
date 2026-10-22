@@ -1,5 +1,30 @@
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
 const shared = require("../constants.json");
+
+// The website keeps the DCU club-API login in the repo-root .env.local.
+// Use it for a local bot when the process does not already have the vars. Never override.
+function fillDcuClubLogin() {
+  const keys = ["DCU_E_SERIE_USERNAME", "DCU_E_SERIE_SECRET"];
+  if (keys.every((key) => String(process.env[key] || "").trim())) return;
+  let text = "";
+  try {
+    text = fs.readFileSync(path.join(__dirname, "..", "..", "..", ".env.local"), "utf8");
+  } catch {
+    return;
+  }
+  for (const line of text.split(/\r?\n/)) {
+    const match = line.match(/^\s*(DCU_E_SERIE_USERNAME|DCU_E_SERIE_SECRET)\s*=\s*(.*)\s*$/);
+    if (!match || String(process.env[match[1]] || "").trim()) continue;
+    let value = match[2].trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    process.env[match[1]] = value;
+  }
+}
+fillDcuClubLogin();
 
 module.exports = {
   discord: {

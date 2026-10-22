@@ -320,6 +320,10 @@ What the helper can read:
 - DCU E-serien's race calendar via `dcu_eserien_races` (`services/dcuESerien.js`), read from the
   public API behind dansk-ecykling.dk/schedule: date, route, world, laps, distance, point segments,
   division groups and Zwift event ids. The club bot has it too, so "DZR løbet" resolves directly
+- DCU E-serien results via `dcu_eserien_results` (`services/dcuClubResults.js`): DZR riders' place
+  in the full field, time and points for one race, plus the season table and the club ranking.
+  It uses the club API login `DCU_E_SERIE_USERNAME` / `DCU_E_SERIE_SECRET`. The club bot has it
+  too, so "hvordan gik DZR løbet" does not go through ZwiftPower
 - Any public https page, via `read_web_page` (`services/webPage.js`), so it can open a race calendar a
   search found. Private and local addresses are refused, redirects included
 - Zwift events via Zwift's public events API (`services/zwiftEvents.js`): route, world, laps or distance,

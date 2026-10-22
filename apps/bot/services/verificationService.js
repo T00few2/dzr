@@ -5,6 +5,7 @@ class VerificationService {
   constructor() {
     this.collection = "verificationSettings";
     this.defaultCriteria = DEFAULT_VERIFICATION_CRITERIA;
+    this.pendingVerifications = new Map();
   }
 
   /**
@@ -67,10 +68,23 @@ class VerificationService {
    * Process verification for a member (assign or remove verified role)
    */
   async processVerification(member) {
+    const key = `${member.guild.id}:${member.id}`;
+    const previous = this.pendingVerifications.get(key) || Promise.resolve();
+    const current = previous.catch(() => {}).then(() => this.processCurrentVerification(member));
+    this.pendingVerifications.set(key, current);
+    try {
+      return await current;
+    } finally {
+      if (this.pendingVerifications.get(key) === current) this.pendingVerifications.delete(key);
+    }
+  }
+
+  async processCurrentVerification(member) {
     try {
       const settings = await this.getVerificationSettings(member.guild.id);
       
-      if (!settings || !settings.enabled || !settings.verifiedRoleId) {
+      if (!settings) return { processed: false, reason: "Verification lookup failed" };
+      if (!settings.enabled || !settings.verifiedRoleId) {
         return { processed: false, reason: "Verification not configured" };
       }
 
@@ -81,7 +95,9 @@ class VerificationService {
         return { processed: false, reason: "Verified role not found" };
       }
 
-      // Capture role state before awaiting verification data to avoid mixing old and new state.
+      // Every entry point uses fresh Discord state after entering the per-member queue.
+      // Read the role state before the database: a delayed event must not undo a newer assignment.
+      member = await member.guild.members.fetch({ user: member.id, force: true });
       const hasVerifiedRole = member.roles.cache.has(settings.verifiedRoleId);
       const criteria = { ...this.defaultCriteria, ...settings.criteria };
       const criteriaCheck = await this.checkVerificationCriteria(member, criteria);
@@ -181,7 +197,8 @@ class VerificationService {
     try {
       const settings = await this.getVerificationSettings(member.guild.id);
       
-      if (!settings || !settings.enabled) {
+      if (!settings) return null;
+      if (!settings.enabled) {
         return {
           enabled: false,
           hasVerifiedRole: false,
