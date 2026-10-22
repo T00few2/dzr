@@ -56,16 +56,16 @@ function nameMatches(name, filter) {
   return words.every((word) => folded.includes(word));
 }
 
+// Kept small: a big DZR turnout must fit the helper's tool-output limit.
+// Finish points are points minus sprint_points. Missing time, zero sprint points and FIN are left out.
 function compactRider(rider) {
-  const row = {
-    position: rider.position,
-    name: rider.name || null,
-    time: formatFinish(rider.finishTime),
-    points: Number(rider.totalPoints) || 0,
-    finish_points: Number(rider.finishPoints) || 0,
-    sprint_points: Number(rider.sprintPoints) || 0,
-    status: rider.raceStatus || null,
-  };
+  const row = { position: rider.position, name: rider.name || null, points: Number(rider.totalPoints) || 0 };
+  const time = formatFinish(rider.finishTime);
+  if (time) row.time = time;
+  const sprint = Number(rider.sprintPoints) || 0;
+  if (sprint) row.sprint_points = sprint;
+  const status = String(rider.raceStatus || "").trim();
+  if (status && status.toUpperCase() !== "FIN") row.status = status;
   if (rider.disqualified) row.disqualified = true;
   if (rider.declassified) row.declassified = true;
   if (rider.transferFromCategory) row.moved_from = rider.transferFromCategory;
@@ -151,7 +151,7 @@ function applyRiderFilters(divisions, { rider, division }) {
     .filter((row) => row.riders.length > 0);
 }
 
-const RESULTS_NOTE = "Only Danish Zwift Racers riders are listed. position is the place in the full division (field_size), in the official result order, not a ranking among DZR riders and not sorted by time. results_phase provisional means the result can still change.";
+const RESULTS_NOTE = "Only Danish Zwift Racers riders are listed. position is the place in the full division (field_size), in the official result order, not a ranking among DZR riders and not sorted by time. results_phase provisional means the result can still change. points includes sprint_points; time is missing and status is set when the rider did not finish normally.";
 
 async function loadRace(args, options) {
   const index = await clubGet("/club-api/races", options);

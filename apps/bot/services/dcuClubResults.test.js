@@ -75,7 +75,10 @@ test("loads the latest race when no race is named", async () => {
   assert.equal(result.divisions[1].riders[0].name, "Jacob Stauner");
   assert.equal(result.divisions[1].riders[0].time, "1:07:42");
   assert.equal(result.divisions[1].riders[0].points, 139);
-  assert.equal(result.divisions[1].riders[1].time, null);
+  assert.equal(result.divisions[1].riders[0].sprint_points, 22);
+  assert.equal(result.divisions[1].riders[0].status, undefined);
+  assert.equal(result.divisions[1].riders[1].time, undefined);
+  assert.equal(result.divisions[1].riders[1].sprint_points, undefined);
   assert.equal(result.divisions[1].riders[1].status, "DNF");
   assert.equal(api.calls[0].url, `${CLUB_API_BASE}/club-api/races`);
   assert.equal(api.calls[1].url, `${CLUB_API_BASE}/club-api/races/dzr1/results`);
