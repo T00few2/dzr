@@ -200,6 +200,10 @@ function compactToolResult(result) {
   if (result.series) base.series = result.series;
   if (Array.isArray(result.races)) base.races = result.races.slice(0, 12);
   if (typeof result.today === "string") base.today = result.today;
+  // dcu_eserien_results: DZR riders per division (race and standings) and the club table
+  if (Array.isArray(result.divisions)) base.divisions = result.divisions;
+  if (Array.isArray(result.clubs)) base.clubs = result.clubs;
+  if (typeof result.note === "string") base.note = result.note.slice(0, 500);
   if (result.zrl) base.zrl = result.zrl;
   if (typeof result.summary === "string") base.summary = result.summary.slice(0, 500);
   if (typeof result.coach_info === "string") base.coach_info = result.coach_info.slice(0, 4000);
