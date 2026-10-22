@@ -1,40 +1,44 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { getDcuResults, resetCache, formatFinish, CLUB_API_BASE } = require("./dcuClubResults");
+const { getDcuResults, resetCache, formatFinish } = require("./dcuClubResults");
+const { RACES_URL } = require("./dcuESerien");
 
 const LOGIN = { username: "dzr", secret: "test-secret" };
 const NOW = Date.parse("2026-10-22T20:30:00Z");
 
-const INDEX = {
+// Same shape as the public races list: results keyed by division, every club's riders included.
+const RACES = {
   races: [
-    { id: "eckd1", name: "eCKD løbet", date: "2026-09-17T19:00:00+00:00", resultsPhase: "finalized", stageRaceName: "eCKD" },
-    { id: "dzr1", name: "DZR løbet", date: "2026-10-22T19:00:00+00:00", resultsPhase: "finalized", stageRaceName: "DZR" },
-  ],
-};
-
-const DZR_RESULTS = {
-  id: "dzr1",
-  name: "DZR løbet",
-  date: "2026-10-22T19:00:00+00:00",
-  resultsPhase: "finalized",
-  stageRaceName: "DZR",
-  divisions: [
     {
-      category: "1. Division",
-      fieldSize: 21,
-      riders: [
-        { position: 10, name: "Emil Ringgaard", finishTime: 3918590, finishPoints: 118, sprintPoints: 6, totalPoints: 124, raceStatus: "FIN" },
-      ],
+      id: "eckd1",
+      name: "eCKD løbet",
+      date: "2026-09-17T19:00",
+      resultsPhase: "finalized",
+      results: {
+        "2. Division": [
+          { name: "Jacob Stauner", club: "Danish Zwift Racers", finishRank: 4, finishTime: 4000000, finishPoints: 100, sprintPoints: 0, totalPoints: 100, raceStatus: "FIN" },
+        ],
+      },
     },
     {
-      category: "2. Division",
-      fieldSize: 62,
-      riders: [
-        { position: 1, name: "Jacob Stauner", finishTime: 4062211, finishPoints: 117, sprintPoints: 22, totalPoints: 139, raceStatus: "FIN" },
-        { position: 58, name: "Kim Damgaard", finishTime: 0, finishPoints: 0, sprintPoints: 0, totalPoints: 0, raceStatus: "DNF" },
-      ],
+      id: "dzr1",
+      name: "DZR løbet",
+      date: "2026-10-22T19:00",
+      resultsPhase: "finalized",
+      results: {
+        "1. Division": [
+          { name: "Jacob Kvistgaard", club: "Holstebro Cycleclub af 1960", finishRank: 1, finishTime: 3901848, finishPoints: 130, sprintPoints: 24, totalPoints: 154, raceStatus: "FIN" },
+          { name: "Emil Ringgaard", club: "Danish Zwift Racers", finishRank: 10, finishTime: 3918590, finishPoints: 118, sprintPoints: 6, totalPoints: 124, raceStatus: "FIN" },
+        ],
+        "2. Division": [
+          { name: "Kim Damgaard", club: "Danish Zwift Racers", finishRank: 0, finishTime: 0, finishPoints: 0, sprintPoints: 0, totalPoints: 0, raceStatus: "DNF" },
+          { name: "Jacob Stauner", club: "Danish Zwift Racers", finishRank: 1, finishTime: 4062211, finishPoints: 117, sprintPoints: 22, totalPoints: 139, raceStatus: "FIN" },
+          { name: "Anders Andersen", club: "eCykle Klub Danmark", finishRank: 2, finishTime: 4062300, finishPoints: 115, sprintPoints: 0, totalPoints: 115, raceStatus: "FIN" },
+        ],
+      },
     },
+    { id: "next1", name: "Næste løb", date: "2026-10-29T19:00", results: {} },
   ],
 };
 
@@ -53,11 +57,7 @@ function http(handlers) {
 }
 
 function client(extra = []) {
-  return http([
-    { match: "/club-api/races/dzr1/results", data: DZR_RESULTS },
-    { match: "/club-api/races", data: INDEX },
-    ...extra,
-  ]);
+  return http([{ match: RACES_URL, data: RACES }, ...extra]);
 }
 
 test("formats finish times from milliseconds", () => {
@@ -77,9 +77,19 @@ test("loads the latest race when no race is named", async () => {
   assert.equal(result.divisions[1].riders[0].points, 139);
   assert.equal(result.divisions[1].riders[1].time, null);
   assert.equal(result.divisions[1].riders[1].status, "DNF");
-  assert.equal(api.calls[0].url, `${CLUB_API_BASE}/club-api/races`);
-  assert.equal(api.calls[1].url, `${CLUB_API_BASE}/club-api/races/dzr1/results`);
-  assert.equal(Buffer.from(api.calls[0].authorization.replace("Basic ", ""), "base64").toString("utf8"), "dzr:test-secret");
+  assert.equal(result.divisions[1].riders[1].position, null);
+  assert.equal(result.divisions[1].field_size, 3);
+  assert.deepEqual(result.divisions.flatMap((row) => row.riders.map((rider) => rider.name)), ["Emil Ringgaard", "Jacob Stauner", "Kim Damgaard"]);
+  assert.equal(api.calls.length, 1);
+  assert.equal(api.calls[0].url, RACES_URL);
+  assert.equal(api.calls[0].authorization, "");
+});
+
+test("race results need no club login", async () => {
+  resetCache();
+  const result = await getDcuResults({ query: "DZR løbet" }, { username: "", secret: "", http: client(), now: NOW });
+  assert.equal(result.success, true);
+  assert.equal(result.divisions[0].riders[0].name, "Emil Ringgaard");
 });
 
 test("finds DZR løbet and can filter to one rider", async () => {
@@ -87,7 +97,7 @@ test("finds DZR løbet and can filter to one rider", async () => {
   const result = await getDcuResults({ query: "DZR løbet", rider: "Emil" }, { ...LOGIN, http: client(), now: NOW });
   assert.equal(result.name, "DZR løbet");
   assert.deepEqual(result.divisions.map((row) => row.riders.map((rider) => rider.name)), [["Emil Ringgaard"]]);
-  assert.equal(result.divisions[0].field_size, 21);
+  assert.equal(result.divisions[0].field_size, 2);
   assert.equal(result.divisions[0].riders[0].position, 10);
 });
 
@@ -108,11 +118,11 @@ test("asks which race when several match", async () => {
   resetCache();
   const api = http([
     {
-      match: "/club-api/races",
+      match: RACES_URL,
       data: {
         races: [
-          { id: "dzr1", name: "DZR løbet", date: "2026-10-22T19:00:00+00:00", resultsPhase: "finalized" },
-          { id: "dzr2", name: "DZR finale", date: "2026-11-19T19:00:00+00:00", resultsPhase: "provisional" },
+          { ...RACES.races[1] },
+          { ...RACES.races[1], id: "dzr2", name: "DZR finale", date: "2026-11-19T19:00", resultsPhase: "provisional" },
         ],
       },
     },
@@ -128,18 +138,18 @@ test("caches a repeated lookup", async () => {
   const api = client();
   await getDcuResults({ query: "DZR" }, { ...LOGIN, http: api, now: NOW });
   await getDcuResults({ query: "DZR" }, { ...LOGIN, http: api, now: NOW + 30_000 });
-  assert.equal(api.calls.length, 2);
+  assert.equal(api.calls.length, 1);
 });
 
 test("reports a missing login, a rejected login, and a failed request", async () => {
   resetCache();
-  assert.equal((await getDcuResults({}, { username: "", secret: "", http: client(), now: NOW })).success, false);
+  assert.equal((await getDcuResults({ kind: "standings" }, { username: "", secret: "", http: client(), now: NOW })).success, false);
   resetCache();
-  const rejected = await getDcuResults({}, { ...LOGIN, http: http([{ match: "/club-api/races", status: 401, data: {} }]), now: NOW });
+  const rejected = await getDcuResults({ kind: "standings" }, { ...LOGIN, http: http([{ match: "/club-api/standings", status: 401, data: {} }]), now: NOW });
   assert.equal(rejected.success, false);
   assert.match(rejected.message, /rejected/);
   resetCache();
-  const down = await getDcuResults({}, { ...LOGIN, http: http([{ match: "/club-api/races", throw: true }]), now: NOW });
+  const down = await getDcuResults({}, { ...LOGIN, http: http([{ match: RACES_URL, throw: true }]), now: NOW });
   assert.equal(down.success, false);
 });
 
