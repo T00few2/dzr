@@ -143,7 +143,6 @@ export async function syncMemberRoleOnLogin(input: {
         const result = evaluateVerificationCriteria(criteria, facts)
         if (!result.meetsAllCriteria) {
           skippedReason = 'verification_requirements_not_met'
-          console.info(`[verification] user=${userId} role=${roleId} source=${input.source} skipped: ${result.missingCriteria.join(', ')}`)
           continue
         }
       } catch (error) {
@@ -155,9 +154,6 @@ export async function syncMemberRoleOnLogin(input: {
 
     try {
       await discordAddRole(guildId, userId, roleId, botToken)
-      if (configuredVerification || isLoginRole) {
-        console.info(`[verification] user=${userId} role=${roleId} source=${input.source} assigned`)
-      }
     } catch {
       failed.push(roleId)
     }
@@ -179,7 +175,7 @@ export async function syncMemberRoleOnLogin(input: {
     attempt: 0,
     source: input.source,
   })
-  return { status: 'queued', roleId: failed[0], roleUpdateId: queued.id }
+  return { status: 'queued', roleId: primaryRoleId, roleUpdateId: queued.id }
 }
 
 /** Sync eligible login roles, and the club role when membership is already paid. */
