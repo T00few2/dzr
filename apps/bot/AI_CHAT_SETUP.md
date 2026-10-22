@@ -322,9 +322,7 @@ What the helper can read:
   division groups and Zwift event ids. The club bot has it too, so "DZR løbet" resolves directly
 - DCU E-serien results via `dcu_eserien_results` (`services/dcuClubResults.js`): DZR riders' place
   in the full field, time and points for one race, plus the season table and the club ranking.
-  Race results come from the same public races list (each finished race carries every rider's
-  club and place), filtered to DZR. The season table and club ranking use the club API login
-  `DCU_E_SERIE_USERNAME` / `DCU_E_SERIE_SECRET`. The club bot has it
+  It uses the club API login `DCU_E_SERIE_USERNAME` / `DCU_E_SERIE_SECRET`. The club bot has it
   too, so "hvordan gik DZR løbet" does not go through ZwiftPower
 - Any public https page, via `read_web_page` (`services/webPage.js`), so it can open a race calendar a
   search found. Private and local addresses are refused, redirects included

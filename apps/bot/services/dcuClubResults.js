@@ -1,17 +1,14 @@
 /**
- * DZR's results in DCU E-serien.
+ * DZR's results in DCU E-serien, from the club results API.
  *
- * One race's results come from the public races list behind dansk-ecykling.dk: each finished race
- * carries `results`, keyed by division, with every rider's club, finishRank, time and points.
- * We keep only Danish Zwift Racers, with their place in the full division.
- * The season table and the club ranking come from the club API, which needs the club login.
+ * The public calendar (dcuESerien.js) has routes and point segments, not placings.
+ * This login only sees Danish Zwift Racers: each rider's place in the full division,
+ * their time and their points. Other clubs' riders are not in the payload.
  */
 const axios = require("axios");
-const { RACES_URL } = require("./dcuESerien");
 
 const CLUB_API_BASE = "https://us-central1-dcu-member-liga-479507.cloudfunctions.net/dcu_api";
 const CACHE_TTL_MS = 2 * 60 * 1000;
-const CLUB_NAME = "Danish Zwift Racers";
 const cache = new Map();
 
 const STOP_WORDS = new Set(["dcu", "e-serien", "eserien", "serien", "resultat", "resultater", "stilling", "stillingen"]);
@@ -61,7 +58,7 @@ function nameMatches(name, filter) {
 
 function compactRider(rider) {
   const row = {
-    position: Number(rider.position ?? rider.finishRank) > 0 ? Number(rider.position ?? rider.finishRank) : null,
+    position: rider.position,
     name: rider.name || null,
     time: formatFinish(rider.finishTime),
     points: Number(rider.totalPoints) || 0,
@@ -92,17 +89,17 @@ function credentials(options) {
 }
 
 async function clubGet(path, { http, now, username, secret }) {
-  return cachedGet(`${CLUB_API_BASE}${path}`, { http, now, username, secret });
-}
-
-async function cachedGet(url, { http, now, username = "", secret = "" }) {
+  const url = `${CLUB_API_BASE}${path}`;
   const key = `${username}\n${url}`;
   const hit = cache.get(key);
   if (hit && now - hit.at < CACHE_TTL_MS) return hit.data;
-  const headers = username
-    ? { Authorization: `Basic ${Buffer.from(`${username}:${secret}`, "utf8").toString("base64")}` }
-    : {};
-  const response = await http.get(url, { timeout: 20000, headers, validateStatus: () => true });
+  const response = await http.get(url, {
+    timeout: 20000,
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${username}:${secret}`, "utf8").toString("base64")}`,
+    },
+    validateStatus: () => true,
+  });
   const status = Number(response?.status);
   if (status === 429) {
     const error = new Error("rate");
@@ -140,26 +137,16 @@ function matchRaces(races, { query, date }) {
   return list;
 }
 
-function hasResults(race) {
-  const results = race?.results;
-  return Boolean(results && typeof results === "object" && Object.values(results).some((list) => Array.isArray(list) && list.length));
-}
-
-function isClubRider(person) {
-  return fold(person?.club) === fold(CLUB_NAME);
-}
-
-// `results` is { "1. Division": [every rider in that division] }.
-function applyRiderFilters(results, { rider, division }) {
-  return Object.entries(results && typeof results === "object" ? results : {})
-    .filter(([category]) => divisionMatches(category, division))
-    .map(([category, list]) => ({
-      division: category || null,
-      field_size: Array.isArray(list) ? list.length : 0,
-      riders: (Array.isArray(list) ? list : [])
-        .filter((person) => isClubRider(person) && nameMatches(person.name, rider))
+function applyRiderFilters(divisions, { rider, division }) {
+  return (Array.isArray(divisions) ? divisions : [])
+    .filter((row) => divisionMatches(row.category, division))
+    .map((row) => ({
+      division: row.category || null,
+      field_size: Number(row.fieldSize) || 0,
+      riders: (Array.isArray(row.riders) ? row.riders : [])
+        .filter((person) => nameMatches(person.name, rider))
         .map(compactRider)
-        .sort((a, b) => (a.position || Infinity) - (b.position || Infinity)),
+        .sort((a, b) => (a.position || 0) - (b.position || 0)),
     }))
     .filter((row) => row.riders.length > 0);
 }
@@ -167,8 +154,8 @@ function applyRiderFilters(results, { rider, division }) {
 const RESULTS_NOTE = "Only Danish Zwift Racers riders are listed. position is the place in the full division (field_size), in the official result order, not a ranking among DZR riders and not sorted by time. results_phase provisional means the result can still change.";
 
 async function loadRace(args, options) {
-  const index = await cachedGet(RACES_URL, { http: options.http, now: options.now });
-  const races = (Array.isArray(index?.races) ? index.races : []).filter(hasResults);
+  const index = await clubGet("/club-api/races", options);
+  const races = Array.isArray(index?.races) ? index.races : [];
   const query = String(args.query || "").trim();
   const date = String(args.date || "").trim();
   const matched = matchRaces(races, { query, date });
@@ -188,12 +175,16 @@ async function loadRace(args, options) {
       races: matched.slice(-8).map(compactRaceMeta),
     };
   }
-  const divisions = applyRiderFilters(race.results, args);
+  if (!/^[A-Za-z0-9_-]+$/.test(String(race.id || ""))) {
+    return { success: false, message: "Could not load DCU E-serien results right now." };
+  }
+  const body = await clubGet(`/club-api/races/${race.id}/results`, options);
+  const divisions = applyRiderFilters(body?.divisions, args);
   const filtered = Boolean(String(args.rider || "").trim() || String(args.division || "").trim());
   if (!divisions.length) {
     return {
       success: true,
-      ...compactRaceMeta(race),
+      ...compactRaceMeta(body || race),
       message: filtered ? "No DZR rider matched that name or division in this race." : "No DZR riders in this result.",
       divisions: [],
       note: RESULTS_NOTE,
@@ -201,7 +192,7 @@ async function loadRace(args, options) {
   }
   return {
     success: true,
-    ...compactRaceMeta(race),
+    ...compactRaceMeta(body || race),
     divisions,
     note: RESULTS_NOTE,
   };
@@ -263,15 +254,15 @@ async function loadClubs(options) {
 }
 
 /**
- * DZR results in DCU E-serien.
- * kind: race (default, public data), standings or clubs (club API login).
+ * DZR results from the DCU club API.
+ * kind: race (default), standings, or clubs.
  */
 async function getDcuResults(args = {}, options = {}) {
   const login = credentials(options);
-  const kind = args.kind === "standings" || args.kind === "clubs" ? args.kind : "race";
-  if (kind !== "race" && (!login.username || !login.secret)) {
-    return { success: false, message: "DCU E-serien standings are not configured." };
+  if (!login.username || !login.secret) {
+    return { success: false, message: "DCU E-serien results are not configured." };
   }
+  const kind = args.kind === "standings" || args.kind === "clubs" ? args.kind : "race";
   const call = { ...options, ...login, http: options.http || axios, now: options.now || Date.now() };
   try {
     if (kind === "standings") return await loadStandings(args, call);
