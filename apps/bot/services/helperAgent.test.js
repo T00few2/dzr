@@ -59,6 +59,13 @@ function scriptedClient(outputs) {
   };
 }
 
+test("fetches DCU E-serien results through the helper", async () => {
+  const deps = fakeDeps({ getDcuResults: async (args) => ({ success: true, query: args.query }) });
+  const result = await executeHelperTool({ name: "dcu_eserien_results", arguments: '{"query":"DZR"}' }, run(), deps);
+  assert.equal(result.success, true);
+  assert.equal(result.query, "DZR");
+});
+
 test("looks up the asking member's own Zwift ID with 'me'", async () => {
   const deps = fakeDeps();
   const state = run();

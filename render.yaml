@@ -48,6 +48,10 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: DCU_E_SERIE_USERNAME
+        sync: false
+      - key: DCU_E_SERIE_SECRET
+        sync: false
       - key: CLUB_ASSISTANT_MODEL
         value: gpt-6-luna
       - key: CLUB_ASSISTANT_REASONING_EFFORT

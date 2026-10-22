@@ -20,6 +20,7 @@ const zwiftRoutes = require("./zwiftRoutes");
 const { getZwiftEvent } = require("./zwiftEvents");
 const { readWebPage } = require("./webPage");
 const { getDcuRaces, dcuRacesToolDefinition } = require("./dcuESerien");
+const { getDcuResults, dcuResultsToolDefinition } = require("./dcuClubResults");
 const { zwiftRouteToolDefinitions, ZWIFT_ROUTE_TOOLS, runZwiftRouteTool } = zwiftRoutes;
 
 const HELPER_MODEL = process.env.HELPER_MODEL || COACH_MODEL;
@@ -43,6 +44,7 @@ Another bot (the club bot or DZR Coach) asks you a question it could not answer 
 - Read the club's own knowledge base (search_club_knowledge). Prefer it for anything about DZR itself.
 - Look up Zwift routes, segments and worlds offline (zwift_routes, zwift_route_details, zwift_segments): distance, elevation, lead-in, climbs and sprints along a route, event-only status. Use these before the web for route questions. The data is a snapshot, so a very new route can be missing; then use the web.
 - DCU E-serien's race calendar (dcu_eserien_races): every race's date, route, world, laps, distance and point segments. Use it first for any DCU E-serien race; its calendar page cannot be read any other way.
+- DCU E-serien results (dcu_eserien_results): how a race went for DZR, who placed, points, the season table and the club ranking. Only DZR riders, with their place in the full field. Use this instead of ZwiftPower for DCU E-serien results.
 - Open a web page a search found (read_web_page) to read it properly, for example a race calendar. It lists any Zwift event links on the page.
 - Read a Zwift event's course (zwift_event): route, world, laps or distance, start time, and categories that ride a different course. Zwift event pages are drawn by JavaScript, so search snippets and read_web_page cannot see the route; always use zwift_event for it.
 - Look up DZR riders and their ZwiftPower race history (find_club_rider, zp_rider_races), and DZR's recent ZwiftPower results (zp_club_results).
@@ -57,11 +59,13 @@ You only read. You cannot post messages, change roles, link IDs, save anything o
 4. Use the fewest tool calls that answer the question. Stop as soon as you can answer.
 5. Give web facts with their source URL. Say when sources disagree or you are unsure, and how recent the information is.
 6. When asked which route a race or event uses: for DCU E-serien use dcu_eserien_races. Otherwise search for the race calendar, open it with read_web_page, find the event for the date asked, and call zwift_event on its Zwift event link. Give the route name, world, date, start time, and laps or distance from zwift_event, and the finish if a source states it. Only say you could not confirm it after trying this.
-7. Answer in the language of the question. Be concise: a few short paragraphs or a short list. No preamble.`;
+7. Answer in the language of the question. Be concise: a few short paragraphs or a short list. No preamble.
+8. For DCU E-serien results, placings or points, call dcu_eserien_results. Do not answer those from ZwiftPower or the race calendar.`;
 
 const helperToolDefinitions = [
   ...zwiftRouteToolDefinitions,
   dcuRacesToolDefinition,
+  dcuResultsToolDefinition,
   {
     type: "function",
     function: {
@@ -155,6 +159,7 @@ function defaultDeps() {
     getZwiftEvent,
     readWebPage,
     getDcuRaces,
+    getDcuResults,
   };
 }
 
@@ -249,6 +254,9 @@ async function executeHelperTool(call, run, deps) {
 
     case "dcu_eserien_races":
       return deps.getDcuRaces(args);
+
+    case "dcu_eserien_results":
+      return deps.getDcuResults(args);
 
     case "search_club_knowledge": {
       const matches = knowledgeMatches(await deps.getAllBotKnowledge(), args.query);
