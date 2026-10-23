@@ -1,4 +1,4 @@
-import { normalizeMemberSnapshot, resolveMemberHistoryRoleId } from '@/app/lib/statsMemberHistory'
+import { normalizeMemberHistory } from '@/app/lib/statsMemberHistory'
 import { getHistoryStart, getPeriodWindow, parseStatsPeriod } from '@/app/lib/statsPeriods'
 import { buildActivitySeries, type ActivityPoint } from '@/app/lib/statsSeries'
 import type { MemberPoint, StatsResponse } from '@/app/lib/statsTypes'
@@ -143,11 +143,7 @@ async function loadMemberCounts() {
       clubMemberRoleId().catch(() => ''),
     ])
     const snapshots = snap.docs.map(d => ({ id: d.id, data: d.data() }))
-    const historyRoleId = resolveMemberHistoryRoleId(roleId, snapshots)
-    const series = snapshots
-      .map(d => normalizeMemberSnapshot(d.id, d.data, historyRoleId))
-      .filter((row): row is MemberPoint => Boolean(row))
-      .sort((a, b) => a.date.localeCompare(b.date))
+    const series = normalizeMemberHistory(snapshots, roleId)
     const latest = series.length ? series[series.length - 1] : null
     return { series, latest }
   } catch {

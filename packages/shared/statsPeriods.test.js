@@ -185,7 +185,7 @@ test("empty histories produce no chart points for any selection", () => {
 });
 
 const { buildChartTimeline, buildSnapshotTimeline, dateTimestamp, isDateKey } = require(path.join(outputDir, "statsTimeline.js"));
-const { resolveMemberHistoryRoleId, normalizeMemberSnapshot, buildMemberTimeline, findMissingMemberObservations } = require(path.join(outputDir, "statsMemberHistory.js"));
+const { normalizeMemberHistory, buildMemberTimeline, findMissingMemberObservations } = require(path.join(outputDir, "statsMemberHistory.js"));
 const now = new Date("2026-10-20T12:00:00Z");
 const member = (date, members = 700, clubMembers = 100) => ({ date, members, clubMembers, presence: null, estimated: false });
 const dailyWindow = (start, end) => ({ selection: StatsPeriod.Last30Days, granularity: "day", start, end });
@@ -282,14 +282,22 @@ test("missing days stay inside the selected window and run through yesterday", (
 });
 
 test("legacy date IDs and role count maps are normalized without losing zero counts", () => {
-  assert.deepEqual(normalizeMemberSnapshot("2026-10-19", { memberCount: 0, roleCounts: { club: 0 } }, "club"), member("2026-10-19", 0, 0));
-  assert.equal(normalizeMemberSnapshot("2026-10-19", { dateKey: "invalid", memberCount: 5 }, "").date, "2026-10-19");
-  assert.equal(normalizeMemberSnapshot("legacy", { dateKey: "2026-10-18", memberCount: 5 }, "").date, "2026-10-18");
+  const snapshots = [
+    { id: "2026-10-19", data: { memberCount: 0, roleCounts: { club: 0 } } },
+    { id: "2026-10-18", data: { dateKey: "invalid", memberCount: 5 } },
+    { id: "legacy", data: { dateKey: "2026-10-17", memberCount: 5 } },
+    { id: "2026-10-16", data: { memberCount: 5, clubMemberCount: NaN, roleCounts: { club: 4 } } },
+  ];
+  assert.deepEqual(normalizeMemberHistory(snapshots, "club"), [
+    member("2026-10-16", 5, 4),
+    member("2026-10-17", 5, null),
+    member("2026-10-18", 5, null),
+    member("2026-10-19", 0, 0),
+  ]);
   for (const memberCount of [undefined, -1, NaN, Infinity, "1"]) {
-    assert.equal(normalizeMemberSnapshot("2026-10-19", { memberCount }, ""), null);
+    assert.deepEqual(normalizeMemberHistory([{ id: "2026-10-19", data: { memberCount } }]), []);
   }
-  assert.equal(normalizeMemberSnapshot("2026-02-30", { memberCount: 5 }, ""), null);
-  assert.equal(normalizeMemberSnapshot("2026-10-19", { memberCount: 5, clubMemberCount: NaN, roleCounts: { club: 4 } }, "club").clubMembers, 4);
+  assert.deepEqual(normalizeMemberHistory([{ id: "2026-02-30", data: { memberCount: 5 } }]), []);
 });
 
 test("all retains legacy Club Member observations when the configured role is missing", () => {
@@ -301,13 +309,14 @@ test("all retains legacy Club Member observations when the configured role is mi
     { id: "2026-01-05", data: { roleCounts: { club: 0 } } },
   ];
   const original = JSON.stringify(snapshots);
-  const roleId = resolveMemberHistoryRoleId("", snapshots);
-  assert.equal(roleId, "club");
-  const rows = snapshots.map(({ id, data }) => normalizeMemberSnapshot(id, data, roleId));
-  assert.equal(rows[1].clubMembers, 70);
-  assert.equal(rows[2].clubMembers, null);
-  assert.equal(rows[3].clubMembers, null);
-  assert.equal(rows[4].clubMembers, 0);
+  const rows = normalizeMemberHistory(snapshots);
+  assert.deepEqual(rows, [
+    { ...member("2025-10-19", 399, null), estimated: true },
+    member("2025-10-20", 400, 70),
+    member("2026-01-05", null, 0),
+    member("2026-09-16", 675, 138),
+    member("2026-10-19", 716, null),
+  ]);
 
   const timeline = buildMemberTimeline(rows, getPeriodWindow(StatsPeriod.All, now), now);
   const firstClub = timeline.points.find(point => point.clubMembers !== null);
@@ -320,25 +329,25 @@ test("all retains legacy Club Member observations when the configured role is mi
 });
 
 test("history role lookup prefers settings, then the latest valid dated role metadata", () => {
+  const legacy = { id: "2025-10-20", data: { memberCount: 400, roleCounts: { configured: 70, latest: 60, older: 50 } } };
   const snapshots = [
     { id: "legacy-id", data: { dateKey: "2026-10-18", clubMemberRoleId: " latest " } },
     { id: "2026-10-20", data: { clubMemberRoleId: " " } },
     { id: "2026-10-19", data: { clubMemberRoleId: 123 } },
     { id: "2026-02-30", data: { clubMemberRoleId: "invalid-date" } },
     { id: "2026-09-16", data: { dateKey: "invalid", clubMemberRoleId: "older" } },
+    legacy,
   ];
-  assert.equal(resolveMemberHistoryRoleId(" configured ", snapshots), "configured");
-  assert.equal(resolveMemberHistoryRoleId("", snapshots), "latest");
-  assert.equal(resolveMemberHistoryRoleId(" ", [...snapshots].reverse()), "latest");
-  assert.equal(resolveMemberHistoryRoleId("", [snapshots[4]]), "older");
+  assert.deepEqual(normalizeMemberHistory(snapshots, " configured "), [member("2025-10-20", 400, 70)]);
+  assert.deepEqual(normalizeMemberHistory(snapshots), [member("2025-10-20", 400, 60)]);
+  assert.deepEqual(normalizeMemberHistory([...snapshots].reverse(), " "), [member("2025-10-20", 400, 60)]);
+  assert.deepEqual(normalizeMemberHistory([legacy, snapshots[4]]), [member("2025-10-20", 400, 50)]);
 });
 
 test("history without explicit Club Member role metadata stays unknown", () => {
   const snapshots = [{ id: "2025-10-20", data: { memberCount: 400, roleCounts: { verified: 200 } } }];
-  const roleId = resolveMemberHistoryRoleId("", snapshots);
-  assert.equal(roleId, "");
-  assert.equal(normalizeMemberSnapshot(snapshots[0].id, snapshots[0].data, roleId).clubMembers, null);
-  assert.equal(resolveMemberHistoryRoleId("", []), "");
+  assert.deepEqual(normalizeMemberHistory(snapshots), [member("2025-10-20", 400, null)]);
+  assert.deepEqual(normalizeMemberHistory([]), []);
 });
 
 for (const [period, weeks] of [[StatsPeriod.LastYear, 53], [StatsPeriod.LastThreeYears, 157]]) {
@@ -368,7 +377,7 @@ test("all shows the full first completed week and reports gaps before its Sunday
 
 test("role-only snapshots survive normalization, and missing totals stay unknown rather than zero", () => {
   for (const data of [{ clubMemberCount: 0 }, { memberCount: NaN, roleCounts: { club: 0 } }]) {
-    assert.deepEqual(normalizeMemberSnapshot("2026-10-16", data, "club"), member("2026-10-16", null, 0));
+    assert.deepEqual(normalizeMemberHistory([{ id: "2026-10-16", data }], "club"), [member("2026-10-16", null, 0)]);
   }
   const rows = [member("2026-10-15", 700, 10), member("2026-10-16", null, 0)];
   const timeline = buildMemberTimeline(rows, dailyWindow("2026-10-15", "2026-10-16"), now);
