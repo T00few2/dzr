@@ -122,7 +122,7 @@ const COACH_REASONING_EFFORT = COACH_BASE_EFFORT;
 // inexpensive model and small output allowance because most turns are transactional tool routing.
 const AI_CONFIG = {
   model: process.env.CLUB_ASSISTANT_MODEL || "gpt-6-luna",
-  maxTokens: Number.parseInt(process.env.CLUB_ASSISTANT_MAX_OUTPUT_TOKENS || "1200", 10),
+  maxTokens: Number.parseInt(process.env.CLUB_ASSISTANT_MAX_OUTPUT_TOKENS || "2500", 10),
   reasoningEffort: process.env.CLUB_ASSISTANT_REASONING_EFFORT || "low",
 };
 
@@ -2712,7 +2712,9 @@ async function runChatTurn(message, client, { coachOnly }) {
         })
       : toolDefinitions;
     const maxIters = isCoachSession ? COACH_MAX_TOOL_ITERATIONS : MAX_TOOL_ITERATIONS;
-    const replyFn = isCoachSession ? safeReplyChunks : safeReply;
+    // Discord rejects a message over 2,000 characters, so a long answer (a full results list)
+    // is split rather than lost.
+    const replyFn = safeReplyChunks;
     const calledToolNames = [];
     let answerEffort = isCoachSession ? COACH_REASONING_EFFORT : null;
     const replyAndTag = async (text, { fromModel = true } = {}) => {
