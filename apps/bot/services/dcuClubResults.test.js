@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { getDcuResults, resetCache, formatFinish, formatResultsList, CLUB_API_BASE } = require("./dcuClubResults");
+const { getDcuResults, resetCache, formatFinish, formatResultsList, asksForFullList, CLUB_API_BASE } = require("./dcuClubResults");
 
 const LOGIN = { username: "dzr", secret: "test-secret" };
 const NOW = Date.parse("2026-10-22T20:30:00Z");
@@ -190,4 +190,13 @@ test("formats the whole race result for posting", async () => {
   assert.match(text, /\*\*1\.\*\* Jacob Stauner · 1:07:42 · 139 p\n– Kim Damgaard \(DNF\)/);
   assert.equal(formatResultsList({ success: false }), "");
   assert.equal(formatResultsList({ success: true, divisions: [] }), "");
+});
+
+test("recognises a request for every result", () => {
+  for (const text of ["<@123> kan du liste alle DZR resultater?", "Hele listen tak", "fulde resultatliste", "list all DZR results", "the full list please"]) {
+    assert.equal(asksForFullList(text), true, text);
+  }
+  for (const text of ["hvordan gik DZR løbet?", "hvordan gik det for Emil?", "kaldet", "halleluja", "Hellerup"]) {
+    assert.equal(asksForFullList(text), false, text);
+  }
 });

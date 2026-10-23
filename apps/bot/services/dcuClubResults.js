@@ -316,6 +316,16 @@ function formatResultsList(result) {
   return lines.join("\n");
 }
 
+const FULL_LIST_PATTERN = /(^|[^\p{L}])(alle|hele|fulde|komplet\p{L}*|all|full|complete|entire|every)(?=$|[^\p{L}])/iu;
+
+/**
+ * True when the user's own message asks for every result ("list alle DZR resultater").
+ * The model does not reliably set send_full, so the club bot also checks the message.
+ */
+function asksForFullList(text) {
+  return FULL_LIST_PATTERN.test(String(text || ""));
+}
+
 function resetCache() {
   cache.clear();
 }
@@ -352,5 +362,6 @@ module.exports = {
   resetCache,
   formatFinish,
   formatResultsList,
+  asksForFullList,
   CLUB_API_BASE,
 };
