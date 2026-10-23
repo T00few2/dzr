@@ -1,5 +1,11 @@
 import { VERIFIED_MEMBER_ROLE_ID } from '@/app/lib/sharedConstants'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
+import {
+  DEFAULT_VERIFICATION_CRITERIA,
+  evaluateVerificationCriteria,
+  type VerificationCriteria,
+  type VerificationFacts,
+} from '@/packages/shared/verificationCriteria'
 
 type RoleSyncResult =
   | { status: 'succeeded'; roleId: string }
@@ -67,6 +73,30 @@ function loginRoleId(): string {
   return String(process.env.DISCORD_REQUIRED_ROLE_ID || VERIFIED_MEMBER_ROLE_ID || '').trim()
 }
 
+async function getVerificationFacts(
+  guildId: string,
+  userId: string,
+  botToken: string,
+  criteria: VerificationCriteria,
+): Promise<VerificationFacts> {
+  const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+    headers: { Authorization: `Bot ${botToken}` },
+    cache: 'no-store',
+  })
+  if (!response.ok) throw new Error(`Discord member lookup failed: ${response.status}`)
+  const member = await response.json()
+  if (!Array.isArray(member.roles)) throw new Error('Discord member response has no roles')
+
+  // Use the same read order as the bot: Discord state, then the saved verification data.
+  const userDoc = criteria.requiresZwiftId ? await adminDb.collection('users').doc(userId).get() : null
+  return {
+    roleIds: member.roles,
+    accountCreatedAt: Number(BigInt(userId) >> BigInt(22)) + 1420070400000,
+    isServerBooster: member.premium_since != null,
+    zwiftId: userDoc?.data()?.zwiftId,
+  }
+}
+
 export async function syncMemberRoleOnLogin(input: {
   userId: string
   source: string
@@ -87,17 +117,58 @@ export async function syncMemberRoleOnLogin(input: {
   const botToken = String(process.env.DISCORD_BOT_TOKEN || '').trim()
   if (!guildId || !botToken) return { status: 'skipped', reason: 'missing_discord_env' }
 
+  // Without the settings we cannot know whether an additional target is the verified role.
+  // Skip this sync safely; payment and onboarding must still be able to complete.
+  let verificationSettings
+  try {
+    const doc = await adminDb.collection('verificationSettings').doc(guildId).get()
+    verificationSettings = doc.data()
+  } catch (error) {
+    console.error(`[verification] user=${userId} source=${input.source} settings lookup failed`, error)
+    return { status: 'skipped', reason: 'verification_unavailable' }
+  }
+
   const failed: string[] = []
+  let skippedReason: string | undefined
   for (const roleId of roleIds) {
+    const configuredVerification = verificationSettings?.enabled && verificationSettings.verifiedRoleId === roleId
+    const isLoginRole = roleId === requiredRoleId || roleId === VERIFIED_MEMBER_ROLE_ID
+    if (configuredVerification || isLoginRole) {
+      const criteria = configuredVerification
+        ? { ...DEFAULT_VERIFICATION_CRITERIA, ...verificationSettings?.criteria }
+        : DEFAULT_VERIFICATION_CRITERIA
+      try {
+        const facts = await getVerificationFacts(guildId, userId, botToken, criteria)
+        if (facts.roleIds.includes(roleId)) continue
+        const result = evaluateVerificationCriteria(criteria, facts)
+        if (!result.meetsAllCriteria) {
+          skippedReason = 'verification_requirements_not_met'
+          console.info(`[verification] user=${userId} role=${roleId} source=${input.source} skipped: ${result.missingCriteria.join(', ')}`)
+          continue
+        }
+      } catch (error) {
+        skippedReason = 'verification_unavailable'
+        console.error(`[verification] user=${userId} role=${roleId} source=${input.source} lookup failed`, error)
+        continue
+      }
+    }
+
     try {
       await discordAddRole(guildId, userId, roleId, botToken)
+      if (configuredVerification || isLoginRole) {
+        console.info(`[verification] user=${userId} role=${roleId} source=${input.source} assigned`)
+      }
     } catch {
       failed.push(roleId)
     }
   }
 
   const primaryRoleId = requiredRoleId || roleIds[0]
-  if (!failed.length) return { status: 'succeeded', roleId: primaryRoleId }
+  if (!failed.length) {
+    return skippedReason
+      ? { status: 'skipped', reason: skippedReason }
+      : { status: 'succeeded', roleId: primaryRoleId }
+  }
 
   const queued = await adminDb.collection('role_updates').add({
     userId,
@@ -108,10 +179,10 @@ export async function syncMemberRoleOnLogin(input: {
     attempt: 0,
     source: input.source,
   })
-  return { status: 'queued', roleId: primaryRoleId, roleUpdateId: queued.id }
+  return { status: 'queued', roleId: failed[0], roleUpdateId: queued.id }
 }
 
-/** Grant the website login role, and the club role when membership is already paid. */
+/** Sync eligible login roles, and the club role when membership is already paid. */
 export async function syncAccessRoles(userId: string, source: string): Promise<void> {
   const id = String(userId || '').trim()
   if (!id) return

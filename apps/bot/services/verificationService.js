@@ -1,16 +1,11 @@
 const { db, getUserZwiftId } = require('./firebase');
+const { DEFAULT_VERIFICATION_CRITERIA, evaluateVerificationCriteria } = require('./verificationCriteria');
 
 class VerificationService {
   constructor() {
     this.collection = "verificationSettings";
-    // Default verification criteria
-    this.defaultCriteria = {
-      requiresZwiftId: true,
-      requiresMinimumAccountAge: false, // in days
-      requiresSpecificRoles: [], // array of role IDs that user must have
-      requiresServerBoost: false,
-      requiresActivityThreshold: false, // minimum messages/interactions
-    };
+    this.defaultCriteria = DEFAULT_VERIFICATION_CRITERIA;
+    this.pendingVerifications = new Map();
   }
 
   /**
@@ -58,72 +53,38 @@ class VerificationService {
    * Check if a member meets verification criteria
    */
   async checkVerificationCriteria(member, criteria) {
-    const results = {
-      meetsAllCriteria: false,
-      criteriaResults: {},
-      missingCriteria: []
+    // Capture Discord facts before the database read: an event can update the cache while we await.
+    const facts = {
+      accountCreatedAt: member.user.createdTimestamp,
+      roleIds: [...member.roles.cache.keys()],
+      isServerBooster: member.premiumSince != null,
+      zwiftId: criteria.requiresZwiftId ? await getUserZwiftId(member.user.id) : null,
     };
-
-    try {
-      // Check ZwiftID requirement
-      if (criteria.requiresZwiftId) {
-        const zwiftId = await getUserZwiftId(member.user.id);
-        results.criteriaResults.hasZwiftId = !!zwiftId;
-        if (!zwiftId) {
-          results.missingCriteria.push("Linked ZwiftID");
-        }
-      }
-
-      // Check account age requirement
-      if (criteria.requiresMinimumAccountAge && criteria.minimumAccountAgeDays) {
-        const accountAge = (Date.now() - member.user.createdTimestamp) / (1000 * 60 * 60 * 24);
-        results.criteriaResults.accountAge = accountAge >= criteria.minimumAccountAgeDays;
-        if (accountAge < criteria.minimumAccountAgeDays) {
-          results.missingCriteria.push(`Account age (${criteria.minimumAccountAgeDays} days minimum)`);
-        }
-      }
-
-      // Check required roles
-      if (criteria.requiresSpecificRoles && criteria.requiresSpecificRoles.length > 0) {
-        const hasAllRequiredRoles = criteria.requiresSpecificRoles.every(roleId => 
-          member.roles.cache.has(roleId)
-        );
-        results.criteriaResults.hasRequiredRoles = hasAllRequiredRoles;
-        if (!hasAllRequiredRoles) {
-          const missingRoles = criteria.requiresSpecificRoles.filter(roleId => 
-            !member.roles.cache.has(roleId)
-          );
-          results.missingCriteria.push(`Required roles: ${missingRoles.length} missing`);
-        }
-      }
-
-      // Check server boost requirement
-      if (criteria.requiresServerBoost) {
-        const isBooster = member.premiumSince !== null;
-        results.criteriaResults.isServerBooster = isBooster;
-        if (!isBooster) {
-          results.missingCriteria.push("Server boost");
-        }
-      }
-
-      // Determine if all criteria are met
-      results.meetsAllCriteria = results.missingCriteria.length === 0;
-
-      return results;
-    } catch (error) {
-      console.error("Error checking verification criteria:", error);
-      return results;
-    }
+    // Let lookup errors reach the caller. They must never be interpreted as ineligibility.
+    return evaluateVerificationCriteria(criteria, facts);
   }
 
   /**
    * Process verification for a member (assign or remove verified role)
    */
   async processVerification(member) {
+    const key = `${member.guild.id}:${member.id}`;
+    const previous = this.pendingVerifications.get(key) || Promise.resolve();
+    const current = previous.catch(() => {}).then(() => this.processCurrentVerification(member));
+    this.pendingVerifications.set(key, current);
+    try {
+      return await current;
+    } finally {
+      if (this.pendingVerifications.get(key) === current) this.pendingVerifications.delete(key);
+    }
+  }
+
+  async processCurrentVerification(member) {
     try {
       const settings = await this.getVerificationSettings(member.guild.id);
       
-      if (!settings || !settings.enabled || !settings.verifiedRoleId) {
+      if (!settings) return { processed: false, reason: "Verification lookup failed" };
+      if (!settings.enabled || !settings.verifiedRoleId) {
         return { processed: false, reason: "Verification not configured" };
       }
 
@@ -134,10 +95,12 @@ class VerificationService {
         return { processed: false, reason: "Verified role not found" };
       }
 
-      // Check verification criteria
-      const criteriaCheck = await this.checkVerificationCriteria(member, settings.criteria);
-      
+      // Every entry point uses fresh Discord state after entering the per-member queue.
+      // Read the role state before the database: a delayed event must not undo a newer assignment.
+      member = await member.guild.members.fetch({ user: member.id, force: true });
       const hasVerifiedRole = member.roles.cache.has(settings.verifiedRoleId);
+      const criteria = { ...this.defaultCriteria, ...settings.criteria };
+      const criteriaCheck = await this.checkVerificationCriteria(member, criteria);
 
       if (criteriaCheck.meetsAllCriteria && !hasVerifiedRole) {
         // User meets criteria but doesn't have the role - assign it
@@ -234,7 +197,8 @@ class VerificationService {
     try {
       const settings = await this.getVerificationSettings(member.guild.id);
       
-      if (!settings || !settings.enabled) {
+      if (!settings) return null;
+      if (!settings.enabled) {
         return {
           enabled: false,
           hasVerifiedRole: false,
@@ -245,7 +209,7 @@ class VerificationService {
       }
 
       const hasVerifiedRole = member.roles.cache.has(settings.verifiedRoleId);
-      const criteriaCheck = await this.checkVerificationCriteria(member, settings.criteria);
+      const criteriaCheck = await this.checkVerificationCriteria(member, { ...this.defaultCriteria, ...settings.criteria });
 
       return {
         enabled: true,
@@ -263,4 +227,4 @@ class VerificationService {
   }
 }
 
-module.exports = new VerificationService(); 
+module.exports = new VerificationService();

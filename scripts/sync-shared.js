@@ -30,6 +30,7 @@ const TARGETS = [
   ["packages/shared/coach/memberCalendar.js", "apps/bot/services/memberCalendar.js"],
   ["packages/shared/coach/coachHowItWorks.js", "apps/bot/services/coachHowItWorks.js"],
   ["packages/shared/phenotype.js", "apps/bot/utils/phenotype.js"],
+  ["packages/shared/verificationCriteria.js", "apps/bot/services/verificationCriteria.js"],
 ];
 
 const checkOnly = process.argv.includes("--check");
