@@ -19,6 +19,6 @@
     "express": "^4.21.2",
     "firebase-admin": "^14.5.0",
     "openai": "^7.30.0",
-    "zwift-data": "^1.50.0"
+    "zwift-data": "^2.1.0"
   }
 }
