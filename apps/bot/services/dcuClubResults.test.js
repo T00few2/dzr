@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { getDcuResults, resetCache, formatFinish, CLUB_API_BASE } = require("./dcuClubResults");
+const { getDcuResults, resetCache, formatFinish, formatResultsList, CLUB_API_BASE } = require("./dcuClubResults");
 
 const LOGIN = { username: "dzr", secret: "test-secret" };
 const NOW = Date.parse("2026-10-22T20:30:00Z");
@@ -179,4 +179,15 @@ test("loads season standings and the club table", async () => {
   assert.equal(standings.divisions[0].riders[0].counting[0].race, "DZR løbet");
   const clubs = await getDcuResults({ kind: "clubs" }, { ...LOGIN, http: api, now: NOW });
   assert.equal(clubs.clubs.find((row) => row.yours).rank, 2);
+});
+
+test("formats the whole race result for posting", async () => {
+  resetCache();
+  const result = await getDcuResults({ query: "DZR løbet" }, { ...LOGIN, http: client(), now: NOW });
+  const text = formatResultsList(result);
+  assert.match(text, /^\*\*DZR løbet\*\* – 22\.10\.2026 \(endelige resultater\)/);
+  assert.match(text, /\*\*1\. Division\*\* \(21 ryttere\)\n\*\*10\.\*\* Emil Ringgaard · 1:05:18 · 124 p/);
+  assert.match(text, /\*\*1\.\*\* Jacob Stauner · 1:07:42 · 139 p\n– Kim Damgaard \(DNF\)/);
+  assert.equal(formatResultsList({ success: false }), "");
+  assert.equal(formatResultsList({ success: true, divisions: [] }), "");
 });

@@ -274,6 +274,48 @@ async function getDcuResults(args = {}, options = {}) {
   }
 }
 
+function danishDate(iso) {
+  const match = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
+}
+
+function raceLine(rider) {
+  if (rider.status) return `– ${rider.name} (${rider.status})`;
+  // Bold, because Discord renumbers lines that start "10." as a list (10, 11, 16 → 10, 11, 12).
+  const parts = [`**${rider.position}.** ${rider.name}`];
+  if (rider.time) parts.push(rider.time);
+  parts.push(`${rider.points} p`);
+  return parts.join(" · ");
+}
+
+/**
+ * The whole result as Discord text, posted by the bot itself. A model asked to copy a list of
+ * 80+ riders runs out of output or shortens it.
+ */
+function formatResultsList(result) {
+  if (!result?.success || !Array.isArray(result.divisions) || !result.divisions.length) return "";
+  const lines = [];
+  if (result.kind === "standings") {
+    lines.push("**DCU E-serien – sæsonstilling for DZR**", "Placering i hele divisionen.");
+    for (const row of result.divisions) {
+      lines.push("", `**${row.division}**`);
+      for (const rider of row.riders) {
+        lines.push(`**${rider.position}.** ${rider.name} · ${rider.points} p · ${rider.races} løb`);
+      }
+    }
+    return lines.join("\n");
+  }
+  const phase = result.results_phase === "provisional" ? "foreløbige resultater" : "endelige resultater";
+  const date = danishDate(result.date);
+  lines.push(`**${result.name || "DCU E-serien"}**${date ? ` – ${date}` : ""} (${phase})`);
+  lines.push("Kun DZR-ryttere. Placering i hele divisionen.");
+  for (const row of result.divisions) {
+    lines.push("", `**${row.division}** (${row.field_size} ryttere)`);
+    for (const rider of row.riders) lines.push(raceLine(rider));
+  }
+  return lines.join("\n");
+}
+
 function resetCache() {
   cache.clear();
 }
@@ -295,6 +337,10 @@ const dcuResultsToolDefinition = {
         date: { type: "string", description: "Race date, YYYY-MM-DD. Ignored for standings and clubs." },
         rider: { type: "string", description: "Optional rider name, to return only that rider." },
         division: { type: "string", description: "Optional division, e.g. '2' or '2. Division'." },
+        send_full: {
+          type: "boolean",
+          description: "Post the complete list of DZR riders in the chat as it is. Only when they ask for all results or the full list (\"list alle\"), for a race or the standings.",
+        },
       },
     },
   },
@@ -305,5 +351,6 @@ module.exports = {
   dcuResultsToolDefinition,
   resetCache,
   formatFinish,
+  formatResultsList,
   CLUB_API_BASE,
 };
