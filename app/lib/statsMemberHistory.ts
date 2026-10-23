@@ -9,6 +9,27 @@ function isCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
 }
 
+// Older snapshots only have roleCounts. If settings are unavailable, use the
+// latest explicitly recorded Club Member role, never guess from other roles.
+export function resolveMemberHistoryRoleId(
+  configuredRoleId: string,
+  snapshots: { id: string; data: Record<string, unknown> }[],
+): string {
+  if (configuredRoleId.trim()) return configuredRoleId.trim()
+
+  let roleId = ''
+  let latestDate = ''
+  for (const { id, data } of snapshots) {
+    const date = [data.dateKey, id].find(isDateKey)
+    const recordedRoleId = typeof data.clubMemberRoleId === 'string' ? data.clubMemberRoleId.trim() : ''
+    if (date && date > latestDate && recordedRoleId) {
+      roleId = recordedRoleId
+      latestDate = date
+    }
+  }
+  return roleId
+}
+
 export function normalizeMemberSnapshot(
   id: string,
   data: Record<string, unknown>,

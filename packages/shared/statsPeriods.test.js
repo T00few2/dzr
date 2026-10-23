@@ -185,7 +185,7 @@ test("empty histories produce no chart points for any selection", () => {
 });
 
 const { buildChartTimeline, buildSnapshotTimeline, dateTimestamp, isDateKey } = require(path.join(outputDir, "statsTimeline.js"));
-const { normalizeMemberSnapshot, buildMemberTimeline, findMissingMemberObservations } = require(path.join(outputDir, "statsMemberHistory.js"));
+const { resolveMemberHistoryRoleId, normalizeMemberSnapshot, buildMemberTimeline, findMissingMemberObservations } = require(path.join(outputDir, "statsMemberHistory.js"));
 const now = new Date("2026-10-20T12:00:00Z");
 const member = (date, members = 700, clubMembers = 100) => ({ date, members, clubMembers, presence: null, estimated: false });
 const dailyWindow = (start, end) => ({ selection: StatsPeriod.Last30Days, granularity: "day", start, end });
@@ -290,6 +290,55 @@ test("legacy date IDs and role count maps are normalized without losing zero cou
   }
   assert.equal(normalizeMemberSnapshot("2026-02-30", { memberCount: 5 }, ""), null);
   assert.equal(normalizeMemberSnapshot("2026-10-19", { memberCount: 5, clubMemberCount: NaN, roleCounts: { club: 4 } }, "club").clubMembers, 4);
+});
+
+test("all retains legacy Club Member observations when the configured role is missing", () => {
+  const snapshots = [
+    { id: "2026-09-16", data: { memberCount: 675, clubMemberCount: 138, clubMemberRoleId: "club" } },
+    { id: "2025-10-20", data: { memberCount: 400, roleCounts: { club: 70, verified: 200 } } },
+    { id: "2026-10-19", data: { memberCount: 716 } },
+    { id: "2025-10-19", data: { memberCount: 399, estimated: true } },
+    { id: "2026-01-05", data: { roleCounts: { club: 0 } } },
+  ];
+  const original = JSON.stringify(snapshots);
+  const roleId = resolveMemberHistoryRoleId("", snapshots);
+  assert.equal(roleId, "club");
+  const rows = snapshots.map(({ id, data }) => normalizeMemberSnapshot(id, data, roleId));
+  assert.equal(rows[1].clubMembers, 70);
+  assert.equal(rows[2].clubMembers, null);
+  assert.equal(rows[3].clubMembers, null);
+  assert.equal(rows[4].clubMembers, 0);
+
+  const timeline = buildMemberTimeline(rows, getPeriodWindow(StatsPeriod.All, now), now);
+  const firstClub = timeline.points.find(point => point.clubMembers !== null);
+  assert.equal(firstClub.clubMembers, 70);
+  assert.equal(firstClub.sourceDates.clubMembers, "2025-10-20");
+  assert.equal(timeline.points.find(point => point.date === "2026-01-11").clubMembers, 0);
+  assert.equal(timeline.points.at(-1).clubMembers, 138);
+  assert.equal(timeline.points.at(-1).sourceDates.clubMembers, "2026-09-16");
+  assert.equal(JSON.stringify(snapshots), original);
+});
+
+test("history role lookup prefers settings, then the latest valid dated role metadata", () => {
+  const snapshots = [
+    { id: "legacy-id", data: { dateKey: "2026-10-18", clubMemberRoleId: " latest " } },
+    { id: "2026-10-20", data: { clubMemberRoleId: " " } },
+    { id: "2026-10-19", data: { clubMemberRoleId: 123 } },
+    { id: "2026-02-30", data: { clubMemberRoleId: "invalid-date" } },
+    { id: "2026-09-16", data: { dateKey: "invalid", clubMemberRoleId: "older" } },
+  ];
+  assert.equal(resolveMemberHistoryRoleId(" configured ", snapshots), "configured");
+  assert.equal(resolveMemberHistoryRoleId("", snapshots), "latest");
+  assert.equal(resolveMemberHistoryRoleId(" ", [...snapshots].reverse()), "latest");
+  assert.equal(resolveMemberHistoryRoleId("", [snapshots[4]]), "older");
+});
+
+test("history without explicit Club Member role metadata stays unknown", () => {
+  const snapshots = [{ id: "2025-10-20", data: { memberCount: 400, roleCounts: { verified: 200 } } }];
+  const roleId = resolveMemberHistoryRoleId("", snapshots);
+  assert.equal(roleId, "");
+  assert.equal(normalizeMemberSnapshot(snapshots[0].id, snapshots[0].data, roleId).clubMembers, null);
+  assert.equal(resolveMemberHistoryRoleId("", []), "");
 });
 
 for (const [period, weeks] of [[StatsPeriod.LastYear, 53], [StatsPeriod.LastThreeYears, 157]]) {
