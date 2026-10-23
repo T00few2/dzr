@@ -59,6 +59,6 @@
     "@types/react-slick": "^0.23.13",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.2",
-    "typescript": "^5"
+    "typescript": "^7"
   }
 }
