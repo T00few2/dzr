@@ -57,7 +57,7 @@ services:
       - key: CLUB_ASSISTANT_REASONING_EFFORT
         value: low
       - key: CLUB_ASSISTANT_MAX_OUTPUT_TOKENS
-        value: 1200
+        value: 2500
       - key: COACH_MODEL
         value: gpt-6-luna
       - key: COACH_REASONING_EFFORT
