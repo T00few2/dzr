@@ -14,6 +14,7 @@
 const FULFILLMENT_INSTRUCTIONS = `You decide whether one proposed tool call does what the user asked.
 
 The user may write in any language, including casual Danish or English. Judge the action they want, not the wording.
+A short follow-up ("list them all", "kan du liste alle") refers to the earlier conversation. Read it from the recent conversation when one is given.
 
 Reading an ID back, linking or changing an ID, showing a rider's stats, deciding which race category they fit, searching for a person, and fetching a help article are different actions. A call about the same person is still wrong when it does a different action.
 
@@ -22,8 +23,10 @@ fulfills is true when this call does something they asked for. It can be true ev
 A lookup that finds what the requested action needs is part of that action: for example asking the helper which route an event uses, so its profile can be posted.
 fulfills is false only when this call would do a different action than the one they asked for.`;
 
-function fulfillmentUserContent({ userText, name, description, args }) {
+function fulfillmentUserContent({ userText, name, description, args, context = "" }) {
+  const recent = String(context || "").trim();
   return [
+    ...(recent ? ["Recent conversation, oldest first:", recent, ""] : []),
     "User message:",
     String(userText || ""),
     "",
@@ -31,6 +34,24 @@ function fulfillmentUserContent({ userText, name, description, args }) {
     `What it does: ${description}`,
     `Arguments: ${typeof args === "string" ? args : JSON.stringify(args || {})}`,
   ].join("\n");
+}
+
+/**
+ * The visible messages just before the latest user message, so a follow-up can be judged.
+ * Plain-text user and assistant messages only, each cut short.
+ */
+function recentConversation(input, { messages = 2, maxChars = 600 } = {}) {
+  const rows = (Array.isArray(input) ? input : [])
+    .filter((item) => ["user", "assistant"].includes(item?.role) && typeof item.content === "string" && item.content.trim());
+  const lastUser = rows.map((item) => item.role).lastIndexOf("user");
+  if (lastUser <= 0) return "";
+  return rows
+    .slice(Math.max(0, lastUser - messages), lastUser)
+    .map((item) => {
+      const text = item.content.trim();
+      return `${item.role}: ${text.length > maxChars ? `${text.slice(0, maxChars)}…` : text}`;
+    })
+    .join("\n");
 }
 
 function parseFulfillment(text) {
@@ -82,6 +103,7 @@ function unmetToolOutput(name, description) {
 module.exports = {
   FULFILLMENT_INSTRUCTIONS,
   fulfillmentUserContent,
+  recentConversation,
   parseFulfillment,
   partitionByFulfillment,
   unmetToolOutput,

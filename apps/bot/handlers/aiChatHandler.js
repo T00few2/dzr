@@ -24,8 +24,10 @@ const {
   parseFulfillment,
   partitionByFulfillment,
   unmetToolOutput,
+  recentConversation,
 } = require("../services/toolFulfillment");
 const { trimConversation } = require("../services/conversationTrim");
+const { discordMessageText, addRepliedMessage } = require("../services/replyContext");
 const { fromDiscordMessage, dmRecordsToHistory, stripSentStamp, DM_READBACK_MAX_AGE_MS } = require("../services/dmHistory");
 const { createTurnQueue } = require("../services/turnQueue");
 const { coachToolsForTurn, reasoningEffortAfterTools } = require("../services/coachTools");
@@ -200,6 +202,10 @@ function compactToolResult(result) {
   if (result.series) base.series = result.series;
   if (Array.isArray(result.races)) base.races = result.races.slice(0, 12);
   if (typeof result.today === "string") base.today = result.today;
+  // dcu_eserien_results: DZR riders per division (race and standings) and the club table
+  if (Array.isArray(result.divisions)) base.divisions = result.divisions;
+  if (Array.isArray(result.clubs)) base.clubs = result.clubs;
+  if (typeof result.note === "string") base.note = result.note.slice(0, 500);
   if (result.zrl) base.zrl = result.zrl;
   if (typeof result.summary === "string") base.summary = result.summary.slice(0, 500);
   if (typeof result.coach_info === "string") base.coach_info = result.coach_info.slice(0, 4000);
@@ -273,21 +279,24 @@ function isCoachingIntent(text) {
   return patterns.some((p) => p.test(t));
 }
 
-async function isReplyToBot(message, client) {
+async function fetchReferencedMessage(message) {
   const refId = message?.reference?.messageId;
-  if (!refId) return false;
+  if (!refId) return null;
 
   try {
     const cached = message.channel?.messages?.cache?.get(refId);
-    if (cached) return cached.author?.id === client.user.id;
+    if (cached) return cached;
 
     // Fallback: fetch referenced message (may fail if missing perms / deleted)
-    const fetched = await message.channel.messages.fetch(refId).catch(() => null);
-    if (!fetched) return false;
-    return fetched.author?.id === client.user.id;
+    return await message.channel.messages.fetch(refId).catch(() => null);
   } catch {
-    return false;
+    return null;
   }
+}
+
+async function isReplyToBot(message, client) {
+  const referenced = await fetchReferencedMessage(message);
+  return Boolean(referenced) && referenced.author?.id === client.user.id;
 }
 
 /**
@@ -1878,9 +1887,10 @@ Available articles (use get_help_article with the key or a tag):
 ${catalogLines}
 
 ## Response Style
-- Be friendly, helpful, and concise
-- Use occasional Danish phrases since this is a Danish cycling club (e.g., "Godt træk!", "Kør stærkt!")
-- When providing commentary about riders, be playful and use cycling metaphors
+- Be friendly, helpful, and concise. Answer in the user's language; in Danish, write plain everyday Danish
+- Sound like a knowledgeable clubmate, not a cheerleader. No catchphrases, slogans or sign-offs, and no pep line after the answer. Stop when the answer is given
+- Praise only what earned it (a win, a podium, a big improvement), say what it was, and say it once. Use at most one emoji, and only when it adds something
+- Light humour about riders is fine when the user invites it; do not force cycling metaphors
 - Avoid overly technical jargon unless the user asks for details
 - For ZRL answers: state Open/Women's category, whether Development is possible, and that the official category is set at the start line
 
@@ -2231,7 +2241,7 @@ function latestUserText(input) {
  * neighbouring tool (an ID lookup when they asked for stats, stats when they asked for a category)
  * never reaches Discord. An inconclusive check allows the call.
  */
-async function screenClubToolCalls(userText, toolCalls, rejectedNames) {
+async function screenClubToolCalls(userText, toolCalls, rejectedNames, context = "") {
   if (!userText) {
     return partitionByFulfillment(toolCalls, new Map());
   }
@@ -2243,12 +2253,12 @@ async function screenClubToolCalls(userText, toolCalls, rejectedNames) {
       verdictById.set(toolCall.id, false);
       return;
     }
-    verdictById.set(toolCall.id, await toolCallFulfills(userText, toolCall, toolDescription(name)));
+    verdictById.set(toolCall.id, await toolCallFulfills(userText, toolCall, toolDescription(name), context));
   }));
   return partitionByFulfillment(toolCalls, verdictById);
 }
 
-async function toolCallFulfills(userText, toolCall, description) {
+async function toolCallFulfills(userText, toolCall, description, context) {
   try {
     const response = await createStatelessResponse(openai, {
       instructions: FULFILLMENT_INSTRUCTIONS,
@@ -2259,6 +2269,7 @@ async function toolCallFulfills(userText, toolCall, description) {
           name: toolCall.name,
           description,
           args: toolCall.arguments || toolCall.function?.arguments || "{}",
+          context,
         }),
       }],
       tools: [],
@@ -2322,7 +2333,7 @@ async function runClubResponsesTurn({
   const rejectedToolNames = new Set();
   let currentToolCalls = response.toolCalls;
   for (let iteration = 0; currentToolCalls.length && iteration < maxIters; iteration++) {
-    const screened = await screenClubToolCalls(latestUserText(input), currentToolCalls, rejectedToolNames);
+    const screened = await screenClubToolCalls(latestUserText(input), currentToolCalls, rejectedToolNames, recentConversation(input));
     for (const name of screened.newlyRejected) rejectedToolNames.add(name);
 
     if (screened.rejected.length) {
@@ -2750,6 +2761,13 @@ async function runChatTurn(message, client, { coachOnly }) {
       };
     }
     
+    // A reply to one of our messages: make sure the model has that message, even when another
+    // user wrote the reply or the history has expired since.
+    const referenced = await fetchReferencedMessage(message);
+    if (referenced && referenced.author?.id === client.user.id) {
+      addRepliedMessage(conversation, discordMessageText(referenced));
+    }
+
     // Add user message to conversation
     conversation.push({
       role: "user",
