@@ -1,4 +1,4 @@
-import { normalizeMemberSnapshot } from '@/app/lib/statsMemberHistory'
+import { normalizeMemberHistory } from '@/app/lib/statsMemberHistory'
 import { getHistoryStart, getPeriodWindow, parseStatsPeriod } from '@/app/lib/statsPeriods'
 import { buildActivitySeries, type ActivityPoint } from '@/app/lib/statsSeries'
 import type { MemberPoint, StatsResponse } from '@/app/lib/statsTypes'
@@ -142,10 +142,8 @@ async function loadMemberCounts() {
       adminDb.collection(COLLECTIONS.serverMemberCounts).get(),
       clubMemberRoleId().catch(() => ''),
     ])
-    const series = snap.docs
-      .map(d => normalizeMemberSnapshot(d.id, d.data(), roleId))
-      .filter((row): row is MemberPoint => Boolean(row))
-      .sort((a, b) => a.date.localeCompare(b.date))
+    const snapshots = snap.docs.map(d => ({ id: d.id, data: d.data() }))
+    const series = normalizeMemberHistory(snapshots, roleId)
     const latest = series.length ? series[series.length - 1] : null
     return { series, latest }
   } catch {

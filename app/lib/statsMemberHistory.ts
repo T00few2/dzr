@@ -9,7 +9,32 @@ function isCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
 }
 
-export function normalizeMemberSnapshot(
+export function normalizeMemberHistory(
+  snapshots: { id: string; data: Record<string, unknown> }[],
+  configuredRoleId = '',
+): MemberPoint[] {
+  let roleId = configuredRoleId.trim()
+  // Older snapshots only have roleCounts. Resolve their role from the entire
+  // history before normalizing rows; its explicit ID may be in a newer snapshot.
+  if (!roleId) {
+    let latestDate = ''
+    for (const { id, data } of snapshots) {
+      const date = [data.dateKey, id].find(isDateKey)
+      const recordedRoleId = typeof data.clubMemberRoleId === 'string' ? data.clubMemberRoleId.trim() : ''
+      if (date && date > latestDate && recordedRoleId) {
+        roleId = recordedRoleId
+        latestDate = date
+      }
+    }
+  }
+
+  return snapshots
+    .map(({ id, data }) => normalizeMemberSnapshot(id, data, roleId))
+    .filter((row): row is MemberPoint => row !== null)
+    .sort((a, b) => a.date.localeCompare(b.date))
+}
+
+function normalizeMemberSnapshot(
   id: string,
   data: Record<string, unknown>,
   roleId: string,
