@@ -20,7 +20,7 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_athlete_stats",
-      description: "Holds year and recent ride totals, plus a power curve when intervals.icu has one. Call when the answer needs those totals or the curve. Weekly load and whether to rest are get_training_trend, not this.",
+      description: "Holds recent, year-to-date, and all-time ride totals, plus power curves for the last 28 days and all time when intervals.icu has them. Call when the answer needs those totals or a curve. Weekly load and whether to rest are get_training_trend, not this.",
       parameters: { type: "object", properties: {} }
     }
   },
@@ -36,13 +36,21 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_recent_activities",
-      description: "Holds ride summaries for the last 28 days: averages only, not interval quality. Call when the answer needs those rides or an activity id. Not the six-month load trend. Activities intervals.icu only holds from another platform may be omitted; say so if the message says that.",
+      description: "Holds ride summaries for a date window: averages only, not interval quality. Default is the last 14 days. Pass days or oldest and newest (YYYY-MM-DD) for any earlier period intervals.icu still has. There is no maximum. Not the weekly load trend. Activities intervals.icu only holds from another platform may be omitted; say so if the message says that.",
       parameters: {
         type: "object",
         properties: {
           days: {
             type: "number",
-            description: "Lookback window in days (1-28). Default 14. For 'this week' (Monday–Sunday, Denmark), fetch enough days to cover from this Monday."
+            description: "Lookback in days ending at newest, or today if newest is omitted. Default 14. No maximum. Ignored when oldest is set. For 'this week' (Monday–Sunday, Denmark), fetch enough days to cover from this Monday."
+          },
+          oldest: {
+            type: "string",
+            description: "Optional window start, YYYY-MM-DD in Denmark. Use with newest to read a period that is not the most recent rides."
+          },
+          newest: {
+            type: "string",
+            description: "Optional window end, YYYY-MM-DD in Denmark. Default today. Not a future date."
           }
         }
       }
@@ -85,19 +93,42 @@ const coachToolDefinitions = [
     type: "function",
     function: {
       name: "get_training_trend",
-      description: "Holds about six months of weekly load, whether load is rising, how long since an easy week, plus CTL, ATL, and form. Not a list of rides. The current week is partial. Not stored. Call when the answer needs that trend.",
-      parameters: { type: "object", properties: {} }
+      description: "Holds weekly load, whether load is rising, how long since an easy week, plus CTL, ATL, and form. Default is about six months. Pass days or oldest (YYYY-MM-DD) for any longer history intervals.icu has. There is no maximum. Not a list of rides. The current week is partial. Not stored. Call when the answer needs that trend.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: {
+            type: "number",
+            description: "Lookback in days from today. Default 182. No maximum. Ignored when oldest is set."
+          },
+          oldest: {
+            type: "string",
+            description: "Optional window start, YYYY-MM-DD in Denmark. Use for history further back than the default."
+          }
+        }
+      }
     }
   },
   {
     type: "function",
     function: {
       name: "get_wellness",
-      description: "Holds the last couple of weeks of sleep, HRV, soreness, fatigue, resting HR, and daily form. Empty fields are unknown, not fine. Call when the answer needs how they feel right now. Not the six-month load trend.",
+      description: "Holds sleep, HRV, soreness, fatigue, resting HR, and daily form. Default is the last 14 days. Pass days or oldest and newest (YYYY-MM-DD) for any earlier period intervals.icu has. There is no maximum. Empty fields are unknown, not fine. Not the weekly load trend.",
       parameters: {
         type: "object",
         properties: {
-          days: { type: "number", description: "Lookback in days, 1-28. Default 14." }
+          days: {
+            type: "number",
+            description: "Lookback in days ending at newest, or today if newest is omitted. Default 14. No maximum. Ignored when oldest is set."
+          },
+          oldest: {
+            type: "string",
+            description: "Optional window start, YYYY-MM-DD in Denmark."
+          },
+          newest: {
+            type: "string",
+            description: "Optional window end, YYYY-MM-DD in Denmark. Default today."
+          }
         }
       }
     }
@@ -110,7 +141,18 @@ const coachToolDefinitions = [
       parameters: {
         type: "object",
         properties: {
-          days: { type: "number", description: "How many days ahead, 1-28. Default 14." }
+          days: {
+            type: "number",
+            description: "How many days ahead of oldest, or of today if oldest is omitted. Default 14. No maximum. Ignored when newest is set."
+          },
+          oldest: {
+            type: "string",
+            description: "Optional window start, YYYY-MM-DD in Denmark. Default today."
+          },
+          newest: {
+            type: "string",
+            description: "Optional window end, YYYY-MM-DD in Denmark."
+          }
         }
       }
     }

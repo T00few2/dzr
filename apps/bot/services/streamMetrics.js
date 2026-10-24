@@ -306,7 +306,7 @@ function segmentSummary(
   const np = w.length >= 30 ? normalizedPower(w) : null;
   const intervals = ftp && w.length
     ? enrichIntervals(
-        detectIntervals(w, { thresholdWatts: Math.round(ftp * 0.95) }).slice(0, 12),
+        detectIntervals(w, { thresholdWatts: Math.round(ftp * 0.95) }),
         {
           heartrate: h,
           cadence: cadence.slice(from, to),

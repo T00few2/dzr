@@ -16,6 +16,9 @@ const {
 
 const COLLECTION = shared.firestore.intervalsConnections || "intervals_connections";
 const API = "https://intervals.icu/api/v1";
+// intervals.icu returns every activity, wellness row, and event in oldest/newest. It only
+// truncates when limit is sent, so these calls do not send one.
+const EARLIEST = "1970-01-01";
 const CONNECT_TOKEN_TTL_MS = 15 * 60 * 1000;
 const STREAM_CACHE_COLLECTION = "coach_activity_metrics";
 const USER_AGENT = "DZR-Coach/1.0";
@@ -279,7 +282,7 @@ function heightCm(athlete) {
 
 async function latestWellnessWeight(discordId) {
   const newest = copenhagenDate(0);
-  const oldest = copenhagenDate(-90);
+  const oldest = EARLIEST;
   const { data } = await intervalsFetch(
     discordId,
     `/athlete/0/wellness?oldest=${oldest}&newest=${newest}`
@@ -342,26 +345,42 @@ function rideTotals(activities) {
   );
 }
 
-function compactCurve(data) {
+function curvePoints(secs, watts) {
   const points = [];
-  const push = (seconds, watts) => {
+  if (!Array.isArray(secs)) return points;
+  const values = Array.isArray(watts) ? watts : [];
+  secs.forEach((seconds, i) => {
     const s = num(seconds);
-    const w = num(watts);
+    const w = num(values[i]);
     if (s && w) points.push({ seconds: s, watts: Math.round(w) });
-  };
-  const curve = Array.isArray(data?.list) ? data.list[0] : null;
-  if (curve && Array.isArray(curve.secs)) {
-    const watts = Array.isArray(curve.values) ? curve.values : curve.watts || [];
-    curve.secs.forEach((seconds, i) => push(seconds, watts[i]));
-  } else if (Array.isArray(data)) {
-    for (const row of data) push(row?.secs ?? row?.seconds ?? row?.duration, row?.watts ?? row?.power);
-  } else if (data && Array.isArray(data.secs) && Array.isArray(data.watts)) {
-    data.secs.forEach((seconds, i) => push(seconds, data.watts[i]));
+  });
+  return points;
+}
+
+function compactCurves(data) {
+  const list = Array.isArray(data?.list) ? data.list : [];
+  if (list.length) {
+    return list
+      .map((curve) => ({
+        id: curve.id || curve.label || null,
+        points: curvePoints(curve.secs, Array.isArray(curve.values) ? curve.values : curve.watts),
+      }))
+      .filter((curve) => curve.points.length);
   }
-  const wanted = [5, 15, 30, 60, 300, 720, 1200];
-  return wanted
-    .map((seconds) => points.find((point) => point.seconds === seconds) || null)
-    .filter(Boolean);
+  if (Array.isArray(data)) {
+    return [{
+      id: null,
+      points: curvePoints(
+        data.map((row) => row?.secs ?? row?.seconds ?? row?.duration),
+        data.map((row) => row?.watts ?? row?.power)
+      ),
+    }].filter((curve) => curve.points.length);
+  }
+  if (data && Array.isArray(data.secs)) {
+    const one = curvePoints(data.secs, data.watts);
+    return one.length ? [{ id: null, points: one }] : [];
+  }
+  return [];
 }
 
 async function getAthleteStats(discordId) {
@@ -371,10 +390,11 @@ async function getAthleteStats(discordId) {
     const recentStart = copenhagenDate(-28);
     const { data } = await intervalsFetch(
       discordId,
-      `/athlete/0/activities?oldest=${yearStart}&newest=${newest}`
+      `/athlete/0/activities?oldest=${EARLIEST}&newest=${newest}`
     );
     const { activities, skippedUnreadable } = readableActivities(data);
     const recent = activities.filter((activity) => String(activity.start_date || "") >= recentStart);
+    const thisYear = activities.filter((activity) => String(activity.start_date || "") >= yearStart);
     let fitness = null;
     try {
       const wellness = await intervalsFetch(discordId, `/athlete/0/wellness/${newest}`);
@@ -387,13 +407,13 @@ async function getAthleteStats(discordId) {
     } catch (err) {
       if (err?.code === "needs_reconnect" || err?.code === "not_connected") throw err;
     }
-    let powerCurve = [];
+    let powerCurves = [];
     try {
       const curve = await intervalsFetch(
         discordId,
-        `/athlete/0/power-curves?type=Ride&curves=28d&newest=${newest}`
+        `/athlete/0/power-curves?type=Ride&curves=${encodeURIComponent("28d,all")}&newest=${newest}`
       );
-      powerCurve = compactCurve(curve.data);
+      powerCurves = compactCurves(curve.data);
     } catch (err) {
       if (err?.code === "needs_reconnect" || err?.code === "not_connected") throw err;
     }
@@ -401,9 +421,10 @@ async function getAthleteStats(discordId) {
       success: true,
       stats: {
         recent_ride_totals: rideTotals(recent),
-        ytd_ride_totals: rideTotals(activities),
+        ytd_ride_totals: rideTotals(thisYear),
+        all_time_ride_totals: rideTotals(activities),
         fitness,
-        power_curve: powerCurve,
+        power_curves: powerCurves,
       },
       message: unreadableSourceMessage(skippedUnreadable),
     };
@@ -441,17 +462,55 @@ async function listActivities(discordId, oldest, newest) {
   return readableActivities(data);
 }
 
-async function getRecentActivities(discordId, { days = 14 } = {}) {
-  const clampedDays = Math.min(Math.max(Number(days) || 14, 1), 28);
+function isoDay(value) {
+  const day = String(value || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
+}
+
+function shiftIsoDay(iso, days) {
+  const [year, month, day] = String(iso || "").split("-").map(Number);
+  if (![year, month, day].every(Number.isFinite)) return "";
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+function lookbackDays(days, fallback) {
+  const n = Math.floor(Number(days));
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return n;
+}
+
+function spanDays(start, end) {
+  const span = Math.round(
+    (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000
+  );
+  return Number.isFinite(span) ? Math.max(0, span) : 0;
+}
+
+function activityListWindow({ days, oldest, newest } = {}) {
+  const today = copenhagenDate(0);
+  let end = isoDay(newest) || today;
+  if (end > today) end = today;
+  let start = isoDay(oldest);
+  if (!start) start = shiftIsoDay(end, -lookbackDays(days, 14));
+  if (start > end) start = end;
+  return { oldest: start, newest: end, days: spanDays(start, end) };
+}
+
+async function getRecentActivities(discordId, options = {}) {
+  const window = activityListWindow(options);
   return wrapCall(discordId, async () => {
-    const newest = copenhagenDate(0);
-    const oldest = copenhagenDate(-clampedDays);
-    const { activities, skippedUnreadable } = await listActivities(discordId, oldest, newest);
+    const { activities, skippedUnreadable } = await listActivities(discordId, window.oldest, window.newest);
+    const ordered = activities
+      .slice()
+      .sort((a, b) => String(a.start_date || "").localeCompare(String(b.start_date || "")));
+    const unread = unreadableSourceMessage(skippedUnreadable);
     return {
       success: true,
-      days: clampedDays,
-      activities: activities.slice(0, 50),
-      message: unreadableSourceMessage(skippedUnreadable),
+      days: window.days,
+      oldest: window.oldest,
+      newest: window.newest,
+      activities: ordered,
+      ...(unread ? { message: unread } : {}),
     };
   });
 }
@@ -467,8 +526,8 @@ function compactIntervals(activity) {
     "zone",
     "decoupling",
   ]);
-  return rows.slice(0, 20).map((row) => {
-    const discovered = discovery.discoverActivityFields(row, { maxFields: 64 }).values;
+  return rows.map((row) => {
+    const discovered = discovery.discoverActivityFields(row).values;
     const sourceData = Object.fromEntries(
       Object.entries(discovered).filter(([key]) => !normalized.has(key))
     );
@@ -811,10 +870,10 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
         ...common,
         intervals: ftp
           ? metrics.enrichIntervals(
-              metrics.detectIntervals(watts, { thresholdWatts: Math.round(ftp * 0.95) }).slice(0, 12),
+              metrics.detectIntervals(watts, { thresholdWatts: Math.round(ftp * 0.95) }),
               { heartrate, cadence, coreTemperature }
             )
-          : compactIntervals(activity).slice(0, 12),
+          : compactIntervals(activity),
         ftpUsed: ftp,
       };
     } else if (powerUsable && (activity?.icu_weighted_avg_watts || activity?.icu_training_load)) {
@@ -828,7 +887,7 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
         meanMaxPower: null,
         aerobicDecouplingPercent: null,
         ...common,
-        intervals: compactIntervals(activity).slice(0, 12),
+        intervals: compactIntervals(activity),
         ftpUsed: ftp,
       };
     } else if (
@@ -842,7 +901,7 @@ async function getActivityMetrics(discordId, activityId, { fromMinute, toMinute 
         durationSeconds: heartrate.length || coreTemperature.length || num(activity?.moving_time),
         powerAvailable: false,
         ...common,
-        intervals: compactIntervals(activity).slice(0, 12),
+        intervals: compactIntervals(activity),
       };
     }
 
@@ -972,11 +1031,11 @@ const RECOVERY_FIELDS = [
   "sleep_quality", "avg_sleeping_hr", "readiness",
 ];
 
-async function getWellness(discordId, { days = 14 } = {}) {
-  const clampedDays = Math.min(Math.max(Number(days) || 14, 1), 28);
+async function getWellness(discordId, options = {}) {
+  const window = activityListWindow({ days: options.days ?? 14, oldest: options.oldest, newest: options.newest });
   return wrapCall(discordId, async () => {
-    const newest = copenhagenDate(0);
-    const oldest = copenhagenDate(-clampedDays);
+    const newest = window.newest;
+    const oldest = window.oldest;
     const { data } = await intervalsFetch(
       discordId,
       `/athlete/0/wellness?oldest=${oldest}&newest=${newest}`
@@ -998,20 +1057,21 @@ async function getWellness(discordId, { days = 14 } = {}) {
     } else {
       message = "Null fields are unknown for that day, not fine.";
     }
-    return { success: true, days: clampedDays, wellness: rows, message };
+    return { success: true, days: window.days, oldest, newest, wellness: rows, message };
   });
 }
 
-async function getPlannedWorkouts(discordId, { days = 14 } = {}) {
-  const clampedDays = Math.min(Math.max(Number(days) || 14, 1), 28);
+async function getPlannedWorkouts(discordId, { days = 14, oldest, newest } = {}) {
+  const start = isoDay(oldest) || copenhagenDate(0);
+  const end = isoDay(newest) || shiftIsoDay(start, lookbackDays(days, 14));
+  const oldestDate = start <= end ? start : end;
+  const newestDate = start <= end ? end : start;
   return wrapCall(discordId, async () => {
-    const oldest = copenhagenDate(0);
-    const newest = copenhagenDate(clampedDays);
     const { data } = await intervalsFetch(
       discordId,
-      `/athlete/0/events?oldest=${oldest}&newest=${newest}&category=WORKOUT`
+      `/athlete/0/events?oldest=${oldestDate}&newest=${newestDate}&category=WORKOUT`
     );
-    const events = (Array.isArray(data) ? data : []).slice(0, 20).map((event) => ({
+    const events = (Array.isArray(data) ? data : []).map((event) => ({
       id: event.id ?? null,
       name: event.name || null,
       start_date: event.start_date_local || null,
@@ -1020,7 +1080,7 @@ async function getPlannedWorkouts(discordId, { days = 14 } = {}) {
       training_load: event.icu_training_load ?? null,
       description: typeof event.description === "string" ? event.description.slice(0, 240) : null,
     }));
-    return { success: true, workouts: events };
+    return { success: true, days: spanDays(oldestDate, newestDate), oldest: oldestDate, newest: newestDate, workouts: events };
   });
 }
 
@@ -1041,28 +1101,29 @@ function weeklyFitness(rows) {
     if (!week) continue;
     byWeek.set(week, { week, ctl: row.ctl, atl: row.atl, form: row.form });
   }
-  return Array.from(byWeek.values()).slice(-12);
+  return Array.from(byWeek.values()).sort((a, b) => a.week.localeCompare(b.week));
 }
 
-async function getTrainingTrend(discordId, { days = 182 } = {}) {
-  const clampedDays = Math.min(Math.max(Number(days) || 182, 28), 182);
+async function getTrainingTrend(discordId, { days = 182, oldest } = {}) {
+  const newest = copenhagenDate(0);
+  let start = isoDay(oldest) || shiftIsoDay(newest, -lookbackDays(days, 182));
+  if (start > newest) start = newest;
+  const weeks = Math.max(1, Math.ceil(spanDays(start, newest) / 7) + 2);
   return wrapCall(discordId, async () => {
-    const newest = copenhagenDate(0);
-    const oldest = copenhagenDate(-clampedDays);
     const [listed, settingsRes, wellnessRes] = await Promise.all([
-      listActivities(discordId, oldest, newest),
+      listActivities(discordId, start, newest),
       intervalsFetch(discordId, "/athlete/0/sport-settings").catch((err) => {
         if (err?.code === "needs_reconnect" || err?.code === "not_connected") throw err;
         return { data: [] };
       }),
-      intervalsFetch(discordId, `/athlete/0/wellness?oldest=${oldest}&newest=${newest}`).catch((err) => {
+      intervalsFetch(discordId, `/athlete/0/wellness?oldest=${start}&newest=${newest}`).catch((err) => {
         if (err?.code === "needs_reconnect" || err?.code === "not_connected") throw err;
         return { data: [] };
       }),
     ]);
     const sport = pickSportSettings(settingsRes.data);
     const ftp = num(sport?.indoor_ftp) || num(sport?.ftp);
-    const weekly = weeklyLoad.rollupWeeks(listed.activities, { ftp, weeks: 26 });
+    const weekly = weeklyLoad.rollupWeeks(listed.activities, { ftp, weeks });
     const trend = weeklyLoad.loadTrend(weekly);
     const fitness = weeklyFitness(
       (Array.isArray(wellnessRes.data) ? wellnessRes.data : []).map(compactWellness).filter(Boolean)
@@ -1071,8 +1132,10 @@ async function getTrainingTrend(discordId, { days = 182 } = {}) {
     return {
       success: true,
       weeks: weekly.length,
+      oldest: start,
+      newest,
       summary: weeklyLoad.formatWeeklyLoadForPrompt(weekly, trend),
-      fitness: fitness.slice(-12),
+      fitness,
       message:
         "Fetched for this question and not stored. The current week only includes days already ridden, so a low number mid-week is not a drop in training." +
         (unread ? ` ${unread}` : ""),

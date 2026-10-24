@@ -1,8 +1,7 @@
 /**
  * Weekly training load rollups.
  *
- * getRecentActivities clamps to 28 days, so the coach could only ever see the last few weeks —
- * enough to report what happened, not enough to see a trend. Periodisation is about trend:
+ * A list of sessions says what happened. Periodisation is about trend:
  * "you have built three weeks in a row, next week should be easy" is coaching; "you rode four
  * times last week" is reading the log back.
  *
@@ -146,9 +145,9 @@ function loadTrend(weekly) {
   return { rampPercent, consecutiveBuildWeeks, weeksWithoutRest };
 }
 
-/** Compact table for the system prompt. A few hundred tokens buys the whole trend. */
+/** Compact table for the system prompt. Every week in the fetched range is included. */
 function formatWeeklyLoadForPrompt(weekly, trend) {
-  const rows = Array.isArray(weekly) ? weekly.slice(-12) : [];
+  const rows = Array.isArray(weekly) ? weekly : [];
   if (!rows.length) return "No weekly history yet.";
 
   const lines = rows.map((w) => {

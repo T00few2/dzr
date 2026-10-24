@@ -164,7 +164,7 @@ function compactToolResult(result) {
   };
 
   if (typeof result.message === "string" && result.message.length > 0) {
-    base.message = result.message.slice(0, 500);
+    base.message = result.message.slice(0, 1000);
   }
 
   // Common payloads
@@ -188,12 +188,14 @@ function compactToolResult(result) {
   if (result.athlete) base.athlete = result.athlete;
   if (result.stats) base.stats = result.stats;
   if (result.zones) base.zones = result.zones;
-  if (Array.isArray(result.activities)) base.activities = result.activities.slice(0, 40);
+  if (Array.isArray(result.activities)) base.activities = result.activities;
+  if (typeof result.oldest === "string") base.oldest = result.oldest.slice(0, 10);
+  if (typeof result.newest === "string") base.newest = result.newest.slice(0, 10);
   if (result.activity) base.activity = result.activity;
   if (result.metrics) base.metrics = result.metrics;
-  if (Array.isArray(result.wellness)) base.wellness = result.wellness.slice(0, 28);
-  if (Array.isArray(result.fitness)) base.fitness = result.fitness.slice(0, 12);
-  if (Array.isArray(result.workouts)) base.workouts = result.workouts.slice(0, 20);
+  if (Array.isArray(result.wellness)) base.wellness = result.wellness;
+  if (Array.isArray(result.fitness)) base.fitness = result.fitness;
+  if (Array.isArray(result.workouts)) base.workouts = result.workouts;
   if (typeof result.days === "number") base.days = result.days;
   if (result.needs_reconnect) base.needs_reconnect = true;
   if (result.not_club_member) base.not_club_member = true;
@@ -207,7 +209,7 @@ function compactToolResult(result) {
   if (Array.isArray(result.clubs)) base.clubs = result.clubs;
   if (typeof result.note === "string") base.note = result.note.slice(0, 500);
   if (result.zrl) base.zrl = result.zrl;
-  if (typeof result.summary === "string") base.summary = result.summary.slice(0, 500);
+  if (typeof result.summary === "string") base.summary = result.summary;
   if (typeof result.coach_info === "string") base.coach_info = result.coach_info.slice(0, 4000);
   if (result.sent_full) base.sent_full = true;
   if (typeof result.confirmMessageDa === "string") base.confirmMessageDa = result.confirmMessageDa.slice(0, 1500);
@@ -1245,15 +1247,30 @@ async function executeSingleToolCall(toolCall, message, turn) {
         if (name === "get_athlete_profile") coachResult = await intervals.getAthleteProfile(discordId);
         else if (name === "get_athlete_stats") coachResult = await intervals.getAthleteStats(discordId);
         else if (name === "get_athlete_zones") coachResult = await intervals.getAthleteZones(discordId);
-        else if (name === "get_recent_activities") coachResult = await intervals.getRecentActivities(discordId, { days: args.days });
+        else if (name === "get_recent_activities") coachResult = await intervals.getRecentActivities(discordId, {
+          days: args.days,
+          oldest: args.oldest,
+          newest: args.newest,
+        });
         else if (name === "get_activity_details") coachResult = await intervals.getActivityDetails(discordId, args.activity_id);
         else if (name === "get_activity_metrics") coachResult = await intervals.getActivityMetrics(discordId, args.activity_id, {
           fromMinute: args.from_minute,
           toMinute: args.to_minute,
         });
-        else if (name === "get_training_trend") coachResult = await intervals.getTrainingTrend(discordId);
-        else if (name === "get_wellness") coachResult = await intervals.getWellness(discordId, { days: args.days });
-        else if (name === "get_planned_workouts") coachResult = await intervals.getPlannedWorkouts(discordId, { days: args.days });
+        else if (name === "get_training_trend") coachResult = await intervals.getTrainingTrend(discordId, {
+          days: args.days,
+          oldest: args.oldest,
+        });
+        else if (name === "get_wellness") coachResult = await intervals.getWellness(discordId, {
+          days: args.days,
+          oldest: args.oldest,
+          newest: args.newest,
+        });
+        else if (name === "get_planned_workouts") coachResult = await intervals.getPlannedWorkouts(discordId, {
+          days: args.days,
+          oldest: args.oldest,
+          newest: args.newest,
+        });
         else coachResult = await intervals.getZwiftPowerContext(discordId);
         return { tool_call_id: toolCall.id, ...(coachResult || { success: false, message: "No data" }) };
       }
