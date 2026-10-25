@@ -105,6 +105,8 @@ export default function JoinPaymentPage() {
             setIsPolling(false)
             setMessage('Betalingen mislykkedes. Prøv igen.')
             setMessageColor('red.300')
+          } else {
+            pollConfirmation(ref, attemptsLeft - 1)
           }
         } catch {
           if (!ignore) pollConfirmation(ref, attemptsLeft - 1)
@@ -122,9 +124,11 @@ export default function JoinPaymentPage() {
       if (ignore) return
       setCanPay(Boolean(session?.session?.steps?.discordLinked))
       setPaymentDone(Boolean(session?.session?.steps?.paymentSucceeded))
+      let paidNow = false
       if (statusRes.ok) {
         const statusData = (await statusRes.json()) as OnboardingStatusResponse
         const paid = Boolean(statusData?.membershipAlreadyPaid)
+        paidNow = paid
         setAlreadyPaid(paid)
         setCoveredThroughYear(typeof statusData?.coveredThroughYear === 'number' ? statusData.coveredThroughYear : null)
         if (paid) {
@@ -144,6 +148,13 @@ export default function JoinPaymentPage() {
         setSettings(s)
         const initial = Math.min(Math.max(50, Number(s.minAmountDkk || 10)), Number(s.maxAmountDkk || 100))
         setAmount(initial)
+        if (!paidNow && (!Array.isArray(s.paymentOptions) || s.paymentOptions.length === 0)) {
+          setMessage('Betalingsperiode kunne ikke indlæses. Genindlæs siden, eller skriv til DZR hvis det fortsætter.')
+          setMessageColor('red.300')
+        }
+      } else if (!paidNow) {
+        setMessage('Kunne ikke hente betalingsperiode. Genindlæs siden.')
+        setMessageColor('red.300')
       }
 
       const ref = new URLSearchParams(window.location.search).get('checkoutReference')
@@ -167,13 +178,21 @@ export default function JoinPaymentPage() {
         } else if (confirmData?.status === 'failed') {
           setMessage('Betalingen mislykkedes. Prøv igen.')
           setMessageColor('red.300')
+        } else if (!confirmRes.ok) {
+          setMessage(confirmData?.error || 'Kunne ikke bekræfte betalingen. Prøv at genindlæse siden.')
+          setMessageColor('red.300')
         }
       }
 
       setLoading(false)
       track('onboarding_step_view', { step: 'payment' })
     }
-    load().catch(() => setLoading(false))
+    load().catch(() => {
+      if (ignore) return
+      setMessage('Kunne ikke hente betalingsperiode. Genindlæs siden.')
+      setMessageColor('red.300')
+      setLoading(false)
+    })
     return () => {
       ignore = true
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
@@ -192,8 +211,12 @@ export default function JoinPaymentPage() {
         return
       }
       if (!selectedOptionId) {
-        setMessage('Vælg betalingsperiode')
-        setMessageColor('orange.300')
+        setMessage(
+          settings?.paymentOptions?.length
+            ? 'Vælg betalingsperiode'
+            : 'Betalingsperiode kunne ikke indlæses. Genindlæs siden, eller skriv til DZR hvis det fortsætter.'
+        )
+        setMessageColor('red.300')
         setSaving(false)
         return
       }
@@ -274,13 +297,16 @@ export default function JoinPaymentPage() {
         ) : (
           <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" bg="gray.900" p={5}>
             <Stack spacing={4}>
-              <HStack>
-                {(settings?.paymentOptions || []).map((opt) => (
-                  <Button key={opt.id} variant={selectedOptionId === opt.id ? 'solid' : 'outline'} onClick={() => setSelectedOptionId(opt.id)} colorScheme="red">
-                    {opt.label || opt.id}
-                  </Button>
-                ))}
-              </HStack>
+              <FormControl>
+                <FormLabel color="white">Betalingsperiode</FormLabel>
+                <HStack wrap="wrap" spacing={3}>
+                  {(settings?.paymentOptions || []).map((opt) => (
+                    <Button key={opt.id} variant={selectedOptionId === opt.id ? 'solid' : 'outline'} onClick={() => setSelectedOptionId(opt.id)} colorScheme="red">
+                      {opt.label || opt.id}
+                    </Button>
+                  ))}
+                </HStack>
+              </FormControl>
               <FormControl>
                 <FormLabel color="white">Fornavn</FormLabel>
                 <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} bg="white" color="black" />
@@ -301,7 +327,7 @@ export default function JoinPaymentPage() {
               <Button
                 onClick={startPayment}
                 isLoading={saving}
-                isDisabled={loading}
+                isDisabled={loading || !selectedOptionId}
                 variant="unstyled"
                 h="auto"
                 p={0}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
+import { resolvePaymentOptions, usesPaymentOptionFallback } from '@/app/lib/membershipPaymentOptions'
 import { vippsCreateCheckoutSession } from '@/app/api/membership/vippsClient'
 
 export const dynamic = 'force-dynamic'
@@ -35,8 +36,10 @@ export async function POST(req: Request) {
     if (amountDkk < minAmount || amountDkk > maxAmount) {
       return NextResponse.json({ error: `Amount must be between ${minAmount} and ${maxAmount} DKK` }, { status: 400 })
     }
-    const paymentOptions: Array<{ id: string; label?: string; coversYears?: number[] }> =
-      Array.isArray(membership?.paymentOptions) ? membership.paymentOptions : []
+    if (usesPaymentOptionFallback(membership?.paymentOptions)) {
+      console.error('[membership] paymentOptions missing; renewal payment is using the current-year fallback')
+    }
+    const paymentOptions = resolvePaymentOptions(membership?.paymentOptions)
     const selected = paymentOptions.find(o => String(o?.id || '') === selectedOptionId)
     if (!selected || !Array.isArray(selected.coversYears) || selected.coversYears.length === 0) {
       return NextResponse.json({ error: 'Invalid payment option' }, { status: 400 })
