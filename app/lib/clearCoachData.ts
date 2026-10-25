@@ -71,6 +71,11 @@ export async function resetCoachProfileToDefault(discordId: string) {
       updatedAt: now,
       updatedBy: 'user',
       howItWorksSentAt: null,
+      onboardingNotesSkippedAt: null,
+      onboardingWeeklySkippedAt: null,
+      onboardingCalendarSkippedAt: null,
+      onboardingNudgeSentAt: null,
+      onboardingFinishedAt: null,
     })
   )
 }

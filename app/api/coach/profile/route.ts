@@ -9,7 +9,7 @@ import {
   publicCoachFields,
   toClientCoachProfile,
 } from '@/app/lib/coachProfile'
-import { persistCoachMemoryDoc, unwrapCoachMemoryDoc, canEncryptCoachMemory } from '@/app/lib/tokenCrypto'
+import { persistCoachMemoryDoc, unwrapCoachMemoryDoc, canEncryptCoachMemory, coachProfileStamps } from '@/app/lib/tokenCrypto'
 import { ensureDefaultCoachProfile } from '@/app/lib/ensureCoachProfile'
 
 export const dynamic = 'force-dynamic'
@@ -26,6 +26,21 @@ function warnIfPlaintext() {
   if (!canEncryptCoachMemory()) {
     console.warn('COACH_MEMORY_KEY / COACH_CONNECT_SECRET missing; storing coach memory in plaintext')
   }
+}
+
+/** A skip or a finished setup is a one-way stamp. The client cannot clear it. */
+function withOnboardingChoice(
+  stamps: ReturnType<typeof coachProfileStamps>,
+  body: { onboardingSkip?: unknown; onboardingFinish?: unknown }
+) {
+  const next = { ...stamps }
+  const now = new Date().toISOString()
+  const skip = String(body?.onboardingSkip || '')
+  if (skip === 'notes') next.onboardingNotesSkippedAt = next.onboardingNotesSkippedAt || now
+  if (skip === 'weekly') next.onboardingWeeklySkippedAt = next.onboardingWeeklySkippedAt || now
+  if (skip === 'calendar') next.onboardingCalendarSkippedAt = next.onboardingCalendarSkippedAt || now
+  if (body?.onboardingFinish === true) next.onboardingFinishedAt = next.onboardingFinishedAt || now
+  return next
 }
 
 export async function GET(req: Request) {
@@ -58,16 +73,19 @@ export async function PUT(req: Request) {
 
     const body = await req.json().catch(() => ({}))
     const ref = adminDb.collection(COACH_PROFILES_COLLECTION).doc(discordId)
-    const fields = publicCoachFields(body)
     const now = new Date()
     warnIfPlaintext()
 
     // Read and write inside a transaction. The bot stamps lastAthleteMessageAt / lastFollowUpAt
     // on the same document, so an unguarded read-then-set here could carry a stale stamp back
     // and undo the bot's write (and vice versa). The transaction retries on contention.
-    const existing = await adminDb.runTransaction(async (tx) => {
+    // onboardingOnly keeps the stored settings and only applies a skip or finished stamp, so
+    // closing the wizard cannot overwrite a save the member just made in the form below.
+    const written = await adminDb.runTransaction(async (tx) => {
       const snap = await tx.get(ref)
       const current = unwrapCoachMemoryDoc({ ...(snap.exists ? snap.data() || {} : {}), discordId })
+      const fields = body?.onboardingOnly === true ? publicCoachFields(current) : publicCoachFields(body)
+      const stamps = withOnboardingChoice(coachProfileStamps(current), body)
       tx.set(
         ref,
         persistCoachMemoryDoc({
@@ -75,23 +93,20 @@ export async function PUT(req: Request) {
           ...fields,
           updatedAt: now,
           updatedBy: 'user',
-          howItWorksSentAt: current.howItWorksSentAt || null,
-          lastAthleteMessageAt: current.lastAthleteMessageAt || null,
-          lastFollowUpAt: current.lastFollowUpAt || null,
+          ...stamps,
         })
       )
-      return current
+      return { fields, stamps }
     })
 
     return NextResponse.json({
       ok: true,
       profile: toClientCoachProfile({
-        ...fields,
+        ...written.fields,
         discordId,
         updatedAt: now,
         updatedBy: 'user',
-        lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
-        lastFollowUpAt: existing.lastFollowUpAt || null,
+        ...written.stamps,
       }, discordId),
     })
   } catch (err: any) {
@@ -139,6 +154,7 @@ export async function DELETE(req: Request) {
         }
       }
 
+      const stamps = coachProfileStamps(existing)
       tx.set(
         ref,
         persistCoachMemoryDoc({
@@ -146,17 +162,21 @@ export async function DELETE(req: Request) {
           ...next,
           updatedAt: now,
           updatedBy: 'user',
-          howItWorksSentAt: existing.howItWorksSentAt || null,
-          lastAthleteMessageAt: existing.lastAthleteMessageAt || null,
-          lastFollowUpAt: existing.lastFollowUpAt || null,
+          ...stamps,
         })
       )
-      return next
+      return { next, stamps }
     })
 
     return NextResponse.json({
       ok: true,
-      profile: toClientCoachProfile({ ...written, discordId, updatedAt: now, updatedBy: 'user' }, discordId),
+      profile: toClientCoachProfile({
+        ...written.next,
+        discordId,
+        updatedAt: now,
+        updatedBy: 'user',
+        ...written.stamps,
+      }, discordId),
     })
   } catch (err: any) {
     console.error('coach profile DELETE failed:', err)

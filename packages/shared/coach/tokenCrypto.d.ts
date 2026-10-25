@@ -36,7 +36,28 @@ export type CoachMemoryPlain = {
   howItWorksSentAt?: string | null
   lastAthleteMessageAt?: string | null
   lastFollowUpAt?: string | null
+  onboardingNotesSkippedAt?: string | null
+  onboardingWeeklySkippedAt?: string | null
+  onboardingCalendarSkippedAt?: string | null
+  onboardingNudgeSentAt?: string | null
+  onboardingFinishedAt?: string | null
 }
+
+/** Bot-owned timestamps stored beside the encrypted profile, never inside it. */
+export type CoachProfileStamps = {
+  howItWorksSentAt: string | null
+  lastAthleteMessageAt: string | null
+  lastFollowUpAt: string | null
+  onboardingNotesSkippedAt: string | null
+  onboardingWeeklySkippedAt: string | null
+  onboardingCalendarSkippedAt: string | null
+  onboardingNudgeSentAt: string | null
+  onboardingFinishedAt: string | null
+}
+
+export function coachProfileStamps(
+  plain: Record<string, unknown> | null | undefined
+): CoachProfileStamps
 
 /** The kinds a chat note may carry. `goal` is only reachable via explicit confirmation. */
 export type CoachChatNoteKind = 'feeling' | 'plan' | 'preference_transient' | 'life' | 'race' | 'goal'

@@ -98,8 +98,8 @@ const CLEAR_CONFIRM_COPY = {
   },
   disableNotes: {
     title: 'Slå chat-noter fra?',
-    body: 'Alle gemte chat-noter slettes, når du gemmer. Det kan ikke fortrydes.',
-    confirm: 'Gem og slet noter',
+    body: 'Alle gemte chat-noter slettes med det samme. Det kan ikke fortrydes.',
+    confirm: 'Slå fra og slet noter',
   },
   note: {
     title: 'Slet note?',
@@ -107,6 +107,28 @@ const CLEAR_CONFIRM_COPY = {
     confirm: 'Slet',
   },
 } as const
+
+function payloadFrom(profile: CoachProfile, minStr: string, maxStr: string): CoachProfile {
+  const minRaw = minStr.trim() === '' ? null : Number(minStr)
+  const maxRaw = maxStr.trim() === '' ? null : Number(maxStr)
+  const min = minRaw != null && Number.isFinite(minRaw) ? minRaw : null
+  const max = maxRaw != null && Number.isFinite(maxRaw) ? maxRaw : null
+  return {
+    ridesPerWeek: min == null && max == null ? null : {
+      ...(min != null ? { min } : {}),
+      ...(max != null ? { max } : {}),
+    },
+    sports: profile.sports || [],
+    weekly: (profile.weekly || []).filter((row) => row.sport.trim() && row.days.length),
+    injuries: (profile.injuries || []).filter((inj) => inj.text.trim()),
+    goals: [],
+    style: profile.style || { length: null, language: null, tone: null, notes: '' },
+    notesOptIn: profile.notesOptIn === true,
+    followUpEveryDays: profile.followUpEveryDays === 3 || profile.followUpEveryDays === 7 || profile.followUpEveryDays === 14
+      ? profile.followUpEveryDays
+      : null,
+  }
+}
 
 function emptyForm(): CoachProfile {
   return {
@@ -134,10 +156,14 @@ export default function CoachMemoryEditor() {
   const [ridesMin, setRidesMin] = useState('')
   const [ridesMax, setRidesMax] = useState('')
   const [clearConfirm, setClearConfirm] = useState<ClearConfirm | null>(null)
+  const [hydrated, setHydrated] = useState(false)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const cancelClearRef = useRef<HTMLButtonElement>(null)
+  const lastSaved = useRef('')
+  const saveSeq = useRef(0)
 
   function applyProfile(profile: CoachProfile) {
-    setForm({
+    const next: CoachProfile = {
       ...emptyForm(),
       ...profile,
       sports: profile.sports || [],
@@ -152,10 +178,14 @@ export default function CoachMemoryEditor() {
       followUpEveryDays: profile.followUpEveryDays === 3 || profile.followUpEveryDays === 7 || profile.followUpEveryDays === 14
         ? profile.followUpEveryDays
         : null,
-    })
-    setSavedNotesOptIn(profile.notesOptIn === true)
-    setRidesMin(profile.ridesPerWeek?.min != null ? String(profile.ridesPerWeek.min) : '')
-    setRidesMax(profile.ridesPerWeek?.max != null ? String(profile.ridesPerWeek.max) : '')
+    }
+    const min = profile.ridesPerWeek?.min != null ? String(profile.ridesPerWeek.min) : ''
+    const max = profile.ridesPerWeek?.max != null ? String(profile.ridesPerWeek.max) : ''
+    setForm(next)
+    setSavedNotesOptIn(next.notesOptIn === true)
+    setRidesMin(min)
+    setRidesMax(max)
+    lastSaved.current = JSON.stringify(payloadFrom(next, min, max))
   }
 
   useEffect(() => {
@@ -173,7 +203,10 @@ export default function CoachMemoryEditor() {
         const data = await profileRes.json()
         if (ignore) return
         setEligible(data?.eligible !== false)
-        if (data?.profile) applyProfile(data.profile)
+        if (data?.profile) {
+          applyProfile(data.profile)
+          setHydrated(true)
+        }
         if (notesRes.ok) {
           const notesData = await notesRes.json().catch(() => ({}))
           if (!ignore && Array.isArray(notesData?.notes)) setChatNotes(notesData.notes)
@@ -241,69 +274,71 @@ export default function CoachMemoryEditor() {
     }))
   }
 
-  async function persistSettings({ clearNotesOnDisable = false } = {}) {
+  async function persist(payload: CoachProfile, { clearNotesOnDisable = false } = {}) {
+    const json = JSON.stringify(payload)
+    const seq = ++saveSeq.current
     setSaving(true)
+    setSaveState('saving')
     try {
-      const min = ridesMin.trim() === '' ? null : Number(ridesMin)
-      const max = ridesMax.trim() === '' ? null : Number(ridesMax)
-      const payload: CoachProfile = {
-        ...form,
-        ridesPerWeek: min == null && max == null ? null : {
-          ...(min != null && Number.isFinite(min) ? { min } : {}),
-          ...(max != null && Number.isFinite(max) ? { max } : {}),
-        },
-        injuries: form.injuries.filter((inj) => inj.text.trim()),
-        weekly: form.weekly.filter((row) => row.sport.trim() && row.days.length),
-        goals: [],
-        notesOptIn: form.notesOptIn === true,
-        followUpEveryDays: form.followUpEveryDays,
-      }
       const res = await fetch('/api/coach/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       const data = await res.json().catch(() => ({}))
+      if (seq !== saveSeq.current) return false
       if (!res.ok) {
+        setSaveState('error')
         toast({ title: data?.error || 'Kunne ikke gemme', status: 'error' })
-        return
+        return false
       }
       // Delete the notes only after the profile save has succeeded. Deleting first meant a
       // failed PUT left the notes gone with notesOptIn still on — unrecoverable for the athlete.
-      let notesCleared = false
       if (clearNotesOnDisable) {
         try {
           await deleteAllNotesRequest()
-          notesCleared = true
         } catch (noteErr: any) {
+          if (seq !== saveSeq.current) return false
           if (data?.profile) applyProfile(data.profile)
+          setSaveState('error')
           toast({
             title: 'Indstillinger gemt, men chat-noterne blev ikke slettet',
             description: noteErr?.message || 'Prøv at slette dem igen under Chat-noter.',
             status: 'warning',
           })
-          return
+          return false
         }
       }
-      if (data?.profile) applyProfile(data.profile)
-      toast({
-        title: notesCleared ? 'Indstillinger gemt, og chat-noter slettet' : 'Coach-indstillinger gemt',
-        status: 'success',
-      })
+      if (seq !== saveSeq.current) return false
+      lastSaved.current = json
+      setSavedNotesOptIn(payload.notesOptIn === true)
+      setSaveState(clearNotesOnDisable ? 'idle' : 'saved')
+      if (clearNotesOnDisable) {
+        setForm((prev) => ({ ...prev, notesOptIn: false }))
+        toast({ title: 'Chat-noter er slået fra, og noterne er slettet', status: 'info' })
+      }
+      return true
     } catch (err: any) {
+      if (seq !== saveSeq.current) return false
+      setSaveState('error')
       toast({ title: err?.message || 'Kunne ikke gemme', status: 'error' })
+      return false
     } finally {
-      setSaving(false)
+      if (seq === saveSeq.current) setSaving(false)
     }
   }
 
-  async function save() {
-    if (savedNotesOptIn && form.notesOptIn !== true) {
-      setClearConfirm({ kind: 'disableNotes' })
-      return
-    }
-    await persistSettings()
-  }
+  const persistRef = useRef(persist)
+  persistRef.current = persist
+
+  useEffect(() => {
+    if (!hydrated) return
+    const payload = payloadFrom(form, ridesMin, ridesMax)
+    const json = JSON.stringify(payload)
+    if (json === lastSaved.current) return
+    const timer = window.setTimeout(() => { void persistRef.current(payload) }, 500)
+    return () => window.clearTimeout(timer)
+  }, [form, ridesMin, ridesMax, hydrated])
 
   async function resetSettingsRequest() {
     const res = await fetch('/api/coach/profile', { method: 'DELETE' })
@@ -393,7 +428,9 @@ export default function CoachMemoryEditor() {
     if (action.kind === 'settings') await clearSettings()
     else if (action.kind === 'notes') await clearNotes()
     else if (action.kind === 'all') await clearAll()
-    else if (action.kind === 'disableNotes') await persistSettings({ clearNotesOnDisable: true })
+    else if (action.kind === 'disableNotes') {
+      await persist(payloadFrom({ ...form, notesOptIn: false }, ridesMin, ridesMax), { clearNotesOnDisable: true })
+    }
     else await deleteChatNote(action.id)
     setClearConfirm(null)
   }
@@ -421,10 +458,16 @@ export default function CoachMemoryEditor() {
   return (
     <Box>
       <Box borderWidth="1px" borderColor="gray.700" borderRadius="md" p={4} mb={6}>
-      <Heading size="sm" mb={2}>DZR Coach-indstillinger</Heading>
-      <Text color="gray.400" mb={4} fontSize="sm">
+      <Flex justify="space-between" align="baseline" gap={3} mb={2}>
+        <Heading size="sm" mb={0}>DZR Coach-indstillinger</Heading>
+        <Text fontSize="sm" color={saveState === 'error' ? 'red.300' : 'gray.500'} flexShrink={0} aria-live="polite">
+          {saveState === 'saving' ? 'Gemmer…' : saveState === 'saved' ? 'Gemt' : saveState === 'error' ? 'Kunne ikke gemme' : ''}
+        </Text>
+      </Flex>
+      <Text color="gray.400" mb={2} fontSize="sm">
         Her sætter du dine faste rammer til DZR Coach: hvor ofte du kører, andre sportsgrene, skader og hvordan coachen skal svare. Du har fået et udgangspunkt, som du kan rette. Coachen ændrer ikke selv de rammer — det gør du her. Når chat-noter er slået til, kan du sætte datobundne mål, som coachen styrer træningen efter. Data bruges kun til din private coaching og sendes til OpenAI, når du chatter med coachen. Det gemmes krypteret.
       </Text>
+      <Text color="gray.500" fontSize="sm" mb={4}>Ændringer gemmes automatisk.</Text>
 
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
         <FormControl>
@@ -677,7 +720,13 @@ export default function CoachMemoryEditor() {
 
       <Checkbox
         isChecked={form.notesOptIn === true}
-        onChange={(e) => setForm((prev) => ({ ...prev, notesOptIn: e.target.checked }))}
+        onChange={(e) => {
+          if (!e.target.checked && savedNotesOptIn) {
+            setClearConfirm({ kind: 'disableNotes' })
+            return
+          }
+          setForm((prev) => ({ ...prev, notesOptIn: e.target.checked }))
+        }}
         colorScheme="red"
         alignItems="flex-start"
         mb={2}
@@ -686,10 +735,6 @@ export default function CoachMemoryEditor() {
           Gem korte, daterede notater fra mine coach-samtaler (fx at jeg var syg i går). Når det er slået til, gemmes nyttige notater automatisk — uden bekræftelse. Datobundne mål sætter du herunder, eller bekræfter i Discord. Coachen ændrer ikke dine indstillinger.
         </Text>
       </Checkbox>
-      <Text color="gray.400" fontSize="sm" mb={4}>
-        Husk at trykke Gem indstillinger, når du slår det til eller fra.
-      </Text>
-
       <FormControl mb={4}>
         <FormLabel>Check-in fra coachen</FormLabel>
         <Text color="gray.400" fontSize="sm" mb={2}>
@@ -713,14 +758,9 @@ export default function CoachMemoryEditor() {
         </RadioGroup>
       </FormControl>
 
-      <Flex wrap="wrap" gap={2}>
-        <Button onClick={save} isLoading={saving} size="sm" bg="#ad1a2d" color="white" _hover={{ bg: '#8c1524' }}>
-          Gem indstillinger
-        </Button>
-        <Button onClick={() => setClearConfirm({ kind: 'settings' })} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
-          Nulstil indstillinger
-        </Button>
-      </Flex>
+      <Button onClick={() => setClearConfirm({ kind: 'settings' })} isLoading={saving} size="sm" variant="outline" colorScheme="red" color="red.300" borderColor="red.400" _hover={{ bg: 'whiteAlpha.100' }}>
+        Nulstil indstillinger
+      </Button>
     </Box>
 
       {savedNotesOptIn && (

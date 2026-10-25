@@ -1,12 +1,15 @@
-// The "how DZR Coach works" DM. Sent once, right after intervals.icu is connected (by the site's
-// OAuth callback) — or by the bot on /coach if that DM never went out. Copied into apps/bot by
-// `npm run sync:shared`, so `../constants.json` resolves to the shared constants in both trees.
+// The "how DZR Coach works" DM, plus the short setup pointer that replaced it as the first message.
+// The essay is posted when someone asks how the coach works. The pointer is what they get the
+// moment intervals.icu connects. Copied into apps/bot by `npm run sync:shared`, so
+// `../constants.json` resolves to the shared constants in both trees.
 const { siteOrigin } = require("../constants.json");
 
 const MY_PAGES_COACH_URL = `${siteOrigin}/members-zone/my-pages?tab=2`;
 // Its own section rather than a Coach tab: every verified member has a calendar, including those
 // who never open the coach, and My Pages is where you change settings, not where you plan a week.
 const CALENDAR_URL = `${siteOrigin}/members-zone/calendar`;
+// The page they land on after OAuth. The setup itself lives here, not in the DM.
+const SETUP_URL = `${siteOrigin}/intervals/connected`;
 
 function noEmbedUrl(url) {
   const raw = String(url || "").trim();
@@ -16,6 +19,62 @@ function noEmbedUrl(url) {
 }
 
 const EXAMPLE_QUESTIONS = "Spørg fx: *Hvordan var min uge?* · *Var i går for hård?* · *Skal jeg hvile i morgen?*";
+const FIRST_QUESTION = "Spørg fx: *Hvordan var min uge?*";
+
+/**
+ * The first setup step that is still open, or "done".
+ *
+ * Skipping a step finishes it. The calendar counts as done when the member already has any
+ * entry, including ones that survived a coach disconnect. This does not look at the finished
+ * latch — a finished setup stays closed even if a step would otherwise look open again.
+ */
+function coachSetupStep(profile, { hasCalendarEntry = false } = {}) {
+  const notesDone = profile?.notesOptIn === true || Boolean(profile?.onboardingNotesSkippedAt);
+  const weekly = Array.isArray(profile?.weekly) ? profile.weekly : [];
+  const weeklyDone = weekly.length > 0 || Boolean(profile?.onboardingWeeklySkippedAt);
+  const calendarDone = Boolean(hasCalendarEntry) || Boolean(profile?.onboardingCalendarSkippedAt);
+  if (!notesDone) return "notes";
+  if (!weeklyDone) return "days";
+  if (!calendarDone) return "calendar";
+  return "done";
+}
+
+/**
+ * True while at least one setup step is still open.
+ *
+ * A finished setup stays finished: turning notes off later, or clearing a day, must not bring
+ * the wizard back.
+ */
+function isCoachSetupOpen(profile, options) {
+  if (profile?.onboardingFinishedAt) return false;
+  return coachSetupStep(profile, options) !== "done";
+}
+
+function coachSetupPointerText() {
+  return [
+    "✅ **intervals.icu er forbundet.**",
+    "",
+    "Tjek at Zwift er forbundet direkte, at upload af planlagte workouts er slået til, og at FTP er den samme på Zwift og intervals.icu.",
+    "",
+    "Tre korte trin gør coachen bedre — chat-noter, faste dage og kalenderen:",
+    noEmbedUrl(SETUP_URL),
+    "",
+    "Du kan også spørge med det samme.",
+    "",
+    FIRST_QUESTION,
+  ].join("\n");
+}
+
+function coachSetupNudgeText() {
+  return [
+    "🚴 **DZR Coach** — jeg er klar.",
+    "",
+    "Tre korte trin gør svarene bedre: chat-noter, dine faste dage, og ét løb eller en plan i kalenderen.",
+    noEmbedUrl(SETUP_URL),
+    "",
+    FIRST_QUESTION,
+  ].join("\n");
+}
 
 function coachHowItWorksText() {
   return [
@@ -60,7 +119,12 @@ function coachHowItWorksText() {
 module.exports = {
   MY_PAGES_COACH_URL,
   CALENDAR_URL,
+  SETUP_URL,
   EXAMPLE_QUESTIONS,
   noEmbedUrl,
   coachHowItWorksText,
+  coachSetupPointerText,
+  coachSetupNudgeText,
+  isCoachSetupOpen,
+  coachSetupStep,
 };

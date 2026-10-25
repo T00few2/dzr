@@ -35,9 +35,17 @@ test("timestamps stay outside the ciphertext so they can be merge-written", () =
     discordId: "1",
     sports: ["cycling"],
     lastAthleteMessageAt: "2026-09-06T10:00:00.000Z",
+    onboardingNotesSkippedAt: "2026-10-25T12:00:00.000Z",
+    onboardingFinishedAt: "2026-10-25T12:05:00.000Z",
   });
   // Stage 1a depends on this: stampCoachProfile writes these fields directly with update().
   assert.equal(doc.lastAthleteMessageAt, "2026-09-06T10:00:00.000Z");
+  assert.equal(doc.onboardingNotesSkippedAt, "2026-10-25T12:00:00.000Z");
+  assert.equal(doc.onboardingFinishedAt, "2026-10-25T12:05:00.000Z");
+  const back = tc.unwrapCoachMemoryDoc(doc);
+  assert.equal(back.onboardingNotesSkippedAt, "2026-10-25T12:00:00.000Z");
+  assert.equal(back.onboardingFinishedAt, "2026-10-25T12:05:00.000Z");
+  assert.equal(back.notesOptIn, false);
 });
 
 test("canary detects a key that does not match the one that wrote it", () => {

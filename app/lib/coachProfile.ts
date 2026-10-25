@@ -51,5 +51,10 @@ export function toClientCoachProfile(data: unknown, discordId: string) {
     updatedAt: src.updatedAt ?? null,
     updatedBy: 'user' as const,
     howItWorksSentAt: src.howItWorksSentAt ?? null,
+    onboardingNotesSkippedAt: src.onboardingNotesSkippedAt ?? null,
+    onboardingWeeklySkippedAt: src.onboardingWeeklySkippedAt ?? null,
+    onboardingCalendarSkippedAt: src.onboardingCalendarSkippedAt ?? null,
+    onboardingNudgeSentAt: src.onboardingNudgeSentAt ?? null,
+    onboardingFinishedAt: src.onboardingFinishedAt ?? null,
   }
 }

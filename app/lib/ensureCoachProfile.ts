@@ -27,6 +27,11 @@ export async function ensureDefaultCoachProfile(discordId: string) {
       updatedAt: now,
       updatedBy: 'user',
       howItWorksSentAt: null,
+      onboardingNotesSkippedAt: null,
+      onboardingWeeklySkippedAt: null,
+      onboardingCalendarSkippedAt: null,
+      onboardingNudgeSentAt: null,
+      onboardingFinishedAt: null,
     })
   )
   return toClientCoachProfile({ ...fields, discordId: id, updatedAt: now, updatedBy: 'user' }, id)

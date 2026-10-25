@@ -13,7 +13,7 @@ import { INTERVALS_SETTINGS_URL } from '@/app/lib/intervalsCoachLinks'
 import { canEncryptTokens, encryptedTokenFields } from '@/app/lib/tokenCrypto'
 import { ensureDefaultCoachProfile } from '@/app/lib/ensureCoachProfile'
 import { COACH_PROFILES_COLLECTION } from '@/app/lib/coachProfile'
-import { EXAMPLE_QUESTIONS, coachHowItWorksText } from '@/packages/shared/coach/coachHowItWorks'
+import { EXAMPLE_QUESTIONS, coachSetupPointerText } from '@/packages/shared/coach/coachHowItWorks'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -84,17 +84,23 @@ export async function GET(req: Request) {
     }
     await adminDb.collection(INTERVALS_CONNECTIONS_COLLECTION).doc(discordId).set(doc)
 
-    // First connection gets the full how-it-works DM — this is the moment they are paying
-    // attention. A reconnect only needs the confirmation and the intervals.icu checklist.
+    // First connection gets a short pointer at the setup page — this is the moment they are
+    // paying attention. The long how-it-works text stays available when they ask for it.
+    // A reconnect only needs the confirmation and the intervals.icu checklist.
     try {
       const profile = await ensureDefaultCoachProfile(discordId)
       if (!profile?.howItWorksSentAt) {
-        const sent = await sendCoachDm(discordId, '✅ **intervals.icu er forbundet.**\n\n' + coachHowItWorksText())
+        const sent = await sendCoachDm(discordId, coachSetupPointerText())
         if (sent) {
+          const stampedAt = new Date().toISOString()
           await adminDb
             .collection(COACH_PROFILES_COLLECTION)
             .doc(discordId)
-            .update({ howItWorksSentAt: new Date().toISOString() })
+            .update({
+              howItWorksSentAt: stampedAt,
+              // The connect DM is the nudge. /coach should not send a second one.
+              onboardingNudgeSentAt: stampedAt,
+            })
         }
       } else {
         await sendCoachDm(

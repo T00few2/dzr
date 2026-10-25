@@ -217,6 +217,25 @@ function packCoachMemory(plain) {
   };
 }
 
+/**
+ * Timestamps the bot merge-writes with update(), and the setup flow stamps when a step is
+ * skipped or finished. They stay OUTSIDE the encrypted blob: a stamp must not re-encrypt the
+ * whole profile, or it races a save on Mine sider and one of the two writes is lost.
+ */
+function coachProfileStamps(plain) {
+  const src = plain && typeof plain === "object" ? plain : {};
+  return {
+    howItWorksSentAt: src.howItWorksSentAt || null,
+    lastAthleteMessageAt: src.lastAthleteMessageAt || null,
+    lastFollowUpAt: src.lastFollowUpAt || null,
+    onboardingNotesSkippedAt: src.onboardingNotesSkippedAt || null,
+    onboardingWeeklySkippedAt: src.onboardingWeeklySkippedAt || null,
+    onboardingCalendarSkippedAt: src.onboardingCalendarSkippedAt || null,
+    onboardingNudgeSentAt: src.onboardingNudgeSentAt || null,
+    onboardingFinishedAt: src.onboardingFinishedAt || null,
+  };
+}
+
 function unwrapCoachMemoryDoc(data) {
   const src = data && typeof data === "object" ? data : {};
   let packed = null;
@@ -231,9 +250,7 @@ function unwrapCoachMemoryDoc(data) {
     discordId: src.discordId || null,
     updatedAt: src.updatedAt || null,
     updatedBy: src.updatedBy || null,
-    howItWorksSentAt: src.howItWorksSentAt || null,
-    lastAthleteMessageAt: src.lastAthleteMessageAt || null,
-    lastFollowUpAt: src.lastFollowUpAt || null,
+    ...coachProfileStamps(src),
     notesOptIn: fromPlain.notesOptIn === true,
   };
 }
@@ -291,9 +308,7 @@ function persistCoachMemoryDoc(plain) {
     updatedAt: plain?.updatedAt || null,
     updatedBy: plain?.updatedBy || null,
     notesOptIn: packed.notesOptIn === true,
-    howItWorksSentAt: plain?.howItWorksSentAt || null,
-    lastAthleteMessageAt: plain?.lastAthleteMessageAt || null,
-    lastFollowUpAt: plain?.lastFollowUpAt || null,
+    ...coachProfileStamps(plain),
   };
   const key = requireKey(getCoachKey(), "coach memory");
   return {
@@ -411,6 +426,7 @@ module.exports = {
   hasStoredAccessToken,
   encryptedTokenFields,
   needsTokenMigration,
+  coachProfileStamps,
   unwrapCoachMemoryDoc,
   persistCoachMemoryDoc,
   unwrapChatNoteDoc,

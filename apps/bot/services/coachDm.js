@@ -1,7 +1,19 @@
 const { MessageFlags } = require("discord.js");
 const intervals = require("./intervalsService");
-const { ensureDefaultCoachProfile, markCoachHowItWorksSent } = require("./firebase");
-const { MY_PAGES_COACH_URL, EXAMPLE_QUESTIONS, coachHowItWorksText, noEmbedUrl } = require("./coachHowItWorks");
+const {
+  ensureDefaultCoachProfile,
+  markCoachHowItWorksSent,
+  markCoachOnboardingNudgeSent,
+  listCalendarEntries,
+} = require("./firebase");
+const {
+  MY_PAGES_COACH_URL,
+  EXAMPLE_QUESTIONS,
+  coachSetupPointerText,
+  coachSetupNudgeText,
+  isCoachSetupOpen,
+  noEmbedUrl,
+} = require("./coachHowItWorks");
 const { getCoachClient, isCoachBotConfigured } = require("./coachBot");
 
 const NOT_CLUB_MEMBER_TEXT =
@@ -80,6 +92,31 @@ async function markHowItWorksSentSafe(discordId) {
   }
 }
 
+async function markNudgeSentSafe(discordId) {
+  try {
+    await markCoachOnboardingNudgeSent(discordId);
+  } catch (err) {
+    console.warn("markCoachOnboardingNudgeSent failed:", err?.message || err);
+  }
+}
+
+/**
+ * One nudge, and only when we could actually tell that setup is still open.
+ * A failed calendar read leaves the stamp unset so the next /coach can try again.
+ */
+async function shouldNudgeSetup(userId, profile) {
+  if (!profile || profile.onboardingNudgeSentAt || profile.onboardingFinishedAt) return false;
+  let hasCalendarEntry = false;
+  try {
+    const entries = await listCalendarEntries(userId);
+    hasCalendarEntry = Array.isArray(entries) && entries.length > 0;
+  } catch (err) {
+    console.warn("listCalendarEntries for setup nudge failed:", err?.message || err);
+    return false;
+  }
+  return isCoachSetupOpen(profile, { hasCalendarEntry });
+}
+
 async function sendCoachingIntroDm(user) {
   if (!isCoachBotConfigured()) {
     return { ok: false, reason: "coach_not_configured" };
@@ -121,8 +158,13 @@ async function sendCoachingIntroDm(user) {
     }
 
     if (!alreadyExplained) {
-      await sendNoEmbeds(dm, coachHowItWorksText());
+      await sendNoEmbeds(dm, coachSetupPointerText());
       await markHowItWorksSentSafe(user.id);
+      // The pointer is their nudge. Don't send the shorter one again on the next /coach.
+      await markNudgeSentSafe(user.id);
+    } else if (await shouldNudgeSetup(user.id, profile)) {
+      await sendNoEmbeds(dm, coachSetupNudgeText());
+      await markNudgeSentSafe(user.id);
     } else {
       await sendNoEmbeds(
         dm,

@@ -36,6 +36,7 @@ export {
   hasStoredAccessToken,
   encryptedTokenFields,
   needsTokenMigration,
+  coachProfileStamps,
   unwrapCoachMemoryDoc,
   persistCoachMemoryDoc,
   unwrapChatNoteDoc,

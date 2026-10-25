@@ -22,6 +22,7 @@ import {
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import CoachMemoryEditor from '../profile/CoachMemoryEditor'
+import CoachSetupFlow from '@/components/coach/CoachSetupFlow'
 import ConnectIntervalsButton from '@/components/ConnectIntervalsButton'
 import { IntervalsPrivacyLink } from '@/components/IntervalsPrivacyModal'
 import { DZR_SUPPORT_EMAIL, INTERVALS_SETTINGS_URL, INTERVALS_SETUP_STEPS } from '@/app/lib/intervalsCoachLinks'
@@ -42,6 +43,7 @@ export default function CoachPage() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false)
+  const [settingsEpoch, setSettingsEpoch] = useState(0)
 
   async function loadStatus() {
     const res = await fetch('/api/intervals/status', { cache: 'no-store' })
@@ -191,7 +193,11 @@ export default function CoachPage() {
         )}
       </Box>
 
-      {intervals?.connected && <CoachMemoryEditor />}
+      {intervals?.connected && (
+        <CoachSetupFlow mode="resume" onProfileChange={() => setSettingsEpoch((n) => n + 1)} />
+      )}
+
+      {intervals?.connected && <CoachMemoryEditor key={settingsEpoch} />}
 
       <AlertDialog
         isOpen={disconnectConfirmOpen}

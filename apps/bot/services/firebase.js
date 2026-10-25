@@ -24,6 +24,7 @@ const {
 const {
   canEncryptCoachMemory,
   unwrapCoachMemoryDoc,
+  coachProfileStamps,
   makeCoachCanary,
   verifyCoachCanary,
   persistCoachMemoryDoc,
@@ -541,9 +542,7 @@ function toPlainProfile(data) {
     discordId: src.discordId || null,
     updatedAt: src.updatedAt || null,
     updatedBy: "user",
-    howItWorksSentAt: src.howItWorksSentAt || null,
-    lastAthleteMessageAt: src.lastAthleteMessageAt || null,
-    lastFollowUpAt: src.lastFollowUpAt || null,
+    ...coachProfileStamps(src),
   };
 }
 
@@ -574,6 +573,11 @@ async function ensureDefaultCoachProfile(discordId) {
     howItWorksSentAt: null,
     lastAthleteMessageAt: null,
     lastFollowUpAt: null,
+    onboardingNotesSkippedAt: null,
+    onboardingWeeklySkippedAt: null,
+    onboardingCalendarSkippedAt: null,
+    onboardingNudgeSentAt: null,
+    onboardingFinishedAt: null,
   };
   await writeCoachProfileDoc(id, doc);
   return toPlainProfile(doc);
@@ -612,6 +616,16 @@ async function markCoachHowItWorksSent(discordId) {
   if (!(await stampCoachProfile(id, "howItWorksSentAt"))) {
     await ensureDefaultCoachProfile(id);
     await stampCoachProfile(id, "howItWorksSentAt");
+  }
+}
+
+/** One setup nudge per athlete. Same create-if-missing behaviour as the how-it-works stamp. */
+async function markCoachOnboardingNudgeSent(discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return;
+  if (!(await stampCoachProfile(id, "onboardingNudgeSentAt"))) {
+    await ensureDefaultCoachProfile(id);
+    await stampCoachProfile(id, "onboardingNudgeSentAt");
   }
 }
 
@@ -854,6 +868,7 @@ module.exports = {
   getCoachProfile,
   ensureDefaultCoachProfile,
   markCoachHowItWorksSent,
+  markCoachOnboardingNudgeSent,
   markCoachAthleteMessage,
   markCoachFollowUpSent,
   listCoachProfiles,
