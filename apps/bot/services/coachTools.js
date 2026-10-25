@@ -27,6 +27,30 @@ const coachToolDefinitions = [
   {
     type: "function",
     function: {
+      name: "get_power_curves",
+      description: "Holds best power per duration (5 s to 60 min, watts and W/kg, with the date each was set) for one or more date windows. Pass up to four windows to compare periods, e.g. January–February against the last 28 days. Call when the answer needs a power curve from a specific period or a comparison between periods.",
+      parameters: {
+        type: "object",
+        properties: {
+          windows: {
+            type: "array",
+            description: "Date windows, at most 4. Default is the last 28 days.",
+            items: {
+              type: "object",
+              properties: {
+                oldest: { type: "string", description: "Window start, YYYY-MM-DD in Denmark." },
+                newest: { type: "string", description: "Window end, YYYY-MM-DD in Denmark. Default today." },
+                days: { type: "number", description: "Lookback in days ending at newest. Default 28. Ignored when oldest is set." }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "get_athlete_zones",
       description: "Holds the asking athlete's heart-rate and power zones. Call when the answer needs zone targets.",
       parameters: { type: "object", properties: {} }
@@ -422,7 +446,7 @@ function coachToolsForTurn(notesOptIn, { calendarBlock = "", userText = "" } = {
 }
 
 // Answers built on these are where the athlete judges the coach, so they get more reasoning.
-const ANALYSIS_TOOLS = new Set(["get_training_trend", "get_activity_metrics", "get_wellness"]);
+const ANALYSIS_TOOLS = new Set(["get_training_trend", "get_activity_metrics", "get_wellness", "get_power_curves"]);
 
 /**
  * Reasoning effort for the model call that follows a tool round. The first call of a turn runs

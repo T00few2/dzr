@@ -1236,6 +1236,7 @@ async function executeSingleToolCall(toolCall, message, turn) {
       case "get_activity_metrics":
       case "get_training_trend":
       case "get_wellness":
+      case "get_power_curves":
       case "get_planned_workouts":
       case "get_zwiftpower_context": {
         const eligible = turn?.eligible ?? await intervals.hasClubMemberRole(message.author.id);
@@ -1266,6 +1267,7 @@ async function executeSingleToolCall(toolCall, message, turn) {
           oldest: args.oldest,
           newest: args.newest,
         });
+        else if (name === "get_power_curves") coachResult = await intervals.getPowerCurves(discordId, { windows: args.windows });
         else if (name === "get_planned_workouts") coachResult = await intervals.getPlannedWorkouts(discordId, {
           days: args.days,
           oldest: args.oldest,

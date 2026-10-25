@@ -7,6 +7,7 @@ const metrics = require("./streamMetrics");
 const discovery = require("./activityDataDiscovery");
 const { phenotypeLabel } = require("../utils/phenotype");
 const weeklyLoad = require("./weeklyLoad");
+const powerCurves = require("./powerCurves");
 const {
   canEncryptTokens,
   encryptedTokenFields,
@@ -1061,6 +1062,30 @@ async function getWellness(discordId, options = {}) {
   });
 }
 
+async function getPowerCurves(discordId, { windows } = {}) {
+  const requested = (Array.isArray(windows) && windows.length ? windows : [{ days: 28 }])
+    .slice(0, powerCurves.MAX_WINDOWS)
+    .map((w) => activityListWindow({ days: w?.days ?? 28, oldest: w?.oldest, newest: w?.newest }));
+  return wrapCall(discordId, async () => {
+    const secs = powerCurves.CURVE_SECS.join(",");
+    const curves = await Promise.all(
+      requested.map(async (window) => {
+        const { data } = await intervalsFetch(
+          discordId,
+          `/athlete/0/activity-power-curves?type=Ride&oldest=${window.oldest}&newest=${window.newest}&secs=${secs}`
+        );
+        return { oldest: window.oldest, newest: window.newest, ...powerCurves.bestPowerCurve(data) };
+      })
+    );
+    return {
+      success: true,
+      curves,
+      message:
+        "Best power per duration across the rides in each window, with the date it was set. A missing duration means no ride in that window was that long. Rides intervals.icu only holds from Strava have no power here. A low curve in a window with few rides is lack of data, not lost fitness.",
+    };
+  });
+}
+
 async function getPlannedWorkouts(discordId, { days = 14, oldest, newest } = {}) {
   const start = isoDay(oldest) || copenhagenDate(0);
   const end = isoDay(newest) || shiftIsoDay(start, lookbackDays(days, 14));
@@ -1202,6 +1227,7 @@ module.exports = {
   getZwiftPowerContext,
   getActivityMetrics,
   getWellness,
+  getPowerCurves,
   getPlannedWorkouts,
   fetchActivityHistory,
   getTrainingTrend,

@@ -219,6 +219,36 @@ const fixtures = [
     expect: "Uses the trend: load has risen for several weeks and there has been no easy week for 5 weeks. Must NOT treat the partial current week (180) as a drop in training.",
   },
   {
+    name: "compares a past period's power curve with now",
+    context: base,
+    message: "Kan du ikke se en effektkurve fra jan-februar og sammenligne med nu?",
+    expectTools: ["get_power_curves"],
+    toolResults: {
+      get_power_curves: {
+        curves: [
+          {
+            oldest: "2026-01-01", newest: "2026-02-28", rides: 31,
+            points: [
+              { seconds: 60, watts: 480, date: "2026-02-11" },
+              { seconds: 300, watts: 330, date: "2026-02-20" },
+              { seconds: 1200, watts: 285, date: "2026-02-20" },
+            ],
+          },
+          {
+            oldest: "2026-08-09", newest: "2026-09-06", rides: 14,
+            points: [
+              { seconds: 60, watts: 455, date: "2026-08-30" },
+              { seconds: 300, watts: 342, date: "2026-09-02" },
+              { seconds: 1200, watts: 296, date: "2026-09-02" },
+            ],
+          },
+        ],
+      },
+    },
+    expect: "Compares the two windows: 5 min and 20 min are higher now (342 vs 330 W, 296 vs 285 W) while 1 min is lower (455 vs 480 W). Must NOT say it can only see the last 28 days and all time.",
+    forbid: [/kun de seneste 28 dage/i],
+  },
+  {
     name: "does not claim a Zwift push that failed",
     context: base,
     message: "Lav et 2x20 min tærskelpas til mig i morgen",
