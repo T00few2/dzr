@@ -1067,19 +1067,14 @@ async function getPowerCurves(discordId, { windows } = {}) {
     .slice(0, powerCurves.MAX_WINDOWS)
     .map((w) => activityListWindow({ days: w?.days ?? 28, oldest: w?.oldest, newest: w?.newest }));
   return wrapCall(discordId, async () => {
-    const secs = powerCurves.CURVE_SECS.join(",");
-    const curves = await Promise.all(
-      requested.map(async (window) => {
-        const { data } = await intervalsFetch(
-          discordId,
-          `/athlete/0/activity-power-curves?type=Ride&oldest=${window.oldest}&newest=${window.newest}&secs=${secs}`
-        );
-        return { oldest: window.oldest, newest: window.newest, ...powerCurves.bestPowerCurve(data) };
-      })
+    const ids = requested.map((w) => powerCurves.rangeCurveId(w.oldest, w.newest)).join(",");
+    const { data } = await intervalsFetch(
+      discordId,
+      `/athlete/0/power-curves?type=Ride&curves=${encodeURIComponent(ids)}&newest=${copenhagenDate(0)}`
     );
     return {
       success: true,
-      curves,
+      curves: powerCurves.rangeCurves(data, requested),
       message:
         "Best power per duration across the rides in each window, with the date it was set. A missing duration means no ride in that window was that long. Rides intervals.icu only holds from Strava have no power here. A low curve in a window with few rides is lack of data, not lost fitness.",
     };
