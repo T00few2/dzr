@@ -8,6 +8,11 @@ This page describes checks present in code. It does not assert that every route 
 
 Purpose: distinguish the NextAuth JWT used by website routes from Firebase Auth used by older browser features.
 
+![Architecture diagram](generated/security-1.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
@@ -52,6 +57,8 @@ sequenceDiagram
     end
 ```
 
+</details>
+
 Sources: [NextAuth callbacks](../../app/api/auth/[...nextauth]/route.ts), [Firebase-token route](../../app/api/auth/firebase-token/route.ts), [AuthContext bridge](../../components/auth/AuthContext.js). Login requests `identify email guilds.members.read`. Admission is an accepted verified role **or** paid membership. The paid flag is evaluated as a fallback, so `membershipActive: false` in a JWT does not prove a verified member is unpaid.
 
 Roles/admin status are captured when the OAuth account is handled; the code does not continuously refresh those JWT claims from Discord. Role removal is not an immediate revocation mechanism for existing sessions. Paid Coach routes independently consult current data. The Firebase bridge skips sign-in if a Firebase user already exists; it is not a continuous reconciliation of the two sessions.
@@ -77,6 +84,11 @@ Middleware matches **pages only**. A protected UI does not authorize the HTTP en
 ## Secrets and training data: where does trust change?
 
 Purpose: identify website-to-Coach trust boundaries and where training data leaves DZR.
+
+![Architecture diagram](generated/security-2.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -118,6 +130,8 @@ flowchart TB
     class browser provider4
     linkStyle 0 stroke:#f59e0b,stroke-width:2px
 ```
+
+</details>
 
 The website and bot initialize Admin SDKs with server credentials; Google Cloud Run uses Application Default Credentials. Firebase client configuration is public configuration, while private keys, Discord tokens, service keys, OAuth client secrets and athlete tokens belong on servers. Admin SDKs bypass Firestore rules.
 

@@ -102,13 +102,15 @@ The overview groups external parties by purpose: **External Zwift sources**, **E
 2. Follow [maintenance guidance](../../../docs/architecture/maintenance.md) to update an existing view or create a focused detail.
 3. Run `npm ci --prefix scripts/architecture --ignore-scripts`, then `npm run check:architecture`. Basic prefix checks read the icon vocabulary from this file; request semantics, external classification and layout still require review.
 4. Render every changed diagram. Check normal-width text, icons, red external outlines/lines, arrowheads, crossing labels and dark/light theme legibility. Parsing alone cannot verify semantics or layout.
-5. Update navigation and code references in the same change. Generated preview images remain review artifacts, not a second source of truth.
+5. Update navigation and code references in the same change. Mermaid fences are the canonical source. Regenerate and commit derived white-canvas SVG previews with `npm run render --prefix scripts/architecture`; the checker rejects stale source hashes or missing white background rectangles.
 
 ## Layer and provider refinements
 
 Abbreviate External as **Ext.** and spell out **Google Cloud Run**. Group multi-layer views into Client, DZR-controlled server deployments (Vercel, Render Cloud and Google Cloud Run), and Ext. integrations. Layer boundaries use light gray fill on white and neutral gray outlines. Hosting names refer to our controlled deployments, not ownership of the provider.
 
 Use one box per technology in stack inventories. Split inventories into focused provider views when necessary; keep enough boundary padding for their contents.
+
+Technology inventories use top-down layouts. Invisible layout links can arrange technologies into readable columns without asserting dependencies. The primary displayed SVG must contain a white rectangle covering its complete viewBox, including outer margins; node fills or a sequence message panel alone are insufficient. Keep the editable Mermaid in the adjacent collapsible source section. `themeCSS: & { background-color: white; }` leaves the root transparent in the pinned renderer and must not be relied upon for the canvas.
 
 | Entity | Outline and outgoing request line |
 | --- | --- |

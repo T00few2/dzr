@@ -8,6 +8,11 @@ Firestore is a shared integration store, not three isolated application database
 
 Purpose: show the logical joins that matter when moving between website, Discord and training data. This is not a complete Firestore schema or a set of enforced foreign keys.
 
+![Architecture diagram](generated/data-1.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
@@ -49,6 +54,8 @@ erDiagram
     }
 ```
 
+</details>
+
 Discord snowflake IDs, Zwift IDs, Firebase Auth UIDs and intervals.icu athlete IDs are different identities. `users/{discordId}` bridges the first three. [Firebase token issuance](../../app/api/auth/firebase-token/route.ts) prefers an existing Firebase account by email, then a saved UID, otherwise creates one. A Firebase UID need not equal the `users` document ID. [Flask link updates](../../apps/api/firebase.py), website onboarding and the bot can all maintain Discord-to-Zwift links.
 
 Coach notes and calendar entries are subcollections beneath Discord-ID parents. Payments use `checkout_{reference}` IDs for Vipps checkout, with a `userId` field linking the Discord identity. A missing user document does not necessarily mean there is no paid-membership or Coach record.
@@ -85,6 +92,11 @@ Key adapters: [website Firebase Admin](../../app/utils/firebaseAdminConfig.js), 
 
 Purpose: distinguish daily ZwiftRacing snapshots from authenticated ZwiftPower reads and roster membership.
 
+![Architecture diagram](generated/data-2.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
@@ -110,6 +122,8 @@ flowchart TB
     linkStyle 3 stroke:#b91c1c,stroke-width:2px
 ```
 
+</details>
+
 [fetchZPdata](../../app/utils/fetchZPdata.ts), despite its filename, calls `api.zwiftracing.app` for rider/club data and maps `zrs.score` to `racingScore`. [Club ingestion](../../app/api/zr/club/[club]/route.ts) stores `club_stats/{UTC-date}` with a 31-day expiry field. The writer does not establish that a Firestore TTL policy exists. A later request that day overwrites that date's snapshot.
 
 The bot reads latest/daily snapshots for many stats tools, while Ladder can request fresh ZwiftPower W/kg and a Zwift profile through Flask. Flask's rider queue is explicitly labeled legacy: it is no longer needed to supply racing scores to the member view. Do not introduce a new dependency on that queue based on older docs.
@@ -117,6 +131,11 @@ The bot reads latest/daily snapshots for many stats tools, while Ladder can requ
 ## Club rosters: how is membership refreshed?
 
 Purpose: show the requests behind the roster collections separately from rider-performance snapshots.
+
+![Architecture diagram](generated/data-3.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -142,6 +161,8 @@ flowchart TB
     class sources external
     linkStyle 3 stroke:#b91c1c,stroke-width:2px
 ```
+
+</details>
 
 [Flask roster refresh](../../apps/api/main.py) compares fetched members to stored records and protects against an empty or ID-less response deleting the roster. “Companion” identifies the club-roster feature visible in the app; Flask reads the Zwift API rather than automating the mobile application. The triggering schedule is in the bot, but this repository does not establish who periodically calls website club-stat ingestion. See [operational gaps](findings.md#what-the-repository-cannot-establish).
 

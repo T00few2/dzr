@@ -21,7 +21,7 @@ Apply the repository [Mermaid architecture skill](../../.agents/skills/mermaid-a
 - Prefer top-to-bottom flowcharts at GitHub's normal content width; use left-to-right when it avoids a wide fan-out. Sequence diagrams should keep participant counts small; split long lifecycles into stages. Standard Mermaid front matter can enable sequence wrapping or adjust spacing, without shrinking fonts.
 - Link to implementation files or directories with relative Markdown links. Avoid line numbers that drift. Link parent/related guides next to the explanation; navigation does not depend on renderer-specific Mermaid click handlers.
 - Keep the index's terminology consistent. Label uncertain or incomplete behavior explicitly; never add a working edge solely because it seems architecturally desirable.
-- Keep diagrams in Markdown fences near their explanations. Generated SVG/PNG files are review artifacts and should not become another source of truth.
+- Keep diagrams in Markdown fences near their explanations. Generated SVG previews are derived artifacts; edit their Mermaid source and regenerate them instead of editing SVGs manually.
 
 ## Local checks
 
@@ -32,6 +32,10 @@ npm ci --prefix scripts/architecture --ignore-scripts
 npm run check:architecture
 npm run check:shared
 ```
+
+After editing a diagram, regenerate its derived white-canvas preview with `npm run render --prefix scripts/architecture`, then run the checker. Rendering needs Chromium (`/usr/bin/chromium` by default; set `ARCHITECTURE_CHROMIUM` for another executable). Commit the generated SVGs with the Mermaid changes. The checker verifies source hashes and the explicit white background rectangle without requiring a browser in CI.
+
+GitHub displays the generated SVG preview on an opaque white canvas; expand **Editable Mermaid source** to edit or inspect the canonical Mermaid. Native Mermaid's scoped theme CSS does not reliably style the root SVG background. The generated preview covers the complete viewBox, including the margins outside the outermost boundary.
 
 The [isolated tool package](../../scripts/architecture/package.json) pins Mermaid and a DOM shim for parsing. It uses no application dependencies or browser downloads. The [checker](../../scripts/architecture/check.mjs) parses every Mermaid fence in repository Markdown and checks local links/fragments in the architecture guides, Mermaid skill and root workflow instructions. Architecture diagrams also get basic checks for skill icon prefixes, the flowchart palette and request-arrow notation. It reads the icon vocabulary directly from the skill. Invalid/unclosed fences, broken references and these convention violations fail with source locations. [CI](../../.github/workflows/ci.yml) runs the same command in its own job, independently of application checks.
 

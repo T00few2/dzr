@@ -6,6 +6,11 @@
 
 Purpose: trace the club bot's dispatch paths rather than treating every service as a separate bot.
 
+![Architecture diagram](generated/bot-automation-1.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
@@ -33,6 +38,8 @@ flowchart LR
     linkStyle 0 stroke:#b91c1c,stroke-width:2px
 ```
 
+</details>
+
 [bot.js](../../apps/bot/bot.js) registers slash commands, attaches gateway handlers and starts the scheduler when ready. [interactionHandler](../../apps/bot/handlers/interactionHandler.js) routes slash commands and component IDs; changes to a command often require both a [declaration](../../apps/bot/commands/slashCommands.js) and its handler. Multiple listeners can observe one event: activity tracking is not an exclusive dispatch branch.
 
 Member events trigger welcome/role messages, verification and New Member role maintenance. Role-panel prerequisites and captain/admin approval live in [roleService](../../apps/bot/services/roleService.js) and [approvalService](../../apps/bot/services/approvalService.js), as expanded in [membership](identity-membership.md#team-roles-how-does-approval-differ-from-verification).
@@ -44,6 +51,11 @@ Activity is buffered and aggregated by [statsCollector](../../apps/bot/services/
 ## Scheduled messages: who decides what is due?
 
 Purpose: show the split between Flask scheduling decisions and bot delivery.
+
+![Architecture diagram](generated/bot-automation-2.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -85,6 +97,8 @@ sequenceDiagram
     end
 ```
 
+</details>
+
 Sources: [scheduler](../../apps/bot/services/scheduler.js), [contentApi](../../apps/bot/services/contentApi.js), [Flask schedule endpoints](../../apps/api/main.py). The network acknowledgment follows the Discord send. A crash or acknowledgment failure between them can permit a repeated post; this is not an exactly-once queue.
 
 ## Scheduler: which work runs on a tick?
@@ -107,6 +121,11 @@ Exact-minute jobs can be missed during downtime. Follow-ups have a catch-up wind
 ## Ladder: how is a match preview built?
 
 Purpose: locate fixture acquisition, rider enrichment, rendering and restart state.
+
+![Architecture diagram](generated/bot-automation-3.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -136,6 +155,8 @@ flowchart TB
     class ladder,racing,discord external
     linkStyle 5,6,7 stroke:#b91c1c,stroke-width:2px
 ```
+
+</details>
 
 `/ladder_link` registers teams; preview/analysis commands and [jobs](../../apps/bot/services/ladder/ladderJobs.js) reuse the [Ladder services](../../apps/bot/services/ladder/). The bot has no Ladder or Zwift login password. Flask's [`/ladder_page`](../../apps/api/main.py) accepts only allow-listed paths from [ladder.py](../../apps/api/ladder.py). Rider enrichment uses `/rider_data/{id}` and `/zwift_profile/{id}`; route geometry comes from the website [route-profile route](../../app/api/route-profile/route.ts).
 

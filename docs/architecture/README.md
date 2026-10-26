@@ -37,6 +37,6 @@ This documentation describes implementation inspected at upstream `d7546b0` (202
 - “Unresolved” and prose limitations identify incomplete paths. Planned behavior is never drawn as an implemented connection.
 - Names remain consistent: **website** means the root Next.js app including its server routes; **Flask API** means `apps/api`; **club bot** and **DZR Coach** are two Discord clients in the same `apps/bot` process.
 
-Diagrams are editable Mermaid fences in Markdown. Their headings provide stable links; code references use repository-relative paths so they follow the branch being reviewed.
+Diagrams have derived white-canvas SVG previews, with canonical editable Mermaid fences in the adjacent expandable source sections. Their headings provide stable links; code references use repository-relative paths so they follow the branch being reviewed.
 
 [Back to repository README](../../README.md)

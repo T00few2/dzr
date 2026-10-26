@@ -6,6 +6,11 @@
 
 Purpose: locate changes by responsibility inside the Next.js deployment.
 
+![Architecture diagram](generated/code-map-1.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
@@ -38,6 +43,8 @@ flowchart TB
     linkStyle 8 stroke:#f59e0b,stroke-width:2px
 ```
 
+</details>
+
 Page middleware only matches `/admin/**` and `/members-zone/**`. Server routes must perform their own checks. Domain services can persist data or call external services; they are not all pure functions. Shared modules accept runtime dependencies where needed, such as a Firestore handle for paid membership checks.
 
 | Change | Start here | Follow across the boundary |
@@ -56,6 +63,11 @@ Page middleware only matches `/admin/**` and `/members-zone/**`. Server routes m
 ## Flask modules: where do integration changes belong?
 
 Purpose: distinguish HTTP orchestration from provider-specific protocol handling in the Python runtime.
+
+![Architecture diagram](generated/code-map-2.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -82,6 +94,8 @@ flowchart LR
     linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
 
+</details>
+
 [main.py](../../apps/api/main.py) combines route registration, bearer checks, cached authenticated sessions and job orchestration. [zwift.py](../../apps/api/zwift.py), [zwiftpower.py](../../apps/api/zwiftpower.py) and [ladder.py](../../apps/api/ladder.py) own provider-specific requests and parsing. [discord_api.py](../../apps/api/discord_api.py) supplies Discord REST operations, and [firebase.py](../../apps/api/firebase.py) initializes Firestore with ADC and provides data helpers. The Flask module name does not make these independent services.
 
 Change an external protocol in its adapter, and change caller authorization or the job contract in the route. Next's [flask adapter](../../app/api/admin/_lib/flask.ts) and the bot's [content API client](../../apps/bot/services/contentApi.js) are important consumers. Flask jobs execute when an endpoint is invoked; `main.py` does not start the bot's periodic scheduler. Legacy commentary orchestration additionally uses [zwiftcommentator.py](../../apps/api/zwiftcommentator.py); its posting path is [unresolved](findings.md#incomplete-and-legacy-paths).
@@ -89,6 +103,11 @@ Change an external protocol in its adapter, and change caller authorization or t
 ## Shared source: why are there copies in the apps?
 
 Purpose: prevent fixing a deployed copy while leaving its canonical source unchanged.
+
+![Architecture diagram](generated/code-map-3.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -113,6 +132,8 @@ flowchart TB
     classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
     linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
+
+</details>
 
 There are deliberately **no npm workspaces**. Vercel installs the root package; Render installs `apps/bot`; Google Cloud Run's documented source root is `apps/api`. A bot import outside that directory would not exist in its build context.
 

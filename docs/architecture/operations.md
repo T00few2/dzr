@@ -6,6 +6,11 @@
 
 Purpose: separate checked-in deployment evidence from provider-managed wiring.
 
+![Architecture diagram](generated/operations-1.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
@@ -41,6 +46,8 @@ flowchart TB
     linkStyle 3 stroke:#8A05FF,stroke-width:2px
 ```
 
+</details>
+
 The root [README](../../README.md) and app [canonical notes](../../apps/api/CANONICAL.md) identify Vercel and Google Cloud Run production services. [render.yaml](../../render.yaml) explicitly describes Render `bot`, Oregon, starter plan, `rootDir: apps/bot`, commit auto-deploy and `apps/bot/**` build filter. It disables previews. Applying it as a new Blueprint could create a second bot; it is not a setup step for a documentation contributor.
 
 | Runtime | Repository evidence | Health and operational implications |
@@ -54,6 +61,11 @@ No Google Cloud Run build/deploy workflow, Dockerfile or Vercel project linkage 
 ## CI: which checks block drift in the repository?
 
 Purpose: locate verification lanes and make clear that the workflow contains checks, not deployment commands.
+
+![Architecture diagram](generated/operations-2.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -84,6 +96,8 @@ flowchart TB
     linkStyle 3 stroke:#0FBF3E,stroke-width:2px
 ```
 
+</details>
+
 See [.github/workflows/ci.yml](../../.github/workflows/ci.yml). Site dependencies are installed at root; bot dependencies are installed under `apps/bot`. Bot CI disables install scripts because tests do not need the native `canvas` binary. A passing unit test suite is therefore not a rendered chart smoke test. There is no Python test lane in the existing workflow.
 
 Coach's `eval:dry` checks prompt structure without an API key. Live model comparisons are opt-in, incur API calls and are described in the root README; do not confuse the dry run with a measured model-quality result. Architecture tooling is isolated under [scripts/architecture](../../scripts/architecture/) and does not change either application lockfile.
@@ -93,6 +107,11 @@ Provider auto-deploy configuration is independent of this workflow. Nothing here
 ## Shared change delivery: what must be committed together?
 
 Purpose: show why a shared-source edit needs synchronized files in the bot/API build contexts.
+
+![Architecture diagram](generated/operations-3.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -127,6 +146,8 @@ flowchart TB
     class commit provider3
     linkStyle 2 stroke:#0FBF3E,stroke-width:2px
 ```
+
+</details>
 
 The [explicit mapping](../../scripts/sync-shared.js) decides which files are copied. Bot-only code stays in the bot. Shared JS is not copied to Python. A stale checked-in copy fails CI; copying during local development does not by itself deploy anything.
 

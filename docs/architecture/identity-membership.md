@@ -6,6 +6,11 @@
 
 Purpose: distinguish the public onboarding session from a website login session. These states are journey milestones, not the stored `status` enum.
 
+![Architecture diagram](generated/identity-membership-1.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
@@ -33,6 +38,8 @@ stateDiagram-v2
     Unavailable --> Session: Start a new session
 ```
 
+</details>
+
 `/join` currently follows **Discord → payment → Zwift ID**. [Session helpers](../../app/api/onboarding/_lib/session.ts) store a 24-hour `onboarding_sessions` document and an HMAC-signed, HTTP-only cookie. Expiry checks reject the session; the diagram does not claim a worker writes the stored `expired` status or deletes the document.
 
 [Discord start](../../app/api/onboarding/discord/start/route.ts) requests `identify email guilds.join`. The [callback](../../app/api/onboarding/discord/callback/route.ts) verifies stored OAuth state, resolves the Discord identity and optionally joins the guild using `DISCORD_ONBOARDING_BOT_TOKEN`. A skipped or failed guild join does not stop the recorded Discord-link step. This flow works before the member qualifies for NextAuth login.
@@ -42,6 +49,11 @@ The [status route](../../app/api/onboarding/status/route.ts) recognizes existing
 ## Payment processing: when is membership granted?
 
 Purpose: follow onboarding checkout from local correlation to access side effects.
+
+![Architecture diagram](generated/identity-membership-2.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -94,6 +106,8 @@ sequenceDiagram
     end
 ```
 
+</details>
+
 Sources: [create](../../app/api/onboarding/payment/create/route.ts), [confirm](../../app/api/onboarding/payment/confirm/route.ts), [callback](../../app/api/onboarding/payment/callback/route.ts), [processor](../../app/api/onboarding/_lib/payment.ts), [Vipps client](../../app/api/membership/vippsClient.ts). The callback acknowledges invalid authorization without processing. Confirmation verifies the local record belongs to the onboarding session. These writes and Discord calls are sequential side effects, not a distributed transaction or an exactly-once guarantee.
 
 Existing members have a separate [membership checkout family](../../app/api/membership/vipps-checkout/). Its confirmation checks the signed-in user against the payment. Its callback differs materially: an invalid callback token is logged but processing continues, and incoming `sessionState` contributes to its success decision. Do not generalize the onboarding sequence's trust checks to that route. See [security limitations](security.md#existing-boundaries-and-limitations).
@@ -103,6 +117,11 @@ Existing members have a separate [membership checkout family](../../app/api/memb
 ## Verification and role delivery: who decides eligibility?
 
 Purpose: distinguish a shared eligibility rule from the two mechanisms that deliver Discord roles.
+
+![Architecture diagram](generated/identity-membership-3.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -131,6 +150,8 @@ flowchart TB
     linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
 
+</details>
+
 The [shared criteria](../../packages/shared/verificationCriteria.js) default to requiring a Zwift ID; optional criteria cover account age, specific roles and server boosting. `requiresActivityThreshold` is reserved and is not evaluated. [Bot verification](../../apps/bot/services/verificationService.js) serializes work per guild/member, fetches fresh Discord state, and may add **or remove** the configured verified role. Lookups that fail must not be treated as evidence of ineligibility.
 
 The [website helper](../../app/utils/discordRoleSync.ts) assigns eligible login roles and separately updates the configured paid club role. Despite its name, `syncMemberRoleOnLogin` is called from onboarding/member-update paths; it is not the NextAuth access predicate. Failed Discord mutations can create `role_updates`, but **no consumer is present in this repository**. A `queued` result is not evidence of eventual delivery.
@@ -140,6 +161,11 @@ The [website helper](../../app/utils/discordRoleSync.ts) assigns eligible login 
 ## Team roles: how does approval differ from verification?
 
 Purpose: show the bot's self-service role approval path; paid membership and verification are separate policies.
+
+![Architecture diagram](generated/identity-membership-4.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -184,5 +210,7 @@ sequenceDiagram
     end
     end
 ```
+
+</details>
 
 Sources: [interaction dispatch](../../apps/bot/handlers/interactionHandler.js), [roleService](../../apps/bot/services/roleService.js), [approvalService](../../apps/bot/services/approvalService.js). The website also manages role panels and provisions roles/channels via [admin helpers](../../app/api/admin/_lib/). Captain [add](../../app/api/team/add-member/route.ts) / [remove](../../app/api/team/remove-member/route.ts) routes check both captain role and configured ownership of the selected team, then call Discord directly.

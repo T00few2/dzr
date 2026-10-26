@@ -6,61 +6,87 @@ DZR uses separate browser, server and managed-service execution zones. These dia
 
 ## Website stack: which code runs in the browser and on Vercel?
 
-Purpose: relate the website's browser libraries to their matching server responsibilities and Firebase services. Every arrow is an initiated request or SDK call.
+Purpose: relate the website's browser libraries to their matching server responsibilities and Firebase services. Arrowless associations group the technologies used in each execution zone. Runtime requests are shown in the system overview.
+
+![Architecture diagram](generated/tech-stack-1.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
 config:
   theme: base
+  flowchart:
+    padding: 20
+    nodeSpacing: 20
+    rankSpacing: 35
   themeCSS: |
     :is(&) { background: #ffffff; }
 ---
-flowchart LR
+flowchart TB
     subgraph client["💻 Client side — browser"]
+        direction TB
         clientapp["💻 Browser application"]
         clientTech0["📦 React 19"]
-        clientapp --- clientTech0
         clientTech1["📦 TypeScript / JavaScript"]
-        clientapp --- clientTech1
         clientTech2["📦 Chakra UI 2"]
-        clientapp --- clientTech2
         clientTech3["📦 Emotion 11"]
-        clientapp --- clientTech3
         clientTech4["📦 next-auth/react 4"]
-        clientapp --- clientTech4
         clientTech5["📦 Firebase Web SDK 12"]
-        clientapp --- clientTech5
+        %% Invisible links arrange columns; these are not dependencies.
+        clientapp --- clientTech0
+        clientTech0 ~~~ clientTech1
+        clientTech1 ~~~ clientTech2
+        clientapp --- clientTech3
+        clientTech3 ~~~ clientTech4
+        clientTech4 ~~~ clientTech5
     end
     classDef default fill:#ffffff,stroke:#111111,color:#111111
     linkStyle default stroke:#6B7280
     style client fill:#f3f4f6,stroke:#9ca3af
 ```
 
+</details>
+
+![Architecture diagram](generated/tech-stack-2.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
   theme: base
+  flowchart:
+    padding: 20
+    nodeSpacing: 20
+    rankSpacing: 35
   themeCSS: |
     :is(&) { background: #ffffff; }
 ---
-flowchart LR
+flowchart TB
     subgraph vercel["▲ Server side — Vercel"]
+        direction TB
         web["🌐 Website runtime"]
         vercelTech0["📦 Next.js 16"]
-        web --- vercelTech0
         vercelTech1["📦 Node.js 22"]
-        web --- vercelTech1
         vercelTech2["📦 TypeScript / JavaScript"]
-        web --- vercelTech2
         vercelTech3["📦 NextAuth 4"]
-        web --- vercelTech3
         vercelTech4["📦 Firebase Admin SDK 14"]
-        web --- vercelTech4
+        %% Invisible links arrange columns; these are not dependencies.
+        web --- vercelTech0
+        vercelTech0 ~~~ vercelTech1
+        vercelTech1 ~~~ vercelTech2
+        web --- vercelTech3
+        vercelTech3 ~~~ vercelTech4
     end
     classDef default fill:#ffffff,stroke:#111111,color:#111111
     linkStyle default stroke:#6B7280
     style vercel fill:#f3f4f6,stroke:#9ca3af
 ```
+
+</details>
 
 The browser executes React components and client SDKs; it does not run Node.js, Flask or Firebase Admin. Next.js also renders server components and runs route handlers on Vercel. NextAuth has both a browser package and server callbacks; the [authentication sequence](security.md#website-login-how-does-discord-identity-become-two-sessions) shows how its JWT session becomes a Firebase custom-token session.
 
@@ -72,63 +98,89 @@ Evidence: [root package](../../package.json), [root lockfile](../../package-lock
 
 ## Bot and integration stack: what runs on Render and Google Cloud Run?
 
-Purpose: distinguish the two server stacks, their clients and their shared managed data. Arrows identify request recipients; outcomes return on the same interaction.
+Purpose: distinguish the two server stacks, their clients and their shared managed data. Arrowless associations list the technologies used by each runtime.
+
+![Architecture diagram](generated/tech-stack-3.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
 config:
   theme: base
+  flowchart:
+    padding: 20
+    nodeSpacing: 20
+    rankSpacing: 35
   themeCSS: |
     :is(&) { background: #ffffff; }
 ---
-flowchart LR
+flowchart TB
     subgraph render["⧉ Server side — Render"]
+        direction TB
         bot["🤖 Bot runtime"]
         renderTech0["📦 Node.js 22"]
-        bot --- renderTech0
         renderTech1["📦 CommonJS"]
-        bot --- renderTech1
         renderTech2["📦 discord.js 14"]
-        bot --- renderTech2
         renderTech3["📦 Express 4"]
-        bot --- renderTech3
         renderTech4["📦 OpenAI SDK 7"]
-        bot --- renderTech4
         renderTech5["📦 canvas 3"]
-        bot --- renderTech5
+        %% Invisible links arrange columns; these are not dependencies.
+        bot --- renderTech0
+        renderTech0 ~~~ renderTech1
+        renderTech1 ~~~ renderTech2
+        bot --- renderTech3
+        renderTech3 ~~~ renderTech4
+        renderTech4 ~~~ renderTech5
     end
     classDef default fill:#ffffff,stroke:#111111,color:#111111
     linkStyle default stroke:#6B7280
     style render fill:#f3f4f6,stroke:#9ca3af
 ```
 
+</details>
+
+![Architecture diagram](generated/tech-stack-4.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
   theme: base
+  flowchart:
+    padding: 20
+    nodeSpacing: 20
+    rankSpacing: 35
   themeCSS: |
     :is(&) { background: #ffffff; }
 ---
-flowchart LR
+flowchart TB
     subgraph cloud["⏩ Google Cloud Run server"]
+        direction TB
         api["🌙 API runtime"]
         cloudTech0["📦 Python 3"]
-        api --- cloudTech0
         cloudTech1["📦 Flask 3.1"]
-        api --- cloudTech1
         cloudTech2["📦 requests"]
-        api --- cloudTech2
         cloudTech3["📦 Beautiful Soup"]
-        api --- cloudTech3
         cloudTech4["📦 Firebase Admin SDK 7"]
-        api --- cloudTech4
         cloudTech5["📦 OpenAI SDK 3"]
-        api --- cloudTech5
+        %% Invisible links arrange columns; these are not dependencies.
+        api --- cloudTech0
+        cloudTech0 ~~~ cloudTech1
+        cloudTech1 ~~~ cloudTech2
+        api --- cloudTech3
+        cloudTech3 ~~~ cloudTech4
+        cloudTech4 ~~~ cloudTech5
     end
     classDef default fill:#ffffff,stroke:#111111,color:#111111
     linkStyle default stroke:#6B7280
     style cloud fill:#f3f4f6,stroke:#9ca3af
 ```
+
+</details>
 
 Render and Google Cloud Run do not serve another DZR browser application. People reach bot features through Discord's own desktop/web/mobile clients, and administrative integration features through the Next.js website. The bot opens Discord gateway connections and hosts only an Express health route. Flask exposes the integration/job HTTP API; its old human admin UI is retired. Python 3's exact minor version is not pinned in a checked-in runtime definition.
 

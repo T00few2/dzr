@@ -8,6 +8,11 @@ Coach is an optional Discord client in the Render bot process. The club bot owns
 
 Purpose: follow the signed connect link across Render, the website and intervals.icu.
 
+![Architecture diagram](generated/coach-1.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
@@ -55,6 +60,8 @@ sequenceDiagram
     end
 ```
 
+</details>
+
 Sources: [bot connect helper](../../apps/bot/services/intervalsService.js), [site signing and scopes](../../app/lib/intervalsAuth.ts), [connect route](../../app/api/intervals/connect/route.ts), [callback](../../app/api/intervals/callback/route.ts). A connect token lasts 15 minutes; OAuth state uses a 20-minute signed token. It is signed identity/expiry state, not a persisted single-use state record.
 
 Scopes are `ACTIVITY:READ,WELLNESS:READ,SETTINGS:READ,CALENDAR:WRITE`. Despite names such as `hasClubMemberRole`, eligibility is the shared **paid current-year membership** predicate, not a Discord role lookup. Missing payment access fails closed. Vercel and Render must agree on signing and encryption keys.
@@ -62,6 +69,11 @@ Scopes are `ACTIVITY:READ,WELLNESS:READ,SETTINGS:READ,CALENDAR:WRITE`. Despite n
 ## Coaching turn: what happens after a member sends a DM?
 
 Purpose: identify the orchestration path and the places to add a tool, data computation or guard.
+
+![Architecture diagram](generated/coach-2.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -94,6 +106,8 @@ flowchart TB
     linkStyle 9 stroke:#b91c1c,stroke-width:2px
 ```
 
+</details>
+
 Start in [aiChatHandler](../../apps/bot/handlers/aiChatHandler.js): `handleCoachChatMessage` accepts DMs only; `runChatTurn` checks membership, connection and budget, composes context and runs a bounded tool loop. [turnClaim](../../apps/bot/services/turnClaim.js) creates a message claim to reduce duplicate answers during overlapping deployments; it fails open if Firestore is unavailable. [turnQueue](../../apps/bot/services/turnQueue.js) serializes each conversation locally and bounds pending work. Neither mechanism provides durable replay of unprocessed messages.
 
 [coachLlm](../../apps/bot/services/coachLlm.js) uses the Responses API with `store: false`. Visible messages remain in process memory; encrypted reasoning is replayed only within the current turn's tool rounds. After restart or an idle timeout, recent Discord DM history can restore visible context. This is separate from opt-in persistent notes.
@@ -105,6 +119,11 @@ A `401` from intervals.icu yields a reconnect request; the bot does not implemen
 ## Data lifecycle: what is retained, and what does disconnect remove?
 
 Purpose: keep consent and deletion changes from erasing a member's independent calendar.
+
+![Architecture diagram](generated/coach-3.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -129,6 +148,8 @@ flowchart TB
     classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
     linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
+
+</details>
 
 [Coach profile/notes APIs](../../app/api/coach/) and the [setup UI](../../components/coach/CoachSetupFlow.tsx) manage settings and member-entered memory. `notesOptIn` controls conversation-derived memory and related write tools; manually entered goals and the member's own calendar have separate behavior. Persistent text is encrypted using shared [tokenCrypto](../../packages/shared/coach/tokenCrypto.js) helpers. Do not assume every metadata field or numerical training cache is encrypted.
 

@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
 import { JSDOM } from 'jsdom'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
@@ -122,12 +123,22 @@ try {
     }
   }
   for (const [file, content] of sources) {
+    let previewIndex = 0
     for (const diagram of content.diagrams) {
       diagrams++
       try {
         if (!diagram.text.trim()) throw new Error('empty Mermaid fence')
         await mermaid.parse(diagram.text)
         checkConventions(diagram, file)
+        if (path.dirname(file) === path.join(root, 'docs/architecture') && !path.basename(file).startsWith('.')) {
+          previewIndex++
+          const preview = path.join(root, 'docs/architecture/generated', `${path.basename(file, '.md')}-${previewIndex}.svg`)
+          const svg = await fs.readFile(preview, 'utf8')
+          const hash = createHash('sha256').update(diagram.text).digest('hex')
+          if (!svg.includes(`data-mermaid-sha256="${hash}"`) || !svg.includes('data-canvas-background="white"')) {
+            throw new Error('white-canvas preview is stale; run npm run render --prefix scripts/architecture')
+          }
+        }
       } catch (error) {
         fail(file, diagram.line, `Mermaid: ${error.message}`)
       }

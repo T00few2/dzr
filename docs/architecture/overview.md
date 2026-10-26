@@ -6,6 +6,11 @@
 
 Purpose: identify the people and external systems a contributor will encounter, without exposing internal modules.
 
+![Architecture diagram](generated/overview-1.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
@@ -52,6 +57,8 @@ flowchart LR
     linkStyle 7 stroke:#b91c1c,stroke-width:2px
 ```
 
+</details>
+
 Visitors browse race series and join. Verified community members can use the member area; paid membership separately unlocks Coach. Admins manage content, membership and Discord configuration. Event editing additionally requires a configured Discord account. Captains can manage their own teams. See [access rules](security.md#access-decisions-which-gate-applies).
 
 The human boundary contains people. 🌐 and ⚙️ identify software systems; the complete [icon and color legend](../../.agents/skills/mermaid-architecture/SKILL.md) distinguishes specific human roles and machine providers. Every arrow points to the recipient of a request. A read points **from DZR to its source**, even though the returned data travels back to DZR.
@@ -69,6 +76,11 @@ See [statistics provenance](data.md#statistics-flow-where-does-a-riders-score-co
 ## Runtime collaboration: what actually calls what?
 
 Purpose: show the three deployment units and their primary working interfaces.
+
+![Architecture diagram](generated/overview-2.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -123,6 +135,8 @@ flowchart TB
     linkStyle 5 stroke:#8A05FF,stroke-width:2px
     linkStyle 6 stroke:#b91c1c,stroke-width:2px
 ```
+
+</details>
 
 The service bearer key is `CONTENT_API_KEY`. Arrows identify the recipient of each request. Gateway event delivery back to the bot is expanded in the [bot event diagram](bot-automation.md#discord-event-handling-which-subsystem-receives-an-event). The [technology stack](tech-stack.md) expands shared persistence and execution zones. All three runtimes read/write Firestore with Admin SDKs; Flask uses Application Default Credentials. See [data ownership](data.md) for their different write responsibilities.
 

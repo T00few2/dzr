@@ -6,6 +6,11 @@
 
 Purpose: distinguish editable planning, the live Zwift feed and the two series models.
 
+![Architecture diagram](generated/events-1.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
 ```mermaid
 ---
 config:
@@ -34,6 +39,8 @@ flowchart TB
     linkStyle 5,6 stroke:#b91c1c,stroke-width:2px
 ```
 
+</details>
+
 [seriesCatalog](../../app/lib/seriesCatalog.ts) seeds After Party and Zwifty Fifty routes from checked-in arrays, then stores editable catalogs. [seriesSchedule](../../app/lib/seriesSchedule.ts) seeds weekly rotation from a published [Google Sheets](../../services/google-sheets.action.ts) row only when the stored schedule is absent. Sheets are not continuously synchronized back from Firestore.
 
 [eventSeries](../../app/lib/eventSeries.ts) is a separate, generic model for configured series, date overrides, multiple starts, publication and logos. [groupRide](../../app/lib/groupRide.ts) has another schedule for Always a Race. These are implemented parallel models, not aliases for one collection. The route catalog is shared by callers; keep the correct schedule model when adding a feature.
@@ -43,6 +50,11 @@ flowchart TB
 ## Weekly race application: who updates the live event?
 
 Purpose: follow the unusual Render → Vercel → Google Cloud Run path and the separate result-fix job.
+
+![Architecture diagram](generated/events-2.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -89,6 +101,8 @@ sequenceDiagram
     end
 ```
 
+</details>
+
 Sources: [bot contentApi](../../apps/bot/services/contentApi.js), [cron route](../../app/api/cron/weekly-series/route.ts), [seriesApply](../../app/lib/seriesApply.ts), [groupRide](../../app/lib/groupRide.ts), [seriesDiscord](../../app/lib/seriesDiscord.ts), [Flask routes](../../apps/api/main.py), [ZwiftPower adapter](../../apps/api/zwiftpower.py). The bot attempts these checks on the half hour; the website decides whether each route is due. Weekly race routes wait until at least 24 hours after the previous event start and for a matching new event. Group ride uses its own due logic.
 
 Fifty WKG categories are rechecked from 1.5 through 4 hours after the start so later finishers are included. Sprint configuration is due about a day after Apply. A prior category change does not suppress every later check inside the window. These details matter when changing job state or retry logic.
@@ -100,6 +114,11 @@ External edits, published-state writes and Discord posts are separate steps. A s
 ## Calendar boundaries: does adding a race schedule a workout?
 
 Purpose: distinguish personal planning, Coach goals, provider workouts and signup boards.
+
+![Architecture diagram](generated/events-3.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
 
 ```mermaid
 ---
@@ -131,6 +150,8 @@ flowchart TB
     linkStyle 0 stroke:#f59e0b,stroke-width:2px
     linkStyle 1 stroke:#f59e0b,stroke-width:2px
 ```
+
+</details>
 
 [Calendar events](../../app/api/calendar/events/route.ts) offers upcoming feed suggestions, not a complete season. Copying a suggestion into [calendar entries](../../app/api/calendar/route.ts) is not a subscription: later race changes do not automatically rewrite the copied entry. A stored racing score is only a category hint; the member chooses. WTRL-organized ZRL events are not supplied by the DZR-tagged feed.
 
