@@ -127,3 +127,5 @@ These colors supersede the earlier two-color palette. Keep white chart backgroun
 Connection labels use 12 px text (flowchart `.edgeLabel` and sequence `messageFontSize`); entity labels keep their normal size. Technology-stack overviews combine client/server or Render/Google Cloud Run in a single top-down diagram with separate neutral boundaries.
 
 Use normal stroke widths by default. Reserve explicit thicker strokes for a deliberately highlighted small subset of entities or connections. Sequence diagrams require `messageFontSize: 12`, `.messageText { font-size: 12px !important; }` and `:is(&) { background: #ffffff; }` in `themeCSS`. Keep the full-viewBox white rectangle in generated previews as well.
+
+Sequence participant lifelines (`.actor-line`) use `stroke-width: 0.5px !important` so lane lines remain visually subordinate to messages and participant boxes, regardless of Mermaid theme defaults.

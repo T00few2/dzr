@@ -76,6 +76,7 @@ config:
     width: 120
     wrap: true
   themeCSS: |
+    .actor-line { stroke-width: 0.5px !important; }
     .messageText { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
     rect.actor[name="V"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
@@ -192,6 +193,7 @@ config:
     width: 120
     wrap: true
   themeCSS: |
+    .actor-line { stroke-width: 0.5px !important; }
     .messageText { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
     rect.actor[name="D"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
