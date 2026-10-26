@@ -14,6 +14,8 @@ Purpose: distinguish the public onboarding session from a website login session.
 ```mermaid
 ---
 config:
+  themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
   theme: base
   themeVariables:
     primaryColor: '#eff6ff'
@@ -69,6 +71,7 @@ config:
     actorLineColor: '#1d4ed8'
     signalColor: '#1d4ed8'
   sequence:
+    messageFontSize: 12
     actorMargin: 20
     width: 120
     wrap: true
@@ -130,11 +133,12 @@ config:
   themeVariables:
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   flowchart:
-    padding: 15
+    padding: 5
     nodeSpacing: 35
-    rankSpacing: 40
+    rankSpacing: 60
 ---
 flowchart TB
     entry["⚙️ Website sync and bot<br/>member handlers"] ---|Read member facts| facts["⚙️ Discord facts and<br/>saved Zwift link"]
@@ -181,6 +185,7 @@ config:
     actorLineColor: '#1d4ed8'
     signalColor: '#1d4ed8'
   sequence:
+    messageFontSize: 12
     actorMargin: 20
     width: 120
     wrap: true

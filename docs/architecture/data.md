@@ -24,6 +24,7 @@ config:
     lineColor: '#1d4ed8'
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   er:
     nodeSpacing: 30
@@ -104,11 +105,12 @@ config:
   themeVariables:
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   flowchart:
-    padding: 15
+    padding: 5
     nodeSpacing: 35
-    rankSpacing: 40
+    rankSpacing: 60
 ---
 flowchart TB
     ingest["🌐 Club-stat ingestion API"] -->|Call fetchClubdata| adapter["📦 fetchZPdata helper"]
@@ -144,11 +146,12 @@ config:
   themeVariables:
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   flowchart:
-    padding: 15
+    padding: 5
     nodeSpacing: 35
-    rankSpacing: 40
+    rankSpacing: 60
 ---
 flowchart TB
     scheduler["🔁 Daily roster jobs"] -->|Request refresh| flask["🌙 Flask roster API"]

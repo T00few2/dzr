@@ -18,10 +18,11 @@ config:
   themeVariables:
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   flowchart:
-    rankSpacing: 25
-    padding: 10
+    rankSpacing: 60
+    padding: 5
 ---
 flowchart LR
     gateway["🎮 Discord gateway"] -->|Deliver events| entry["🤖 Club client"]
@@ -71,6 +72,7 @@ config:
     actorLineColor: '#1d4ed8'
     signalColor: '#1d4ed8'
   sequence:
+    messageFontSize: 12
     actorMargin: 20
     width: 120
     wrap: true
@@ -134,11 +136,12 @@ config:
   themeVariables:
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   flowchart:
-    padding: 15
+    padding: 5
     nodeSpacing: 35
-    rankSpacing: 40
+    rankSpacing: 60
 ---
 flowchart TB
     trigger["🔁 Command handler or<br/>Ladder job"] -->|Load fixtures| fixtures["🤖 ladderClient and parser"]

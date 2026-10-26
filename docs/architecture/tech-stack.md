@@ -18,10 +18,11 @@ Purpose: relate the website's browser libraries to their matching server respons
 config:
   theme: base
   flowchart:
-    padding: 20
-    nodeSpacing: 20
-    rankSpacing: 35
+    padding: 5
+    nodeSpacing: 35
+    rankSpacing: 60
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
 ---
 flowchart TB
@@ -42,30 +43,6 @@ flowchart TB
         clientTech3 ~~~ clientTech4
         clientTech4 ~~~ clientTech5
     end
-    classDef default fill:#ffffff,stroke:#111111,color:#111111
-    linkStyle default stroke:#6B7280
-    style client fill:#f3f4f6,stroke:#9ca3af
-```
-
-</details>
-
-![Architecture diagram](generated/tech-stack-2.svg)
-
-<details>
-<summary>Editable Mermaid source</summary>
-
-```mermaid
----
-config:
-  theme: base
-  flowchart:
-    padding: 20
-    nodeSpacing: 20
-    rankSpacing: 35
-  themeCSS: |
-    :is(&) { background: #ffffff; }
----
-flowchart TB
     subgraph vercel["▲ Server side — Vercel"]
         direction TB
         web["🌐 Website runtime"]
@@ -81,8 +58,10 @@ flowchart TB
         web --- vercelTech3
         vercelTech3 ~~~ vercelTech4
     end
+    client -->|HTTPS and session requests| vercel
     classDef default fill:#ffffff,stroke:#111111,color:#111111
-    linkStyle default stroke:#6B7280
+    linkStyle default stroke:#111111
+    style client fill:#f3f4f6,stroke:#9ca3af
     style vercel fill:#f3f4f6,stroke:#9ca3af
 ```
 
@@ -100,7 +79,7 @@ Evidence: [root package](../../package.json), [root lockfile](../../package-lock
 
 Purpose: distinguish the two server stacks, their clients and their shared managed data. Arrowless associations list the technologies used by each runtime.
 
-![Architecture diagram](generated/tech-stack-3.svg)
+![Architecture diagram](generated/tech-stack-2.svg)
 
 <details>
 <summary>Editable Mermaid source</summary>
@@ -110,10 +89,11 @@ Purpose: distinguish the two server stacks, their clients and their shared manag
 config:
   theme: base
   flowchart:
-    padding: 20
-    nodeSpacing: 20
-    rankSpacing: 35
+    padding: 5
+    nodeSpacing: 35
+    rankSpacing: 60
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
 ---
 flowchart TB
@@ -134,30 +114,6 @@ flowchart TB
         renderTech3 ~~~ renderTech4
         renderTech4 ~~~ renderTech5
     end
-    classDef default fill:#ffffff,stroke:#111111,color:#111111
-    linkStyle default stroke:#6B7280
-    style render fill:#f3f4f6,stroke:#9ca3af
-```
-
-</details>
-
-![Architecture diagram](generated/tech-stack-4.svg)
-
-<details>
-<summary>Editable Mermaid source</summary>
-
-```mermaid
----
-config:
-  theme: base
-  flowchart:
-    padding: 20
-    nodeSpacing: 20
-    rankSpacing: 35
-  themeCSS: |
-    :is(&) { background: #ffffff; }
----
-flowchart TB
     subgraph cloud["⏩ Google Cloud Run server"]
         direction TB
         api["🌙 API runtime"]
@@ -175,8 +131,10 @@ flowchart TB
         cloudTech3 ~~~ cloudTech4
         cloudTech4 ~~~ cloudTech5
     end
-    classDef default fill:#ffffff,stroke:#111111,color:#111111
-    linkStyle default stroke:#6B7280
+    render -->|Bearer-key API requests| cloud
+    classDef default fill:#ffffff,stroke:#8A05FF,color:#111111
+    linkStyle default stroke:#8A05FF
+    style render fill:#f3f4f6,stroke:#9ca3af
     style cloud fill:#f3f4f6,stroke:#9ca3af
 ```
 

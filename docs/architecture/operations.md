@@ -18,11 +18,12 @@ config:
   themeVariables:
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   flowchart:
-    padding: 15
+    padding: 5
     nodeSpacing: 35
-    rankSpacing: 40
+    rankSpacing: 60
 ---
 flowchart TB
     repo["🐙 Canonical monorepo main"] ---|Root build| vercel["▲ Vercel website<br/>Root Next.js context<br/>⬡ Node.js 22"]
@@ -74,11 +75,12 @@ config:
   themeVariables:
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   flowchart:
-    padding: 15
+    padding: 5
     nodeSpacing: 35
-    rankSpacing: 40
+    rankSpacing: 60
 ---
 flowchart TB
     event["🐙 PR or push to main"] ---|Triggers| site["🛠️ Site<br/>Types and lints<br/>Shared tests"]
@@ -120,11 +122,12 @@ config:
   themeVariables:
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   flowchart:
-    padding: 15
+    padding: 5
     nodeSpacing: 35
-    rankSpacing: 40
+    rankSpacing: 60
 ---
 flowchart TB
     edit["📦 Shared source change"] ---|Requires| sync["📦 npm run sync:shared"]

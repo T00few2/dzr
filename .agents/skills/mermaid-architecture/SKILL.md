@@ -11,7 +11,7 @@ Use this skill when creating or editing Mermaid architecture diagrams in this re
 
 Give each diagram a question-based heading and one-sentence purpose. Aim for 5–10 meaningful entities; split by purpose, abstraction level or execution zone when a diagram becomes crowded. Link the parent overview, related detail and implementation. Use native GitHub Mermaid and normal-sized text. Review at roughly 860 px content width.
 
-Flowcharts normally use front-matter `flowchart` settings `padding: 15`, `nodeSpacing: 35` and `rankSpacing: 40`; adjust spacing or direction when it prevents crowding. Shorten or wrap labels with `<br/>` before adding layout complexity. Keep fonts at their normal size.
+Flowcharts normally use front-matter `flowchart` settings `padding: 5`, `nodeSpacing: 35` and `rankSpacing: 60`; adjust spacing or direction when it prevents crowding. Shorten or wrap labels with `<br/>` before adding layout complexity. Keep fonts at their normal size.
 
 ## Icon vocabulary
 
@@ -123,3 +123,5 @@ Technology inventories use top-down layouts. Invisible layout links can arrange 
 | Ext. integration | #b91c1c |
 
 These colors supersede the earlier two-color palette. Keep white chart backgrounds in light and dark mode. Opposing requests use two separately labeled directed lines. Show implemented callbacks separately; distinguish server webhooks, gateway deliveries and browser-mediated OAuth redirects.
+
+Connection labels use 12 px text (flowchart `.edgeLabel` and sequence `messageFontSize`); entity labels keep their normal size. Technology-stack overviews combine client/server or Render/Google Cloud Run in a single top-down diagram with separate neutral boundaries.

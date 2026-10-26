@@ -18,11 +18,12 @@ config:
   themeVariables:
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   flowchart:
-    padding: 15
+    padding: 5
     nodeSpacing: 35
-    rankSpacing: 40
+    rankSpacing: 60
 ---
 flowchart TB
     pages["🌐 App Router pages"] -->|Compose| ui["💻 Components and providers"]
@@ -76,11 +77,12 @@ config:
   themeVariables:
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   flowchart:
-    padding: 15
+    padding: 5
     nodeSpacing: 35
-    rankSpacing: 40
+    rankSpacing: 60
 ---
 flowchart LR
     callers["⚙️ Website and bot"] -->|HTTP requests| routes["🌙 main.py<br/>Routes and jobs"]
@@ -116,11 +118,12 @@ config:
   themeVariables:
     edgeLabelBackground: '#ffffff'
   themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
     :is(&) { background: #ffffff; }
   flowchart:
-    padding: 15
+    padding: 5
     nodeSpacing: 35
-    rankSpacing: 40
+    rankSpacing: 60
 ---
 flowchart TB
     source["📦 packages/shared"] ---|Directly imported by| next["🌐 Website wrappers and<br/>services"]
