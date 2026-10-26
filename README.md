@@ -2,12 +2,14 @@
 
 Canonical GitHub repo: [`T00few2/dzr`](https://github.com/T00few2/dzr). Production site: [www.dzrracingseries.com](https://www.dzrracingseries.com).
 
+**New contributor? Start with the [architecture guide and Mermaid diagrams](docs/architecture/README.md).** Follow the system overview and client/server technology stack into membership, bot automation, Coach, events, data, security and deployment. See the [maintenance guide](docs/architecture/maintenance.md) for keeping it current.
+
 Three runtimes stay separate. Do not add npm workspaces (Vercel must keep using the root Next `package.json` only).
 
 | Path | App | Host | Runtime |
 |---|---|---|---|
-| repo root | Next.js 14 site, `/admin`, `/members-zone`, `/join` | Vercel | Node 22 (`.nvmrc`) |
-| `apps/api` | Flask jobs / bot HTTP API | Cloud Run (`zwiftpower`) | Python, `PORT` default `8080` |
+| repo root | Next.js 16 site, `/admin`, `/members-zone`, `/join` | Vercel | Node 22 (`.nvmrc`) |
+| `apps/api` | Flask jobs and integration API | Cloud Run (`zwiftpower`) | Python, `PORT` default `8080` |
 | `apps/bot` | Discord club bot + optional DZR Coach | Render service `bot`, Oregon (`bot-tdnm.onrender.com`) | Node 22, `node bot.js` |
 
 All three already deploy from this repo. Local secrets live in `.env.local` (site) and `apps/api/.env` / `apps/bot/.env`. Do not commit `service-account-key.json` or `.env` files.
@@ -24,8 +26,8 @@ Open http://localhost:3000
 | Area | Path | Access |
 |---|---|---|
 | Public site | `/`, `/about`, `/racing`, event pages | Anyone |
-| Join / onboarding | `/join` | Public flow (Discord → Zwift ID → Vipps) |
-| Members zone | `/members-zone` | Discord **Verified member** via NextAuth |
+| Join / onboarding | `/join` | Public flow (Discord → Vipps → Zwift ID) |
+| Members zone | `/members-zone` | Verified-member role or paid membership via NextAuth |
 | Admin | `/admin` | Discord **Admin** role |
 | intervals.icu | `/intervals/connect` | Logged-in members |
 
@@ -65,7 +67,7 @@ Binds `0.0.0.0:$PORT` (`8080` locally). Firebase uses Application Default Creden
 
 Cloud Run deploys `apps/api` from this repo. The service name stays `zwiftpower`. Health check is `GET /` and returns `{"service":"dzr-api",...}`. Admin UI is on the Next site, not this service.
 
-Required API env names: `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `CONTENT_API_KEY`, `ZWIFT_USERNAME`, `ZWIFT_PASSWORD`, `ZWIFTPOWER_CLUB_ID`, `FLASK_SECRET_KEY`. `DISCORD_BOT_URL` should be the Render bot origin (`https://bot-tdnm.onrender.com`) so Flask jobs can call the bot HTTP API.
+Required API env names: `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `CONTENT_API_KEY`, `ZWIFT_USERNAME`, `ZWIFT_PASSWORD`, `ZWIFTPOWER_CLUB_ID`, `FLASK_SECRET_KEY`. Legacy commentary jobs use `DISCORD_BOT_URL`, but the current Render server exposes only a health route; [the posting path is unresolved in this checkout](docs/architecture/findings.md#incomplete-and-legacy-paths).
 
 ## Discord bot (`apps/bot`)
 
