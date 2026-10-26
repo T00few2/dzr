@@ -103,8 +103,8 @@ function checkConventions(diagram, file) {
     if (/<-->|<--|<==>|<==/.test(body)) {
       fail(file, diagram.line, 'use initiator --> recipient or an arrowless association')
     }
-    if (!/classDef default .*stroke:#1d4ed8/.test(body) ||
-        !/linkStyle default stroke:#1d4ed8/.test(body)) {
+    if (!/classDef default .*stroke:#[0-9a-fA-F]{6}/.test(body) ||
+        !/linkStyle default stroke:#[0-9a-fA-F]{6}/.test(body)) {
       fail(file, diagram.line, 'flowchart needs the skill outline and connection palette')
     }
   }

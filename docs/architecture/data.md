@@ -18,6 +18,8 @@ config:
     primaryBorderColor: '#1d4ed8'
     lineColor: '#1d4ed8'
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   er:
     nodeSpacing: 30
 ---
@@ -89,6 +91,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     padding: 15
     nodeSpacing: 35
@@ -120,6 +124,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     padding: 15
     nodeSpacing: 35

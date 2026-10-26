@@ -12,6 +12,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     rankSpacing: 25
     padding: 10
@@ -27,6 +29,7 @@ flowchart LR
     classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
     linkStyle default stroke:#1d4ed8,stroke-width:2px
     class gateway external
+    linkStyle 0 stroke:#b91c1c,stroke-width:2px
     linkStyle 0 stroke:#b91c1c,stroke-width:2px
 ```
 
@@ -111,6 +114,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     padding: 15
     nodeSpacing: 35

@@ -12,6 +12,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     padding: 15
     nodeSpacing: 35
@@ -30,6 +32,10 @@ flowchart TB
     classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
     classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
     linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef provider4 fill:#ffffff,stroke:#f59e0b,stroke-width:2px,color:#111111
+    class ui provider4
+    linkStyle 2 stroke:#f59e0b,stroke-width:2px
+    linkStyle 8 stroke:#f59e0b,stroke-width:2px
 ```
 
 Page middleware only matches `/admin/**` and `/members-zone/**`. Server routes must perform their own checks. Domain services can persist data or call external services; they are not all pure functions. Shared modules accept runtime dependencies where needed, such as a Firestore handle for paid membership checks.
@@ -57,6 +63,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     padding: 15
     nodeSpacing: 35
@@ -88,6 +96,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     padding: 15
     nodeSpacing: 35
@@ -104,7 +114,7 @@ flowchart TB
     linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
 
-There are deliberately **no npm workspaces**. Vercel installs the root package; Render installs `apps/bot`; Cloud Run's documented source root is `apps/api`. A bot import outside that directory would not exist in its build context.
+There are deliberately **no npm workspaces**. Vercel installs the root package; Render installs `apps/bot`; Google Cloud Run's documented source root is `apps/api`. A bot import outside that directory would not exist in its build context.
 
 The [sync script's `TARGETS`](../../scripts/sync-shared.js) is the authoritative copy list: constants, selected Coach modules, phenotype and verification criteria. Other shared modules, including series rotation and route matching, are imported by the website without a bot copy. JavaScript declarations beside shared modules provide TypeScript interfaces.
 

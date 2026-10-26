@@ -69,6 +69,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     padding: 15
     nodeSpacing: 35
@@ -110,6 +112,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     padding: 15
     nodeSpacing: 35

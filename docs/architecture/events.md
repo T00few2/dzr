@@ -12,6 +12,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     padding: 15
     nodeSpacing: 35
@@ -40,7 +42,7 @@ flowchart TB
 
 ## Weekly race application: who updates the live event?
 
-Purpose: follow the unusual Render → Vercel → Cloud Run path and the separate result-fix job.
+Purpose: follow the unusual Render → Vercel → Google Cloud Run path and the separate result-fix job.
 
 ```mermaid
 ---
@@ -105,6 +107,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     padding: 15
     nodeSpacing: 35
@@ -122,6 +126,10 @@ flowchart TB
     linkStyle default stroke:#1d4ed8,stroke-width:2px
     class intervals external
     linkStyle 5 stroke:#b91c1c,stroke-width:2px
+    classDef provider4 fill:#ffffff,stroke:#f59e0b,stroke-width:2px,color:#111111
+    class ui provider4
+    linkStyle 0 stroke:#f59e0b,stroke-width:2px
+    linkStyle 1 stroke:#f59e0b,stroke-width:2px
 ```
 
 [Calendar events](../../app/api/calendar/events/route.ts) offers upcoming feed suggestions, not a complete season. Copying a suggestion into [calendar entries](../../app/api/calendar/route.ts) is not a subscription: later race changes do not automatically rewrite the copied entry. A stored racing score is only a category hint; the member chooses. WTRL-organized ZRL events are not supplied by the DZR-tagged feed.

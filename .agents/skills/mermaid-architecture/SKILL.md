@@ -103,3 +103,21 @@ The overview groups external parties by purpose: **External Zwift sources**, **E
 3. Run `npm ci --prefix scripts/architecture --ignore-scripts`, then `npm run check:architecture`. Basic prefix checks read the icon vocabulary from this file; request semantics, external classification and layout still require review.
 4. Render every changed diagram. Check normal-width text, icons, red external outlines/lines, arrowheads, crossing labels and dark/light theme legibility. Parsing alone cannot verify semantics or layout.
 5. Update navigation and code references in the same change. Generated preview images remain review artifacts, not a second source of truth.
+
+## Layer and provider refinements
+
+Abbreviate External as **Ext.** and spell out **Google Cloud Run**. Group multi-layer views into Client, DZR-controlled server deployments (Vercel, Render Cloud and Google Cloud Run), and Ext. integrations. Layer boundaries use light gray fill on white and neutral gray outlines. Hosting names refer to our controlled deployments, not ownership of the provider.
+
+Use one box per technology in stack inventories. Split inventories into focused provider views when necessary; keep enough boundary padding for their contents.
+
+| Entity | Outline and outgoing request line |
+| --- | --- |
+| People | #6B7280 |
+| Google Cloud Run | #4285F4 |
+| Render Cloud | #8A05FF |
+| Vercel | #111111 |
+| GitHub | #0FBF3E |
+| Client | #f59e0b |
+| Ext. integration | #b91c1c |
+
+These colors supersede the earlier two-color palette. Keep white chart backgrounds in light and dark mode. Opposing requests use two separately labeled directed lines. Show implemented callbacks separately; distinguish server webhooks, gateway deliveries and browser-mediated OAuth redirects.

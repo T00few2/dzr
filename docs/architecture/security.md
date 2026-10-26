@@ -84,6 +84,8 @@ config:
   theme: base
   themeVariables:
     edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    :is(&) { background: #ffffff; }
   flowchart:
     padding: 15
     nodeSpacing: 35
@@ -106,11 +108,18 @@ flowchart TB
     linkStyle default stroke:#1d4ed8,stroke-width:2px
     class intervals,openai external
     linkStyle 3,4 stroke:#b91c1c,stroke-width:2px
-    style vercel fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    style render fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    style vercel fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#1f2328
+    style render fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#1f2328
+    classDef provider0 fill:#ffffff,stroke:#111111,stroke-width:2px,color:#111111
+    class vercel provider0
+    classDef provider1 fill:#ffffff,stroke:#8A05FF,stroke-width:2px,color:#111111
+    class render provider1
+    classDef provider4 fill:#ffffff,stroke:#f59e0b,stroke-width:2px,color:#111111
+    class browser provider4
+    linkStyle 0 stroke:#f59e0b,stroke-width:2px
 ```
 
-The website and bot initialize Admin SDKs with server credentials; Cloud Run uses Application Default Credentials. Firebase client configuration is public configuration, while private keys, Discord tokens, service keys, OAuth client secrets and athlete tokens belong on servers. Admin SDKs bypass Firestore rules.
+The website and bot initialize Admin SDKs with server credentials; Google Cloud Run uses Application Default Credentials. Firebase client configuration is public configuration, while private keys, Discord tokens, service keys, OAuth client secrets and athlete tokens belong on servers. Admin SDKs bypass Firestore rules.
 
 Shared [tokenCrypto](../../packages/shared/coach/tokenCrypto.js) derives AES-256-GCM keys. Token material prefers `COACH_TOKEN_KEY`, otherwise a domain-separated `COACH_CONNECT_SECRET`; memory prefers `COACH_MEMORY_KEY`, then a domain-separated connect secret, then token-key fallback. Connect links always use `COACH_CONNECT_SECRET`. New protected writes require keys; readers accept legacy plaintext for migration. Metadata and numerical caches do not all use the same encryption envelope.
 
