@@ -49,7 +49,22 @@ try {
         element.insertBefore(background, element.firstChild)
         element.setAttribute('data-mermaid-sha256', hash)
         element.style.backgroundColor = '#ffffff'
-        return new XMLSerializer().serializeToString(element)
+        document.body.appendChild(container)
+        try {
+          if (element.getAttribute('aria-roledescription') === 'sequence') {
+            const lanes = [...element.querySelectorAll('.actor-line')]
+            const labels = [...element.querySelectorAll('.messageText')]
+            if (!lanes.length || lanes.some(lane => getComputedStyle(lane).strokeWidth !== '0.5px')) {
+              throw new Error(`${id}: sequence lifelines must render at 0.5px`)
+            }
+            if (!labels.length || labels.some(label => getComputedStyle(label).fontSize !== '12px')) {
+              throw new Error(`${id}: sequence connection labels must render at 12px`)
+            }
+          }
+          return new XMLSerializer().serializeToString(element)
+        } finally {
+          container.remove()
+        }
       }, { text: match[2], id: `dzr-${name.slice(0, -3)}-${index}`, hash })
       await fs.writeFile(path.join(docs, 'generated', `${name.slice(0, -3)}-${index}.svg`), svg + '\n')
     }

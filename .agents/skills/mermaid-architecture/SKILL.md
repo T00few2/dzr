@@ -129,3 +129,17 @@ Connection labels use 12 px text (flowchart `.edgeLabel` and sequence `messageFo
 Use normal stroke widths by default. Reserve explicit thicker strokes for a deliberately highlighted small subset of entities or connections. Sequence diagrams require `messageFontSize: 12`, `.messageText { font-size: 12px !important; }` and `:is(&) { background: #ffffff; }` in `themeCSS`. Keep the full-viewBox white rectangle in generated previews as well.
 
 Sequence participant lifelines (`.actor-line`) use `stroke-width: 0.5px !important` so lane lines remain visually subordinate to messages and participant boxes, regardless of Mermaid theme defaults.
+
+## Sequence source and lifeline contract
+
+Present every sequence diagram as a generated white-canvas SVG followed by an expandable **Copy Mermaid code for mermaid.ai/live** section. Use a `text` fence for the canonical sequence source so GitHub exposes its code-copy button. Copy only the fence contents into Mermaid editors; Markdown backticks are not diagram syntax. Keep nested `rect`/`alt` blocks indented and balanced.
+
+Every sequence must set `messageFontSize: 12` and include these exact theme CSS rules:
+
+```text
+.actor-line { stroke-width: 0.5px !important; }
+.messageText { font-size: 12px !important; }
+:is(&) { background: #ffffff; }
+```
+
+Do not replace the lifeline width with Mermaid's default or a provider-specific width. Provider rules may change lane color, while the shared 0.5 px rule controls thickness. The architecture checker enforces these source rules and copyable fences. When rendering, verify computed lifeline widths and message font sizes before committing generated previews.

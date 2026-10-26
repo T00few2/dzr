@@ -47,7 +47,7 @@ function extract(source, file) {
         // Plain-text sequence sources expose GitHub's code-copy button instead of a second
         // rendered diagram. Validate the same source used for the white-canvas preview.
         if (fence.mermaid || (fence.language === 'text' && /^sequenceDiagram\s*$/m.test(text))) {
-          diagrams.push({ line: fence.line, text })
+          diagrams.push({ line: fence.line, text, language: fence.language })
         }
         fence = null
       } else fence.body.push(line)
@@ -116,6 +116,17 @@ function checkConventions(diagram, file) {
   }
   if (body.includes('sequenceDiagram') && /-->>/.test(body)) {
     fail(file, diagram.line, 'put response outcomes in notes; arrows identify initiated messages')
+  }
+  if (body.includes('sequenceDiagram')) {
+    if (diagram.language !== 'text') fail(file, diagram.line, 'sequence source must use a copyable text fence')
+    for (const required of [
+      'messageFontSize: 12',
+      '.actor-line { stroke-width: 0.5px !important; }',
+      '.messageText { font-size: 12px !important; }',
+      ':is(&) { background: #ffffff; }',
+    ]) {
+      if (!body.includes(required)) fail(file, diagram.line, `sequence convention missing: ${required}`)
+    }
   }
 }
 

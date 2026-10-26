@@ -56,9 +56,9 @@ Purpose: show the split between Flask scheduling decisions and bot delivery.
 ![Architecture diagram](generated/bot-automation-2.svg)
 
 <details>
-<summary>Editable Mermaid source</summary>
+<summary>Copy Mermaid code for mermaid.ai/live</summary>
 
-```mermaid
+```text
 ---
 config:
   theme: base

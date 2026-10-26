@@ -11,9 +11,9 @@ Purpose: distinguish the NextAuth JWT used by website routes from Firebase Auth 
 ![Architecture diagram](generated/security-1.svg)
 
 <details>
-<summary>Editable Mermaid source</summary>
+<summary>Copy Mermaid code for mermaid.ai/live</summary>
 
-```mermaid
+```text
 ---
 config:
   theme: base

@@ -55,9 +55,9 @@ Purpose: follow the unusual Render → Vercel → Google Cloud Run path and the 
 ![Architecture diagram](generated/events-2.svg)
 
 <details>
-<summary>Editable Mermaid source</summary>
+<summary>Copy Mermaid code for mermaid.ai/live</summary>
 
-```mermaid
+```text
 ---
 config:
   theme: base

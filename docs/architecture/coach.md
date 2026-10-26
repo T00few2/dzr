@@ -11,9 +11,9 @@ Purpose: follow the signed connect link across Render, the website and intervals
 ![Architecture diagram](generated/coach-1.svg)
 
 <details>
-<summary>Editable Mermaid source</summary>
+<summary>Copy Mermaid code for mermaid.ai/live</summary>
 
-```mermaid
+```text
 ---
 config:
   theme: base
