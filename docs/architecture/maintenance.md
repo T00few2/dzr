@@ -14,6 +14,8 @@ Create a new diagram when a **different question or abstraction level** needs ex
 
 ## Diagram conventions
 
+Apply the repository [Mermaid architecture skill](../../.agents/skills/mermaid-architecture/SKILL.md). It is the source of truth for the icon table, blue/red palette, request direction and diagram-type exceptions. Keep those conventions there instead of maintaining a second legend here.
+
 - Give every diagram a question-based heading, one-sentence purpose and short explanation of the consequences a contributor needs to know.
 - Use ordinary GitHub-compatible Mermaid: `flowchart`, `sequenceDiagram`, `stateDiagram-v2` or `erDiagram`. Use short labels, named boundaries and explicit relationship labels where direction is ambiguous.
 - Prefer top-to-bottom flowcharts at GitHub's normal content width; use left-to-right when it avoids a wide fan-out. Sequence diagrams should keep participant counts small; split long lifecycles into stages. Standard Mermaid front matter can enable sequence wrapping or adjust spacing, without shrinking fonts.
@@ -31,9 +33,9 @@ npm run check:architecture
 npm run check:shared
 ```
 
-The [isolated tool package](../../scripts/architecture/package.json) pins Mermaid and a DOM shim for parsing. It uses no application dependencies or browser downloads. The [checker](../../scripts/architecture/check.mjs) parses every Mermaid fence in repository Markdown, checks local link targets/fragments in the architecture guides and root workflow instructions, and reports source locations. An invalid/unclosed fence or broken local reference fails the check. [CI](../../.github/workflows/ci.yml) runs the same command in its own job, independently of application checks.
+The [isolated tool package](../../scripts/architecture/package.json) pins Mermaid and a DOM shim for parsing. It uses no application dependencies or browser downloads. The [checker](../../scripts/architecture/check.mjs) parses every Mermaid fence in repository Markdown and checks local links/fragments in the architecture guides, Mermaid skill and root workflow instructions. Architecture diagrams also get basic checks for skill icon prefixes, the flowchart palette and request-arrow notation. It reads the icon vocabulary directly from the skill. Invalid/unclosed fences, broken references and these convention violations fail with source locations. [CI](../../.github/workflows/ci.yml) runs the same command in its own job, independently of application checks.
 
-Syntax validation does not prove layout readability, business correctness or that GitHub runs exactly the pinned Mermaid release. Keep syntax conservative and render changed diagrams before review. In GitHub's Markdown preview, inspect at normal width: labels should be legible without zoom, arrows should not hide labels, and a reader should follow a feature from [overview](overview.md) to the relevant implementation. For many changes, a local Mermaid browser renderer is useful; do not commit its generated output or add a second diagram source.
+Syntax and notation checks do not establish that a request is drawn in the correct direction, that every external edge is colored correctly, or that GitHub runs exactly the pinned Mermaid release. Verify those against code and render changed diagrams before review. In GitHub's Markdown preview, inspect at normal width: labels should be legible without zoom, arrows should not hide labels, and a reader should follow a feature from [overview](overview.md) to the relevant implementation. For many changes, a local Mermaid browser renderer is useful; do not commit its generated output or add a second diagram source.
 
 ## Review checklist
 

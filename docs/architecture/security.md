@@ -11,29 +11,45 @@ Purpose: distinguish the NextAuth JWT used by website routes from Firebase Auth 
 ```mermaid
 ---
 config:
+  theme: base
+  themeVariables:
+    primaryColor: '#eff6ff'
+    primaryTextColor: '#1f2328'
+    primaryBorderColor: '#1d4ed8'
+    lineColor: '#1d4ed8'
+    actorBkg: '#eff6ff'
+    actorBorder: '#1d4ed8'
+    actorLineColor: '#1d4ed8'
+    signalColor: '#1d4ed8'
   sequence:
     actorMargin: 20
     width: 120
     wrap: true
+  themeCSS: |
+    rect.actor[name="D"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
+    .actor-line[name="D"] { stroke: #b91c1c !important; }
+    [data-from="D"], [data-to="D"] { stroke: #b91c1c !important; }
 ---
 sequenceDiagram
-    participant B as Browser
-    participant N as NextAuth and website API
-    participant D as Discord
-    participant F as Firestore
-    participant A as Firebase Auth
+    participant B as 💻 Browser
+    participant N as 🌐 NextAuth and website API
+    participant D as 🎮 Discord
+    participant F as 🔥 Firestore
+    participant A as 🔥 Firebase Auth
+    rect rgb(255, 255, 255)
     B->>N: Sign in with Discord
     N->>D: OAuth identity and guild member roles
     Note over N,D: Bot-token role lookup is a fallback
     alt No accepted verified role
         N->>F: Check current-year paid membership
     end
-    N-->>B: JWT with Discord ID, roles, admin and paid-access flags
+    Note over N,B: JWT with Discord ID, roles, admin and paid-access flags
     B->>N: GET auth/firebase-token using website session
     N->>A: Resolve or create Firebase UID and mint custom token
     N->>F: Save users/discordId linkage
-    N-->>B: Custom token
+    Note over N,B: Custom token
     B->>A: Firebase SDK sign-in
+    end
 ```
 
 Sources: [NextAuth callbacks](../../app/api/auth/[...nextauth]/route.ts), [Firebase-token route](../../app/api/auth/firebase-token/route.ts), [AuthContext bridge](../../components/auth/AuthContext.js). Login requests `identify email guilds.members.read`. Admission is an accepted verified role **or** paid membership. The paid flag is evaluated as a fallback, so `membershipActive: false` in a JWT does not prove a verified member is unpaid.
@@ -63,18 +79,35 @@ Middleware matches **pages only**. A protected UI does not authorize the HTTP en
 Purpose: identify website-to-Coach trust boundaries and where training data leaves DZR.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    browser[Browser with session<br/>or signed link] -->|HTTP| web
-    subgraph vercel[Vercel server boundary]
-        web[Website]
+    browser["💻 Browser with session<br/>or signed link"] -->|HTTP request| web
+    subgraph vercel["▲ Vercel server boundary"]
+        web["🌐 Website"]
     end
-    subgraph render[Render server boundary]
-        bot[Bot and Coach]
+    subgraph render["⧉ Render server boundary"]
+        bot["🤖 Bot and Coach"]
     end
-    web <-->|Encrypted tokens,<br/>memory and calendar text| db[(Firestore)]
-    db <-->|Decrypt tokens<br/>and memory| bot
-    bot -->|Bearer athlete token| intervals[intervals.icu]
-    bot -->|Selected prompt<br/>and tool results| openai[OpenAI]
+    web -->|Read or write<br/>encrypted records| db[("🔥 Firestore")]
+    bot -->|Read tokens and memory| db
+    bot -->|Read training or write<br/>workouts| intervals["💓 intervals.icu"]
+    bot -->|Request coaching using<br/>selected context| openai["❋ OpenAI"]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    class intervals,openai external
+    linkStyle 3,4 stroke:#b91c1c,stroke-width:2px
+    style vercel fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    style render fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
 ```
 
 The website and bot initialize Admin SDKs with server credentials; Cloud Run uses Application Default Credentials. Firebase client configuration is public configuration, while private keys, Discord tokens, service keys, OAuth client secrets and athlete tokens belong on servers. Admin SDKs bypass Firestore rules.

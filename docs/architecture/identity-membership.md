@@ -7,7 +7,21 @@
 Purpose: distinguish the public onboarding session from a website login session. These states are journey milestones, not the stored `status` enum.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    primaryColor: '#eff6ff'
+    primaryTextColor: '#1f2328'
+    primaryBorderColor: '#1d4ed8'
+    lineColor: '#1d4ed8'
+---
 stateDiagram-v2
+    state "⚙️ Onboarding session" as Session
+    state "⚙️ Discord linked" as DiscordLinked
+    state "⚙️ Payment covered" as Paid
+    state "⚙️ Complete" as Complete
+    state "⚙️ Session unavailable" as Unavailable
     [*] --> Session: Open join flow
     Session --> DiscordLinked: Discord OAuth callback
     DiscordLinked --> Paid: Checkout confirmed or existing coverage
@@ -32,21 +46,39 @@ Purpose: follow onboarding checkout from local correlation to access side effect
 ```mermaid
 ---
 config:
+  theme: base
+  themeVariables:
+    primaryColor: '#eff6ff'
+    primaryTextColor: '#1f2328'
+    primaryBorderColor: '#1d4ed8'
+    lineColor: '#1d4ed8'
+    actorBkg: '#eff6ff'
+    actorBorder: '#1d4ed8'
+    actorLineColor: '#1d4ed8'
+    signalColor: '#1d4ed8'
   sequence:
     actorMargin: 20
     width: 120
     wrap: true
+  themeCSS: |
+    rect.actor[name="V"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
+    .actor-line[name="V"] { stroke: #b91c1c !important; }
+    [data-from="V"], [data-to="V"] { stroke: #b91c1c !important; }
+    rect.actor[name="D"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
+    .actor-line[name="D"] { stroke: #b91c1c !important; }
+    [data-from="D"], [data-to="D"] { stroke: #b91c1c !important; }
 ---
 sequenceDiagram
-    participant B as Browser
-    participant W as Website onboarding API
-    participant V as Vipps Checkout
-    participant F as Firestore
-    participant D as Discord REST
+    participant B as 💻 Browser
+    participant W as 🌐 Website onboarding API
+    participant V as 🔵 Vipps Checkout
+    participant F as 🔥 Firestore
+    participant D as 🎮 Discord REST
+    rect rgb(255, 255, 255)
     B->>W: Create checkout using onboarding cookie
     W->>F: Store payments/checkout_reference and session link
     W->>V: Create checkout session
-    W-->>B: Checkout URL
+    Note over W,B: Checkout URL
     B->>V: Complete payment
     V->>W: Callback with reference
     B->>W: Confirm using session and reference
@@ -57,7 +89,8 @@ sequenceDiagram
         W->>D: Attempt club and eligible login roles
         W->>F: Role-sync outcome and payment step
     else Pending or failed
-        W-->>B: Pending or failed result on confirmation
+        Note over W,B: Pending or failed result on confirmation
+    end
     end
 ```
 
@@ -72,15 +105,28 @@ Existing members have a separate [membership checkout family](../../app/api/memb
 Purpose: distinguish a shared eligibility rule from the two mechanisms that deliver Discord roles.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    entry[Website access sync or bot member event] --> facts[Fresh Discord facts and users Zwift link]
-    settings[verificationSettings and shared criteria] --> decision[Evaluate verification]
-    facts --> decision
-    decision -->|Bot configured verification| bot[Add or remove verified role]
-    decision -->|Website eligible login roles| web[Attempt role addition]
-    paid[Paid coverage] --> club[Website club-role update]
-    web -->|Discord delivery failure| queue[(role_updates)]
-    club -->|Discord delivery failure| queue
+    entry["⚙️ Website sync and bot<br/>member handlers"] ---|Read member facts| facts["⚙️ Discord facts and<br/>saved Zwift link"]
+    settings["🔑 Verification settings<br/>and shared criteria"] ---|Policy| decision["🔑 Verification evaluation"]
+    facts ---|Inputs| decision
+    decision ---|Bot action| bot["🤖 Add or remove verified<br/>role"]
+    decision ---|Website action| web["🌐 Eligible login-role<br/>addition"]
+    paid["🔥 Paid coverage"] ---|Coverage rule| club["🌐 Club-role update"]
+    web ---|Delivery failure<br/>record| queue[("🔥 role_updates")]
+    club ---|Delivery failure<br/>record| queue
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
 
 The [shared criteria](../../packages/shared/verificationCriteria.js) default to requiring a Zwift ID; optional criteria cover account age, specific roles and server boosting. `requiresActivityThreshold` is reserved and is not evaluated. [Bot verification](../../apps/bot/services/verificationService.js) serializes work per guild/member, fetches fresh Discord state, and may add **or remove** the configured verified role. Lookups that fail must not be treated as evidence of ineligibility.
@@ -96,17 +142,32 @@ Purpose: show the bot's self-service role approval path; paid membership and ver
 ```mermaid
 ---
 config:
+  theme: base
+  themeVariables:
+    primaryColor: '#eff6ff'
+    primaryTextColor: '#1f2328'
+    primaryBorderColor: '#1d4ed8'
+    lineColor: '#1d4ed8'
+    actorBkg: '#eff6ff'
+    actorBorder: '#1d4ed8'
+    actorLineColor: '#1d4ed8'
+    signalColor: '#1d4ed8'
   sequence:
     actorMargin: 20
     width: 120
     wrap: true
+  themeCSS: |
+    rect.actor[name="D"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
+    .actor-line[name="D"] { stroke: #b91c1c !important; }
+    [data-from="D"], [data-to="D"] { stroke: #b91c1c !important; }
 ---
 sequenceDiagram
-    participant M as Member
-    participant B as Club bot
-    participant F as Firestore
-    participant A as Captain or admin
-    participant D as Discord
+    participant M as 👤 Member
+    participant B as 🤖 Club bot
+    participant F as 🔥 Firestore
+    participant A as 🥸 Captain or 🛡️ admin
+    participant D as 🎮 Discord
+    rect rgb(255, 255, 255)
     M->>B: Select role and confirm join
     B->>F: Read selfRoles prerequisites and approval policy
     alt Immediate role
@@ -118,6 +179,7 @@ sequenceDiagram
         B->>B: Verify approver authority and bot hierarchy
         B->>D: Add role on approval and notify member
         B->>F: Store outcome
+    end
     end
 ```
 

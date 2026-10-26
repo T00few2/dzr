@@ -7,14 +7,24 @@
 Purpose: separate checked-in deployment evidence from provider-managed wiring.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    repo[Canonical<br/>monorepo main] -->|Root build| vercel[Vercel<br/>website]
-    repo -->|apps/bot filter| render[Render<br/>bot service]
-    repo -->|Documented apps/api root| cloud[Cloud Run<br/>zwiftpower]
-    render -->|One process| clients[Club and<br/>Coach clients]
-    vercel -->|Root package| sitebuild[Node 22<br/>npm run build]
-    render -->|Own lockfile| botbuild[Node 22<br/>npm ci, node bot.js]
-    cloud -->|Requirements| apibuild[Python<br/>Flask main.py]
+    repo["🐙 Canonical monorepo main"] ---|Root build| vercel["▲ Vercel website<br/>Root Next.js context<br/>⬡ Node.js 22"]
+    repo ---|apps/bot filter| render["⧉ Render bot service<br/>apps/bot context<br/>⬡ Node.js 22"]
+    repo ---|Documented source root| cloud["⏩ Cloud Run zwiftpower<br/>apps/api context<br/>🐍 Python 3"]
+    render ---|One process| clients["🤖 Club and Coach clients"]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
 
 The root [README](../../README.md) and app [canonical notes](../../apps/api/CANONICAL.md) identify Vercel and Cloud Run production services. [render.yaml](../../render.yaml) explicitly describes Render `bot`, Oregon, starter plan, `rootDir: apps/bot`, commit auto-deploy and `apps/bot/**` build filter. It disables previews. Applying it as a new Blueprint could create a second bot; it is not a setup step for a documentation contributor.
@@ -32,15 +42,24 @@ No Cloud Run build/deploy workflow, Dockerfile or Vercel project linkage is chec
 Purpose: locate verification lanes and make clear that the workflow contains checks, not deployment commands.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    event[PR or push to main] --> site[Site lane]
-    event --> bot[Bot lane]
-    event --> shared[Shared-copy lane]
-    event --> docs[Architecture lane]
-    site --> sitechecks[Install and audit<br/>Types and lints<br/>Shared tests]
-    bot --> botchecks[Install and audit<br/>Tests<br/>eval:dry]
-    shared --> sync[Byte-check<br/>generated copies]
-    docs --> docchecks[Isolated install<br/>Mermaid parse<br/>Local links]
+    event["🐙 PR or push to main"] ---|Triggers| site["🛠️ Site<br/>Types and lints<br/>Shared tests"]
+    event ---|Triggers| bot["🛠️ Bot<br/>Tests and eval:dry"]
+    event ---|Triggers| shared["🛠️ Shared copies<br/>Byte comparison"]
+    event ---|Triggers| docs["🛠️ Architecture<br/>Mermaid and links"]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
 
 See [.github/workflows/ci.yml](../../.github/workflows/ci.yml). Site dependencies are installed at root; bot dependencies are installed under `apps/bot`. Bot CI disables install scripts because tests do not need the native `canvas` binary. A passing unit test suite is therefore not a rendered chart smoke test. There is no Python test lane in the existing workflow.
@@ -54,13 +73,26 @@ Provider auto-deploy configuration is independent of this workflow. Nothing here
 Purpose: show why a shared-source edit needs synchronized files in the bot/API build contexts.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    edit[Edit packages/shared source] --> sync[Run npm run sync:shared]
-    sync --> commit[Commit source and generated copies]
-    commit --> check[CI check:shared]
-    check -->|Website direct imports| web[Website build context]
-    check -->|Changed apps/bot files| bot[Render build context and filter]
-    check -->|Constants copy when changed| api[Cloud Run build context]
+    edit["📦 Shared source change"] ---|Requires| sync["📦 npm run sync:shared"]
+    sync ---|Required artifacts| commit["🐙 Commit source and copies"]
+    commit ---|Verification| check["🛠️ CI check:shared"]
+    check ---|Direct imports| web["▲ Website build context"]
+    check ---|apps/bot paths trigger<br/>filter| bot["⧉ Render build context"]
+    check ---|Constants copy when<br/>changed| api["⏩ Cloud Run build context"]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
 
 The [explicit mapping](../../scripts/sync-shared.js) decides which files are copied. Bot-only code stays in the bot. Shared JS is not copied to Python. A stale checked-in copy fails CI; copying during local development does not by itself deploy anything.

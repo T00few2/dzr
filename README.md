@@ -2,7 +2,7 @@
 
 Canonical GitHub repo: [`T00few2/dzr`](https://github.com/T00few2/dzr). Production site: [www.dzrracingseries.com](https://www.dzrracingseries.com).
 
-**New contributor? Start with the [architecture guide and Mermaid diagrams](docs/architecture/README.md).** Follow the system overview into membership, bot automation, Coach, events, data, security and deployment. See [contributor instructions](AGENTS.md) for keeping it current.
+**New contributor? Start with the [architecture guide and Mermaid diagrams](docs/architecture/README.md).** Follow the system overview and client/server technology stack into membership, bot automation, Coach, events, data, security and deployment. See [contributor instructions](AGENTS.md) for keeping it current.
 
 Three runtimes stay separate. Do not add npm workspaces (Vercel must keep using the root Next `package.json` only).
 

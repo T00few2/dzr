@@ -69,12 +69,48 @@ function headingIds(lines) {
 }
 
 const sources = new Map()
+const skillPath = path.join(root, '.agents/skills/mermaid-architecture/SKILL.md')
+const skill = await fs.readFile(skillPath, 'utf8')
+// Read the canonical vocabulary from the skill instead of maintaining another icon list.
+const iconTable = skill.split('## Icon vocabulary')[1].split('## Colors')[0]
+const icons = [...iconTable.matchAll(/^\| (\S+) \| .+ \| (?:Human|Machine[^|]*) \|$/gm)]
+  .map((match) => match[1])
+if (!icons.length) throw new Error('No icons found in the Mermaid architecture skill')
 let errors = 0
 let diagrams = 0
 let links = 0
 function fail(file, line, message) {
   console.error(`${path.relative(root, file)}:${line}: ${message}`)
   errors++
+}
+
+function checkConventions(diagram, file) {
+  if (!path.relative(root, file).startsWith(`docs${path.sep}architecture${path.sep}`)) return
+  const body = diagram.text
+  // Limit label matching to diagram syntax, excluding front-matter CSS attribute selectors.
+  const syntax = body.slice(body.search(/^(?:flowchart|sequenceDiagram|erDiagram|stateDiagram-v2)\b/m))
+  const labels = [
+    ...[...syntax.matchAll(/\b[A-Za-z_]\w*\[\(?("?)([^"\]\n]+)\1\)?\]/g)].map((match) => match[2]),
+    ...[...syntax.matchAll(/^\s*participant \w+ as (.+)$/gm)].map((match) => match[1]),
+    ...[...syntax.matchAll(/^\s*state "([^"]+)" as \w+/gm)].map((match) => match[1]),
+  ]
+  for (const label of labels) {
+    if (!icons.some((icon) => label.startsWith(`${icon} `))) {
+      fail(file, diagram.line, `entity label needs a skill icon prefix: ${label}`)
+    }
+  }
+  if (/flowchart\s+(?:TB|TD|BT|LR|RL)/.test(body)) {
+    if (/<-->|<--|<==>|<==/.test(body)) {
+      fail(file, diagram.line, 'use initiator --> recipient or an arrowless association')
+    }
+    if (!/classDef default .*stroke:#1d4ed8/.test(body) ||
+        !/linkStyle default stroke:#1d4ed8/.test(body)) {
+      fail(file, diagram.line, 'flowchart needs the skill outline and connection palette')
+    }
+  }
+  if (body.includes('sequenceDiagram') && /-->>/.test(body)) {
+    fail(file, diagram.line, 'put response outcomes in notes; arrows identify initiated messages')
+  }
 }
 
 try {
@@ -91,12 +127,14 @@ try {
       try {
         if (!diagram.text.trim()) throw new Error('empty Mermaid fence')
         await mermaid.parse(diagram.text)
+        checkConventions(diagram, file)
       } catch (error) {
         fail(file, diagram.line, `Mermaid: ${error.message}`)
       }
     }
     const relative = path.relative(root, file).split(path.sep).join('/')
-    if (!relative.startsWith('docs/architecture/') && ![
+    if (!relative.startsWith('docs/architecture/') &&
+        !relative.startsWith('.agents/skills/mermaid-architecture/') && ![
       'README.md', 'AGENTS.md', '.github/pull_request_template.md',
     ].includes(relative)) continue
 

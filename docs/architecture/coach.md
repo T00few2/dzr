@@ -11,32 +11,48 @@ Purpose: follow the signed connect link across Render, the website and intervals
 ```mermaid
 ---
 config:
+  theme: base
+  themeVariables:
+    primaryColor: '#eff6ff'
+    primaryTextColor: '#1f2328'
+    primaryBorderColor: '#1d4ed8'
+    lineColor: '#1d4ed8'
+    actorBkg: '#eff6ff'
+    actorBorder: '#1d4ed8'
+    actorLineColor: '#1d4ed8'
+    signalColor: '#1d4ed8'
   sequence:
     actorMargin: 20
     width: 120
     wrap: true
+  themeCSS: |
+    rect.actor[name="I"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
+    .actor-line[name="I"] { stroke: #b91c1c !important; }
+    [data-from="I"], [data-to="I"] { stroke: #b91c1c !important; }
 ---
 sequenceDiagram
-    participant M as Member browser
-    participant B as Coach on Render
-    participant W as Website on Vercel
-    participant I as intervals.icu
-    participant F as Firestore
-    B-->>M: Connect link with signed Discord ID and expiry
+    participant M as 💻 Member browser
+    participant B as ⧉ Coach on Render
+    participant W as ▲ Website on Vercel
+    participant I as 💓 intervals.icu
+    participant F as 🔥 Firestore
+    rect rgb(255, 255, 255)
+    Note over B,M: Connect link with signed Discord ID and expiry
     M->>W: Open consent page and accept
     Note over M,W: Website session may be used instead of a signed link
     W->>F: Check paid membership
-    W-->>M: OAuth redirect with signed state
+    Note over W,M: OAuth redirect with signed state
     M->>I: Grant requested scopes
-    I-->>M: Redirect with code and state
+    Note over I,M: Redirect with code and state
     M->>W: OAuth callback
     W->>W: Validate state signature and expiry
     W->>F: Recheck paid membership
     W->>I: Exchange code using client credentials
-    I-->>W: Athlete and access token
+    Note over I,W: Athlete and access token
     W->>F: Encrypted intervals_connections record
     W->>F: Ensure default Coach profile
-    W-->>M: Connected page and setup DM attempt via Discord REST
+    Note over W,M: Connected page and setup DM attempt via Discord REST
+    end
 ```
 
 Sources: [bot connect helper](../../apps/bot/services/intervalsService.js), [site signing and scopes](../../app/lib/intervalsAuth.ts), [connect route](../../app/api/intervals/connect/route.ts), [callback](../../app/api/intervals/callback/route.ts). A connect token lasts 15 minutes; OAuth state uses a 20-minute signed token. It is signed identity/expiry state, not a persisted single-use state record.
@@ -48,17 +64,32 @@ Scopes are `ACTIVITY:READ,WELLNESS:READ,SETTINGS:READ,CALENDAR:WRITE`. Despite n
 Purpose: identify the orchestration path and the places to add a tool, data computation or guard.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    dm[Coach DM] --> claim[Firestore turn claim and local queue]
-    claim --> gate[Paid membership, connection and token budget]
-    gate --> prompt[Profile, calendar, goals and allowed notes]
-    prompt --> llm[OpenAI Responses loop]
-    llm -->|Function calls| tools[Tool executor and consent checks]
-    tools -->|Read training or upsert workout| intervals[intervalsService]
-    intervals -->|Compacted results and metrics| llm
-    tools -->|Authorized memory or calendar writes| store[(Firestore)]
-    llm --> reply[Discord reply and usage accounting]
-    reply -->|Opted-in session extraction| store
+    dm["🤖 Coach DM handler"] -->|Claim and enqueue turn| claim["🤖 Turn claim and local<br/>queue"]
+    claim -->|Run guarded turn| gate["🔑 Membership, connection<br/>and budget checks"]
+    gate -->|Build context| prompt["🤖 Profile, calendar,<br/>goals and notes reader"]
+    prompt ---|Context for| loop["🤖 Coach turn orchestration"]
+    loop -->|Execute selected tools| tools["🤖 Tool executor and<br/>consent checks"]
+    tools -->|Read or write via<br/>adapter| intervals["💓 intervalsService adapter"]
+    tools -->|Write authorized<br/>memory or entries| store[("🔥 Firestore")]
+    loop -->|Produce reply and<br/>account usage| reply["🤖 Reply and usage writer"]
+    reply -->|Save opted-in session<br/>notes| store
+    loop -->|Request answer or tool<br/>selection| ai["❋ OpenAI Responses API"]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    class ai external
+    linkStyle 9 stroke:#b91c1c,stroke-width:2px
 ```
 
 Start in [aiChatHandler](../../apps/bot/handlers/aiChatHandler.js): `handleCoachChatMessage` accepts DMs only; `runChatTurn` checks membership, connection and budget, composes context and runs a bounded tool loop. [turnClaim](../../apps/bot/services/turnClaim.js) creates a message claim to reduce duplicate answers during overlapping deployments; it fails open if Firestore is unavailable. [turnQueue](../../apps/bot/services/turnQueue.js) serializes each conversation locally and bounds pending work. Neither mechanism provides durable replay of unprocessed messages.
@@ -74,14 +105,25 @@ A `401` from intervals.icu yields a reconnect request; the bot does not implemen
 Purpose: keep consent and deletion changes from erasing a member's independent calendar.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    settings[Website Coach settings] -->|Opt-in and preferences| profile[(coach_profiles)]
-    turns[Coach conversation] -->|Notes opt-in and extraction| notes[(coach_chat_notes)]
-    calendar[(member_calendar)] -->|Read as training context| turns
-    disconnect[Disconnect intervals.icu] --> wipe[Reset profile and delete Coach records]
-    wipe -->|Delete| connection[(intervals_connections)]
-    wipe -->|Delete notes, usage, feedback and training caches| coachdata[Coach-owned data]
-    wipe -->|Preserve member-owned entries| calendar
+    disconnect["🌐 Disconnect route"] -->|Invoke cleanup| wipe["📦 Coach cleanup helpers"]
+    wipe -->|Reset defaults| profile[("🔥 Coach profile")]
+    wipe -->|Delete| connection[("🔥 Connection")]
+    wipe -->|Delete| coachdata["🔥 Notes, usage<br/>and training caches"]
+    wipe ---|Preserves| calendar[("🔥 Member calendar")]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
 
 [Coach profile/notes APIs](../../app/api/coach/) and the [setup UI](../../components/coach/CoachSetupFlow.tsx) manage settings and member-entered memory. `notesOptIn` controls conversation-derived memory and related write tools; manually entered goals and the member's own calendar have separate behavior. Persistent text is encrypted using shared [tokenCrypto](../../packages/shared/coach/tokenCrypto.js) helpers. Do not assume every metadata field or numerical training cache is encrypted.

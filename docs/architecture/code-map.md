@@ -7,16 +7,29 @@
 Purpose: locate changes by responsibility inside the Next.js deployment.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    pages[App Router pages] --> ui[Components and providers]
-    pages -->|Server reads| lib[app/lib domain services]
-    ui -->|HTTP requests| routes[app/api route handlers]
-    routes -->|Per-route access checks| auth[NextAuth and admin guards]
-    routes --> lib
-    lib --> shared[packages/shared logic]
-    routes --> adapters[Firebase Admin, Discord and Flask adapters]
-    lib --> adapters
-    ui -->|Legacy shop and ZRL| client[Firebase client SDK]
+    pages["🌐 App Router pages"] -->|Compose| ui["💻 Components and providers"]
+    pages -->|Call server services| lib["📦 app/lib domain services"]
+    ui -->|HTTP requests| routes["🌐 app/api route handlers"]
+    routes -->|Check access| auth["🔑 NextAuth and admin<br/>guards"]
+    routes -->|Invoke| lib
+    lib -->|Import| shared["📦 packages/shared logic"]
+    routes -->|Invoke| adapters["📦 Firebase, Discord and<br/>Flask adapters"]
+    lib -->|Invoke| adapters
+    ui -->|Legacy shop and ZRL<br/>calls| client["🔥 Firebase client SDK"]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
 
 Page middleware only matches `/admin/**` and `/members-zone/**`. Server routes must perform their own checks. Domain services can persist data or call external services; they are not all pure functions. Shared modules accept runtime dependencies where needed, such as a Firestore handle for paid membership checks.
@@ -39,13 +52,26 @@ Page middleware only matches `/admin/**` and `/members-zone/**`. Server routes m
 Purpose: distinguish HTTP orchestration from provider-specific protocol handling in the Python runtime.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart LR
-    callers[Website and<br/>bot requests] --> routes[main.py<br/>Guards and jobs]
-    routes --> zwift[zwift.py<br/>Roster and organizer]
-    routes --> zp[zwiftpower.py<br/>Riders and results]
-    routes --> ladder[ladder.py<br/>Allowed page client]
-    routes --> discord[discord_api.py<br/>Member and messaging REST]
-    routes --> firebase[firebase.py<br/>Firestore adapter]
+    callers["⚙️ Website and bot"] -->|HTTP requests| routes["🌙 main.py<br/>Routes and jobs"]
+    routes -->|Invoke| zwift["🐍 zwift.py<br/>Roster / organizer"]
+    routes -->|Invoke| zp["🐍 zwiftpower.py<br/>Riders / results"]
+    routes -->|Invoke| ladder["🐍 ladder.py<br/>Allowed page client"]
+    routes -->|Invoke| discord["🐍 discord_api.py<br/>Discord REST"]
+    routes -->|Invoke| firebase["🐍 firebase.py<br/>Firestore adapter"]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
 
 [main.py](../../apps/api/main.py) combines route registration, bearer checks, cached authenticated sessions and job orchestration. [zwift.py](../../apps/api/zwift.py), [zwiftpower.py](../../apps/api/zwiftpower.py) and [ladder.py](../../apps/api/ladder.py) own provider-specific requests and parsing. [discord_api.py](../../apps/api/discord_api.py) supplies Discord REST operations, and [firebase.py](../../apps/api/firebase.py) initializes Firestore with ADC and provides data helpers. The Flask module name does not make these independent services.
@@ -57,12 +83,25 @@ Change an external protocol in its adapter, and change caller authorization or t
 Purpose: prevent fixing a deployed copy while leaving its canonical source unchanged.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    source[packages/shared] -->|Direct imports| next[Website wrappers and services]
-    source -->|Explicit TARGETS mapping| sync[scripts/sync-shared.js]
-    sync -->|Constants and selected JS| bot[apps/bot copies]
-    sync -->|Constants JSON only| api[apps/api/constants.json]
-    check[CI check:shared] -->|Byte comparison| sync
+    source["📦 packages/shared"] ---|Directly imported by| next["🌐 Website wrappers and<br/>services"]
+    source ---|Source mapping| sync["📦 scripts/sync-shared.js"]
+    sync ---|Constants and selected<br/>JS copies| bot["🤖 apps/bot copies"]
+    sync ---|Constants JSON copy| api["🌙 apps/api/constants.json"]
+    check["🛠️ CI check:shared"] -->|Invoke byte comparison| sync
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
 ```
 
 There are deliberately **no npm workspaces**. Vercel installs the root package; Render installs `apps/bot`; Cloud Run's documented source root is `apps/api`. A bot import outside that directory would not exist in its build context.

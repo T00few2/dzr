@@ -11,11 +11,25 @@ Purpose: show the logical joins that matter when moving between website, Discord
 ```mermaid
 ---
 config:
+  theme: base
+  themeVariables:
+    primaryColor: '#eff6ff'
+    primaryTextColor: '#1f2328'
+    primaryBorderColor: '#1d4ed8'
+    lineColor: '#1d4ed8'
+    edgeLabelBackground: '#ffffff'
   er:
     nodeSpacing: 30
 ---
 erDiagram
     direction LR
+    DISCORD_IDENTITY["🎮 Discord identity"]
+    USERS["🔥 users"]
+    MEMBERSHIPS["🔥 memberships"]
+    PAYMENTS["🔥 payments"]
+    INTERVALS_CONNECTIONS["🔥 intervals_connections"]
+    COACH_PROFILE["🔥 coach_profiles"]
+    CALENDAR_ENTRIES["🔥 Calendar entries"]
     DISCORD_IDENTITY ||--o| USERS : "document ID"
     DISCORD_IDENTITY ||--o| MEMBERSHIPS : "document ID"
     DISCORD_IDENTITY ||--o{ PAYMENTS : "userId field"
@@ -70,21 +84,60 @@ Key adapters: [website Firebase Admin](../../app/utils/firebaseAdminConfig.js), 
 Purpose: distinguish daily ZwiftRacing snapshots from authenticated ZwiftPower reads and roster membership.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    zr[ZwiftRacing API] -->|Club and zrs.score| ingest[Website /api/zr/club/club]
-    ingest -->|UTC date snapshot and expiry field| stats[(club_stats)]
-    stats --> readers[Website stats, bot tools and Flask member views]
-    scheduler[Bot daily roster jobs] --> flask[Flask roster refresh]
-    sources[Zwift Companion and ZwiftPower] -->|Roster fetches| flask
-    flask -->|Diff and persist| rosters[(Roster collections)]
-    rosters --> readers
+    ingest["🌐 Club-stat ingestion API"] -->|Call fetchClubdata| adapter["📦 fetchZPdata helper"]
+    ingest -->|Write UTC-date snapshot| stats[("🔥 club_stats")]
+    readers["⚙️ Website, bot<br/>and Flask readers"] -->|Read snapshots| stats
+    adapter -->|Read club and<br/>rider statistics| zr["📊 ZwiftRacing API"]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    class zr external
+    linkStyle 3 stroke:#b91c1c,stroke-width:2px
 ```
 
 [fetchZPdata](../../app/utils/fetchZPdata.ts), despite its filename, calls `api.zwiftracing.app` for rider/club data and maps `zrs.score` to `racingScore`. [Club ingestion](../../app/api/zr/club/[club]/route.ts) stores `club_stats/{UTC-date}` with a 31-day expiry field. The writer does not establish that a Firestore TTL policy exists. A later request that day overwrites that date's snapshot.
 
 The bot reads latest/daily snapshots for many stats tools, while Ladder can request fresh ZwiftPower W/kg and a Zwift profile through Flask. Flask's rider queue is explicitly labeled legacy: it is no longer needed to supply racing scores to the member view. Do not introduce a new dependency on that queue based on older docs.
 
-[Flask roster refresh](../../apps/api/main.py) compares fetched members to stored records and protects against an empty or ID-less response deleting the roster. The triggering schedule is in the bot, but this repository does not establish who periodically calls website club-stat ingestion. See [operational gaps](findings.md#what-the-repository-cannot-establish).
+## Club rosters: how is membership refreshed?
+
+Purpose: show the requests behind the roster collections separately from rider-performance snapshots.
+
+```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
+flowchart TB
+    scheduler["🔁 Daily roster jobs"] -->|Request refresh| flask["🌙 Flask roster API"]
+    flask -->|Diff and persist| rosters[("🔥 Roster collections")]
+    readers["⚙️ Membership and<br/>growth readers"] -->|Read stored roster| rosters
+    flask -->|Fetch club rosters| sources["🧡 Zwift / 🩵 Companion<br/>⏱️ ZwiftPower rosters"]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    class sources external
+    linkStyle 3 stroke:#b91c1c,stroke-width:2px
+```
+
+[Flask roster refresh](../../apps/api/main.py) compares fetched members to stored records and protects against an empty or ID-less response deleting the roster. “Companion” identifies the club-roster feature visible in the app; Flask reads the Zwift API rather than automating the mobile application. The triggering schedule is in the bot, but this repository does not establish who periodically calls website club-stat ingestion. See [operational gaps](findings.md#what-the-repository-cannot-establish).
 
 ## Client rules versus feature ownership
 

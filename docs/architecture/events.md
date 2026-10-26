@@ -7,14 +7,29 @@
 Purpose: distinguish editable planning, the live Zwift feed and the two series models.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    seeds[Checked-in<br/>race arrays] -->|Initial catalog| catalogs[(series_catalogs)]
-    sheets[Google Sheets] -->|Initial weekly anchor| weekly[(series_schedules)]
-    catalogs -->|Route choices| weekly
-    catalogs -->|Route choices| generic[(event_series)]
-    weekly --> view[Website series and event views]
-    generic --> view
-    zwift[Public Zwift<br/>event feed] -->|Live matching| view
+    seeds["📦 Checked-in race arrays"] ---|Initial catalog source| catalogs[("🔥 series_catalogs")]
+    catalogs ---|Route choices| weekly[("🔥 series_schedules")]
+    catalogs ---|Route choices| generic[("🔥 event_series")]
+    weekly ---|Weekly schedule model| view["🌐 Series and event views"]
+    generic ---|Generic series model| view
+    sheets["📋 Google Sheets"] ---|Initial weekly anchor<br/>source| weekly
+    zwift["🧡 Public Zwift event feed"] ---|Live event lookup<br/>source| view
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    class sheets,zwift external
+    linkStyle 5,6 stroke:#b91c1c,stroke-width:2px
 ```
 
 [seriesCatalog](../../app/lib/seriesCatalog.ts) seeds After Party and Zwifty Fifty routes from checked-in arrays, then stores editable catalogs. [seriesSchedule](../../app/lib/seriesSchedule.ts) seeds weekly rotation from a published [Google Sheets](../../services/google-sheets.action.ts) row only when the stored schedule is absent. Sheets are not continuously synchronized back from Firestore.
@@ -30,30 +45,46 @@ Purpose: follow the unusual Render → Vercel → Cloud Run path and the separat
 ```mermaid
 ---
 config:
+  theme: base
+  themeVariables:
+    primaryColor: '#eff6ff'
+    primaryTextColor: '#1f2328'
+    primaryBorderColor: '#1d4ed8'
+    lineColor: '#1d4ed8'
+    actorBkg: '#eff6ff'
+    actorBorder: '#1d4ed8'
+    actorLineColor: '#1d4ed8'
+    signalColor: '#1d4ed8'
   sequence:
     actorMargin: 20
     width: 120
     wrap: true
+  themeCSS: |
+    rect.actor[name="Z"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
+    .actor-line[name="Z"] { stroke: #b91c1c !important; }
+    [data-from="Z"], [data-to="Z"] { stroke: #b91c1c !important; }
 ---
 sequenceDiagram
-    participant B as Bot scheduler
-    participant W as Website series services
-    participant F as Firestore
-    participant A as Flask organizer API
-    participant Z as Zwift and ZwiftPower
+    participant B as 🔁 Bot scheduler
+    participant W as 🌐 Website series services
+    participant F as 🔥 Firestore
+    participant A as 🌙 Flask organizer API
+    participant Z as 🧡 Zwift and ⏱️ ZwiftPower
+    rect rgb(255, 255, 255)
     B->>W: POST cron/weekly-series with dedicated bearer secret
     W->>F: Read rotation, catalog and published events
     W->>W: Check due time and match public feed event
     W->>A: Update event course with CONTENT_API_KEY
     A->>Z: Authenticate organizer and edit course
-    A-->>W: Updated event
+    Note over A,W: Updated event
     W->>F: Save published ID, route and timestamp
     Note over W,F: Website attempts Discord announcement separately
-    W-->>B: Applied, waiting, idle or error per job
+    Note over W,B: Applied, waiting, idle or error per job
     B->>A: POST zwiftpower/results/fix-due
     A->>F: Read due Fifty published-event state
     A->>Z: Fix result categories or configure sprints when due
     A->>F: Save processing markers
+    end
 ```
 
 Sources: [bot contentApi](../../apps/bot/services/contentApi.js), [cron route](../../app/api/cron/weekly-series/route.ts), [seriesApply](../../app/lib/seriesApply.ts), [groupRide](../../app/lib/groupRide.ts), [seriesDiscord](../../app/lib/seriesDiscord.ts), [Flask routes](../../apps/api/main.py), [ZwiftPower adapter](../../apps/api/zwiftpower.py). The bot attempts these checks on the half hour; the website decides whether each route is due. Weekly race routes wait until at least 24 hours after the previous event start and for a matching new event. Group ride uses its own due logic.
@@ -69,15 +100,28 @@ External edits, published-state writes and Discord posts are separate steps. A s
 Purpose: distinguish personal planning, Coach goals, provider workouts and signup boards.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  flowchart:
+    padding: 15
+    nodeSpacing: 35
+    rankSpacing: 40
+---
 flowchart TB
-    feed[Upcoming Zwift events] -->|Suggestions| ui[Member calendar page]
-    ui -->|Choose and copy event| calendar[(member_calendar entries)]
-    ui -->|Manual entry| calendar
-    goals[(Coach goal notes)] -->|Read-only projection| ui
-    coach[Coach tools] -->|Consent-gated planning entry| calendar
-    coach -->|Separate workout upsert| intervals[intervals.icu planned workouts]
-    calendar -->|Training context| coach
-    boards[Discord signup reactions or buttons] --> signups[(signup_boards)]
+    ui["💻 Calendar page"] -->|Request suggestions| feed["🌐 Calendar events API"]
+    ui -->|Read or edit entries| api["🌐 Calendar entry API"]
+    api -->|Read own goal pins| goals[("🔥 Coach goals")]
+    api -->|Read or write entries| calendar[("🔥 Personal calendar")]
+    coach["🤖 Coach tools"] -->|Read or consent-gated write| calendar
+    coach -->|Upsert workout| intervals["💓 intervals.icu<br/>Planned workouts"]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
+    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    class intervals external
+    linkStyle 5 stroke:#b91c1c,stroke-width:2px
 ```
 
 [Calendar events](../../app/api/calendar/events/route.ts) offers upcoming feed suggestions, not a complete season. Copying a suggestion into [calendar entries](../../app/api/calendar/route.ts) is not a subscription: later race changes do not automatically rewrite the copied entry. A stored racing score is only a category hint; the member chooses. WTRL-organized ZRL events are not supplied by the DZR-tagged feed.
