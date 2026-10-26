@@ -1,0 +1,12 @@
+{
+  "name": "dzr-architecture-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node check.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0",
+    "mermaid": "11.17.2"
+  }
+}
