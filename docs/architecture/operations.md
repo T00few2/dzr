@@ -86,7 +86,6 @@ flowchart TB
     event["🐙 PR or push to main"] ---|Triggers| site["🛠️ Site<br/>Types and lints<br/>Shared tests"]
     event ---|Triggers| bot["🛠️ Bot<br/>Tests and eval:dry"]
     event ---|Triggers| shared["🛠️ Shared copies<br/>Byte comparison"]
-    event ---|Triggers| docs["🛠️ Architecture<br/>Mermaid and links"]
     classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
     classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
     linkStyle default stroke:#1d4ed8
@@ -95,14 +94,13 @@ flowchart TB
     linkStyle 0 stroke:#0FBF3E
     linkStyle 1 stroke:#0FBF3E
     linkStyle 2 stroke:#0FBF3E
-    linkStyle 3 stroke:#0FBF3E
 ```
 
 </details>
 
 See [.github/workflows/ci.yml](../../.github/workflows/ci.yml). Site dependencies are installed at root; bot dependencies are installed under `apps/bot`. Bot CI disables install scripts because tests do not need the native `canvas` binary. A passing unit test suite is therefore not a rendered chart smoke test. There is no Python test lane in the existing workflow.
 
-Coach's `eval:dry` checks prompt structure without an API key. Live model comparisons are opt-in, incur API calls and are described in the root README; do not confuse the dry run with a measured model-quality result. Architecture tooling is isolated under [scripts/architecture](../../scripts/architecture/) and does not change either application lockfile.
+Coach's `eval:dry` checks prompt structure without an API key. Live model comparisons are opt-in, incur API calls and are described in the root README; do not confuse the dry run with a measured model-quality result. Diagram previews can be regenerated locally using the optional [renderer](../../scripts/architecture/render.mjs); architecture documentation has no CI job.
 
 Provider auto-deploy configuration is independent of this workflow. Nothing here proves deployments wait for CI to pass. Review [findings](findings.md#what-the-repository-cannot-establish) before assuming such a gate exists.
 

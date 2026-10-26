@@ -13,8 +13,7 @@
     "lint:bot": "eslint apps/bot --config eslint.bot.config.mjs --max-warnings 25",
     "test": "node --test \"packages/shared/**/*.test.js\"",
     "sync:shared": "node scripts/sync-shared.js",
-    "check:shared": "node scripts/sync-shared.js --check",
-    "check:architecture": "node scripts/architecture/check.mjs"
+    "check:shared": "node scripts/sync-shared.js --check"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.651.1",

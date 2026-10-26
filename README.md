@@ -2,7 +2,7 @@
 
 Canonical GitHub repo: [`T00few2/dzr`](https://github.com/T00few2/dzr). Production site: [www.dzrracingseries.com](https://www.dzrracingseries.com).
 
-**New contributor? Start with the [architecture guide and Mermaid diagrams](docs/architecture/README.md).** Follow the system overview and client/server technology stack into membership, bot automation, Coach, events, data, security and deployment. See [contributor instructions](AGENTS.md) for keeping it current.
+**New contributor? Start with the [architecture guide and Mermaid diagrams](docs/architecture/README.md).** Follow the system overview and client/server technology stack into membership, bot automation, Coach, events, data, security and deployment. See the [maintenance guide](docs/architecture/maintenance.md) for keeping it current.
 
 Three runtimes stay separate. Do not add npm workspaces (Vercel must keep using the root Next `package.json` only).
 
@@ -127,7 +127,7 @@ npm run eval
 - Next.js imports it via `app/lib/sharedConstants.ts`
 - Copies live in `apps/bot/constants.json` and `apps/api/constants.json` because Render and Cloud Run build those folders as the project root
 
-When you change shared sources, run `npm run sync:shared` and commit the mapped copies. `npm run check:shared` verifies them in CI. The [sync script](scripts/sync-shared.js) also maps selected shared JavaScript into the bot; see the [shared-module guide](docs/architecture/code-map.md#shared-source-why-are-there-copies-in-the-apps).
+When you change the shared file, copy it into both app trees before deploying bot or API.
 
 ## Rollback remotes
 

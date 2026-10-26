@@ -42,7 +42,7 @@ stateDiagram-v2
 
 </details>
 
-`/join` currently follows **Discord → payment → Zwift ID**. [Session helpers](../../app/api/onboarding/_lib/session.ts) store a 24-hour `onboarding_sessions` document and an HMAC-signed, HTTP-only cookie. Expiry checks reject the session; the diagram does not claim a worker writes the stored `expired` status or deletes the document.
+`/join` currently follows **Discord → payment → Zwift ID**. The [Discord callback](../../app/api/onboarding/discord/callback/route.ts) redirects to `/join/payment`; the [payment page](../../app/join/payment/page.tsx) sends successful payments to `/join/zwift-id`. The Zwift-ID API rejects submissions without payment coverage; already-paid members do not need to pay again. [Session helpers](../../app/api/onboarding/_lib/session.ts) store a 24-hour `onboarding_sessions` document and an HMAC-signed, HTTP-only cookie. Expiry checks reject the session; the diagram does not claim a worker writes the stored `expired` status or deletes the document.
 
 [Discord start](../../app/api/onboarding/discord/start/route.ts) requests `identify email guilds.join`. The [callback](../../app/api/onboarding/discord/callback/route.ts) verifies stored OAuth state, resolves the Discord identity and optionally joins the guild using `DISCORD_ONBOARDING_BOT_TOKEN`. A skipped or failed guild join does not stop the recorded Discord-link step. This flow works before the member qualifies for NextAuth login.
 

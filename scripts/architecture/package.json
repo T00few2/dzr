@@ -1,13 +1,11 @@
 {
-  "name": "dzr-architecture-checks",
+  "name": "dzr-architecture-previews",
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node check.mjs",
     "render": "node render.mjs"
   },
   "devDependencies": {
-    "jsdom": "26.1.0",
     "mermaid": "11.17.2",
     "playwright-core": "1.56.1"
   }

@@ -100,9 +100,9 @@ The overview groups external parties by purpose: **External Zwift sources**, **E
 
 1. Check each request direction against its caller and recipient; check each write against the implementation and access guard.
 2. Follow [maintenance guidance](../../../docs/architecture/maintenance.md) to update an existing view or create a focused detail.
-3. Run `npm ci --prefix scripts/architecture --ignore-scripts`, then `npm run check:architecture`. Basic prefix checks read the icon vocabulary from this file; request semantics, external classification and layout still require review.
+3. Check Mermaid syntax by rendering the source, and follow changed local links and heading anchors. Review icon prefixes, request semantics, external classification and layout against this skill.
 4. Render every changed diagram. Check normal-width text, icons, red external outlines/lines, arrowheads, crossing labels and dark/light theme legibility. Parsing alone cannot verify semantics or layout.
-5. Update navigation and code references in the same change. Mermaid fences are the canonical source. Regenerate and commit derived white-canvas SVG previews with `npm run render --prefix scripts/architecture`; the checker rejects stale source hashes or missing white background rectangles.
+5. Update navigation and code references in the same change. Mermaid fences are the canonical source. Regenerate and commit derived white-canvas SVG previews using the optional local renderer described in the maintenance guide. It is separate from application commands and CI.
 
 ## Layer and provider refinements
 
@@ -142,4 +142,4 @@ Every sequence must set `messageFontSize: 12` and include these exact theme CSS 
 :is(&) { background: #ffffff; }
 ```
 
-Do not replace the lifeline width with Mermaid's default or a provider-specific width. Provider rules may change lane color, while the shared 0.5 px rule controls thickness. The architecture checker enforces these source rules and copyable fences. When rendering, verify computed lifeline widths and message font sizes before committing generated previews.
+Do not replace the lifeline width with Mermaid's default or a provider-specific width. Provider rules may change lane color, while the shared 0.5 px rule controls thickness. Review these source rules and copyable fences whenever a sequence changes. The local renderer verifies computed lifeline widths and message font sizes before writing generated previews.

@@ -1,6 +1,6 @@
 # Maintaining architecture documentation
 
-[Architecture index](README.md) · Related: [repository instructions](../../AGENTS.md), [PR template](../../.github/pull_request_template.md), [CI](../../.github/workflows/ci.yml)
+[Architecture index](README.md) · Related: [Mermaid skill](../../.agents/skills/mermaid-architecture/SKILL.md), [operations](operations.md)
 
 Architecture review is part of the feature change, not a separate sign-off process. The developer or coding agent changing behavior owns the affected guide update. The reviewer checks whether the described behavior and code agree. A PR can explain that no architecture update is needed when the existing explanation remains accurate.
 
@@ -14,7 +14,7 @@ Create a new diagram when a **different question or abstraction level** needs ex
 
 ## Diagram conventions
 
-Apply the repository [Mermaid architecture skill](../../.agents/skills/mermaid-architecture/SKILL.md). It is the source of truth for the icon table, blue/red palette, request direction and diagram-type exceptions. Keep those conventions there instead of maintaining a second legend here.
+Apply the repository [Mermaid architecture skill](../../.agents/skills/mermaid-architecture/SKILL.md). It is the source of truth for the icon table, provider colors, request direction and diagram-type exceptions. Keep those conventions there instead of maintaining a second legend here.
 
 - Give every diagram a question-based heading, one-sentence purpose and short explanation of the consequences a contributor needs to know.
 - Use ordinary GitHub-compatible Mermaid: `flowchart`, `sequenceDiagram`, `stateDiagram-v2` or `erDiagram`. Use short labels, named boundaries and explicit relationship labels where direction is ambiguous.
@@ -23,30 +23,27 @@ Apply the repository [Mermaid architecture skill](../../.agents/skills/mermaid-a
 - Keep the index's terminology consistent. Label uncertain or incomplete behavior explicitly; never add a working edge solely because it seems architecturally desirable.
 - Keep diagrams in Markdown fences near their explanations. Generated SVG previews are derived artifacts; edit their Mermaid source and regenerate them instead of editing SVGs manually.
 
-## Local checks
+## Previewing diagrams
 
-From the repository root:
+The optional [local renderer](../../scripts/architecture/render.mjs) reproduces the checked-in previews. Its isolated [package](../../scripts/architecture/package.json) pins Mermaid and Playwright Core; the lockfile keeps dependency versions reproducible. It uses an existing Chromium installation rather than downloading a browser. From the repository root:
 
 ```sh
 npm ci --prefix scripts/architecture --ignore-scripts
-npm run check:architecture
-npm run check:shared
+npm run render --prefix scripts/architecture
 ```
 
-After editing a diagram, regenerate its derived white-canvas preview with `npm run render --prefix scripts/architecture`, then run the checker. Rendering needs Chromium (`/usr/bin/chromium` by default; set `ARCHITECTURE_CHROMIUM` for another executable). Commit the generated SVGs with the Mermaid changes. The checker verifies source hashes and the explicit white background rectangle without requiring a browser in CI.
+Rendering needs Chromium (`/usr/bin/chromium` by default; set `ARCHITECTURE_CHROMIUM` for another executable). It parses and renders the Mermaid sources, adds an opaque white canvas, and verifies that sequence lifelines render at 0.5 px and message labels at 12 px. Commit changed SVGs with their Mermaid sources. Ordinary prose edits do not require regeneration. This helper is not part of application builds or CI, and there is no root architecture-check command.
 
-GitHub displays the generated SVG preview on an opaque white canvas; expand **Editable Mermaid source** to edit or inspect the canonical Mermaid. Native Mermaid's scoped theme CSS does not reliably style the root SVG background. The generated preview covers the complete viewBox, including the margins outside the outermost boundary.
+GitHub displays the generated SVG preview on an opaque white canvas; expand the adjacent source section to edit or inspect the canonical Mermaid. Sequence sources use a plain-text fence and a code-copy button for Mermaid Live; copy only its contents, without Markdown backticks. Native Mermaid's scoped theme CSS does not reliably style the root SVG background. The generated preview covers the complete viewBox, including the margins outside the outermost boundary.
 
-The [isolated tool package](../../scripts/architecture/package.json) pins Mermaid and a DOM shim for parsing. It uses no application dependencies or browser downloads. The [checker](../../scripts/architecture/check.mjs) parses every Mermaid fence in repository Markdown and checks local links/fragments in the architecture guides, Mermaid skill and root workflow instructions. Architecture diagrams also get basic checks for skill icon prefixes, the flowchart palette and request-arrow notation. It reads the icon vocabulary directly from the skill. Invalid/unclosed fences, broken references and these convention violations fail with source locations. [CI](../../.github/workflows/ci.yml) runs the same command in its own job, independently of application checks.
-
-Syntax and notation checks do not establish that a request is drawn in the correct direction, that every external edge is colored correctly, or that GitHub runs exactly the pinned Mermaid release. Verify those against code and render changed diagrams before review. In GitHub's Markdown preview, inspect at normal width: labels should be legible without zoom, arrows should not hide labels, and a reader should follow a feature from [overview](overview.md) to the relevant implementation. For many changes, a local Mermaid browser renderer is useful; do not commit its generated output or add a second diagram source.
+Successful rendering does not establish that a request is drawn in the correct direction, that every external edge is colored correctly, or that GitHub runs exactly the pinned Mermaid release. Verify those against code. Inspect previews at normal width in light and dark mode: labels should be legible without zoom, arrows should not hide labels, and a reader should follow a feature from [overview](overview.md) to the relevant implementation. Follow changed file links and heading anchors manually; there is no automated documentation-link gate.
 
 ## Review checklist
 
 1. Check each changed relationship against the caller, callee, route guard and data writer, not just a filename.
 2. Follow the affected journey from overview → feature guide → implementation; verify every link.
 3. Compare names and ownership with [data](data.md), [security](security.md) and [operations](operations.md).
-4. Render changed diagrams and simplify crowded views. Run the syntax/link checker and relevant existing checks.
+4. Render changed diagrams and simplify crowded views. Check the skill's styling rules, especially sequence lane thickness, message-label size and the white canvas.
 5. Update [findings](findings.md) if a previously uncertain path is confirmed or resolved. Explain remaining limitations in the PR.
 
 Keep setup commands and secret-name inventories in the root README and env examples. Keep behavior explanations here. This avoids maintaining the same architecture narrative in multiple sources.
