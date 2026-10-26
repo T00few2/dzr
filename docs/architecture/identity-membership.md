@@ -76,6 +76,8 @@ config:
     width: 120
     wrap: true
   themeCSS: |
+    .messageText { font-size: 12px !important; }
+    :is(&) { background: #ffffff; }
     rect.actor[name="V"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
     .actor-line[name="V"] { stroke: #b91c1c !important; }
     [data-from="V"], [data-to="V"] { stroke: #b91c1c !important; }
@@ -149,9 +151,9 @@ flowchart TB
     paid["🔥 Paid coverage"] ---|Coverage rule| club["🌐 Club-role update"]
     web ---|Delivery failure<br/>record| queue[("🔥 role_updates")]
     club ---|Delivery failure<br/>record| queue
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
 ```
 
 </details>
@@ -190,6 +192,8 @@ config:
     width: 120
     wrap: true
   themeCSS: |
+    .messageText { font-size: 12px !important; }
+    :is(&) { background: #ffffff; }
     rect.actor[name="D"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
     .actor-line[name="D"] { stroke: #b91c1c !important; }
     [data-from="D"], [data-to="D"] { stroke: #b91c1c !important; }

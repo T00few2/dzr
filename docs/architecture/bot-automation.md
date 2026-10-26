@@ -31,12 +31,12 @@ flowchart LR
     entry -->|Messages| messages["🤖 Zwift ID and AI"]
     entry -->|Activity| stats["🤖 Activity"]
     entry -->|Reactions| reactions["🤖 Signups / approvals"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
     class gateway external
-    linkStyle 0 stroke:#b91c1c,stroke-width:2px
-    linkStyle 0 stroke:#b91c1c,stroke-width:2px
+    linkStyle 0 stroke:#b91c1c
+    linkStyle 0 stroke:#b91c1c
 ```
 
 </details>
@@ -77,6 +77,8 @@ config:
     width: 120
     wrap: true
   themeCSS: |
+    .messageText { font-size: 12px !important; }
+    :is(&) { background: #ffffff; }
     rect.actor[name="D"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
     .actor-line[name="D"] { stroke: #b91c1c !important; }
     [data-from="D"], [data-to="D"] { stroke: #b91c1c !important; }
@@ -152,11 +154,11 @@ flowchart TB
     api -->|Read allowed pages| ladder["🪜 Ladder website"]
     api -->|Read power and scores| racing["⏱️ ZwiftPower and 🧡 Zwift"]
     preview -->|Post image and embed| discord["🎮 Discord"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
     class ladder,racing,discord external
-    linkStyle 5,6,7 stroke:#b91c1c,stroke-width:2px
+    linkStyle 5,6,7 stroke:#b91c1c
 ```
 
 </details>

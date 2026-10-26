@@ -32,6 +32,8 @@ config:
     width: 120
     wrap: true
   themeCSS: |
+    .messageText { font-size: 12px !important; }
+    :is(&) { background: #ffffff; }
     rect.actor[name="I"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
     .actor-line[name="I"] { stroke: #b91c1c !important; }
     [data-from="I"], [data-to="I"] { stroke: #b91c1c !important; }
@@ -101,11 +103,11 @@ flowchart TB
     loop -->|Produce reply and<br/>account usage| reply["🤖 Reply and usage writer"]
     reply -->|Save opted-in session<br/>notes| store
     loop -->|Request answer or tool<br/>selection| ai["❋ OpenAI Responses API"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
     class ai external
-    linkStyle 9 stroke:#b91c1c,stroke-width:2px
+    linkStyle 9 stroke:#b91c1c
 ```
 
 </details>
@@ -147,9 +149,9 @@ flowchart TB
     wipe -->|Delete| connection[("🔥 Connection")]
     wipe -->|Delete| coachdata["🔥 Notes, usage<br/>and training caches"]
     wipe ---|Preserves| calendar[("🔥 Member calendar")]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
 ```
 
 </details>

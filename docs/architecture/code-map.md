@@ -35,13 +35,13 @@ flowchart TB
     routes -->|Invoke| adapters["📦 Firebase, Discord and<br/>Flask adapters"]
     lib -->|Invoke| adapters
     ui -->|Legacy shop and ZRL<br/>calls| client["🔥 Firebase client SDK"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
-    classDef provider4 fill:#ffffff,stroke:#f59e0b,stroke-width:2px,color:#111111
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
+    classDef provider4 fill:#ffffff,stroke:#f59e0b,color:#111111
     class ui provider4
-    linkStyle 2 stroke:#f59e0b,stroke-width:2px
-    linkStyle 8 stroke:#f59e0b,stroke-width:2px
+    linkStyle 2 stroke:#f59e0b
+    linkStyle 8 stroke:#f59e0b
 ```
 
 </details>
@@ -91,9 +91,9 @@ flowchart LR
     routes -->|Invoke| ladder["🐍 ladder.py<br/>Allowed page client"]
     routes -->|Invoke| discord["🐍 discord_api.py<br/>Discord REST"]
     routes -->|Invoke| firebase["🐍 firebase.py<br/>Firestore adapter"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
 ```
 
 </details>
@@ -131,9 +131,9 @@ flowchart TB
     sync ---|Constants and selected<br/>JS copies| bot["🤖 apps/bot copies"]
     sync ---|Constants JSON copy| api["🌙 apps/api/constants.json"]
     check["🛠️ CI check:shared"] -->|Invoke byte comparison| sync
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
 ```
 
 </details>

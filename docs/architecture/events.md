@@ -33,11 +33,11 @@ flowchart TB
     generic ---|Generic series model| view
     sheets["📋 Google Sheets"] ---|Initial weekly anchor<br/>source| weekly
     zwift["🧡 Public Zwift event feed"] ---|Live event lookup<br/>source| view
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
     class sheets,zwift external
-    linkStyle 5,6 stroke:#b91c1c,stroke-width:2px
+    linkStyle 5,6 stroke:#b91c1c
 ```
 
 </details>
@@ -76,6 +76,8 @@ config:
     width: 120
     wrap: true
   themeCSS: |
+    .messageText { font-size: 12px !important; }
+    :is(&) { background: #ffffff; }
     rect.actor[name="Z"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
     .actor-line[name="Z"] { stroke: #b91c1c !important; }
     [data-from="Z"], [data-to="Z"] { stroke: #b91c1c !important; }
@@ -143,15 +145,15 @@ flowchart TB
     api -->|Read or write entries| calendar[("🔥 Personal calendar")]
     coach["🤖 Coach tools"] -->|Read or consent-gated write| calendar
     coach -->|Upsert workout| intervals["💓 intervals.icu<br/>Planned workouts"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
     class intervals external
-    linkStyle 5 stroke:#b91c1c,stroke-width:2px
-    classDef provider4 fill:#ffffff,stroke:#f59e0b,stroke-width:2px,color:#111111
+    linkStyle 5 stroke:#b91c1c
+    classDef provider4 fill:#ffffff,stroke:#f59e0b,color:#111111
     class ui provider4
-    linkStyle 0 stroke:#f59e0b,stroke-width:2px
-    linkStyle 1 stroke:#f59e0b,stroke-width:2px
+    linkStyle 0 stroke:#f59e0b
+    linkStyle 1 stroke:#f59e0b
 ```
 
 </details>

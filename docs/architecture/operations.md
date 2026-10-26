@@ -30,21 +30,21 @@ flowchart TB
     repo ---|apps/bot filter| render["⧉ Render bot service<br/>apps/bot context<br/>⬡ Node.js 22"]
     repo ---|Documented source root| cloud["⏩ Google Cloud Run zwiftpower<br/>apps/api context<br/>🐍 Python 3"]
     render ---|One process| clients["🤖 Club and Coach clients"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
-    classDef provider0 fill:#ffffff,stroke:#111111,stroke-width:2px,color:#111111
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
+    classDef provider0 fill:#ffffff,stroke:#111111,color:#111111
     class vercel provider0
-    classDef provider1 fill:#ffffff,stroke:#8A05FF,stroke-width:2px,color:#111111
+    classDef provider1 fill:#ffffff,stroke:#8A05FF,color:#111111
     class render provider1
-    classDef provider2 fill:#ffffff,stroke:#4285F4,stroke-width:2px,color:#111111
+    classDef provider2 fill:#ffffff,stroke:#4285F4,color:#111111
     class cloud provider2
-    classDef provider3 fill:#ffffff,stroke:#0FBF3E,stroke-width:2px,color:#111111
+    classDef provider3 fill:#ffffff,stroke:#0FBF3E,color:#111111
     class repo provider3
-    linkStyle 0 stroke:#0FBF3E,stroke-width:2px
-    linkStyle 1 stroke:#0FBF3E,stroke-width:2px
-    linkStyle 2 stroke:#0FBF3E,stroke-width:2px
-    linkStyle 3 stroke:#8A05FF,stroke-width:2px
+    linkStyle 0 stroke:#0FBF3E
+    linkStyle 1 stroke:#0FBF3E
+    linkStyle 2 stroke:#0FBF3E
+    linkStyle 3 stroke:#8A05FF
 ```
 
 </details>
@@ -87,15 +87,15 @@ flowchart TB
     event ---|Triggers| bot["🛠️ Bot<br/>Tests and eval:dry"]
     event ---|Triggers| shared["🛠️ Shared copies<br/>Byte comparison"]
     event ---|Triggers| docs["🛠️ Architecture<br/>Mermaid and links"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
-    classDef provider3 fill:#ffffff,stroke:#0FBF3E,stroke-width:2px,color:#111111
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
+    classDef provider3 fill:#ffffff,stroke:#0FBF3E,color:#111111
     class event provider3
-    linkStyle 0 stroke:#0FBF3E,stroke-width:2px
-    linkStyle 1 stroke:#0FBF3E,stroke-width:2px
-    linkStyle 2 stroke:#0FBF3E,stroke-width:2px
-    linkStyle 3 stroke:#0FBF3E,stroke-width:2px
+    linkStyle 0 stroke:#0FBF3E
+    linkStyle 1 stroke:#0FBF3E
+    linkStyle 2 stroke:#0FBF3E
+    linkStyle 3 stroke:#0FBF3E
 ```
 
 </details>
@@ -136,18 +136,18 @@ flowchart TB
     check ---|Direct imports| web["▲ Website build context"]
     check ---|apps/bot paths trigger<br/>filter| bot["⧉ Render build context"]
     check ---|Constants copy when<br/>changed| api["⏩ Google Cloud Run build context"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
-    classDef provider0 fill:#ffffff,stroke:#111111,stroke-width:2px,color:#111111
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
+    classDef provider0 fill:#ffffff,stroke:#111111,color:#111111
     class web provider0
-    classDef provider1 fill:#ffffff,stroke:#8A05FF,stroke-width:2px,color:#111111
+    classDef provider1 fill:#ffffff,stroke:#8A05FF,color:#111111
     class bot provider1
-    classDef provider2 fill:#ffffff,stroke:#4285F4,stroke-width:2px,color:#111111
+    classDef provider2 fill:#ffffff,stroke:#4285F4,color:#111111
     class api provider2
-    classDef provider3 fill:#ffffff,stroke:#0FBF3E,stroke-width:2px,color:#111111
+    classDef provider3 fill:#ffffff,stroke:#0FBF3E,color:#111111
     class commit provider3
-    linkStyle 2 stroke:#0FBF3E,stroke-width:2px
+    linkStyle 2 stroke:#0FBF3E
 ```
 
 </details>

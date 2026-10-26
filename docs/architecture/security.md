@@ -32,6 +32,8 @@ config:
     width: 120
     wrap: true
   themeCSS: |
+    .messageText { font-size: 12px !important; }
+    :is(&) { background: #ffffff; }
     rect.actor[name="D"] { stroke: #b91c1c !important; fill: #fff1f2 !important; }
     .actor-line[name="D"] { stroke: #b91c1c !important; }
     [data-from="D"], [data-to="D"] { stroke: #b91c1c !important; }
@@ -117,20 +119,20 @@ flowchart TB
     bot -->|Read tokens and memory| db
     bot -->|Read training or write<br/>workouts| intervals["💓 intervals.icu"]
     bot -->|Request coaching using<br/>selected context| openai["❋ OpenAI"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
     class intervals,openai external
-    linkStyle 3,4 stroke:#b91c1c,stroke-width:2px
-    style vercel fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#1f2328
-    style render fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#1f2328
-    classDef provider0 fill:#ffffff,stroke:#111111,stroke-width:2px,color:#111111
+    linkStyle 3,4 stroke:#b91c1c
+    style vercel fill:#f3f4f6,stroke:#9ca3af,color:#1f2328
+    style render fill:#f3f4f6,stroke:#9ca3af,color:#1f2328
+    classDef provider0 fill:#ffffff,stroke:#111111,color:#111111
     class vercel provider0
-    classDef provider1 fill:#ffffff,stroke:#8A05FF,stroke-width:2px,color:#111111
+    classDef provider1 fill:#ffffff,stroke:#8A05FF,color:#111111
     class render provider1
-    classDef provider4 fill:#ffffff,stroke:#f59e0b,stroke-width:2px,color:#111111
+    classDef provider4 fill:#ffffff,stroke:#f59e0b,color:#111111
     class browser provider4
-    linkStyle 0 stroke:#f59e0b,stroke-width:2px
+    linkStyle 0 stroke:#f59e0b
 ```
 
 </details>

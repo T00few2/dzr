@@ -39,23 +39,23 @@ flowchart LR
     dzr -->|Use shared tools| tools["⚙️ Ext. tools"]
     tools -->|Payment webhooks| dzr
     integrations ---|OAuth uses browser redirects| dzr
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
     class sources,integrations,tools external
-    linkStyle 3,4,5 stroke:#b91c1c,stroke-width:2px
-    style people fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#1f2328
-    classDef provider5 fill:#ffffff,stroke:#6B7280,stroke-width:2px,color:#111111
+    linkStyle 3,4,5 stroke:#b91c1c
+    style people fill:#f3f4f6,stroke:#9ca3af,color:#1f2328
+    classDef provider5 fill:#ffffff,stroke:#6B7280,color:#111111
     class people,member provider5
-    classDef provider6 fill:#ffffff,stroke:#6B7280,stroke-width:2px,color:#111111
+    classDef provider6 fill:#ffffff,stroke:#6B7280,color:#111111
     class visitor provider6
-    classDef provider7 fill:#ffffff,stroke:#6B7280,stroke-width:2px,color:#111111
+    classDef provider7 fill:#ffffff,stroke:#6B7280,color:#111111
     class staff provider7
-    linkStyle 0 stroke:#6B7280,stroke-width:2px
-    linkStyle 1 stroke:#6B7280,stroke-width:2px
-    linkStyle 2 stroke:#6B7280,stroke-width:2px
-    linkStyle 6 stroke:#b91c1c,stroke-width:2px
-    linkStyle 7 stroke:#b91c1c,stroke-width:2px
+    linkStyle 0 stroke:#6B7280
+    linkStyle 1 stroke:#6B7280
+    linkStyle 2 stroke:#6B7280
+    linkStyle 6 stroke:#b91c1c
+    linkStyle 7 stroke:#b91c1c
 ```
 
 </details>
@@ -115,27 +115,27 @@ flowchart TB
     bot -->|Service-key request| api
     web -->|OAuth and REST| discord["🎮 Discord"]
     bot -->|Gateway and REST| discord
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
     discord -->|Deliver gateway events| bot
     class discord external
-    linkStyle 4,5 stroke:#b91c1c,stroke-width:2px
-    classDef provider0 fill:#ffffff,stroke:#111111,stroke-width:2px,color:#111111
+    linkStyle 4,5 stroke:#b91c1c
+    classDef provider0 fill:#ffffff,stroke:#111111,color:#111111
     class web,web provider0
-    classDef provider1 fill:#ffffff,stroke:#8A05FF,stroke-width:2px,color:#111111
+    classDef provider1 fill:#ffffff,stroke:#8A05FF,color:#111111
     class bot,bot provider1
-    classDef provider2 fill:#ffffff,stroke:#4285F4,stroke-width:2px,color:#111111
+    classDef provider2 fill:#ffffff,stroke:#4285F4,color:#111111
     class api,api provider2
-    classDef provider4 fill:#ffffff,stroke:#f59e0b,stroke-width:2px,color:#111111
+    classDef provider4 fill:#ffffff,stroke:#f59e0b,color:#111111
     class clientLayer,browser provider4
-    linkStyle 0 stroke:#f59e0b,stroke-width:2px
-    linkStyle 1 stroke:#8A05FF,stroke-width:2px
-    linkStyle 2 stroke:#111111,stroke-width:2px
-    linkStyle 3 stroke:#8A05FF,stroke-width:2px
-    linkStyle 4 stroke:#111111,stroke-width:2px
-    linkStyle 5 stroke:#8A05FF,stroke-width:2px
-    linkStyle 6 stroke:#b91c1c,stroke-width:2px
+    linkStyle 0 stroke:#f59e0b
+    linkStyle 1 stroke:#8A05FF
+    linkStyle 2 stroke:#111111
+    linkStyle 3 stroke:#8A05FF
+    linkStyle 4 stroke:#111111
+    linkStyle 5 stroke:#8A05FF
+    linkStyle 6 stroke:#b91c1c
 ```
 
 </details>

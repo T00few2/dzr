@@ -117,11 +117,11 @@ flowchart TB
     ingest -->|Write UTC-date snapshot| stats[("🔥 club_stats")]
     readers["⚙️ Website, bot<br/>and Flask readers"] -->|Read snapshots| stats
     adapter -->|Read club and<br/>rider statistics| zr["📊 ZwiftRacing API"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
     class zr external
-    linkStyle 3 stroke:#b91c1c,stroke-width:2px
+    linkStyle 3 stroke:#b91c1c
 ```
 
 </details>
@@ -158,11 +158,11 @@ flowchart TB
     flask -->|Diff and persist| rosters[("🔥 Roster collections")]
     readers["⚙️ Membership and<br/>growth readers"] -->|Read stored roster| rosters
     flask -->|Fetch club rosters| sources["🧡 Zwift / 🩵 Companion<br/>⏱️ ZwiftPower rosters"]
-    classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-    classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-    linkStyle default stroke:#1d4ed8,stroke-width:2px
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
     class sources external
-    linkStyle 3 stroke:#b91c1c,stroke-width:2px
+    linkStyle 3 stroke:#b91c1c
 ```
 
 </details>

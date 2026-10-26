@@ -69,11 +69,11 @@ Color every entity outline and connection line. Color a connection red when eith
 For flowcharts, use these native styles, assign `external` to the relevant IDs, and color the corresponding zero-based links red with `linkStyle`. Keep external links together and comment their indices when useful. Recheck indices after changing edges. Style subgraph boundaries explicitly with the same palette.
 
 ```text
-classDef default fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px,color:#1f2328
-classDef external fill:#fff1f2,stroke:#b91c1c,stroke-width:2px,color:#1f2328
-linkStyle default stroke:#1d4ed8,stroke-width:2px
+classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+linkStyle default stroke:#1d4ed8
 class discord external
-linkStyle 0 stroke:#b91c1c,stroke-width:2px
+linkStyle 0 stroke:#b91c1c
 ```
 
 For sequence, state and ER diagrams, use `theme: base` and blue `primaryBorderColor` / `lineColor` in Mermaid front matter. Sequence diagrams also set blue `actorBorder`, `actorLineColor` and `signalColor`. Keep `actorMargin: 20`, `width: 120` and `wrap: true` unless the rendered view needs another layout.
@@ -125,3 +125,5 @@ Technology inventories use top-down layouts. Invisible layout links can arrange 
 These colors supersede the earlier two-color palette. Keep white chart backgrounds in light and dark mode. Opposing requests use two separately labeled directed lines. Show implemented callbacks separately; distinguish server webhooks, gateway deliveries and browser-mediated OAuth redirects.
 
 Connection labels use 12 px text (flowchart `.edgeLabel` and sequence `messageFontSize`); entity labels keep their normal size. Technology-stack overviews combine client/server or Render/Google Cloud Run in a single top-down diagram with separate neutral boundaries.
+
+Use normal stroke widths by default. Reserve explicit thicker strokes for a deliberately highlighted small subset of entities or connections. Sequence diagrams require `messageFontSize: 12`, `.messageText { font-size: 12px !important; }` and `:is(&) { background: #ffffff; }` in `themeCSS`. Keep the full-viewBox white rectangle in generated previews as well.
