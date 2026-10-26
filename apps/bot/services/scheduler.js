@@ -260,19 +260,31 @@ function sprintDm(row) {
     : "The Zwifty Fifty sprints were checked. No sprints to set.";
 }
 
+function movedRiders(row) {
+  if (Array.isArray(row?.updated)) return row.updated;
+  return Array.isArray(row?.changes) ? row.changes : [];
+}
+
 function categoryDm(row) {
   if (!row) return "";
   if (row.expired && row.pending) return "The Zwifty Fifty categories were not moved. ZwiftPower had no results within 4 hours of the start.";
   if (row.pending) return "";
-  const moved = Array.isArray(row.updated) ? row.updated.length : (row.changes || []).length;
+  const moved = movedRiders(row).length;
   return moved
     ? `The Zwifty Fifty categories moved ${moved} rider${moved === 1 ? "" : "s"} off WKG.`
     : "The Zwifty Fifty categories were checked. No WKG riders to move.";
 }
 
+function categoryDmKey(row) {
+  if (row?.expired) return `weekly_categories_expired_${row.eventId}`;
+  const ids = movedRiders(row).map((rider) => rider?.zwid).filter(Boolean).sort().join(",");
+  return ids ? `weekly_categories_${row.eventId}_${ids}` : `weekly_categories_${row.eventId}`;
+}
+
 /**
- * Twice an hour, move WKG finishers from 1.5 to 4 hours after the Fifty starts,
- * and set sprints about a day after Apply. The API decides whether a race is due.
+ * Twice an hour, move WKG finishers from 1.5 to 4 hours after the Fifty starts.
+ * A race stays in that window after riders have already been moved, so later WKG results are still picked up.
+ * Sprints are set about a day after Apply. The API decides whether a race is due.
  */
 async function checkFiftyResultsFix(client) {
   try {
@@ -281,8 +293,7 @@ async function checkFiftyResultsFix(client) {
     for (const row of result?.categories?.results || []) {
       const text = categoryDm(row);
       if (!text) continue;
-      const key = row.expired ? `weekly_categories_expired_${row.eventId}` : `weekly_categories_${row.eventId}`;
-      await dmOnce(client, key, text);
+      await dmOnce(client, categoryDmKey(row), text);
     }
     for (const row of result?.sprints?.results || []) {
       const text = sprintDm(row);

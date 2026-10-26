@@ -49,6 +49,7 @@ test("categories run from 1.5 hours after the start until 4 hours", () => {
   const start = "2026-10-25T12:45:00.000Z";
   assert.match(categoryLine({ checked: false, start, now: new Date("2026-10-25T13:00:00.000Z") }), /^Categories: not due yet\. From /);
   assert.strictEqual(categoryLine({ checked: false, start, now: new Date("2026-10-25T14:30:00.000Z") }), "Categories: waiting.");
+  assert.match(categoryLine({ checked: true, start, now: new Date("2026-10-25T14:30:00.000Z") }), /^Categories: checking until /);
   assert.strictEqual(categoryLine({ checked: false, start, now: new Date("2026-10-25T17:00:00.000Z") }), "Categories: not checked.");
   assert.strictEqual(categoryLine({ checked: true, start, now: new Date("2026-10-25T17:00:00.000Z") }), "Categories: checked.");
 });

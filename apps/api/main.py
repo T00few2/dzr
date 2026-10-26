@@ -633,7 +633,11 @@ def _event_start(inspected: dict) -> datetime:
 
 
 def _fix_due_fifty_results() -> dict:
-    """Move WKG finishers from 1.5 hours after the start until 4 hours after."""
+    """Move WKG finishers from 1.5 hours after the start until 4 hours after.
+
+    A pass that already moved riders does not finish the job. Each check inside the
+    window looks again, so riders who land on WKG later are still moved. After 4 hours it stops.
+    """
     doc = firebase.get_document("series_schedules", "zwifty-fifty") or {}
     events = doc.get("events") or {}
     now = datetime.now(timezone.utc)
@@ -643,7 +647,7 @@ def _fix_due_fifty_results() -> dict:
     due = []
     expired = []
     for date, row in events.items():
-        if not isinstance(row, dict) or row.get("resultsFix"):
+        if not isinstance(row, dict):
             continue
         try:
             event_date = datetime.strptime(str(date), "%Y-%m-%d").date()
@@ -657,6 +661,8 @@ def _fix_due_fifty_results() -> dict:
         start = _event_start(get_authenticated_organizer_api().inspect_event(int(event_id)))
         if start + timedelta(minutes=90) <= now < start + timedelta(hours=4):
             due.append(int(event_id))
+        elif row.get("resultsFix"):
+            continue
         elif start + timedelta(hours=4) <= now < start + timedelta(hours=12):
             expired.append(int(event_id))
     if not due and not expired:
@@ -944,7 +950,7 @@ def zwiftpower_event_sprints(event_id: int):
 
 @app.route('/api/zwiftpower/results/fix-due', methods=['POST'])
 def zwiftpower_fix_due_results():
-    """Move categories from 1.5 to 4 hours after the start, and set sprints about a day after Apply. Auth: Bearer CONTENT_API_KEY."""
+    """Move categories from 1.5 to 4 hours after the start, checking again every pass until that window ends, and set sprints about a day after Apply. Auth: Bearer CONTENT_API_KEY."""
     unauthorized = require_api_or_401()
     if unauthorized:
         return unauthorized

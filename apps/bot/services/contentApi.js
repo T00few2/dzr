@@ -197,7 +197,9 @@ async function refreshZwiftPowerRoster() {
 }
 
 /**
- * Move WKG Zwifty Fifty finishers from 1.5 to 4 hours after the start, and set sprints about a day after Apply.
+ * Move WKG Zwifty Fifty finishers from 1.5 to 4 hours after the start.
+ * Each check inside that window runs again, including after riders have already been moved.
+ * Sprints are set about a day after Apply.
  */
 async function fixDueFiftyResults() {
   const response = await axios.post(`${API_BASE_URL}/api/zwiftpower/results/fix-due`, {}, {

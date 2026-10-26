@@ -62,13 +62,12 @@ function sprintLine({ set, publishedAt, now }) {
 }
 
 function categoryLine({ checked, start, now }) {
-  if (checked) return "Categories: checked.";
   const from = start ? hoursAfter(start, 1.5) : null;
   const to = start ? hoursAfter(start, 4) : null;
-  if (!from || !to) return "Categories: not due yet.";
+  if (!from || !to) return checked ? "Categories: checked." : "Categories: not due yet.";
   if (now < from) return `Categories: not due yet. From ${formatWhen(from)} to ${formatWhen(to)}.`;
-  if (now < to) return "Categories: waiting.";
-  return "Categories: not checked.";
+  if (now < to) return checked ? `Categories: checking until ${formatWhen(to)}.` : "Categories: waiting.";
+  return checked ? "Categories: checked." : "Categories: not checked.";
 }
 
 module.exports = {
