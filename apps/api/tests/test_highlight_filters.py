@@ -40,9 +40,11 @@ class HighlightFilterTests(unittest.TestCase):
         )
         patch.object(main, "_club_member_zwift_ids_cache", None).start()
         patch.object(main, "_club_member_zwift_ids_cache_ts", None).start()
+        patch.object(main, "_club_member_role_id_cache", None).start()
         self.clock = patch.object(main.time, "time", return_value=1000).start()
         patch.dict(os.environ, {"DISCORD_GUILD_ID": "guild", "DISCORD_BOT_TOKEN": "unused"}).start()
-        patch.object(main, "CLUB_MEMBER_ROLE_ID", "club").start()
+        self.membership = {"membership": {"clubMemberRoleId": "club"}}
+        self.settings = patch.object(firebase, "get_document", side_effect=self._membership_settings).start()
         self.users = patch.object(firebase, "get_collection", return_value=[
             {"discordId": "both", "zwiftId": "42"},
             {"discordId": "verified", "zwiftId": 43},
@@ -67,6 +69,10 @@ class HighlightFilterTests(unittest.TestCase):
         }
         patch.object(main, "get_authenticated_session", return_value=self.weekly_session).start()
         self.analyze = patch.object(ZwiftPower, "analyze_team_results", return_value={}).start()
+
+    def _membership_settings(self, collection, doc_id):
+        self.assertEqual((collection, doc_id), ("system_settings", "global"))
+        return self.membership
 
     def post(self, path):
         with patch.object(main, "require_api_or_401", return_value=None), patch.object(main, "datetime") as clock:
@@ -111,23 +117,47 @@ class HighlightFilterTests(unittest.TestCase):
                     self.assertEqual(self.post(endpoint).status_code, 200)
                 self.members.assert_called_once()
 
-    def test_club_role_override_controls_selection(self):
-        with patch.object(main, "CLUB_MEMBER_ROLE_ID", "other-club"):
-            self.members.return_value[1]["role_ids"].append("other-club")
-            self.assertEqual(main._get_club_member_zwift_ids(), {"43"})
+    def test_membership_setting_controls_selection(self):
+        self.membership["membership"]["clubMemberRoleId"] = "other-club"
+        self.members.return_value[1]["role_ids"].append("other-club")
+        self.assertEqual(main._get_club_member_zwift_ids(), {"43"})
+
+    def test_membership_role_change_refreshes_the_cached_audience(self):
+        self.assertEqual(main._get_club_member_zwift_ids(), {"42", "44"})
+        self.membership["membership"]["clubMemberRoleId"] = "other-club"
+        self.members.return_value[1]["role_ids"].append("other-club")
+        self.assertEqual(main._get_club_member_zwift_ids(), {"43"})
+        self.assertEqual(self.members.call_count, 2)
 
     def test_empty_club_role_skips_lookups_and_caches_no_riders(self):
-        for role_id in [None, "", "  "]:
-            with self.subTest(role_id=role_id), patch.object(main, "CLUB_MEMBER_ROLE_ID", role_id):
+        cases = [
+            {"membership": {"clubMemberRoleId": None}},
+            {"membership": {"clubMemberRoleId": ""}},
+            {"membership": {"clubMemberRoleId": "  "}},
+            {"membership": {}},
+            {},
+            None,
+        ]
+        for membership in cases:
+            with self.subTest(membership=membership):
+                self.membership = membership
                 self.assertEqual(main._get_club_member_zwift_ids(force_refresh=True), set())
                 self.assertEqual(main._club_member_zwift_ids_cache, set())
+                self.assertEqual(main._club_member_role_id_cache, "")
                 self.assertEqual(main._club_member_zwift_ids_cache_ts, self.clock.return_value)
         self.users.assert_not_called()
         self.members.assert_not_called()
 
+    def test_membership_settings_errors_select_no_riders(self):
+        self.settings.side_effect = RuntimeError("Settings unavailable")
+        self.assertEqual(main._get_club_member_zwift_ids(), set())
+        self.assertEqual(main._club_member_role_id_cache, "")
+        self.users.assert_not_called()
+        self.members.assert_not_called()
+
     def test_club_role_ignores_surrounding_whitespace(self):
-        with patch.object(main, "CLUB_MEMBER_ROLE_ID", " club "):
-            self.assertEqual(main._get_club_member_zwift_ids(), {"42", "44"})
+        self.membership["membership"]["clubMemberRoleId"] = " club "
+        self.assertEqual(main._get_club_member_zwift_ids(), {"42", "44"})
 
     def test_member_lookup_errors_select_no_riders(self):
         for lookup in [self.users, self.members]:

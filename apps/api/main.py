@@ -86,44 +86,63 @@ VERIFIED_MEMBER_ROLE_ID = os.getenv(
     "DISCORD_VERIFIED_MEMBER_ROLE_ID", _SHARED_ROLES.get("verifiedMember", "1385216556166025347")
 )
 
-CLUB_MEMBER_ROLE_ID = os.getenv("DISCORD_CLUB_MEMBER_ROLE_ID", "1438296312977166357")
-
 # Cache for Club Member Zwift IDs, shared by daily and weekly commentary.
 _club_member_zwift_ids_cache: Optional[set[str]] = None
 _club_member_zwift_ids_cache_ts: Optional[float] = None
+_club_member_role_id_cache: Optional[str] = None
 MEMBER_ZWIFT_IDS_CACHE_TTL_SECONDS = int(os.getenv("VERIFIED_ZWIFT_IDS_CACHE_TTL_SECONDS", "900"))  # 15 min
+
+
+def _membership_club_member_role_id() -> str:
+    """Club Member role saved in system_settings/global.membership.clubMemberRoleId."""
+    try:
+        settings = firebase.get_document("system_settings", "global") or {}
+    except Exception as e:
+        print(f"[WARN] Failed to load Club Member role from membership settings: {e}")
+        return ""
+    if not isinstance(settings, dict):
+        return ""
+    membership = settings.get("membership") or {}
+    if not isinstance(membership, dict):
+        return ""
+    return str(membership.get("clubMemberRoleId") or "").strip()
+
+
+def _remember_club_member_zwift_ids(zwift_ids: set[str], role_id: str, now: float) -> set[str]:
+    global _club_member_zwift_ids_cache, _club_member_zwift_ids_cache_ts, _club_member_role_id_cache
+    _club_member_zwift_ids_cache = zwift_ids
+    _club_member_role_id_cache = role_id
+    _club_member_zwift_ids_cache_ts = now
+    return zwift_ids
 
 
 def _get_club_member_zwift_ids(force_refresh: bool = False) -> set[str]:
     """
-    Return linked Zwift IDs for Discord members with the configured Club Member role.
+    Return linked Zwift IDs for Discord members with the Club Member role
+    configured in membership settings.
 
     Source of truth:
+      - system_settings/global membership.clubMemberRoleId
       - Discord guild member roles (role_ids)
       - Firestore users collection for discordId -> zwiftId link
     """
-    global _club_member_zwift_ids_cache, _club_member_zwift_ids_cache_ts
-
+    role_id = _membership_club_member_role_id()
     now = time.time()
     if (not force_refresh
         and _club_member_zwift_ids_cache is not None
+        and _club_member_role_id_cache == role_id
         and _club_member_zwift_ids_cache_ts is not None
         and (now - _club_member_zwift_ids_cache_ts) < MEMBER_ZWIFT_IDS_CACHE_TTL_SECONDS):
         return _club_member_zwift_ids_cache
 
-    role_id = str(CLUB_MEMBER_ROLE_ID or "").strip()
     if not role_id:
-        _club_member_zwift_ids_cache = set()
-        _club_member_zwift_ids_cache_ts = now
-        return _club_member_zwift_ids_cache
+        return _remember_club_member_zwift_ids(set(), role_id, now)
 
     guild_id = os.environ.get("DISCORD_GUILD_ID")
     bot_token = os.environ.get("DISCORD_BOT_TOKEN")
     if not guild_id or not bot_token:
         # Don't hard-fail cron endpoints if env is misconfigured; just return empty allowlist.
-        _club_member_zwift_ids_cache = set()
-        _club_member_zwift_ids_cache_ts = now
-        return _club_member_zwift_ids_cache
+        return _remember_club_member_zwift_ids(set(), role_id, now)
 
     # Build discordId -> zwiftId lookup from Firestore users
     discord_to_zwift: dict[str, str] = {}
@@ -161,9 +180,7 @@ def _get_club_member_zwift_ids(force_refresh: bool = False) -> set[str]:
         print(f"[WARN] Failed to build Club Member allowlist from Discord: {e}")
         club_member_zwift_ids = set()
 
-    _club_member_zwift_ids_cache = club_member_zwift_ids
-    _club_member_zwift_ids_cache_ts = now
-    return club_member_zwift_ids
+    return _remember_club_member_zwift_ids(club_member_zwift_ids, role_id, now)
 
 CONTENT_API_KEY = os.getenv("CONTENT_API_KEY", "your_content_api_key")
 ZWIFT_CLUB_ID = os.getenv("ZWIFT_CLUB_ID", "")  # Optional default for roster refresh
