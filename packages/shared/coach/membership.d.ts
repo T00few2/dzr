@@ -11,3 +11,10 @@ export function isPaidClubMember(
   collections: MembershipCollections,
   discordId: string
 ): Promise<boolean>
+
+/** Same check, but Firestore errors are thrown instead of read as "not paid". */
+export function readPaidClubMember(
+  db: any,
+  collections: MembershipCollections,
+  discordId: string
+): Promise<boolean>

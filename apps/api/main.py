@@ -1084,28 +1084,40 @@ def rider_data(rider_id: int):
         return jsonify({"error": str(e)}), 500
 
 def _racing_score_and_category(profile):
-    """Racing score and the rider's category. None when Zwift has no score."""
-    if not profile:
-        return None
-    metrics = profile.get("competitionMetrics") or {}
+    """Racing score and the rider's category; both None when Zwift has no score."""
+    metrics = (profile or {}).get("competitionMetrics") or {}
     score = metrics.get("racingScore")
     if score is None:
-        return None
+        return {"racingScore": None, "category": None}
     women = profile.get("male") is False
     category = metrics.get("categoryWomen") if women else metrics.get("category")
     return {"racingScore": score, "category": category}
 
 
+def _profile_identity(profile):
+    """Who the rider is, for confirming a Zwift ID. None only when Zwift has no such profile."""
+    if not profile or not profile.get("id"):
+        return None
+    avatar = profile.get("imageSrcLarge") or profile.get("imageSrc")
+    return {
+        "firstName": profile.get("firstName"),
+        "lastName": profile.get("lastName"),
+        "countryCode": profile.get("countryAlpha3") or profile.get("countryCode"),
+        "avatar": avatar if isinstance(avatar, str) and avatar.startswith("https://") else None,
+        **_racing_score_and_category(profile),
+    }
+
+
 @app.route('/zwift_profile/<int:rider_id>', methods=['GET'])
 def zwift_profile(rider_id: int):
-    """Racing score and category for a rider; null when the rider or the score does not exist"""
+    """Name, country, avatar, racing score and category; null only when the profile does not exist"""
     try:
         unauthorized = require_api_or_401()
         if unauthorized:
             return unauthorized
         zwift_api = get_authenticated_zwift_api()
         zwift_api.ensure_valid_token()
-        return jsonify(_racing_score_and_category(zwift_api.get_profile(rider_id)))
+        return jsonify(_profile_identity(zwift_api.get_profile(rider_id)))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

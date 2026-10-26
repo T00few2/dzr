@@ -11,6 +11,48 @@
 // bot, adminDb in Next), and this module must not import either.
 
 /**
+ * Paid DZR club membership for the current year, read strictly: Firestore errors are thrown.
+ *
+ * For callers that must tell "not paid" apart from "could not check" (onboarding records what it
+ * sent, so a lookup blip must not become a permanent "go and pay" message).
+ *
+ * @param {object} db Firestore instance (bot `db` or Next `adminDb`)
+ * @param {object} collections Collection names, e.g. { memberships, payments }
+ * @param {string} discordId
+ * @returns {Promise<boolean>}
+ */
+async function readPaidClubMember(db, collections, discordId) {
+  const id = String(discordId || "").trim();
+  if (!id) return false;
+  const year = new Date().getUTCFullYear();
+  const membershipSnap = await db.collection(collections.memberships).doc(id).get();
+  const membership = membershipSnap.exists ? membershipSnap.data() || {} : {};
+  if (
+    String(membership.currentStatus || "") === "club" &&
+    typeof membership.coveredThroughYear === "number" &&
+    membership.coveredThroughYear >= year
+  ) {
+    return true;
+  }
+
+  // Fall back to the payment record, in case the rollup on memberships is stale.
+  const paymentsSnap = await db
+    .collection(collections.payments)
+    .where("userId", "==", id)
+    .where("status", "==", "succeeded")
+    .get();
+
+  let maxCovered = null;
+  paymentsSnap.forEach((doc) => {
+    const covered = doc.data()?.coveredThroughYear;
+    if (typeof covered === "number" && (maxCovered == null || covered > maxCovered)) {
+      maxCovered = covered;
+    }
+  });
+  return maxCovered != null && maxCovered >= year;
+}
+
+/**
  * Paid DZR club membership for the current year.
  *
  * A Verified Member / community Discord role is deliberately not enough — those are free.
@@ -22,39 +64,12 @@
  * @returns {Promise<boolean>}
  */
 async function isPaidClubMember(db, collections, discordId) {
-  const id = String(discordId || "").trim();
-  if (!id) return false;
-  const year = new Date().getUTCFullYear();
   try {
-    const membershipSnap = await db.collection(collections.memberships).doc(id).get();
-    const membership = membershipSnap.exists ? membershipSnap.data() || {} : {};
-    if (
-      String(membership.currentStatus || "") === "club" &&
-      typeof membership.coveredThroughYear === "number" &&
-      membership.coveredThroughYear >= year
-    ) {
-      return true;
-    }
-
-    // Fall back to the payment record, in case the rollup on memberships is stale.
-    const paymentsSnap = await db
-      .collection(collections.payments)
-      .where("userId", "==", id)
-      .where("status", "==", "succeeded")
-      .get();
-
-    let maxCovered = null;
-    paymentsSnap.forEach((doc) => {
-      const covered = doc.data()?.coveredThroughYear;
-      if (typeof covered === "number" && (maxCovered == null || covered > maxCovered)) {
-        maxCovered = covered;
-      }
-    });
-    return maxCovered != null && maxCovered >= year;
+    return await readPaidClubMember(db, collections, discordId);
   } catch (err) {
     console.error("isPaidClubMember failed", err?.message || err);
     return false;
   }
 }
 
-module.exports = { isPaidClubMember };
+module.exports = { isPaidClubMember, readPaidClubMember };

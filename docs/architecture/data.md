@@ -72,6 +72,7 @@ Coach notes and calendar entries are subcollections beneath Discord-ID parents. 
 | `verificationSettings`, `selfRoles`, `roleApprovals` | Bot verification/roles/approval; website also edits self-role panels | Discord policy and approval lifecycle; Discord remains actual role state |
 | `role_updates` | Website role mutation fallback | No in-repository consumer found; do not promise automatic retry |
 | `welcome_messages`, `role_messages`, `scheduled_messages`, `bot_knowledge` | Website admin collection routes; Flask content endpoints | Bot content and assistant services; Flask computes schedule eligibility |
+| `onboarding_dms` | Bot onboarding DMs and `/onboarding_reset` | Per-step `sentAt`/`dmFailedAt`/lease and funnel timestamps; metadata only, no message text |
 | `bot_state`, `chat_turn_claims` | Bot job markers and per-message claims | Operational coordination; claims have expiry fields, TTL policy is external |
 | `signup_board_configs`, `signup_boards` | Website admin and bot signup service | Reaction/button enrollment and admin review |
 | `series_catalogs`, `series_schedules`, `event_series`, `group_ride_schedules` | Website planning/publishing; Flask updates Fifty result markers | Public/member event views, bot automation and result jobs; [events guide](events.md) |

@@ -115,3 +115,21 @@ test('real removal and later re-verification send each configured message again'
   await f.drainEvents();
   assert.equal(f.state.messages.length, 4);
 });
+
+test('onboarding runs for the community, verified and club roles, not for team roles', async () => {
+  const shared = require('../constants.json');
+  const f = createVerificationFixture();
+  const triggerFor = async roleId => {
+    f.state.onboarding.length = 0;
+    const before = f.member();
+    const after = f.member();
+    after.roles.cache = new Map([[roleId, { id: roleId, name: roleId }]]);
+    after.roles.cache.filter = predicate => new Map([...after.roles.cache].filter(([, role]) => predicate(role)));
+    await f.handler.handleGuildMemberUpdate(before, after);
+    return f.state.onboarding.map(call => call.trigger);
+  };
+  assert.deepEqual(await triggerFor(shared.discord.roles.communityMember), ['community']);
+  assert.deepEqual(await triggerFor(shared.discord.roles.verifiedMember), ['role']);
+  assert.deepEqual(await triggerFor('club'), ['role']);
+  assert.deepEqual(await triggerFor('custom'), []);
+});

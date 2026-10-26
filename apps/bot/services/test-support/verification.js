@@ -28,7 +28,7 @@ function createVerificationFixture() {
   ]);
   const state = {
     userId, guildId, docs,
-    roles: new Set(), events: [], messages: [], mutations: [], roleCalls: [], queued: [], logs: [],
+    roles: new Set(), events: [], onboarding: [], messages: [], mutations: [], roleCalls: [], queued: [], logs: [],
     failCollection: null, failDiscord: false, failRoleWrite: false,
     beforeRead: null, beforeMemberFetch: null,
     premiumSince: null,
@@ -98,6 +98,9 @@ function createVerificationFixture() {
     '../config/config': { contentApi: { baseUrl: 'https://content.test', apiKey: 'test' } },
     '../services/verificationService': service,
     '../services/newMemberService': { ensureNewMemberRole: async () => {} },
+    '../services/onboardingDm': { runOnboarding: async options => state.onboarding.push(options) },
+    '../services/onboardingStatus': { getClubRoleId: async () => 'club' },
+    '../constants.json': require('../../constants.json'),
   }, {
     console: quietConsole,
     fetch: async url => {

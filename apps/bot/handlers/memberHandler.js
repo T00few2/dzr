@@ -1,8 +1,10 @@
-const { EmbedBuilder } = require("discord.js");
 const { getWelcomeMessage, processMessageContent } = require("../services/contentApi");
 const config = require("../config/config");
 const verificationService = require("../services/verificationService");
 const { ensureNewMemberRole } = require("../services/newMemberService");
+const { runOnboarding } = require("../services/onboardingDm");
+const { getClubRoleId } = require("../services/onboardingStatus");
+const shared = require("../constants.json");
 
 /**
  * Handle new member joining the server
@@ -27,30 +29,9 @@ async function handleGuildMemberAdd(member) {
         mention: `<@${member.user.id}>`
       };
 
-      const content = processMessageContent(welcomeMessage.content, variables);
-
-      // Build message object
-      const messageOptions = { content };
-
-      // Add embed if configured
-      if (welcomeMessage.embed) {
-        const embed = new EmbedBuilder()
-          .setTitle(processMessageContent(welcomeMessage.embed.title || "", variables))
-          .setDescription(processMessageContent(welcomeMessage.embed.description || "", variables))
-          .setColor(welcomeMessage.embed.color || 0x0099FF);
-
-        if (welcomeMessage.embed.thumbnail) {
-          embed.setThumbnail(member.user.displayAvatarURL());
-        }
-
-        if (welcomeMessage.embed.footer) {
-          embed.setFooter({ 
-            text: processMessageContent(welcomeMessage.embed.footer, variables) 
-          });
-        }
-
-        messageOptions.embeds = [embed];
-      }
+      // Content only: the public hello is one line. Any old embed on the document is ignored here;
+      // the onboarding guide is sent by DM.
+      const messageOptions = { content: processMessageContent(welcomeMessage.content, variables) };
 
       // Send to channel specified in welcome message or fallback to config/system channel
       const channelId = welcomeMessage.channel_id || config.discord.welcomeChannelId || member.guild.systemChannelId;
@@ -75,9 +56,33 @@ async function handleGuildMemberAdd(member) {
     // Ensure New Member role assignment on join
     await ensureNewMemberRole(member);
 
+    await runOnboarding({ client: member.client, member, trigger: "join" });
+    // Rejoining members can get their roles back at once; then the guide is due now.
+    if (member.roles.cache.has(shared.discord.roles.communityMember)) {
+      await runOnboarding({ client: member.client, member, trigger: "community" });
+    }
+
   } catch (error) {
     console.error("❌ Error handling new member:", error);
   }
+}
+
+/**
+ * Onboarding DMs for added roles. The role only decides that a DM may be due; onboardingDm
+ * picks the content from the member's current next step.
+ */
+async function handleOnboardingRoles(member, addedRoleIds) {
+  const roles = shared.discord.roles;
+  let trigger = null;
+  if (addedRoleIds.includes(roles.communityMember)) {
+    trigger = "community";
+  } else if (addedRoleIds.includes(roles.verifiedMember)) {
+    trigger = "role";
+  } else {
+    const clubRoleId = await getClubRoleId();
+    if (clubRoleId && addedRoleIds.includes(clubRoleId)) trigger = "role";
+  }
+  if (trigger) await runOnboarding({ client: member.client, member, trigger });
 }
 
 /**
@@ -107,6 +112,10 @@ async function handleGuildMemberUpdate(oldMember, newMember) {
 
     // Ensure New Member role is correct after any role changes
     await ensureNewMemberRole(newMember);
+
+    if (addedRoles.size > 0) {
+      await handleOnboardingRoles(newMember, [...addedRoles.keys()]);
+    }
     
   } catch (error) {
     console.error("❌ Error handling member role update:", error);
