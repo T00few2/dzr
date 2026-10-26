@@ -54,10 +54,12 @@ Purpose: follow onboarding checkout from local correlation to access side effect
 
 ![Architecture diagram](generated/identity-membership-2.svg)
 
-<details>
-<summary>Editable Mermaid source</summary>
+For mermaid.ai/live, expand the plain-text source below and use the code block’s copy button. Paste only its contents, from `---` through the final `end`; Markdown backticks are not Mermaid syntax. The final two `end` statements close the nested `alt` and `rect` blocks.
 
-```mermaid
+<details>
+<summary>Copy Mermaid code for mermaid.ai/live</summary>
+
+```text
 ---
 config:
   theme: base
@@ -93,22 +95,22 @@ sequenceDiagram
     participant F as 🔥 Firestore
     participant D as 🎮 Discord REST
     rect rgb(255, 255, 255)
-    B->>W: Create checkout using onboarding cookie
-    W->>F: Store payments/checkout_reference and session link
-    W->>V: Create checkout session
-    Note over W,B: Checkout URL
-    B->>V: Complete payment
-    V->>W: Callback with reference
-    B->>W: Confirm using session and reference
-    Note over W,V: Either trigger can enter the payment processor
-    W->>V: Read checkout state and capture if authorized
-    alt Success reported by fetched session or captured amount
-        W->>F: Payment succeeded, membership coverage, default Coach profile
-        W->>D: Attempt club and eligible login roles
-        W->>F: Role-sync outcome and payment step
-    else Pending or failed
-        Note over W,B: Pending or failed result on confirmation
-    end
+        B->>W: Create checkout using onboarding cookie
+        W->>F: Store payments/checkout_reference and session link
+        W->>V: Create checkout session
+        Note over W,B: Checkout URL
+        B->>V: Complete payment
+        V->>W: Callback with reference
+        B->>W: Confirm using session and reference
+        Note over W,V: Either trigger can enter the payment processor
+        W->>V: Read checkout state and capture if authorized
+        alt Success reported by fetched session or captured amount
+            W->>F: Payment succeeded, membership coverage, default Coach profile
+            W->>D: Attempt club and eligible login roles
+            W->>F: Role-sync outcome and payment step
+        else Pending or failed
+            Note over W,B: Pending or failed result on confirmation
+        end
     end
 ```
 
@@ -171,10 +173,12 @@ Purpose: show the bot's self-service role approval path; paid membership and ver
 
 ![Architecture diagram](generated/identity-membership-4.svg)
 
-<details>
-<summary>Editable Mermaid source</summary>
+Use the code block’s copy button below to paste this diagram into mermaid.ai/live, without Markdown backticks.
 
-```mermaid
+<details>
+<summary>Copy Mermaid code for mermaid.ai/live</summary>
+
+```text
 ---
 config:
   theme: base
@@ -207,18 +211,18 @@ sequenceDiagram
     participant A as 🥸 Captain or 🛡️ admin
     participant D as 🎮 Discord
     rect rgb(255, 255, 255)
-    M->>B: Select role and confirm join
-    B->>F: Read selfRoles prerequisites and approval policy
-    alt Immediate role
-        B->>D: Add role
-    else Approval required
-        B->>F: Create roleApprovals record
-        B->>D: Post approval message
-        A->>B: Approve or reject reaction
-        B->>B: Verify approver authority and bot hierarchy
-        B->>D: Add role on approval and notify member
-        B->>F: Store outcome
-    end
+        M->>B: Select role and confirm join
+        B->>F: Read selfRoles prerequisites and approval policy
+        alt Immediate role
+            B->>D: Add role
+        else Approval required
+            B->>F: Create roleApprovals record
+            B->>D: Post approval message
+            A->>B: Approve or reject reaction
+            B->>B: Verify approver authority and bot hierarchy
+            B->>D: Add role on approval and notify member
+            B->>F: Store outcome
+        end
     end
 ```
 

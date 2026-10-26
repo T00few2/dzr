@@ -33,9 +33,10 @@ try {
   for (const name of (await fs.readdir(docs)).filter(name => name.endsWith('.md') && !name.startsWith('.')).sort()) {
     const source = await fs.readFile(path.join(docs, name), 'utf8')
     let index = 0
-    for (const match of source.matchAll(/```mermaid\n([\s\S]*?)\n```/g)) {
+    for (const match of source.matchAll(/```(mermaid|text)\n([\s\S]*?)\n```/g)) {
+      if (match[1] === 'text' && !/^sequenceDiagram\s*$/m.test(match[2])) continue
       index++; count++
-      const hash = createHash('sha256').update(match[1]).digest('hex')
+      const hash = createHash('sha256').update(match[2]).digest('hex')
       const svg = await page.evaluate(async ({ text, id, hash }) => {
         const { svg } = await window.mermaid.render(id, text)
         const container = document.createElement('div')
@@ -49,7 +50,7 @@ try {
         element.setAttribute('data-mermaid-sha256', hash)
         element.style.backgroundColor = '#ffffff'
         return new XMLSerializer().serializeToString(element)
-      }, { text: match[1], id: `dzr-${name.slice(0, -3)}-${index}`, hash })
+      }, { text: match[2], id: `dzr-${name.slice(0, -3)}-${index}`, hash })
       await fs.writeFile(path.join(docs, 'generated', `${name.slice(0, -3)}-${index}.svg`), svg + '\n')
     }
   }

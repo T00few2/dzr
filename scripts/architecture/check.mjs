@@ -37,13 +37,18 @@ function extract(source, file) {
       const start = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/)
       if (start) {
         fence = { marker: start[1][0], length: start[1].length, line: index + 1,
-          mermaid: start[2].trim() === 'mermaid', body: [] }
+          mermaid: start[2].trim() === 'mermaid', language: start[2].trim(), body: [] }
         prose.push('')
       } else prose.push(line)
     } else {
       const end = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/)
       if (end && end[1][0] === fence.marker && end[1].length >= fence.length) {
-        if (fence.mermaid) diagrams.push({ line: fence.line, text: fence.body.join('\n') })
+        const text = fence.body.join('\n')
+        // Plain-text sequence sources expose GitHub's code-copy button instead of a second
+        // rendered diagram. Validate the same source used for the white-canvas preview.
+        if (fence.mermaid || (fence.language === 'text' && /^sequenceDiagram\s*$/m.test(text))) {
+          diagrams.push({ line: fence.line, text })
+        }
         fence = null
       } else fence.body.push(line)
       prose.push('')
