@@ -2,10 +2,20 @@
   "siteOrigin": "https://www.dzrracingseries.com",
   "discord": {
     "guildId": "1195850595014299669",
+    "channels": {
+      "welcome": "1196470145493774446",
+      "zwiftId": "1381263324934832219",
+      "selfRoles": "1376291028448968876",
+      "teamsLookingForRiders": "1297934562558611526",
+      "announcements": "1302176784623734797",
+      "raceSchedule": "1196354482385211532",
+      "help": "1353477785674453104"
+    },
     "roles": {
       "admin": "1195852714270277763",
       "verifiedMember": "1385216556166025347",
       "communityMember": "1195878123795910736",
+      "newMember": "1410492230002671736",
       "holdkaptajn": "1195878349617250405",
       "kms": "1413793742808416377"
     }
@@ -32,6 +42,12 @@
     "coachUsageEvents": "coach_usage_events",
     "coachProfiles": "coach_profiles",
     "coachChatNotes": "coach_chat_notes",
-    "memberCalendar": "member_calendar"
+    "memberCalendar": "member_calendar",
+    "onboardingDms": "onboarding_dms",
+    "assistantDmEvents": "assistant_dm_events",
+    "assistantDmUsage": "assistant_dm_usage",
+    "assistantDmDaily": "assistant_dm_daily",
+    "assistantDmFeedback": "assistant_dm_feedback",
+    "assistantKnowledgeGaps": "assistant_knowledge_gaps"
   }
 }

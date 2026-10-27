@@ -6,6 +6,7 @@ const { handleInteractions } = require("./handlers/interactionHandler");
 const { handleGuildMemberAdd, handleGuildMemberUpdate } = require("./handlers/memberHandler");
 const { startScheduler } = require("./services/scheduler");
 const approvalService = require("./services/approvalService");
+const { recordClubDmFeedback } = require("./services/assistantDmStats");
 const { handleReactionAdd: handleSignupReactionAdd, handleReactionRemove: handleSignupReactionRemove } = require("./services/signupService");
 const { 
   handleMessageCreate, 
@@ -34,9 +35,11 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,  // Reaction stats and approval reactions
     GatewayIntentBits.GuildVoiceStates,       // Voice activity stats
     GatewayIntentBits.MessageContent,         // Read message content
-    GatewayIntentBits.DirectMessages          // Enable DMs to the bot
+    GatewayIntentBits.DirectMessages,         // Enable DMs to the bot
+    GatewayIntentBits.DirectMessageReactions  // 👍/👎 on the club assistant's DM replies
   ],
-  partials: [Partials.Channel] // Required to receive DMs as messageCreate events
+  // Channel: receive DMs. Message/Reaction: reactions on messages sent before a restart.
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction]
 });
 
 const streaming = createStreamingService({
@@ -68,6 +71,12 @@ const rest = new REST({ version: "10" }).setToken(config.discord.token);
 
 // Handle approval reactions
 client.on("messageReactionAdd", async (reaction, user) => {
+  // DMs: only ratings of the club assistant's replies. Everything below is guild-only.
+  if (!reaction.message.guildId) {
+    recordClubDmFeedback(reaction, user);
+    return;
+  }
+
   // Handle stats collection
   handleMessageReactionAdd(reaction, user);
 
@@ -114,7 +123,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
 
 // Handle reaction removal for signup board
 client.on("messageReactionRemove", async (reaction, user) => {
-  if (user?.bot) return;
+  if (user?.bot || !reaction.message.guildId) return;
   try {
     if (reaction.partial) {
       await reaction.fetch();

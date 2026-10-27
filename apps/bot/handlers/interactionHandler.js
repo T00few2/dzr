@@ -1,3 +1,4 @@
+const { handleOnboardingPreview, handleOnboardingReset } = require("./onboardingCommands");
 const { ActionRowBuilder, StringSelectMenuBuilder, InteractionResponseType, MessageFlags, EmbedBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const roleService = require("../services/roleService");
 const { linkUserZwiftId, getTodaysClubStats } = require("../services/firebase");
@@ -12,7 +13,6 @@ const {
   handleBrowseRiders,
   handleEventResults,
   handleWhoAmI,
-  handleTestWelcome,
   handleRefreshClubRoster,
   handleRefreshZwiftPowerRoster,
   handleSyncZpRoles,
@@ -144,16 +144,12 @@ async function handleSelectMenus(interaction) {
     try {
       const [selectedValue] = interaction.values;
       await interaction.deferUpdate();
-      const discordID = interaction.user.id;
-      const username = interaction.user.username;
 
-      await linkUserZwiftId(discordID, username, selectedValue);
-      const content = `✅ You have selected rider ZwiftID: **${selectedValue}**. It is now linked to your Discord profile!`;
-      await ephemeralReplyWithPublish(interaction, content);
-
-      // Check verification status after linking ZwiftID
-      const { checkVerificationAfterZwiftLink } = require("./memberHandler");
-      await checkVerificationAfterZwiftLink(interaction.guild, discordID);
+      // Show the picked rider; linking happens on the confirm button. deferUpdate was the response,
+      // so the confirm replaces the menu with editReply.
+      const { prepareZwiftIdConfirmation, sendConfirmation } = require("./zwiftIdMessageHandler");
+      const payload = await prepareZwiftIdConfirmation(interaction.user.id, selectedValue);
+      await sendConfirmation((p) => interaction.editReply({ content: "", ...p }), payload);
     } catch (error) {
       console.error("❌ myzwift_select error:", error);
       if (!interaction.replied) {
@@ -533,7 +529,8 @@ async function handleInteractions(interaction) {
       "team_stats": handleTeamStats,
       "browse_riders": handleBrowseRiders,
       "event_results": handleEventResults,
-      "test_welcome": handleTestWelcome,
+      "onboarding_preview": handleOnboardingPreview,
+      "onboarding_reset": handleOnboardingReset,
       "refresh_club_roster": handleRefreshClubRoster,
       "refresh_zwiftpower_roster": handleRefreshZwiftPowerRoster,
       "sync_zp_roles": handleSyncZpRoles,

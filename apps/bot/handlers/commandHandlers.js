@@ -6,11 +6,11 @@ const { phenotypeLabel } = require("../utils/phenotype");
 const { getUserZwiftId, linkUserZwiftId, searchRidersByName, getTodaysClubStats } = require("../services/firebase");
 const { ephemeralReplyWithPublish } = require("../utils/ephemeralStore");
 const { generatePowerGraph } = require("../utils/powerGraph");
-const { getWelcomeMessage, processMessageContent, refreshClubRoster, refreshZwiftPowerRoster } = require("../services/contentApi");
-const { EmbedBuilder } = require("discord.js");
+const { refreshClubRoster, refreshZwiftPowerRoster } = require("../services/contentApi");
 const config = require("../config/config");
 const { syncZpRolesForGuild } = require("../services/zpRoleSync");
 const { checkVerificationAfterZwiftLink } = require("./memberHandler");
+const { prepareZwiftIdConfirmation, sendConfirmation } = require("./zwiftIdMessageHandler");
 const { MessageFlags } = require("discord.js");
 const { postSignupBoard, repostSignupBoard } = require("../services/signupService");
 
@@ -18,19 +18,15 @@ async function handleMyZwiftId(interaction) {
   const zwiftID = interaction.options.getString("zwiftid");
   const searchTerm = interaction.options.getString("searchterm");
   const discordID = interaction.user.id;
-  const username = interaction.user.username;
 
   if (zwiftID) {
+    // Show who the ID belongs to; linking happens on the confirm button.
     try {
-      await linkUserZwiftId(discordID, username, zwiftID);
-      const content = `✅ Your ZwiftID (${zwiftID}) is now linked to your Discord ID!`;
-      await ephemeralReplyWithPublish(interaction, content);
-
-      // Check verification status after linking ZwiftID
-      await checkVerificationAfterZwiftLink(interaction.guild, discordID);
+      const payload = await prepareZwiftIdConfirmation(discordID, zwiftID);
+      await sendConfirmation((p) => interaction.editReply(p), payload);
     } catch (error) {
-      console.error("❌ Firebase Error:", error);
-      await interaction.editReply({ content: "⚠️ Error saving your ZwiftID." });
+      console.error("❌ my_zwiftid confirm Error:", error);
+      await interaction.editReply({ content: "⚠️ Error looking up your ZwiftID." });
     }
     return;
   }
@@ -457,115 +453,6 @@ async function handleWhoAmI(interaction) {
   }
 }
 
-async function handleTestWelcome(interaction) {
-  try {
-    const targetUser = interaction.options.getUser("target_user") || interaction.user;
-
-    // Check if user has admin permissions (moved after defer to prevent timeout)
-    if (!interaction.member.permissions.has('ADMINISTRATOR')) {
-      await interaction.editReply({ content: "❌ This command is for administrators only." });
-      return;
-    }
-
-    // Get welcome message from API
-    const welcomeMessage = await getWelcomeMessage();
-    if (!welcomeMessage) {
-      await interaction.editReply({ content: "❌ No welcome message configured. Create one via the web interface first." });
-      return;
-    }
-
-    // Process message content with member variables
-    const variables = {
-      username: targetUser.username,
-      displayName: targetUser.displayName || targetUser.username,
-      server_name: interaction.guild.name,
-      member_count: interaction.guild.memberCount,
-      mention: `<@${targetUser.id}>`
-    };
-
-    const content = processMessageContent(welcomeMessage.content, variables);
-
-    // Build message object
-    const messageOptions = { content };
-
-    // Add embed if configured
-    if (welcomeMessage.embed) {
-      const embed = new EmbedBuilder()
-        .setColor(welcomeMessage.embed.color || 0x0099FF);
-
-      let hasContent = false;
-
-      // Only set title if it's not empty after processing
-      const embedTitle = processMessageContent(welcomeMessage.embed.title || "", variables);
-      if (embedTitle && embedTitle.trim().length > 0) {
-        embed.setTitle(embedTitle);
-        hasContent = true;
-      }
-
-      // Only set description if it's not empty after processing
-      const embedDescription = processMessageContent(welcomeMessage.embed.description || "", variables);
-      if (embedDescription && embedDescription.trim().length > 0) {
-        embed.setDescription(embedDescription);
-        hasContent = true;
-      }
-
-      if (welcomeMessage.embed.thumbnail) {
-        embed.setThumbnail(targetUser.displayAvatarURL());
-        hasContent = true;
-      }
-
-      if (welcomeMessage.embed.footer) {
-        const footerText = processMessageContent(welcomeMessage.embed.footer, variables);
-        if (footerText && footerText.trim().length > 0) {
-          embed.setFooter({ text: footerText });
-          hasContent = true;
-        }
-      }
-
-      // Only add embed if it has some content, and ensure it has at least a description
-      if (hasContent) {
-        // If embed has content but no description, add a minimal one
-        if (!embedDescription || embedDescription.trim().length === 0) {
-          embed.setDescription(`Welcome ${targetUser.username}!`);
-        }
-        messageOptions.embeds = [embed];
-      }
-    }
-
-    // Send test message to current channel (where command was executed)
-    const testChannel = interaction.channel;
-
-    if (!testChannel) {
-      await interaction.editReply({
-        content: "❌ Could not determine current channel for test message."
-      });
-      return;
-    }
-
-    // Add a header to distinguish this as a test message
-    const testMessageOptions = {
-      content: `🧪 **TEST WELCOME MESSAGE** (for ${targetUser.username})\n\n${content}`,
-      embeds: messageOptions.embeds
-    };
-
-    // Send test welcome message to current channel
-    await testChannel.send(testMessageOptions);
-
-    // Get info about the real welcome channel for comparison
-    const realWelcomeChannelId = config.discord.welcomeChannelId || interaction.guild.systemChannelId;
-    const realWelcomeChannel = realWelcomeChannelId ? interaction.guild.channels.cache.get(realWelcomeChannelId) : null;
-    const welcomeChannelInfo = realWelcomeChannel ? `#${realWelcomeChannel.name}` : "system channel or first available channel";
-
-    await interaction.editReply({
-      content: `✅ Test welcome message sent to this channel!\n\n📍 **Note:** Real welcome messages will be sent to ${welcomeChannelInfo} when new members join.`
-    });
-
-  } catch (error) {
-    console.error("❌ test_welcome Error:", error);
-    await interaction.editReply({ content: "⚠️ Error testing welcome message: " + error.message });
-  }
-}
-
 async function handlePostSignupBoard(interaction) {
   try {
     if (!interaction.member.permissions.has('Administrator')) {
@@ -766,7 +653,6 @@ module.exports = {
   handleBrowseRiders,
   handleEventResults,
   handleWhoAmI,
-  handleTestWelcome,
   handleRefreshClubRoster,
   handleRefreshZwiftPowerRoster,
   handleSyncZpRoles,

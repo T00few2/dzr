@@ -59,6 +59,9 @@ function compactToolResult(result) {
   if (Array.isArray(result.clubs)) base.clubs = result.clubs;
   if (typeof result.note === "string") base.note = result.note.slice(0, 500);
   if (result.zrl) base.zrl = result.zrl;
+  // my_onboarding_status and club_overview
+  if (result.onboarding) base.onboarding = result.onboarding;
+  if (result.membership) base.membership = result.membership;
   if (typeof result.summary === "string") base.summary = result.summary;
   if (typeof result.coach_info === "string") base.coach_info = result.coach_info.slice(0, 4000);
   if (result.sent_full) base.sent_full = true;

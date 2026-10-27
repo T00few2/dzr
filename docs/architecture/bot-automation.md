@@ -31,6 +31,7 @@ flowchart LR
     entry -->|Messages| messages["🤖 Zwift ID and AI"]
     entry -->|Activity| stats["🤖 Activity"]
     entry -->|Reactions| reactions["🤖 Signups / approvals"]
+    members -->|Join / role added| onboarding["🤖 Onboarding DMs"]
     classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
     classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
     linkStyle default stroke:#1d4ed8
@@ -43,7 +44,7 @@ flowchart LR
 
 [bot.js](../../apps/bot/bot.js) registers slash commands, attaches gateway handlers and starts the scheduler when ready. [interactionHandler](../../apps/bot/handlers/interactionHandler.js) routes slash commands and component IDs; changes to a command often require both a [declaration](../../apps/bot/commands/slashCommands.js) and its handler. Multiple listeners can observe one event: activity tracking is not an exclusive dispatch branch.
 
-Member events trigger welcome/role messages, verification and New Member role maintenance. Role-panel prerequisites and captain/admin approval live in [roleService](../../apps/bot/services/roleService.js) and [approvalService](../../apps/bot/services/approvalService.js), as expanded in [membership](identity-membership.md#team-roles-how-does-approval-differ-from-verification).
+Member events trigger the public welcome/role one-liners, [onboarding DMs](#onboarding-dms-which-message-does-a-member-get), verification and New Member role maintenance. Role-panel prerequisites and captain/admin approval live in [roleService](../../apps/bot/services/roleService.js) and [approvalService](../../apps/bot/services/approvalService.js), as expanded in [membership](identity-membership.md#team-roles-how-does-approval-differ-from-verification).
 
 Streaming commands, buttons and modals are intercepted before the generic interaction handler by [streamingHandlers](../../apps/bot/handlers/streamingHandlers.js), allowing modal responses without an earlier acknowledgement. The same process accepts OBS callbacks on its HTTP listener and runs a durable verification/announcement worker once Discord is ready. Guild departure revokes enrollment. See [OBS streaming](streaming.md) for member onboarding, provider verification, quota limits and delivery recovery.
 
@@ -169,3 +170,53 @@ flowchart TB
 `/ladder_link` registers teams; preview/analysis commands and [jobs](../../apps/bot/services/ladder/ladderJobs.js) reuse the [Ladder services](../../apps/bot/services/ladder/). The bot has no Ladder or Zwift login password. Flask's [`/ladder_page`](../../apps/api/main.py) accepts only allow-listed paths from [ladder.py](../../apps/api/ladder.py). Rider enrichment uses `/rider_data/{id}` and `/zwift_profile/{id}`; route geometry comes from the website [route-profile route](../../app/api/route-profile/route.ts).
 
 Defaults: preview inside 65 minutes before start, match-day reminder from noon Copenhagen time. [ladderStore](../../apps/bot/services/ladder/ladderStore.js) loads documents into memory and serializes whole-document writes; this is restart persistence, not a multi-instance locking protocol. Post/send and marking state are separate operations. `/ladder_ai` adds OpenAI tactics analysis with per-user daily runs and a short-lived result cache; it shares the OpenAI integration but is not a Coach conversation.
+
+## Onboarding DMs: which message does a member get?
+
+Purpose: show that a role event only says a DM may be due, while the member's current state picks the message.
+
+![Architecture diagram](generated/bot-automation-4.svg)
+
+<details>
+<summary>Editable Mermaid source</summary>
+
+```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    edgeLabelBackground: '#ffffff'
+  themeCSS: |
+    .edgeLabel, .edgeLabel p { font-size: 12px !important; }
+    :is(&) { background: #ffffff; }
+  flowchart:
+    rankSpacing: 50
+    padding: 5
+---
+flowchart TD
+    event["🎮 Join, or community /<br/>verified / club role added"] -->|Read every fact, fail closed| status["🤖 onboardingStatus"]
+    status -->|Not verified, unpaid| channel["link_zwift_id_channel"]
+    status -->|Not verified, paid on /join| joinlink["link_zwift_id_join"]
+    status -->|Not verified, other criteria| meet["meet_verification"]
+    status -->|Verified, role and payment differ| pending["club_role_pending"]
+    status -->|Verified, not paid| club["become_club_member"]
+    status -->|Paid, no intervals.icu| coach["connect_intervals"]
+    channel & joinlink & meet & pending & club & coach -->|Claim lease, send once| dm["🎮 DM, or one channel<br/>fallback if DMs are closed"]
+    dm -->|sentAt / dmFailedAt per step| store[("🔥 onboarding_dms")]
+    classDef default fill:#eff6ff,stroke:#1d4ed8,color:#1f2328
+    classDef external fill:#fff1f2,stroke:#b91c1c,color:#1f2328
+    linkStyle default stroke:#1d4ed8
+    class event,dm external
+```
+
+</details>
+
+[onboardingStatus](../../apps/bot/services/onboardingStatus.js) reads roles, Zwift ID, verification criteria, paid membership and the intervals.icu connection, and returns one `nextStep`. The order follows `/join` (Discord, payment, Zwift ID): an unverified member always gets a Zwift ID step, even when payment and the club role briefly disagree mid-`/join`; only a verified member gets `club_role_pending`. `done` is status only, because connecting intervals.icu fires no Discord event. A failed read throws; a missing document (not paid, not connected, default verification settings) is a normal answer.
+
+[onboardingDm](../../apps/bot/services/onboardingDm.js) sends Danish templates filled with live values ([clubFacts](../../apps/bot/services/clubFacts.js) reads the fee from the website's `/api/membership/settings`). The community role adds a channel intro to the same message. Each step key is claimed in a Firestore transaction that writes a 60-second lease, sent once, and finished with `sentAt` or `dmFailedAt`; another error leaves the step open for the next event. A crash between the send and the finish can still repeat one DM. Closed DMs (Discord 50007) post one line in the welcome or Zwift ID channel. The DM is sent before the public welcome/role line, and those admin-edited texts can use `{dm_hint}`: it expands to a "look in your DMs" hint only when a DM went out just then, and to nothing otherwise. The same document records `communityAt`, `zwiftLinkedAt` and `clubJoinedAt` for the onboarding funnel; no message content is stored.
+
+The club assistant reads the same status through `my_onboarding_status`, and the fee and teams through `club_overview`, so a reply in the DM cannot contradict the DM. Admins test with `/onboarding_preview` (a simulated status, real templates, nothing written) and `/onboarding_reset` (forget sent steps and mark the user as test, for alt-account runs).
+
+[assistantDmStats](../../apps/bot/services/assistantDmStats.js) records how the club assistant is used in DMs, as metadata only: one `assistant_dm_events` document per DM turn (member, onboarding stage, tools, duration, outcome: answered, error, empty, no answer, or the code-detected Coach redirect), per-member and per-day counters, and reply counts on `onboarding_dms` for the funnel. The club client has the DirectMessageReactions intent and Message/Reaction partials so 👍/👎 on its DM replies reach a DM-only listener; ratings store the producing tools, never text, and the guild reaction listeners stay guild-only. The assistant calls `report_knowledge_gap` when nothing covers a DZR question; the topic is its own summary, merged by a normalized id, and the tool is exempt from the fulfillment screen because it is never the requested action. [`/admin/onboarding`](../../app/admin/onboarding/page.tsx) shows the funnel (Zwift ID linked or club joined within 7 days of the DM that asked), weekly DM members, tools, ratings and open gaps, with a link that prefills a knowledge article.
+
+Linking a Zwift ID now shows who the ID belongs to before anything is stored: [riderIdentity](../../apps/bot/services/riderIdentity.js) reads Flask `/zwift_profile/{id}` (name, country, avatar, racing score) and `/rider_data/{id}` (ZwiftPower). A lookup error keeps the plain number-only confirm; only two clean misses show "not found" with "Link alligevel". The Zwift ID channel, `/my_zwiftid` (ID or name search) and the assistant in DMs all post the same confirm buttons, and linking happens on the button.

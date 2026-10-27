@@ -41,7 +41,7 @@ class StatsCollector {
     this.activityBuffer.reactions.push({
       userId: user.id,
       username: user.username,
-      channelId: reaction.message.channel.id,
+      channelId: reaction.message.channelId,
       channelName: reaction.message.channel?.name || 'unknown',
       emoji: reaction.emoji.name,
       timestamp: Date.now()

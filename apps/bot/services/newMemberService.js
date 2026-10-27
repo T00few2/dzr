@@ -1,5 +1,7 @@
-const MEMBER_ROLE_ID = "1195878123795910736";
-const NEW_MEMBER_ROLE_ID = "1410492230002671736";
+const shared = require("../constants.json");
+
+const MEMBER_ROLE_ID = shared.discord.roles.communityMember;
+const NEW_MEMBER_ROLE_ID = shared.discord.roles.newMember;
 const WINDOW_DAYS = 14;
 
 function isWithinWindow(joinedTimestamp, windowDays = WINDOW_DAYS) {
