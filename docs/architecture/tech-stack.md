@@ -140,7 +140,7 @@ flowchart TB
 
 </details>
 
-Render and Google Cloud Run do not serve another DZR browser application. People reach bot features through Discord's own desktop/web/mobile clients, and administrative integration features through the Next.js website. The bot opens Discord gateway connections and hosts only an Express health route. Flask exposes the integration/job HTTP API; its old human admin UI is retired. Python 3's exact minor version is not pinned in a checked-in runtime definition.
+Render and Google Cloud Run do not serve another DZR browser application. People reach bot features through Discord's own desktop/web/mobile clients, and administrative integration features through the Next.js website. The bot opens Discord gateway connections and hosts Express health, [OBS script download and authenticated streaming callback](streaming.md) routes. Flask exposes the integration/job HTTP API; its old human admin UI is retired. Python 3's exact minor version is not pinned in a checked-in runtime definition.
 
 The bot also calls intervals.icu directly for Coach, DCU for race information and the website for route profiles and weekly automation. Flask also has Discord REST and legacy commentary paths. These selective stack diagrams show the principal boundaries; [Coach](coach.md), [Ladder](bot-automation.md#ladder-how-is-a-match-preview-built), [Flask modules](code-map.md#flask-modules-where-do-integration-changes-belong) and [findings](findings.md) describe the remaining interfaces and incomplete paths.
 

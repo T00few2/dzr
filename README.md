@@ -67,7 +67,7 @@ Binds `0.0.0.0:$PORT` (`8080` locally). Firebase uses Application Default Creden
 
 Cloud Run deploys `apps/api` from this repo. The service name stays `zwiftpower`. Health check is `GET /` and returns `{"service":"dzr-api",...}`. Admin UI is on the Next site, not this service.
 
-Required API env names: `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `CONTENT_API_KEY`, `ZWIFT_USERNAME`, `ZWIFT_PASSWORD`, `ZWIFTPOWER_CLUB_ID`, `FLASK_SECRET_KEY`. Legacy commentary jobs use `DISCORD_BOT_URL`, but the current Render server exposes only a health route; [the posting path is unresolved in this checkout](docs/architecture/findings.md#incomplete-and-legacy-paths).
+Required API env names: `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `CONTENT_API_KEY`, `ZWIFT_USERNAME`, `ZWIFT_PASSWORD`, `ZWIFTPOWER_CLUB_ID`, `FLASK_SECRET_KEY`. Legacy commentary jobs use `DISCORD_BOT_URL`, but Render has no general-purpose posting route; [the posting path is unresolved in this checkout](docs/architecture/findings.md#incomplete-and-legacy-paths).
 
 ## Discord bot (`apps/bot`)
 
@@ -119,6 +119,26 @@ $env:COACH_EVAL_JUDGE_MODEL="gpt-6.1-sol"
 $env:COACH_EVAL_REPEATS="3"
 npm run eval
 ```
+
+### OBS streaming
+
+Members use `/streaming_add` in the DZR guild to enter their YouTube/Twitch channels in a private modal. The bot returns a download link for `dzr-stream.lua`, the callback URL and a personal OBS key. Add the file in OBS **Tools → Scripts**, paste the endpoint/key, and click **Test forbindelse**. `/streaming_remove` revokes the key and stops monitoring. `/streaming_overview [page]` gives admins a private list of members, channel links, last verified live starts, broadcast links and errors.
+
+The existing Render service serves `GET /streaming/dzr-stream.lua` and authenticated `POST /streaming/obs`; no extra service or provider OAuth flow is required. Set on Render before onboarding:
+
+| Variable | Purpose |
+| --- | --- |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 enabled; restrict the key to that API. Required for YouTube registrations/verification. |
+| `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | Twitch application credentials. Required for Twitch registrations/verification. |
+| `STREAMING_PUBLIC_URL` | Optional external HTTPS bot origin; defaults to `RENDER_EXTERNAL_URL`, then `https://bot-tdnm.onrender.com`. Used in onboarding links. |
+| `STREAMING_CHANNEL_ID` | Optional destination override; defaults to `1196454773558345768` (`#streaming-now`). |
+| `STREAMING_YOUTUBE_SEARCH_BUDGET` | Optional daily search cap; default `90`, reset at Pacific midnight. Set `0` to allow known-video verification only. |
+
+Grant the bot **View Channel**, **Send Messages**, **Embed Links**, and **Read Message History** in the destination. History is needed to recover ambiguous sends without duplicating announcements. `Administrator` can use the overview by default; to give the DZR Admin role command visibility separately, configure it under Discord Server Settings → Integrations. Runtime authorization also checks that role. Publish the updated Firestore rules; the server-only `streaming_bot` collection is created on first use and needs no composite index.
+
+Public live status is verified before posting; schedules and OBS preview alone do not trigger announcements. Lua sends start/stop and 30-second heartbeats. Optional per-broadcast YouTube video links avoid discovery search; provider API/indexing delays still need live acceptance testing before claiming a maximum notification delay. Start with one channel on each platform, including a scheduled YouTube stream and a reconnect. Script transport is tested with real HTTPS/libcurl on Linux, but native Windows/macOS OBS require a smoke test. See the [streaming architecture and failure behavior](docs/architecture/streaming.md).
+
+Streaming tests are part of the bot suite. Install `luajit`, `libcurl` and `openssl` to run the real Lua transport test locally (or set `LUAJIT_BIN`); CI provides these. Without LuaJIT, that test is explicitly skipped. Tests do not post to Discord or read production Firestore.
 
 ## Shared constants
 

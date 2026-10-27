@@ -70,7 +70,7 @@ The external groups describe purpose. “Zwift” here means the cycling ecosyst
 | --- | --- |
 | **Ext. Zwift sources** | 🧡 **Zwift:** public events, route/profile data and rosters, including 🩵 **Zwift Companion App** club membership. ⏱️ **ZwiftPower:** rider power/category data, race results and club rosters. 📊 **ZwiftRacing:** individual and club rider statistics, including aggregated performance/ranking data and racing scores. 🪜 **Ladder:** fixtures and signups. 🇩🇰 **DCU:** E-serien race calendar and scoring-segment information. 📋 **Google Sheets:** initial weekly-series anchor and legacy race-calendar rows. 💓 **intervals.icu:** athlete settings, activities, wellness, power curves and planned workouts. |
 | **Ext. Zwift integrations** | 🧡 **Zwift:** update existing event courses/tags. ⏱️ **ZwiftPower:** adjust result categories and configure sprint scoring. 💓 **intervals.icu:** upsert planned workouts. These write integrations do not mean DZR owns the source records or creates all upstream events. |
-| **Ext. tools** | 🎮 **Discord:** identity, roles, gateway events, channels and DMs. 🔵 **Vipps MobilePay:** membership checkout, status and capture. ❋ **OpenAI:** assistant, coaching and race-analysis requests. |
+| **Ext. tools** | 🎮 **Discord:** identity, roles, gateway events, channels and DMs. 🔵 **Vipps MobilePay:** membership checkout, status and capture. ❋ **OpenAI:** assistant, coaching and race-analysis requests. ⚙️ **YouTube / Twitch:** channel resolution and public live verification after authenticated [OBS signals](streaming.md). |
 
 See [statistics provenance](data.md#statistics-flow-where-does-a-riders-score-come-from), [Ladder](bot-automation.md#ladder-how-is-a-match-preview-built), [event updates](events.md#weekly-race-application-who-updates-the-live-event) and [Coach](coach.md) for their different contracts. The [technology stack](tech-stack.md) separately shows hosting, browser libraries and server libraries.
 
@@ -146,10 +146,10 @@ The website contains public pages, `/join`, `/members-zone`, `/admin` and `/api/
 
 The bot keeps Discord gateway connections open and owns a minute scheduler. Coach is an optional second Discord client, not a fourth deployed service. The Flask API brokers credentialed race integrations, content scheduling and roster jobs. Its former human admin pages return `410`; administration is on the website.
 
-The reverse bot → website arrow is specifically weekly race automation. There is no implemented general-purpose Flask → Render message API: the bot HTTP server currently exposes health only. See [findings](findings.md#incomplete-and-legacy-paths) before relying on older commentary instructions.
+The reverse bot → website arrow is specifically weekly race automation. There is no implemented general-purpose Flask → Render message API. The bot HTTP server exposes health and the separately authenticated [OBS streaming callback](streaming.md); the latter verifies streams before posting. See [findings](findings.md#incomplete-and-legacy-paths) before relying on older commentary instructions.
 
 Implementation: [Next routes](../../app/api/), [bot entry point](../../apps/bot/bot.js), [Flask routes and guards](../../apps/api/main.py), [bot health server](../../apps/bot/services/server.js), [Render definition](../../render.yaml).
 
 Continue with the [client/server technology stack](tech-stack.md), [module boundaries](code-map.md), [Coach](coach.md), [data ownership](data.md) or [deployment evidence](operations.md).
 
-Incoming interactions include Vipps payment webhooks and Discord gateway events. Discord and intervals.icu OAuth callbacks arrive through browser redirects, rather than provider-to-server webhooks. See [payment processing](identity-membership.md) and [Coach connection](coach.md).
+Incoming interactions include Vipps payment webhooks, Discord gateway events and authenticated OBS start/heartbeat/stop callbacks. Discord and intervals.icu OAuth callbacks arrive through browser redirects, rather than provider-to-server webhooks. See [payment processing](identity-membership.md), [Coach connection](coach.md) and [OBS streaming](streaming.md).

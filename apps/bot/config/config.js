@@ -69,6 +69,15 @@ module.exports = {
       "https://bot-tdnm.onrender.com",
     keepAliveInterval: 24 * 60 * 60 * 1000, // 24 hours. Not needed anymore. Remove at some point
   },
+  streaming: {
+    publicUrl: process.env.STREAMING_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || "https://bot-tdnm.onrender.com",
+    channelId: process.env.STREAMING_CHANNEL_ID || "1196454773558345768",
+    youtubeApiKey: process.env.YOUTUBE_API_KEY,
+    twitchClientId: process.env.TWITCH_CLIENT_ID,
+    twitchClientSecret: process.env.TWITCH_CLIENT_SECRET,
+    // Bound discovery across members; tune this to the project's YouTube API quota.
+    searchBudget: Math.max(0, Number.parseInt(process.env.STREAMING_YOUTUBE_SEARCH_BUDGET || "90", 10) || 0),
+  },
   contentApi: {
     baseUrl: process.env.CONTENT_API_BASE_URL, // Your Google Cloud Function URL
     apiKey: process.env.CONTENT_API_KEY,       // API key for authentication

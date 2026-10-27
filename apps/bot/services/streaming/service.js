@@ -1,0 +1,101 @@
+const { StreamingError, tokenOwner, tokenMatches, parseEvent, createToken, hash, announcementMessage } = require("./model");
+
+function createStreamingService({ store, providers, publisher, guildId, channelId, now = Date.now, logger = console }) {
+  let running = false;
+  let timer;
+
+  async function enroll(discordId, discordName, inputs) {
+    const channels = {};
+    for (const platform of ["youtube", "twitch"]) {
+      if (String(inputs[platform] || "").trim()) channels[platform] = await providers.resolveChannel(platform, inputs[platform]);
+    }
+    if (!Object.keys(channels).length) throw new StreamingError("missing_channels", "Angiv mindst én YouTube- eller Twitch-kanal.");
+    const token = createToken(discordId);
+    const registration = await store.register({ guildId, discordId, discordName, channels, tokenHash: hash(token) });
+    return { registration, token };
+  }
+
+  async function callback(token, body) {
+    const discordId = tokenOwner(token);
+    if (!discordId) throw new StreamingError("invalid_key", "DZR-nøglen er ikke gyldig.", 401);
+    const registration = await store.getRegistration(guildId, discordId);
+    if (!registration || !tokenMatches(token, registration.tokenHash)) throw new StreamingError("invalid_key", "DZR-nøglen er ikke gyldig.", 401);
+    const event = parseEvent(body, now());
+    if (!registration.channels[event.platform]) throw new StreamingError("channel_not_registered", "Denne platform er ikke tilmeldt.", 403);
+    return store.acceptEvent(registration, event);
+  }
+
+  async function check(id) {
+    const claimed = await store.claimSession(id);
+    if (!claimed) return;
+    const { session, registration } = claimed;
+    try {
+      const result = await providers.verify(registration.channels[session.platform], session, store);
+      await store.finishCheck(session, result, channelId);
+    } catch (error) {
+      const code = error instanceof StreamingError ? error.code : "verification_failed";
+      logger.warn(`Streaming verification: ${code}`); // Never log request objects, headers, keys or provider URLs.
+      await store.finishCheck(session, { error: code }, channelId);
+    }
+  }
+
+  async function publish(id) {
+    const claimed = await store.claimNotice(id);
+    if (!claimed) return;
+    const { notice, registration, session } = claimed;
+    try {
+      if (notice.firstAttemptAt) {
+        const recovered = await publisher.findExisting(notice);
+        if (recovered.messageId) {
+          await store.finishNotice(notice, { status: "sent", messageId: recovered.messageId, sentAt: now() });
+          return;
+        }
+        // If history is inaccessible/incomplete, fail closed rather than risk a duplicate.
+        if (!recovered.complete) {
+          await store.finishNotice(notice, { status: "pending", lastError: "discord_history_unavailable" });
+          return;
+        }
+      }
+      // Reconfirm before delayed delivery/recovery. A queued notice must not announce an ended stream.
+      if (now() - notice.verifiedAt > 30_000) {
+        const result = await providers.verify(registration.channels[session.platform], {
+          ...session, ...(session.platform === "youtube" ? { videoId: notice.stream.id } : {}),
+        }, store);
+        if (!result.streams.some((stream) => stream.id === notice.stream.id)) {
+          await store.finishNotice(notice, { status: "cancelled", lastError: "stream_no_longer_live" });
+          return;
+        }
+      }
+      if (!(await store.beginSend(notice))) return;
+      const messageId = await publisher.send(notice, announcementMessage(registration, notice.stream));
+      await store.finishNotice(notice, { status: "sent", messageId, sentAt: now(), lastError: null });
+    } catch {
+      logger.warn("Streaming publication deferred; will reconcile Discord history before retrying.");
+      await store.finishNotice(notice, { status: "pending", lastError: "discord_delivery_pending" });
+    }
+  }
+
+  async function tick() {
+    if (running) return;
+    running = true;
+    try {
+      const sessions = (await store.listSessions()).filter((session) => session.guildId === guildId
+        && !(session.nextCheckAt > now()) && !(session.leaseUntil > now()));
+      // Bounded concurrency keeps one slow provider from delaying every other streamer.
+      for (let i = 0; i < sessions.length; i += 4) await Promise.all(sessions.slice(i, i + 4).map((session) => check(session.id)));
+      for (const notice of await store.listNotices()) if (notice.channelId === channelId) await publish(notice.id);
+    } catch {
+      logger.warn("Streaming worker temporarily unavailable; durable work will be retried.");
+    } finally { running = false; }
+  }
+
+  return { enroll, callback, tick,
+    getRegistration: (discordId) => store.getRegistration(guildId, discordId),
+    remove: (discordId) => store.remove(guildId, discordId),
+    overview: () => store.listRegistrations(guildId),
+    async issues() { return [...await store.listIssues(guildId), ...(await store.listNotices()).filter((item) => item.channelId === channelId && item.lastError)]; },
+    start() { if (!timer) { timer = setInterval(tick, 5000); timer.unref(); void tick(); } },
+    stop() { clearInterval(timer); timer = null; } };
+}
+
+module.exports = { createStreamingService };

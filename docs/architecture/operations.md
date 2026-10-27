@@ -54,7 +54,7 @@ The root [README](../../README.md) and app [canonical notes](../../apps/api/CANO
 | Runtime | Repository evidence | Health and operational implications |
 | --- | --- | --- |
 | Website | Root [package](../../package.json), [.nvmrc](../../.nvmrc), [Next config](../../next.config.mjs); no `vercel.json` | Pages and server routes; route-profile files explicitly included in output tracing |
-| Bot | [render.yaml](../../render.yaml), own [package](../../apps/bot/package.json) / [lockfile](../../apps/bot/package-lock.json) / [.nvmrc](../../apps/bot/.nvmrc) | `GET /` returns `Bot is running!`; health does not prove Discord login, job progress or Coach readiness |
+| Bot | [render.yaml](../../render.yaml), own [package](../../apps/bot/package.json) / [lockfile](../../apps/bot/package-lock.json) / [.nvmrc](../../apps/bot/.nvmrc) | `GET /` returns `Bot is running!`; also serves the [OBS script and authenticated callback](streaming.md). Health does not prove Discord login, job progress or Coach readiness |
 | Flask | [main.py](../../apps/api/main.py), [requirements](../../apps/api/requirements.txt), [canonical notes](../../apps/api/CANONICAL.md) | `GET /` returns service JSON; default port 8080; credentialed integrations initialize/cache sessions on demand |
 
 No Google Cloud Run build/deploy workflow, Dockerfile or Vercel project linkage is checked in. Live source repository, branch, project credentials, scaling, deploy approvals and external schedules cannot be verified from these files. The diagram's production source is the documented canonical repository; a contributor's fork branch is for review, not a production deployment instruction.

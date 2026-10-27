@@ -1,6 +1,20 @@
 const { SlashCommandBuilder, PermissionsBitField } = require("discord.js");
 
 const commands = [
+  new SlashCommandBuilder()
+    .setName("streaming_add")
+    .setDescription("Tilmeld dine streamingkanaler, og få DZR-script og nøgle til OBS")
+    .setDMPermission(false),
+  new SlashCommandBuilder()
+    .setName("streaming_remove")
+    .setDescription("Afmeld din streaming, og spær din OBS-nøgle")
+    .setDMPermission(false),
+  new SlashCommandBuilder()
+    .setName("streaming_overview")
+    .setDescription("Se tilmeldte streamere og deres seneste livestreams (admin)")
+    .setDMPermission(false)
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
+    .addIntegerOption(option => option.setName("page").setDescription("Side i oversigten").setMinValue(1)),
   // refresh_club_roster (admin only)
   new SlashCommandBuilder()
     .setName("refresh_club_roster")
@@ -787,4 +801,4 @@ const commands = [
     ),
 ].map(cmd => cmd.toJSON());
 
-module.exports = commands; 
+module.exports = commands;

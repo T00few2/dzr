@@ -82,6 +82,9 @@ Roles/admin status are captured when the OAuth account is handled; the code does
 | Flask service routes | Explicit bearer `CONTENT_API_KEY` checks; retired session routes return `410` | [Flask main](../../apps/api/main.py) |
 | Weekly-series cron | Dedicated bearer `WEEKLY_SERIES_CRON_SECRET` | [cron route](../../app/api/cron/weekly-series/route.ts) |
 | Browser Firestore | Firebase Auth and collection rules, not the website's admin JWT | [rules](../../firestore.rules) |
+| Streaming enrollment/removal | Configured guild; invoking Discord member only; ephemeral replies and owner-bound components | [streaming handlers](../../apps/bot/handlers/streamingHandlers.js) |
+| Streaming overview | Administrator permission or configured DZR Admin role, checked on execution | [streaming handlers](../../apps/bot/handlers/streamingHandlers.js) |
+| OBS callback | Per-member hashed bearer key, registered platform, validated payload, size/rate limits; provider verification before posting | [streaming guide](streaming.md) |
 
 Middleware matches **pages only**. A protected UI does not authorize the HTTP endpoint it calls. Before extending a route, inspect the actual route guard; [known exceptions](#existing-boundaries-and-limitations) are part of the current architecture.
 
