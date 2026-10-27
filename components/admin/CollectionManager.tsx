@@ -9,10 +9,12 @@ export default function CollectionManager({
   collection,
   fields,
   idField = 'id',
+  initialDraft,
 }: {
   collection: string
   fields: Array<{ key: string; label: string; multiline?: boolean }>
   idField?: string
+  initialDraft?: Record<string, string>
 }) {
   const toast = useToast()
   const [docs, setDocs] = useState<any[]>([])
@@ -26,6 +28,11 @@ export default function CollectionManager({
   }
 
   useEffect(() => { refresh().catch(() => {}) }, [collection])
+
+  // Prefill (e.g. a knowledge gap's topic); anything already typed wins.
+  useEffect(() => {
+    if (initialDraft) setDraft((current) => ({ ...initialDraft, ...current }))
+  }, [initialDraft])
 
   async function save() {
     setLoading(true)

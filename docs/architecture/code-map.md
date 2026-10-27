@@ -140,7 +140,7 @@ flowchart TB
 
 There are deliberately **no npm workspaces**. Vercel installs the root package; Render installs `apps/bot`; Google Cloud Run's documented source root is `apps/api`. A bot import outside that directory would not exist in its build context.
 
-The [sync script's `TARGETS`](../../scripts/sync-shared.js) is the authoritative copy list: constants, selected Coach modules, phenotype and verification criteria. Other shared modules, including series rotation and route matching, are imported by the website without a bot copy. JavaScript declarations beside shared modules provide TypeScript interfaces.
+The [sync script's `TARGETS`](../../scripts/sync-shared.js) is the authoritative copy list: constants, selected Coach modules, phenotype and verification criteria. The shared membership module has a lenient `isPaidClubMember` (the Coach gate, errors read as "not paid") and a strict `readPaidClubMember` (onboarding, errors thrown). Other shared modules, including series rotation and route matching, are imported by the website without a bot copy. JavaScript declarations beside shared modules provide TypeScript interfaces.
 
 Edit the source, run `npm run sync:shared`, and commit source **and** changed copies. CI's `npm run check:shared` compares bytes. This also matters to deployment: Render's build filter watches `apps/bot/**`; a shared-only edit does not trigger its build. [Operations](operations.md#shared-change-delivery-what-must-be-committed-together) explains the delivery path.
 

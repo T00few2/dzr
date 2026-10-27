@@ -183,15 +183,35 @@ const commands = [
         .setMaxValue(365)
     )
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
-  // test_welcome (admin only)
+  // onboarding_preview (admin only)
   new SlashCommandBuilder()
-    .setName("test_welcome")
-    .setDescription("Test the welcome message system (admin only)")
+    .setName("onboarding_preview")
+    .setDescription("Send yourself the onboarding DM for a simulated member status (admin only)")
+    .addStringOption(option =>
+      option
+        .setName("as_status")
+        .setDescription("The member status to simulate")
+        .setRequired(true)
+        .addChoices(
+          { name: "Just joined", value: "join" },
+          { name: "Member, no Zwift ID, not paid", value: "fresh_unpaid" },
+          { name: "Paid on /join, no Zwift ID yet", value: "paid_no_zwift" },
+          { name: "Verified, not paid", value: "verified_not_paid" },
+          { name: "Verified, role and payment disagree", value: "paid_role_pending" },
+          { name: "Club member, intervals.icu not connected", value: "club_no_intervals" },
+          { name: "Everything done", value: "done" }
+        )
+    )
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+  // onboarding_reset (admin only)
+  new SlashCommandBuilder()
+    .setName("onboarding_reset")
+    .setDescription("Forget which onboarding DMs a user got, and mark them as test (admin only)")
     .addUserOption(option =>
       option
-        .setName("target_user")
-        .setDescription("User to simulate welcome message for (optional, defaults to yourself)")
-        .setRequired(false)
+        .setName("user")
+        .setDescription("The (test) user to reset")
+        .setRequired(true)
     )
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
 
