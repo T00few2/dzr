@@ -89,8 +89,9 @@ export async function GET(req: Request) {
         stepSent[key]++
         if (!latest || at > latest.at) latest = { key, at }
       }
-      if (steps[key]?.dmFailedAt) dmClosed++
     }
+    // Per member, not per step: one member with closed DMs can fail several steps.
+    if (STEP_KEYS.some((key) => steps[key]?.dmFailedAt)) dmClosed++
     if (latest) stageById.set(doc.id, latest.key)
     if (d.firstReplyAt) replied++
     const linkAsked = [sentAt('link_zwift_id_channel'), sentAt('link_zwift_id_join')].filter((t): t is number => t != null)

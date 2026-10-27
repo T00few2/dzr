@@ -58,6 +58,7 @@ function introText() {
     `• <#${CHANNELS.announcements}> – vigtige opdateringer`,
     `• <#${CHANNELS.raceSchedule}> – hvilke løb vi kører`,
     `• <#${CHANNELS.help}> – få hjælp`,
+    "• DZR-kittet i Zwift får du ved at gennemføre et DZR-event med kittet som præmie – spørg mig hvilke.",
   ].join("\n");
 }
 
