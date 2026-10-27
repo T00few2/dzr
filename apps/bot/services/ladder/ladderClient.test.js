@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { refreshSignups, refreshFixture } = require("./ladderClient");
+const { refreshSignups, refreshFixture, describeFailure } = require("./ladderClient");
 
 const MIN = 60 * 1000;
 
@@ -42,4 +42,11 @@ test("refreshFixture returns the fixture unchanged when there is no event id", a
 test("refreshFixture leaves a match that has already started alone", async () => {
   const fixture = { id: "2", zwiftEventId: "7100001", start: "2026-10-05T17:30:00Z" };
   assert.equal(await refreshFixture(fixture, Date.parse("2026-10-21T12:00:00Z")), fixture);
+});
+
+test("describeFailure names the API status, a timeout or a missing connection", () => {
+  assert.equal(describeFailure({ response: { status: 502 } }), "API svarede 502");
+  assert.equal(describeFailure({ response: { status: 401 } }), "API svarede 401");
+  assert.equal(describeFailure({ code: "ECONNABORTED" }), "API svarede ikke i tide");
+  assert.equal(describeFailure({ code: "ENOTFOUND" }), "ingen forbindelse til API");
 });

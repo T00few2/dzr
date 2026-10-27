@@ -3,6 +3,13 @@ const axios = require("axios");
 const config = require("../../config/config");
 const { parseFixtureList, parseFixture } = require("./ladderParser");
 
+// Short reason shown to the user, so a failing API can be told apart without looking in the logs.
+function describeFailure(err) {
+  if (err.response) return `API svarede ${err.response.status}`;
+  if (err.code === "ECONNABORTED") return "API svarede ikke i tide";
+  return "ingen forbindelse til API";
+}
+
 async function getPage(path) {
   const { baseUrl, apiKey } = config.contentApi;
   if (!baseUrl || !apiKey) throw new Error("CONTENT_API_BASE_URL and CONTENT_API_KEY must be set to read the ladder");
@@ -18,7 +25,7 @@ async function getPage(path) {
   } catch (err) {
     const status = err.response ? err.response.status : "no response";
     const wrapped = new Error(`Ladder page ${path} failed: ${status} ${err.message}`);
-    wrapped.userMessage = "Ladder-siden kunne ikke hentes lige nu. Prøv igen senere.";
+    wrapped.userMessage = `Ladder-siden kunne ikke hentes lige nu (${describeFailure(err)}). Prøv igen senere.`;
     throw wrapped;
   }
 }
@@ -82,4 +89,4 @@ async function getNextFixture(team) {
   return null;
 }
 
-module.exports = { getPage, fixturesPath, getFixtures, getFixture, getFixtureStart, getNextFixture, refreshSignups, refreshFixture };
+module.exports = { getPage, describeFailure, fixturesPath, getFixtures, getFixture, getFixtureStart, getNextFixture, refreshSignups, refreshFixture };
