@@ -134,6 +134,10 @@ const { compactToolResult } = require("../services/toolResult");
 const { prepareZwiftIdConfirmation, sendConfirmation } = require("./zwiftIdMessageHandler");
 const { getOnboardingStatus, LINKS: ONBOARDING_LINKS, ZWIFT_ID_CHANNEL_ID } = require("../services/onboardingStatus");
 const { getMembershipFacts, feeText, getTeamsLookingForRiders } = require("../services/clubFacts");
+const { recordClubDmTurn, rememberClubDmReply, recordKnowledgeGap, GAP_CATEGORIES } = require("../services/assistantDmStats");
+
+// Bookkeeping tools are never "the action the user asked for", so the fulfillment screen would always reject them.
+const UNSCREENED_TOOLS = new Set(["report_knowledge_gap"]);
 
 // What each onboarding step asks the member to do, for the model to say in its own words.
 const ONBOARDING_STEP_HELP = {
@@ -267,6 +271,21 @@ const toolDefinitions = [
             description: "The Discord username or mention (e.g. '@Chris' or 'Chris'). Omit to use the person asking."
           }
         }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "report_knowledge_gap",
+      description: "Note, anonymously, that you could not answer a question about DZR because no tool or knowledge article covers it. Call it alongside your answer (still tell the user you do not know). topic is your own short summary of what was asked, never a quote and never a name.",
+      parameters: {
+        type: "object",
+        properties: {
+          topic: { type: "string", description: "Your own one-line summary of the missing information, max 80 characters, e.g. 'krav til cykeltøj i DCU-løb'" },
+          category: { type: "string", enum: GAP_CATEGORIES, description: "What the question was about" }
+        },
+        required: ["topic", "category"]
       }
     }
   },
@@ -1123,6 +1142,15 @@ async function executeSingleToolCall(toolCall, message, turn) {
         return { tool_call_id: toolCall.id, ...helped };
       }
 
+      case "report_knowledge_gap": {
+        try {
+          await recordKnowledgeGap({ topic: args.topic, category: args.category });
+        } catch (error) {
+          console.warn("Knowledge gap write failed:", error?.message || error);
+        }
+        return { tool_call_id: toolCall.id, success: true, message: "Noted. Now tell the user you do not know, and where they can ask (the help channel or an admin)." };
+      }
+
       case "my_onboarding_status": {
         try {
           const status = await getOnboardingStatus(message.client, message.author.id);
@@ -1896,6 +1924,7 @@ You can help users with:
 11. **ZRL category questions** ("hvilken ZRL kategori/gruppe/division er jeg?", "kan jeg køre B?", etc.): ALWAYS call zrl_category. Do not answer from memory, and do not use only rider_stats or get_help_article for this. Use the tool's summary and numbers as-is — do not recalculate.
 
 12. **Onboarding, joining, membership, fees or roles** ("hvordan bliver jeg medlem", "what should I do next", "hvorfor har jeg ikke rollen"): call my_onboarding_status, and club_overview for fees or what membership gives. Give the one next step from the result with its link. Never state fees, steps or teams from memory
+13. If you cannot answer a question about DZR (club, membership, teams, races, Discord) because no tool or knowledge article covers it, say you do not know, suggest asking in the help channel, and call report_knowledge_gap with your own short summary of the topic. Not for small talk or general cycling questions that ask_helper can research
 
 ## Knowledge base
 Available articles (use get_help_article with the key or a tag):
@@ -2228,7 +2257,8 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
   if (!(await claimChatTurn(db, { botId: client.user.id, messageId: message.id }))) return;
 
   const queueKey = getConversationKey(message);
-  const queued = chatTurnQueue.tryEnqueue(queueKey, () => runChatTurn(message, client, { coachOnly }));
+  const queued = chatTurnQueue.tryEnqueue(queueKey, () =>
+    coachOnly || !isDM ? runChatTurn(message, client, { coachOnly }) : runTrackedClubDmTurn(message, client));
   if (!queued) {
     console.warn("Chat turn queue full, message not answered", { key: queueKey });
     if (coachOnly) {
@@ -2237,6 +2267,25 @@ async function handleChatMessage(message, client, { coachOnly = false } = {}) {
     return;
   }
   return queued;
+}
+
+/**
+ * A club-bot DM turn, with its metadata recorded afterwards (who, stage, tools, time, outcome).
+ * No message text is recorded. Recording never affects the reply.
+ */
+async function runTrackedClubDmTurn(message, client) {
+  const stats = { outcome: "answered", tools: [] };
+  const started = Date.now();
+  try {
+    await runChatTurn(message, client, { coachOnly: false, stats });
+  } finally {
+    recordClubDmTurn({
+      discordId: message.author.id,
+      toolsUsed: stats.tools,
+      turnMs: Date.now() - started,
+      outcome: stats.outcome,
+    }).catch((err) => console.warn("Club DM turn stats failed:", err?.message || err));
+  }
 }
 
 function toolDescription(name) {
@@ -2264,6 +2313,7 @@ async function screenClubToolCalls(userText, toolCalls, rejectedNames, context =
   const verdictById = new Map();
   await Promise.all(toolCalls.map(async (toolCall) => {
     const name = toolCall.name;
+    if (UNSCREENED_TOOLS.has(name)) return;
     if (rejectedNames.has(name)) {
       verdictById.set(toolCall.id, false);
       return;
@@ -2604,7 +2654,7 @@ async function runCoachResponsesTurn({
   };
 }
 
-async function runChatTurn(message, client, { coachOnly }) {
+async function runChatTurn(message, client, { coachOnly, stats = null }) {
   // Declared outside the try because the catch block flushes it. It was previously scoped to the
   // try, so every errored coach turn threw a ReferenceError from its own error handler after
   // replying — losing the token accounting and burying the real OpenAI error in the logs.
@@ -2634,6 +2684,7 @@ async function runChatTurn(message, client, { coachOnly }) {
     }
 
     if (!cleanedMessage) {
+      if (stats) stats.outcome = "empty";
       await safeReply(
         message,
         coachOnly
@@ -2645,6 +2696,7 @@ async function runChatTurn(message, client, { coachOnly }) {
 
     // Club bot never coaches. Point people at /coach (opens a DZR Coach DM).
     if (!coachOnly && isCoachingIntent(cleanedMessage)) {
+      if (stats) stats.outcome = "coach_redirect";
       await safeReply(message, USE_COACH_BOT_TEXT);
       return;
     }
@@ -2652,6 +2704,7 @@ async function runChatTurn(message, client, { coachOnly }) {
     // Shortcut: "mine stats" → use caller's linked ZwiftID directly (club bot only)
     const normalized = cleanedMessage.toLowerCase().replace(/[!?.]+$/g, '').trim();
     if (!coachOnly && (normalized === "mine stats" || normalized === "my stats")) {
+      if (stats) stats.tools = ["rider_stats"];
       const zwiftId = await getUserZwiftId(message.author.id);
       if (!zwiftId) {
         await safeReply(message,
@@ -2731,6 +2784,7 @@ async function runChatTurn(message, client, { coachOnly }) {
     // is split rather than lost.
     const replyFn = safeReplyChunks;
     const calledToolNames = [];
+    if (stats) stats.tools = calledToolNames;
     let answerEffort = isCoachSession ? COACH_REASONING_EFFORT : null;
     const replyAndTag = async (text, { fromModel = true } = {}) => {
       const sent = await replyFn(message, text);
@@ -2740,6 +2794,7 @@ async function runChatTurn(message, client, { coachOnly }) {
       if (isCoachSession && fromModel) {
         recordCoachReplyStats({ askedQuestion: endsWithQuestion(text) });
       }
+      if (stats) rememberClubDmReply(sent, calledToolNames);
       return sent;
     };
     coachUsageTally = isCoachSession
@@ -2831,6 +2886,7 @@ async function runChatTurn(message, client, { coachOnly }) {
         conversation.push({ role: "assistant", content: text });
         await replyAndTag(text, { fromModel: clubTurn.fromModel });
       } else if (!clubTurn.handledExternally) {
+        if (stats) stats.outcome = "no_answer";
         await safeReply(message, "⚠️ I couldn't produce an answer. Please try again.");
       }
     }
@@ -2866,6 +2922,8 @@ async function runChatTurn(message, client, { coachOnly }) {
       message: info.message,
       raw: error,
     });
+
+    if (stats) stats.outcome = "error";
 
     // A turn that failed mid tool-loop can leave unanswered tool_calls in the stored history,
     // which OpenAI rejects on every later turn. The coach rebuilds from the DM on the next message.

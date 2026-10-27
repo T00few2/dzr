@@ -43,6 +43,11 @@
     "coachProfiles": "coach_profiles",
     "coachChatNotes": "coach_chat_notes",
     "memberCalendar": "member_calendar",
-    "onboardingDms": "onboarding_dms"
+    "onboardingDms": "onboarding_dms",
+    "assistantDmEvents": "assistant_dm_events",
+    "assistantDmUsage": "assistant_dm_usage",
+    "assistantDmDaily": "assistant_dm_daily",
+    "assistantDmFeedback": "assistant_dm_feedback",
+    "assistantKnowledgeGaps": "assistant_knowledge_gaps"
   }
 }

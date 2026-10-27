@@ -18,7 +18,6 @@ async function handleMyZwiftId(interaction) {
   const zwiftID = interaction.options.getString("zwiftid");
   const searchTerm = interaction.options.getString("searchterm");
   const discordID = interaction.user.id;
-  const username = interaction.user.username;
 
   if (zwiftID) {
     // Show who the ID belongs to; linking happens on the confirm button.

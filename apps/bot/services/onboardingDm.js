@@ -40,7 +40,7 @@ const DM_HINTS = {
   role: "Tjek dine **DMs fra mig** – der står dit næste skridt.",
 };
 
-const ASK_ME = "Spørg mig om hvad som helst her i DM – hold, løb, ZRL-kategori, Zwift. _(You can write to me in English.)_";
+const ASK_ME = "Spørg mig om hvad som helst her i DM – hold, løb, ZRL-kategori, Zwift. Giv gerne mine svar 👍 eller 👎, så jeg bliver bedre. _(You can write to me in English.)_";
 
 function joinGreeting(name) {
   return [

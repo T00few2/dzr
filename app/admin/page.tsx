@@ -13,6 +13,7 @@ const CARDS = [
   { href: '/admin/signups', title: 'Signup boards', body: 'Live Discord signups, remove riders, board templates' },
   { href: '/admin/knowledge', title: 'Bot knowledge', body: 'Snippets for the Discord AI assistant' },
   { href: '/admin/coach', title: 'DZR Coach', body: 'intervals.icu connections and coaching token usage' },
+  { href: '/admin/onboarding', title: 'Onboarding & bot DMs', body: 'Onboarding funnel, bot DM usage, ratings and knowledge gaps' },
   { href: '/admin/outreach', title: 'Member outreach', body: 'DM members from a template' },
 ]
 
