@@ -2,7 +2,7 @@ const { getWelcomeMessage, processMessageContent } = require("../services/conten
 const config = require("../config/config");
 const verificationService = require("../services/verificationService");
 const { ensureNewMemberRole } = require("../services/newMemberService");
-const { runOnboarding } = require("../services/onboardingDm");
+const { runOnboarding, DM_HINTS } = require("../services/onboardingDm");
 const { getClubRoleId } = require("../services/onboardingStatus");
 const shared = require("../constants.json");
 
@@ -13,6 +13,13 @@ async function handleGuildMemberAdd(member) {
   try {
     console.log(`🔔 NEW MEMBER EVENT TRIGGERED: ${member.user.username} (${member.user.id}) joined ${member.guild.name}`);
     
+    // The DM goes first so the public hello can say whether there is one to look for.
+    const joinDm = await runOnboarding({ client: member.client, member, trigger: "join" });
+    // Rejoining members can get their roles back at once; then the guide is due now.
+    if (member.roles.cache.has(shared.discord.roles.communityMember)) {
+      await runOnboarding({ client: member.client, member, trigger: "community" });
+    }
+
     // Get welcome message from API
     const welcomeMessage = await getWelcomeMessage();
     if (!welcomeMessage) {
@@ -26,12 +33,13 @@ async function handleGuildMemberAdd(member) {
         displayName: member.displayName,
         server_name: member.guild.name,
         member_count: member.guild.memberCount,
-        mention: `<@${member.user.id}>`
+        mention: `<@${member.user.id}>`,
+        dm_hint: joinDm.outcome === "sent" ? DM_HINTS.join : ""
       };
 
       // Content only: the public hello is one line. Any old embed on the document is ignored here;
       // the onboarding guide is sent by DM.
-      const messageOptions = { content: processMessageContent(welcomeMessage.content, variables) };
+      const messageOptions = { content: processMessageContent(welcomeMessage.content, variables).trim() };
 
       // Send to channel specified in welcome message or fallback to config/system channel
       const channelId = welcomeMessage.channel_id || config.discord.welcomeChannelId || member.guild.systemChannelId;
@@ -56,12 +64,6 @@ async function handleGuildMemberAdd(member) {
     // Ensure New Member role assignment on join
     await ensureNewMemberRole(member);
 
-    await runOnboarding({ client: member.client, member, trigger: "join" });
-    // Rejoining members can get their roles back at once; then the guide is due now.
-    if (member.roles.cache.has(shared.discord.roles.communityMember)) {
-      await runOnboarding({ client: member.client, member, trigger: "community" });
-    }
-
   } catch (error) {
     console.error("❌ Error handling new member:", error);
   }
@@ -82,7 +84,8 @@ async function handleOnboardingRoles(member, addedRoleIds) {
     const clubRoleId = await getClubRoleId();
     if (clubRoleId && addedRoleIds.includes(clubRoleId)) trigger = "role";
   }
-  if (trigger) await runOnboarding({ client: member.client, member, trigger });
+  if (!trigger) return null;
+  return runOnboarding({ client: member.client, member, trigger });
 }
 
 /**
@@ -99,10 +102,14 @@ async function handleGuildMemberUpdate(oldMember, newMember) {
     
     if (addedRoles.size > 0) {
       console.log(`🔔 ROLE UPDATE EVENT: ${newMember.user.username} received ${addedRoles.size} new role(s)`);
-      
+
+      // The DM goes first so the public role line can say whether there is one to look for.
+      const onboarding = await handleOnboardingRoles(newMember, [...addedRoles.keys()]);
+      const dmHint = onboarding?.outcome === "sent" ? DM_HINTS.role : "";
+
       // Process each added role
       for (const [roleId, role] of addedRoles) {
-        await handleRoleAssignment(newMember, role);
+        await handleRoleAssignment(newMember, role, dmHint);
       }
     }
     
@@ -113,9 +120,6 @@ async function handleGuildMemberUpdate(oldMember, newMember) {
     // Ensure New Member role is correct after any role changes
     await ensureNewMemberRole(newMember);
 
-    if (addedRoles.size > 0) {
-      await handleOnboardingRoles(newMember, [...addedRoles.keys()]);
-    }
     
   } catch (error) {
     console.error("❌ Error handling member role update:", error);
@@ -125,7 +129,7 @@ async function handleGuildMemberUpdate(oldMember, newMember) {
 /**
  * Handle a specific role assignment
  */
-async function handleRoleAssignment(member, role) {
+async function handleRoleAssignment(member, role, dmHint = "") {
   try {
     console.log(`🎭 Processing role assignment: ${member.user.username} received role "${role.name}" (${role.id})`);
     
@@ -157,7 +161,7 @@ async function handleRoleAssignment(member, role) {
     
     // Process each matching message
     for (const roleMessage of matchingMessages) {
-      await sendRoleMessage(member, role, roleMessage);
+      await sendRoleMessage(member, role, roleMessage, dmHint);
     }
     
   } catch (error) {
@@ -168,7 +172,7 @@ async function handleRoleAssignment(member, role) {
 /**
  * Send a role assignment message
  */
-async function sendRoleMessage(member, role, roleMessage) {
+async function sendRoleMessage(member, role, roleMessage, dmHint = "") {
   try {
     console.log(`📤 Sending role message: "${roleMessage.title}" for role "${role.name}"`);
     
@@ -181,11 +185,12 @@ async function sendRoleMessage(member, role, roleMessage) {
       mention: `<@${member.user.id}>`,
       role_name: role.name,
       role_mention: `<@&${role.id}>`,
-      role_color: role.hexColor || '#000000'
+      role_color: role.hexColor || '#000000',
+      dm_hint: dmHint
     };
     
     const { processMessageContent } = require("../services/contentApi");
-    const content = processMessageContent(roleMessage.content, variables);
+    const content = processMessageContent(roleMessage.content, variables).trim();
     
     // Build message object
     const messageOptions = { content };

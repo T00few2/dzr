@@ -133,3 +133,19 @@ test('onboarding runs for the community, verified and club roles, not for team r
   assert.deepEqual(await triggerFor('club'), ['role']);
   assert.deepEqual(await triggerFor('custom'), []);
 });
+
+test('the public role line carries the DM hint only when a DM was just sent', async () => {
+  const shared = require('../constants.json');
+  const community = shared.discord.roles.communityMember;
+  for (const [outcome, expected] of [['sent', 'Hi <@100000000000000000> ROLE-HINT'], ['already_handled', 'Hi <@100000000000000000>']]) {
+    const f = createVerificationFixture();
+    f.state.onboardingOutcome = outcome;
+    f.state.templates = [{ id: 'm', active: true, role_id: community, channel_id: 'announcements', content: 'Hi {mention} {dm_hint}' }];
+    const before = f.member();
+    const after = f.member();
+    after.roles.cache = new Map([[community, { id: community, name: 'community' }]]);
+    after.roles.cache.filter = predicate => new Map([...after.roles.cache].filter(([, role]) => predicate(role)));
+    await f.handler.handleGuildMemberUpdate(before, after);
+    assert.deepEqual(f.state.messages.map(message => message.content), [expected]);
+  }
+});

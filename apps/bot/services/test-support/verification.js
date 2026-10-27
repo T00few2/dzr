@@ -28,7 +28,7 @@ function createVerificationFixture() {
   ]);
   const state = {
     userId, guildId, docs,
-    roles: new Set(), events: [], onboarding: [], messages: [], mutations: [], roleCalls: [], queued: [], logs: [],
+    roles: new Set(), events: [], onboarding: [], onboardingOutcome: 'nothing_due', messages: [], mutations: [], roleCalls: [], queued: [], logs: [],
     failCollection: null, failDiscord: false, failRoleWrite: false,
     beforeRead: null, beforeMemberFetch: null,
     premiumSince: null,
@@ -94,11 +94,14 @@ function createVerificationFixture() {
   }, { console: quietConsole });
   const handler = loadCommonJs(readFileSync(path.resolve(__dirname, '../../handlers/memberHandler.js'), 'utf8'), {
     'discord.js': { EmbedBuilder: class {} },
-    '../services/contentApi': { processMessageContent: content => content },
+    '../services/contentApi': { processMessageContent: (content, variables = {}) => content.replace(/{(\w+)}/g, (match, key) => key in variables ? variables[key] : match) },
     '../config/config': { contentApi: { baseUrl: 'https://content.test', apiKey: 'test' } },
     '../services/verificationService': service,
     '../services/newMemberService': { ensureNewMemberRole: async () => {} },
-    '../services/onboardingDm': { runOnboarding: async options => state.onboarding.push(options) },
+    '../services/onboardingDm': {
+      runOnboarding: async options => { state.onboarding.push(options); return { outcome: state.onboardingOutcome }; },
+      DM_HINTS: { join: 'JOIN-HINT', role: 'ROLE-HINT' },
+    },
     '../services/onboardingStatus': { getClubRoleId: async () => 'club' },
     '../constants.json': require('../../constants.json'),
   }, {

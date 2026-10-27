@@ -2,7 +2,7 @@ const { getWelcomeMessage, processMessageContent } = require("../services/conten
 const config = require("../config/config");
 const shared = require("../constants.json");
 const { getOnboardingStatus, getClubRoleId } = require("../services/onboardingStatus");
-const { buildMessage, STEP_KEYS, COLLECTION } = require("../services/onboardingDm");
+const { buildMessage, STEP_KEYS, DM_HINTS, COLLECTION } = require("../services/onboardingDm");
 const { getMembershipFacts, feeText, getTeamsLookingForRiders } = require("../services/clubFacts");
 
 const ROLES = shared.discord.roles;
@@ -32,6 +32,8 @@ function previewVariables(interaction, roleId) {
     role_name: role?.name || "",
     role_mention: roleId ? `<@&${roleId}>` : "",
     role_color: role?.hexColor || "#000000",
+    // As if the DM was just sent.
+    dm_hint: roleId ? DM_HINTS.role : DM_HINTS.join,
   };
 }
 

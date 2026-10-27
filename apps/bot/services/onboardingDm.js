@@ -34,6 +34,12 @@ const STEP_KEYS = new Set([
   "connect_intervals",
 ]);
 
+/** {dm_hint} in the public join/role lines: filled only when a DM was sent just now, so a line never points to a DM that does not exist. */
+const DM_HINTS = {
+  join: "Jeg har sendt dig en privat besked (DM), som hjælper dig i gang. Find den under **Direkte beskeder**: Discord-logoet øverst til venstre på computeren, eller 💬 på mobilen.",
+  role: "Tjek dine **DMs fra mig** – der står dit næste skridt.",
+};
+
 const ASK_ME = "Spørg mig om hvad som helst her i DM – hold, løb, ZRL-kategori, Zwift. _(You can write to me in English.)_";
 
 function joinGreeting(name) {
@@ -288,6 +294,7 @@ module.exports = {
   finishKeys,
   recordFunnelFacts,
   STEP_KEYS,
+  DM_HINTS,
   LEASE_MS,
   COLLECTION,
 };
