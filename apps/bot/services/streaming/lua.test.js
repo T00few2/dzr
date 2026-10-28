@@ -22,7 +22,7 @@ test("OBS Lua uses real libcurl multi over TLS; start/heartbeat/stop ordering, r
     req.on("end", () => {
       const parsed = JSON.parse(body);
       requests.push({ body: parsed, authorization: req.headers.authorization, url: req.url });
-      res.writeHead(requests.length === 1 ? 503 : parsed.platform === "unknown" ? 400 : 202, { "Content-Type": "application/json" });
+      res.writeHead(requests.length === 1 ? 503 : parsed.platform === null ? 400 : 202, { "Content-Type": "application/json" });
       res.end('{"accepted":true}');
     });
   });
@@ -90,13 +90,13 @@ test_button(); pump(50)
 event(1); pump(50)
 event(2); pump(50)
 service_name="Custom RTMP"
-event(1); pump(50) -- unknown detection must reach DZR, so it can report to IT
+event(1); pump(50) -- an undetected platform is sent as null so DZR can report to IT
 script_update({endpoint=${JSON.stringify(endpoint)}, key=${JSON.stringify(token)}, platform="twitch"})
 pump(50) -- selecting a known platform repairs the active session
 event(2); pump(50)
 service_available=false
 script_update({endpoint=${JSON.stringify(endpoint)}, key=${JSON.stringify(token)}, platform="auto"})
-test_button(); pump(50) -- missing OBS service also becomes unknown
+test_button(); pump(50) -- a missing OBS service also serializes as null
 script_update({endpoint=${JSON.stringify(endpoint)}, key=${JSON.stringify(token)}, platform="facebook"})
 test_button(); pump(50) -- invalid persisted/manual settings cannot become a provider
 script_unload()
@@ -111,7 +111,7 @@ script_unload()
   assert.deepEqual(requests.map((r) => r.body.event), ["test", "test", "started", "heartbeat", "stopped",
     "test", "started", "stopped", "started", "started", "stopped", "test", "test"], output);
   assert.deepEqual(requests.map((r) => r.body.platform), ["youtube", "youtube", "youtube", "youtube", "youtube",
-    "twitch", "twitch", "twitch", "unknown", "twitch", "twitch", "unknown", "unknown"]);
+    "twitch", "twitch", "twitch", null, "twitch", "twitch", null, null]);
   assert.deepEqual(requests.slice(2, 5).map((r) => r.body.sequence), [1, 2, 3]);
   assert.equal(requests[2].body.sessionId, requests[4].body.sessionId);
   assert.equal(requests[8].body.sessionId, requests[9].body.sessionId);
