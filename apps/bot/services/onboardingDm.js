@@ -74,12 +74,13 @@ function stepText(step, status, extras = {}) {
       return [
         "**Næste skridt: link dit Zwift ID** → så bliver du ✅ Verificeret Medlem og får adgang til members-zone på hjemmesiden og bot-kommandoerne.",
         `Skriv \`zwiftid 1234567\` (dit eget ID) i <#${CHANNELS.zwiftId}>, brug \`/my_zwiftid\` – eller send det bare til mig her. Jeg viser dig profilen, så du kan bekræfte, at det er dig.`,
-        "Kender du ikke dit ID? `/my_zwiftid searchterm:` finder dig på dit Zwift-navn.",
+        "Kender du ikke dit ID? Skriv dit navn, som det står på Zwift/ZwiftPower, til mig her – så finder jeg dig.",
       ].join("\n");
     case "link_zwift_id_join":
       return [
         "**Tak for din betaling! Sidste skridt: link dit Zwift ID**",
         `Gør det her: ${LINKS.joinZwiftId} – så er du både ⭐ Klub Medlem og ✅ Verificeret Medlem.`,
+        "Kender du ikke dit Zwift ID? Skriv dit navn, som det står på Zwift/ZwiftPower, til mig her – så finder jeg dig og viser profilen, så du kan bekræfte.",
       ].join("\n");
     case "meet_verification":
       return [

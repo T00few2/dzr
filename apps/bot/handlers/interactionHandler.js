@@ -21,6 +21,7 @@ const {
   handleRepostSignupBoard,
 } = require("./commandHandlers");
 const { handleCoach } = require("../services/coachDm");
+const { isRiderSelect, riderSelectOwner } = require("../services/riderSearch");
 const { handleLadderLink, handleLadderPreview, handleLadderAnalysis, handleLadderAi } = require("./ladderHandlers");
 const ladderTeams = require("../services/ladder/ladderTeams");
 const {
@@ -140,7 +141,14 @@ async function handleSelectMenus(interaction) {
     return;
   }
 
-  if (interaction.customId === "myzwift_select") {
+  if (isRiderSelect(interaction.customId)) {
+    // A search menu belongs to the member who searched: someone else picking from it in a channel
+    // would otherwise get a confirm card for that rider on their own account.
+    const owner = riderSelectOwner(interaction.customId);
+    if (owner && owner !== interaction.user.id) {
+      await interaction.reply({ content: "Den liste er til en anden. Søg selv med `/my_zwiftid searchterm:`.", ephemeral: true });
+      return;
+    }
     try {
       const [selectedValue] = interaction.values;
       await interaction.deferUpdate();

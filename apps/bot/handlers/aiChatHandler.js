@@ -64,6 +64,7 @@ const { buildZwo, describeWorkout } = require("../services/zwoBuilder");
 const { runHelper, askHelperToolDefinition } = require("../services/helperAgent");
 const { searchAnnouncements, searchAnnouncementsToolDefinition } = require("../services/announcementIndex");
 const { draftGapArticle } = require("../services/gapDrafts");
+const { findRidersByName, buildRiderSearchReply } = require("../services/riderSearch");
 const { zwiftRouteToolDefinitions, ZWIFT_ROUTE_TOOLS, runZwiftRouteTool } = require("../services/zwiftRoutes");
 const { buildRouteProfileImages } = require("../services/routeProfileImages");
 const { getZwiftEvent } = require("../services/zwiftEvents");
@@ -458,7 +459,7 @@ const toolDefinitions = [
           },
           searchterm: {
             type: "string",
-            description: "First 3+ letters of name to search for in club stats"
+            description: "Their name as it is on Zwift/ZwiftPower (4+ letters, the full name works best), when they do not know their ZwiftID. Searches DZR riders and all of ZwiftPower, and posts a menu where they pick themselves."
           }
         }
       }
@@ -940,18 +941,23 @@ async function executeSingleToolCall(toolCall, message, turn) {
           return { tool_call_id: toolCall.id, success: true };
         }
 
+        if (args.searchterm) {
+          // Post the menu directly: the synthetic reply helper strips components, which left the
+          // member with "select your name" and nothing to select.
+          const term = String(args.searchterm).trim();
+          const result = await findRidersByName(term, { discordId: message.author.id });
+          await safeReply(message, buildRiderSearchReply(message.author.id, term, result));
+          return { tool_call_id: toolCall.id, success: true, found: result.riders.length };
+        }
+
         const options = {
           strings: {}
         };
-        
+
         if (args.zwiftid) {
           options.strings.zwiftid = args.zwiftid;
         }
-        
-        if (args.searchterm) {
-          options.strings.searchterm = args.searchterm;
-        }
-        
+
         const interaction = createSyntheticInteraction(message, options);
         await handleMyZwiftId(interaction);
         return { tool_call_id: toolCall.id, success: true };
@@ -1950,6 +1956,7 @@ You can help users with:
 12. **Onboarding, joining, membership, fees or roles** ("hvordan bliver jeg medlem", "what should I do next", "hvorfor har jeg ikke rollen"): call my_onboarding_status, and club_overview for fees or what membership gives. Give the one next step from the result with its link. Never state fees, steps or teams from memory
 13. If you cannot answer a question about DZR (club, membership, teams, races, Discord) because no tool, knowledge article or announcement covers it, say you do not know, suggest asking in the help channel, and call report_knowledge_gap with your own short summary of the topic. Not for small talk or general cycling questions that ask_helper can research
 14. **DZR news and events** ("hvad sker der", "er der recon på søndag", "hvornår er næste DZR event", a campaign or kit): call search_announcements. Also call it before rule 13 for any DZR question the knowledge base did not answer. Give the post's date, and never present an event dated before today as upcoming
+15. Someone who wants to link their Zwift ID but does not know it: ask for their name as it is on Zwift/ZwiftPower, then call my_zwiftid with searchterm. They pick themselves from the menu and confirm on the profile card. Do not send them looking for the ID first
 
 ## Knowledge base
 Available articles (use get_help_article with the key or a tag):

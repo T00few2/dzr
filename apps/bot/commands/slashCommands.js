@@ -48,7 +48,7 @@ const commands = [
     .addStringOption(option =>
       option
         .setName("searchterm")
-        .setDescription("First 3+ letters of your name in the club stats")
+        .setDescription("Your name as on Zwift/ZwiftPower (4+ letters searches all of ZwiftPower)")
         .setRequired(false)
     ),
   // whoami
