@@ -94,6 +94,7 @@ function compactToolResult(result) {
   if (Array.isArray(result.segments)) base.segments = result.segments.slice(0, 15);
   if (Array.isArray(result.candidates)) base.candidates = result.candidates.slice(0, 8);
   if (Array.isArray(result.worlds)) base.worlds = result.worlds.slice(0, 20);
+  if (Array.isArray(result.announcements)) base.announcements = result.announcements.slice(0, 5);
 
   // Fallback: keep only small scalar keys
   const keepScalars = {};

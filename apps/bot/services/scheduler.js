@@ -7,6 +7,7 @@ const { syncZpRolesForGuild } = require("./zpRoleSync");
 const { maybePostScheduledQuiz } = require("./quizService");
 const { maybeSendCoachFollowUps } = require("./coachFollowUp");
 const { maybeRunLadderJobs } = require("./ladder/ladderJobs");
+const { maybeSyncAnnouncements } = require("./announcementIndex");
 
 /**
  * Check for and send scheduled messages (both time-based and probability-based)
@@ -42,6 +43,9 @@ async function checkScheduledMessages(client) {
     await maybePostScheduledQuiz(client);
 
     await maybeSendCoachFollowUps();
+
+    // Index the announcements channel once a day (live events keep it current in between)
+    await maybeSyncAnnouncements(client);
 
     // Ladder match previews and match-day reminders. Not awaited: rendering the preview can take
     // several seconds and must not delay the other minute checks; it does its own error handling.

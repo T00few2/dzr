@@ -9,7 +9,8 @@
       "teamsLookingForRiders": "1297934562558611526",
       "announcements": "1302176784623734797",
       "raceSchedule": "1196354482385211532",
-      "help": "1353477785674453104"
+      "help": "1353477785674453104",
+      "moderators": "1196359141019635782"
     },
     "roles": {
       "admin": "1195852714270277763",
@@ -48,6 +49,8 @@
     "assistantDmUsage": "assistant_dm_usage",
     "assistantDmDaily": "assistant_dm_daily",
     "assistantDmFeedback": "assistant_dm_feedback",
-    "assistantKnowledgeGaps": "assistant_knowledge_gaps"
+    "assistantKnowledgeGaps": "assistant_knowledge_gaps",
+    "announcementIndex": "announcement_index",
+    "knowledgeGapDrafts": "knowledge_gap_drafts"
   }
 }

@@ -74,7 +74,9 @@ Coach notes and calendar entries are subcollections beneath Discord-ID parents. 
 | `welcome_messages`, `role_messages`, `scheduled_messages`, `bot_knowledge` | Website admin collection routes; Flask content endpoints | Bot content and assistant services; Flask computes schedule eligibility |
 | `onboarding_dms` | Bot onboarding DMs and `/onboarding_reset` | Per-step `sentAt`/`dmFailedAt`/lease, funnel and reply timestamps; metadata only, no message text |
 | `assistant_dm_events`, `assistant_dm_usage`, `assistant_dm_daily`, `assistant_dm_feedback` | Bot club-assistant DM turns and 👍/👎 | `/admin/onboarding` reporting; who, when, tools, outcome and ratings only |
-| `assistant_knowledge_gaps` | Bot `report_knowledge_gap` tool; website admin marks solved/open | Anonymous topic summaries per normalized id; no user id or quote |
+| `assistant_knowledge_gaps` | Bot `report_knowledge_gap` tool; website admin marks solved/open; moderator publish marks solved | Anonymous topic summaries per normalized id; no user id or quote; `draftedAt`/`draftId`/`articleKey` link the draft flow |
+| `knowledge_gap_drafts` | Bot gap drafts (DZR Helper) and moderator buttons | Draft article per gap, state pending/not_found/published/rejected, who decided |
+| `announcement_index` | Bot announcement events and daily sync | Text, link, date and embedding of admin/bot posts in the announcements channel, for `search_announcements` |
 | `bot_state`, `chat_turn_claims` | Bot job markers and per-message claims | Operational coordination; claims have expiry fields, TTL policy is external |
 | `signup_board_configs`, `signup_boards` | Website admin and bot signup service | Reaction/button enrollment and admin review |
 | `series_catalogs`, `series_schedules`, `event_series`, `group_ride_schedules` | Website planning/publishing; Flask updates Fifty result markers | Public/member event views, bot automation and result jobs; [events guide](events.md) |
