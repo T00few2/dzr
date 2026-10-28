@@ -147,3 +147,53 @@ test("cosine is 1 for the same direction and 0 for a zero vector", () => {
   assert.equal(Math.round(cosine([1, 2], [2, 4]) * 1000) / 1000, 1);
   assert.equal(cosine([0, 0], [1, 1]), 0);
 });
+
+test("a failed sync is retried after 15 minutes, not after a day", async () => {
+  const state = {};
+  const deps = {
+    db: fakeDb(),
+    embed: fakeEmbed([]),
+    getBotState: async (k) => state[k] || null,
+    setBotState: async (k, v) => { state[k] = { ...(state[k] || {}), ...v }; },
+  };
+  let fail = true;
+  const page = new Map();
+  const client = { channels: { fetch: async () => { if (fail) throw new Error("rate limited"); return { messages: { fetch: async () => page } }; } } };
+  const t0 = Date.parse("2026-10-28T11:05:00Z");
+  assert.equal(await maybeSyncAnnouncements(client, deps, t0), null);
+  fail = false;
+  assert.equal(await maybeSyncAnnouncements(client, deps, t0 + 5 * 60 * 1000), null, "too soon to retry");
+  assert.deepEqual(await maybeSyncAnnouncements(client, deps, t0 + 16 * 60 * 1000), { messages: 0, written: 0, removed: 0 });
+  assert.equal(await maybeSyncAnnouncements(client, deps, t0 + 60 * 60 * 1000), null, "synced today");
+});
+
+test("sync looks up authors one by one and keeps rows whose author lookup failed", async () => {
+  invalidateCache();
+  const db = fakeDb();
+  const deps = { db, embed: fakeEmbed([]) };
+  await upsertMessages([message("kept", long("Recon søndag"), { authorId: "flaky" })], deps);
+  const lookedUp = [];
+  const guild = {
+    members: {
+      cache: new Map(),
+      fetch: async (id) => {
+        lookedUp.push(id);
+        if (id === "flaky") throw Object.assign(new Error("timeout"), { code: 500 });
+        if (id === "left") throw Object.assign(new Error("Unknown Member"), { code: 10007 });
+      },
+    },
+  };
+  const msgs = [
+    message("kept", long("Recon søndag"), { authorId: "flaky" }),
+    message("gone", long("Gammel post"), { authorId: "left", roles: [] }),
+    message("new", long("Nyt kit til salg"), { authorId: "flaky" }),
+  ];
+  const page = new Map(msgs.map((m) => [m.id, m]));
+  page.last = () => msgs[msgs.length - 1];
+  const client = { channels: { fetch: async () => ({ guild, messages: { fetch: async () => page } }) } };
+  const { syncAnnouncements } = require("./announcementIndex");
+  const result = await syncAnnouncements(client, deps);
+  assert.deepEqual(lookedUp.sort(), ["flaky", "left"]);
+  assert.deepEqual(result, { messages: 3, written: 0, removed: 0 });
+  assert.equal(db.docs.has(`${COLLECTION}/kept`), true);
+});
