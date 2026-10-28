@@ -64,7 +64,11 @@ function fixture(status, { sendError = null } = {}) {
   };
   const run = (trigger) => runOnboarding({ client: null, member, trigger, deps });
   const steps = () => db.docs.get(`${COLLECTION}/${USER}`)?.steps || {};
-  return { db, deps, sent, channelPosts, run, steps, member };
+  // A step recorded as sent without the intro (sent before the intro rode along with steps).
+  const claimStepOnly = async () => {
+    db.docs.set(`${COLLECTION}/${USER}`, { steps: { [status.nextStep]: { sentAt: new Date(1) } } });
+  };
+  return { db, deps, sent, channelPosts, run, steps, member, claimStepOnly };
 }
 
 const unpaidNewcomer = { inServer: true, community: true, verified: false, paidClubMember: false, clubRole: false, nextStep: "link_zwift_id_channel" };
@@ -88,13 +92,21 @@ test("the same step is never sent twice", async () => {
   assert.equal(f.sent.length, 1);
 });
 
-test("intro goes out alone when the step was already sent", async () => {
+test("intro goes out alone on the community role when the step went out without it", async () => {
   const f = fixture({ ...unpaidNewcomer, community: false });
-  await f.run("role");
+  await f.claimStepOnly();
   const result = await f.run("community");
   assert.deepEqual(result.keys, ["intro"]);
-  assert.equal(f.sent.length, 2);
-  assert.doesNotMatch(f.sent[1], /link dit Zwift ID/);
+  assert.doesNotMatch(f.sent.at(-1), /link dit Zwift ID/);
+});
+
+test("/join without a community role event: the first step DM carries the intro", async () => {
+  const f = fixture({ ...unpaidNewcomer, community: false, paidClubMember: true, clubRole: true, nextStep: "link_zwift_id_join" });
+  assert.deepEqual((await f.run("role")).keys, ["intro", "link_zwift_id_join"]);
+  assert.match(f.sent[0], /Kom godt i gang/);
+  f.deps.getOnboardingStatus = async () => ({ ...unpaidNewcomer, verified: true, paidClubMember: true, clubRole: true, nextStep: "connect_intervals" });
+  assert.deepEqual((await f.run("role")).keys, ["connect_intervals"]);
+  assert.doesNotMatch(f.sent[1], /Kom godt i gang/);
 });
 
 test("/join order: channel link, then the join link, then connect_intervals", async () => {
@@ -113,8 +125,8 @@ test("the channel link is never sent after the join link", async () => {
   const f = fixture({ ...unpaidNewcomer, paidClubMember: true, nextStep: "link_zwift_id_join" });
   await f.run("role");
   f.deps.getOnboardingStatus = async () => unpaidNewcomer;
-  const result = await f.run("community");
-  assert.deepEqual(result.keys, ["intro"]);
+  assert.equal((await f.run("community")).outcome, "already_handled");
+  assert.equal(f.sent.length, 1);
 });
 
 test("closed DMs record dmFailedAt, post the fallback once, and stop", async () => {

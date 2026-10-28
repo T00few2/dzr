@@ -127,9 +127,12 @@ function buildMessage(keys, status, extras = {}) {
 /** Keys this event wants to send, before send-once filtering. */
 function wantedKeys(trigger, status) {
   if (trigger === "join") return ["join"];
-  const keys = [];
-  if (trigger === "community") keys.push("intro");
-  if (STEP_KEYS.has(status?.nextStep)) keys.push(status.nextStep);
+  const step = STEP_KEYS.has(status?.nextStep) ? status.nextStep : null;
+  // The intro rides along with the first step DM, whatever role triggered it: members who come
+  // through /join are added to the server without the community role, so that event never fires.
+  // Claiming drops it once it has been sent.
+  const keys = trigger === "community" || step ? ["intro"] : [];
+  if (step) keys.push(step);
   return keys;
 }
 
