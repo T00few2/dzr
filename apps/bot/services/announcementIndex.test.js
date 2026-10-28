@@ -197,3 +197,62 @@ test("sync looks up authors one by one and keeps rows whose author lookup failed
   assert.deepEqual(result, { messages: 3, written: 0, removed: 0 });
   assert.equal(db.docs.has(`${COLLECTION}/kept`), true);
 });
+
+function withImages(msg, images) {
+  msg.attachments = new Map(images.map((im) => [im.id, { size: 1000, contentType: "image/png", url: `https://cdn/${im.id}.png`, ...im }]));
+  return msg;
+}
+
+test("image text is read once, searched with the post, and reused when only the text changes", async () => {
+  invalidateCache();
+  const db = fakeDb();
+  const reads = [];
+  const deps = {
+    db,
+    embed: fakeEmbed([]),
+    readImage: async (image) => { reads.push(image.id); return "03-11-2026 – DZR klubmesterskab - Hold"; },
+  };
+  const post = () => withImages(message("cal", "Kalender"), [{ id: "a1" }, { id: "big", size: 50 * 1024 * 1024 }, { id: "pdf", contentType: "application/pdf" }]);
+  assert.deepEqual(await upsertMessages([post()], deps), { written: 1 }, "a short post with an image is indexed");
+  assert.deepEqual(reads, ["a1"], "too big and non-image attachments are skipped");
+  const row = db.docs.get(`${COLLECTION}/cal`);
+  assert.equal(row.text, "Kalender\n\n[Billede]\n03-11-2026 – DZR klubmesterskab - Hold");
+  assert.deepEqual(row.images, { a1: "03-11-2026 – DZR klubmesterskab - Hold" });
+
+  assert.deepEqual(await upsertMessages([post()], deps), { written: 0 });
+  const edited = withImages(message("cal", "Kalender 2026/27"), [{ id: "a1" }]);
+  assert.deepEqual(await upsertMessages([edited], deps), { written: 1 });
+  assert.deepEqual(reads, ["a1"], "the transcription is reused");
+});
+
+test("a failed image read is retried on the next upsert", async () => {
+  const db = fakeDb();
+  let fail = true;
+  const deps = {
+    db,
+    embed: fakeEmbed([]),
+    readImage: async () => { if (fail) throw new Error("timeout"); return "Plakat: recon søndag"; },
+  };
+  const post = () => withImages(message("p", long("Se plakaten")), [{ id: "x" }]);
+  assert.deepEqual(await upsertMessages([post()], deps), { written: 1 });
+  assert.equal(db.docs.get(`${COLLECTION}/p`).hash, null);
+  fail = false;
+  assert.deepEqual(await upsertMessages([post()], deps), { written: 1 });
+  assert.match(db.docs.get(`${COLLECTION}/p`).text, /Plakat: recon søndag/);
+  assert.notEqual(db.docs.get(`${COLLECTION}/p`).hash, null);
+});
+
+test("a new index version syncs at once even after today's sync", async () => {
+  const state = { announcement_index_sync: { lastSuccessAtMs: Date.parse("2026-10-28T11:12:00Z"), lastAttemptAtMs: Date.parse("2026-10-28T11:12:00Z") } };
+  const deps = {
+    db: fakeDb(),
+    embed: fakeEmbed([]),
+    getBotState: async (k) => state[k] || null,
+    setBotState: async (k, v) => { state[k] = { ...(state[k] || {}), ...v }; },
+  };
+  const page = new Map();
+  const client = { channels: { fetch: async () => ({ messages: { fetch: async () => page } }) } };
+  const now = Date.parse("2026-10-28T12:00:00Z");
+  assert.deepEqual(await maybeSyncAnnouncements(client, deps, now), { messages: 0, written: 0, removed: 0 });
+  assert.equal(await maybeSyncAnnouncements(client, deps, now + 20 * 60 * 1000), null, "same version: once a day");
+});
