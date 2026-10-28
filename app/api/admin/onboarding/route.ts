@@ -70,7 +70,6 @@ export async function GET(req: Request) {
   let replied = 0
   let askedToLink = 0
   let linkedWithin7 = 0
-  let askedToJoin = 0
   let joinedWithin7 = 0
   onboardingSnap.forEach((doc) => {
     const d = doc.data() || {}
@@ -83,11 +82,13 @@ export async function GET(req: Request) {
     if (!Object.values(steps).some((s: any) => s?.sentAt || s?.dmFailedAt)) return
     members++
     let latest: { key: string; at: number } | null = null
+    let firstDm: number | null = null
     for (const key of STEP_KEYS) {
       const at = sentAt(key)
       if (at != null) {
         stepSent[key]++
         if (!latest || at > latest.at) latest = { key, at }
+        if (firstDm == null || at < firstDm) firstDm = at
       }
     }
     // Per member, not per step: one member with closed DMs can fail several steps.
@@ -99,11 +100,9 @@ export async function GET(req: Request) {
       askedToLink++
       if (within7Days(Math.min(...linkAsked), ms(d.zwiftLinkedAt))) linkedWithin7++
     }
-    const joinAsked = sentAt('become_club_member')
-    if (joinAsked != null) {
-      askedToJoin++
-      if (within7Days(joinAsked, ms(d.clubJoinedAt))) joinedWithin7++
-    }
+    // From the first DM, not from the "become a club member" DM: on /join members pay before they
+    // ever need that DM, and they are the ones the onboarding should count.
+    if (within7Days(firstDm, ms(d.clubJoinedAt))) joinedWithin7++
   })
 
   // DM turns: tools, outcomes, per-day counts (last 30 days).
@@ -167,7 +166,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     windowDays: WINDOW_DAYS,
-    funnel: { members, stepSent, dmClosed, replied, askedToLink, linkedWithin7, askedToJoin, joinedWithin7 },
+    funnel: { members, stepSent, dmClosed, replied, askedToLink, linkedWithin7, joinedWithin7 },
     usage: {
       turns,
       outcomes,

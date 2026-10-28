@@ -34,7 +34,6 @@ type Data = {
     replied: number
     askedToLink: number
     linkedWithin7: number
-    askedToJoin: number
     joinedWithin7: number
   }
   usage: {
@@ -57,7 +56,7 @@ const STEP_LABELS: Record<string, string> = {
   meet_verification: 'Other verification criteria',
   become_club_member: 'Become club member',
   club_role_pending: 'Club role pending',
-  connect_intervals: 'Connect intervals.icu (Coach)',
+  connect_intervals: '⭐ Club welcome (Coach, intervals.icu, teams)',
 }
 
 function pct(part: number, whole: number) {
@@ -136,7 +135,7 @@ export default function OnboardingAdminPage() {
             <StatBox label="Members who got DMs" value={f.members} help={f.dmClosed ? `${f.dmClosed} with DMs closed` : undefined} />
             <StatBox label="Replied to the bot" value={f.replied} help={pct(f.replied, f.members)} />
             <StatBox label="Linked Zwift ID ≤ 7 days" value={`${f.linkedWithin7} / ${f.askedToLink}`} help={pct(f.linkedWithin7, f.askedToLink)} />
-            <StatBox label="Joined club ≤ 7 days" value={`${f.joinedWithin7} / ${f.askedToJoin}`} help={pct(f.joinedWithin7, f.askedToJoin)} />
+            <StatBox label="Club member ≤ 7 days of first DM" value={`${f.joinedWithin7} / ${f.members}`} help={pct(f.joinedWithin7, f.members)} />
             <StatBox label="👍 / 👎 (last 30 days)" value={`${data?.feedback.up ?? 0} / ${data?.feedback.down ?? 0}`} />
           </SimpleGrid>
           <Box overflowX="auto" mb={8}>
