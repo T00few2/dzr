@@ -946,7 +946,20 @@ async function executeSingleToolCall(toolCall, message, turn) {
           // member with "select your name" and nothing to select.
           const term = String(args.searchterm).trim();
           const result = await findRidersByName(term, { discordId: message.author.id });
-          await safeReply(message, buildRiderSearchReply(message.author.id, term, result));
+          const reply = buildRiderSearchReply(message.author.id, term, result);
+          // A channel message cannot be private like a slash command reply, so in a server the list
+          // goes to the member's DMs. Closed DMs (50007) fall back to the channel; the menu is bound
+          // to the member either way.
+          if (message.guild && reply.components) {
+            try {
+              await message.author.send(reply);
+              await safeReply(message, "Jeg har sendt dig listen i en DM 📬");
+              return { tool_call_id: toolCall.id, success: true, found: result.riders.length, sent_to_dm: true };
+            } catch (error) {
+              if (error?.code !== 50007) console.warn("Rider search DM failed:", error?.message || error);
+            }
+          }
+          await safeReply(message, reply);
           return { tool_call_id: toolCall.id, success: true, found: result.riders.length };
         }
 
