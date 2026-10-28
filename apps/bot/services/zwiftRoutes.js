@@ -1,11 +1,13 @@
 /**
- * Zwift routes, segments and worlds from the zwift-data package, for DZR Helper.
+ * Zwift routes, segments and worlds for DZR Helper.
  *
- * Local and free, so route questions need no web search. The package is a snapshot (see its
- * version in package.json): a route Zwift released after it will be missing, and the helper is
- * told to fall back to the web then.
+ * The facts come from the website's zwift-data package via /api/zwift-catalog. A route Zwift
+ * released after that package will be missing, and the helper is told to fall back to the web then.
+ * Until the catalog has loaded, the tools say it is unavailable rather than inventing a miss.
  */
-const zwiftData = require("zwift-data");
+const { getZwiftCatalog } = require("./zwiftCatalog");
+
+const CATALOG_UNAVAILABLE = "The route catalog is unavailable right now.";
 
 const MAX_RESULTS = 15;
 
@@ -26,7 +28,7 @@ function round(value, digits = 1) {
   return Math.round(n * f) / f;
 }
 
-function createZwiftRoutes(data = zwiftData) {
+function createZwiftRoutes(data) {
   const worldName = new Map((data.worlds || []).map((w) => [w.slug, w.name]));
   const segmentBySlug = new Map((data.segments || []).map((s) => [s.slug, s]));
 
@@ -92,14 +94,14 @@ function createZwiftRoutes(data = zwiftData) {
       success: true,
       total_matches: list.length,
       routes: list.slice(0, n).map(routeSummary),
-      message: list.length ? undefined : "No route in zwift-data matched. It may be newer than the package; try the web.",
+      message: list.length ? undefined : "No route in the route catalog matched. It may be newer than the site's zwift-data package; try the web.",
     };
   }
 
   function routeDetails(name) {
     const hits = matchByName(data.routes || [], name);
     if (!hits.length) {
-      return { success: false, message: `No route named '${name}' in zwift-data. It may be newer than the package; try the web.` };
+      return { success: false, message: `No route named '${name}' in the route catalog. It may be newer than the site's zwift-data package; try the web.` };
     }
     if (hits.length > 1 && fold(hits[0].name) !== fold(name)) {
       return { success: false, message: "Several routes match; pick one.", candidates: hits.slice(0, 8).map((r) => r.name) };
@@ -171,8 +173,30 @@ function createZwiftRoutes(data = zwiftData) {
   return { searchRoutes, routeDetails, searchSegments };
 }
 
-// Shared by the club bot and DZR Helper. Local and instant, so the club bot calls them itself
-// instead of asking the helper.
+function liveRoutes() {
+  const data = getZwiftCatalog();
+  return data ? createZwiftRoutes(data) : null;
+}
+
+function searchRoutes(args) {
+  const routes = liveRoutes();
+  if (!routes) return { success: false, message: CATALOG_UNAVAILABLE };
+  return routes.searchRoutes(args);
+}
+
+function routeDetails(name) {
+  const routes = liveRoutes();
+  if (!routes) return { success: false, message: CATALOG_UNAVAILABLE };
+  return routes.routeDetails(name);
+}
+
+function searchSegments(args) {
+  const routes = liveRoutes();
+  if (!routes) return { success: false, message: CATALOG_UNAVAILABLE };
+  return routes.searchSegments(args);
+}
+
+// Shared by the club bot and DZR Helper. The club bot calls them itself instead of asking the helper.
 const zwiftRouteToolDefinitions = [
   {
     type: "function",
@@ -226,18 +250,18 @@ const zwiftRouteToolDefinitions = [
 
 const ZWIFT_ROUTE_TOOLS = new Set(zwiftRouteToolDefinitions.map((tool) => tool.function.name));
 
-function runZwiftRouteTool(name, args = {}, routes = defaultRoutes) {
+function runZwiftRouteTool(name, args = {}, routes = live) {
   if (name === "zwift_routes") return routes.searchRoutes(args);
   if (name === "zwift_route_details") return routes.routeDetails(args.route);
   if (name === "zwift_segments") return routes.searchSegments(args);
   return { success: false, message: `Unknown tool ${name}.` };
 }
 
-const defaultRoutes = createZwiftRoutes();
+const live = { searchRoutes, routeDetails, searchSegments };
 
 module.exports = {
   createZwiftRoutes,
-  ...defaultRoutes,
+  ...live,
   zwiftRouteToolDefinitions,
   ZWIFT_ROUTE_TOOLS,
   runZwiftRouteTool,

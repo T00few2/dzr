@@ -21,6 +21,7 @@ const { handleAnnouncementUpsert, handleAnnouncementDelete } = require("./servic
 const { isGapDraftInteraction, handleGapDraftInteraction } = require("./services/gapDrafts");
 const { startCoachBot } = require("./services/coachBot");
 const { checkCoachKeyCanary } = require("./services/firebase");
+const { loadZwiftCatalog, startZwiftCatalogRefresh } = require("./services/zwiftCatalog");
 
 // Setup keep-alive server
 setupKeepAliveServer();
@@ -228,6 +229,10 @@ async function verifyCoachKeyOrExit() {
     console.warn("Coach key canary could not be checked (Firestore unavailable):", result.message);
   }
 }
+
+loadZwiftCatalog()
+  .catch((err) => console.warn("Zwift catalog:", err?.message || err))
+  .finally(() => startZwiftCatalogRefresh());
 
 client.login(config.discord.token);
 

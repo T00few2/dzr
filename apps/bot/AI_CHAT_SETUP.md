@@ -291,10 +291,11 @@ If you encounter issues:
 
 ## Zwift routes (`zwift_routes`, `zwift_route_details`, `zwift_segments`)
 
-The club bot answers route, climb and segment questions itself from the bundled `zwift-data`
-package (`services/zwiftRoutes.js`): distance, elevation, lead-in, and the climbs and sprints along
-each route. It is local, so these answers are instant and free. The package is a snapshot; bump
-`zwift-data` now and then, and a route newer than it is passed to DZR Helper's web search.
+The club bot answers route, climb and segment questions from the website's `zwift-data` package
+(`GET /api/zwift-catalog`, read by `services/zwiftCatalog.js` and searched in `services/zwiftRoutes.js`):
+distance, elevation, lead-in, and the climbs and sprints along each route. The website is the only
+install. The package is a snapshot; bump it on the website, and a route newer than it is passed to
+DZR Helper's web search.
 
 ## Route profile images (`route_profile_image`)
 
@@ -313,9 +314,9 @@ links, which the calling bot rewords for the member.
 What the helper can read:
 
 - The web (OpenAI's built-in `web_search` tool)
-- Zwift routes, segments and worlds from the bundled `zwift-data` package (`services/zwiftRoutes.js`):
-  distance, elevation, lead-in and the climbs and sprints along each route. It is a snapshot, so
-  routes released after the package version fall back to web search
+- Zwift routes, segments and worlds from the website route catalog (`services/zwiftRoutes.js`):
+  distance, elevation, lead-in and the climbs and sprints along each route. It is a snapshot of the
+  website's `zwift-data` package, so routes released after that version fall back to web search
 - The `bot_knowledge` articles
 - DCU E-serien's race calendar via `dcu_eserien_races` (`services/dcuESerien.js`), read from the
   public API behind dansk-ecykling.dk/schedule: date, route, world, laps, distance, point segments,

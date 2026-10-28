@@ -3,6 +3,7 @@
  * Returns files and a caption; the caller posts them, so this has no Discord dependency.
  */
 const { routeDetails, searchRoutes } = require("./zwiftRoutes");
+const { loadZwiftCatalog } = require("./zwiftCatalog");
 const { getRouteProfile } = require("./routeProfileApi");
 const { zoomWindows, totalGainM } = require("./routeProfileGeometry");
 
@@ -13,7 +14,7 @@ function fileSlug(value) {
   return String(value || "route").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "route";
 }
 
-/** The exact route name and world, from zwift-data, so the site API gets names it can match. */
+/** The exact route name and world, from the website route catalog, so the site API gets names it can match. */
 function resolveRoute(route, world) {
   if (world) {
     const found = searchRoutes({ query: route, world, limit: 5 });
@@ -69,6 +70,7 @@ function facts(profile, world, laps) {
 async function buildRouteProfileImages(args = {}, deps = {}) {
   const render = deps.render || require("./routeProfileChart");
   const fetchProfile = deps.getRouteProfile || getRouteProfile;
+  await loadZwiftCatalog();
 
   const resolved = resolveRoute(String(args.route || "").trim(), String(args.world || "").trim());
   if (!resolved.success) return { success: false, message: resolved.message, candidates: resolved.candidates };

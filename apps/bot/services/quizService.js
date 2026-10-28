@@ -8,7 +8,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require("discord.js");
-const { routes, worlds } = require("zwift-data");
+const { getZwiftCatalog, loadZwiftCatalog } = require("./zwiftCatalog");
 const config = require("../config/config");
 const { renderRouteSilhouette } = require("../utils/routeMapRenderer");
 
@@ -44,11 +44,13 @@ function shuffle(arr) {
 }
 
 function getWorldName(slug) {
-  return worlds.find((w) => w.slug === slug)?.name || slug;
+  return (getZwiftCatalog()?.worlds || []).find((w) => w.slug === slug)?.name || slug;
 }
 
 function getCandidateRoutes() {
-  return routes.filter((r) => r.stravaSegmentId && !r.eventOnly);
+  const data = getZwiftCatalog();
+  if (!data) throw new Error("Route catalog is unavailable right now.");
+  return data.routes.filter((r) => r.stravaSegmentId && !r.eventOnly);
 }
 
 /**
@@ -112,6 +114,7 @@ async function fetchLatLng(stravaSegmentId) {
 }
 
 async function pickQuizRoute(maxAttempts = 12) {
+  await loadZwiftCatalog();
   const candidates = getCandidateRoutes();
   if (candidates.length === 0) throw new Error("No quiz routes available");
 

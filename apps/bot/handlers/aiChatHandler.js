@@ -66,6 +66,7 @@ const { searchAnnouncements, searchAnnouncementsToolDefinition, SEARCH_RESULT_IN
 const { draftGapArticle } = require("../services/gapDrafts");
 const { findRidersByName, buildRiderSearchReply } = require("../services/riderSearch");
 const { zwiftRouteToolDefinitions, ZWIFT_ROUTE_TOOLS, runZwiftRouteTool } = require("../services/zwiftRoutes");
+const { loadZwiftCatalog } = require("../services/zwiftCatalog");
 const { buildRouteProfileImages } = require("../services/routeProfileImages");
 const { getZwiftEvent } = require("../services/zwiftEvents");
 const { getDcuRaces, dcuRacesToolDefinition } = require("../services/dcuESerien");
@@ -803,6 +804,7 @@ async function executeSingleToolCall(toolCall, message, turn) {
     let result;
 
     if (ZWIFT_ROUTE_TOOLS.has(name)) {
+      await loadZwiftCatalog();
       return { tool_call_id: toolCall.id, ...runZwiftRouteTool(name, args) };
     }
     

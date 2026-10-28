@@ -3,17 +3,24 @@
  *
  * zwift.com/events/view/<id> is drawn by JavaScript, so a web search or a page read sees no route,
  * laps or distance. The public API returns them as data. Route ids are matched to names with
- * zwift-data, the same package the route tools use.
+ * the website route catalog, the same one the route tools use.
  */
 const axios = require("axios");
-const zwiftData = require("zwift-data");
+const { getZwiftCatalog, loadZwiftCatalog } = require("./zwiftCatalog");
 
 const API = "https://us-or-rly101.zwift.com/api/public/events";
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const cache = new Map();
 
-const routeById = new Map(zwiftData.routes.filter((r) => r.id).map((r) => [r.id, r]));
-const worldBySlug = new Map(zwiftData.worlds.map((w) => [w.slug, w.name]));
+function routeById(routeId) {
+  const id = Number(routeId);
+  if (!Number.isFinite(id)) return null;
+  return (getZwiftCatalog()?.routes || []).find((route) => Number(route.id) === id) || null;
+}
+
+function worldName(slug) {
+  return (getZwiftCatalog()?.worlds || []).find((world) => world.slug === slug)?.name || slug;
+}
 
 /** An event id from a number, "123", or any zwift.com/events/view/<id> style link. */
 function parseEventId(value) {
@@ -24,11 +31,11 @@ function parseEventId(value) {
 }
 
 function courseOf(row) {
-  const route = routeById.get(Number(row?.routeId));
+  const route = routeById(row?.routeId);
   const distanceKm = Number(row?.distanceInMeters) > 0 ? Math.round(row.distanceInMeters / 100) / 10 : null;
   return {
     route: route?.name || null,
-    world: route ? worldBySlug.get(route.world) || route.world : null,
+    world: route ? worldName(route.world) : null,
     route_id: row?.routeId ?? null,
     laps: distanceKm ? null : Number(row?.laps) || 1,
     distance_km: distanceKm,
@@ -65,13 +72,17 @@ async function getZwiftEvent(idOrUrl, { http = axios } = {}) {
   if (!id) return { success: false, message: "Give a Zwift event id or a zwift.com/events/view/<id> link." };
   const hit = cache.get(id);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
+  await loadZwiftCatalog();
   try {
     const response = await http.get(`${API}/${id}`, { timeout: 15000, validateStatus: () => true });
     if (response.status === 404) return { success: false, message: `Zwift has no event ${id}.` };
     if (response.status !== 200 || !response.data?.id) return { success: false, message: "Zwift's event API did not answer." };
     const value = { success: true, event: compactEvent(response.data) };
-    if (cache.size > 200) cache.clear();
-    cache.set(id, { at: Date.now(), value });
+    const unnamedBecauseCatalogIsDown = value.event.route_id != null && !value.event.route && !getZwiftCatalog();
+    if (!unnamedBecauseCatalogIsDown) {
+      if (cache.size > 200) cache.clear();
+      cache.set(id, { at: Date.now(), value });
+    }
     return value;
   } catch (err) {
     console.warn("getZwiftEvent failed:", err?.message || err);
