@@ -44,8 +44,9 @@ async function checkScheduledMessages(client) {
 
     await maybeSendCoachFollowUps();
 
-    // Index the announcements channel once a day (live events keep it current in between)
-    await maybeSyncAnnouncements(client);
+    // Index the announcements channel once a day (live events keep it current in between). Not
+    // awaited: reading new images can take minutes; it records its attempt and handles its errors.
+    maybeSyncAnnouncements(client);
 
     // Ladder match previews and match-day reminders. Not awaited: rendering the preview can take
     // several seconds and must not delay the other minute checks; it does its own error handling.

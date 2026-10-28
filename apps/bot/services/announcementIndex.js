@@ -2,7 +2,10 @@
  * The announcements channel as a searchable source, so the bots answer club news from what admins
  * already posted instead of from hand-written articles.
  *
- *   announcement_index/{messageId}  { text, url, author, postedAt, editedAt, hash, embedding, embedModel }
+ *   announcement_index/{messageId}  { text, images, url, author, postedAt, editedAt, hash, embedding, embedModel }
+ *
+ * Text in a post's images (a season calendar, a poster) is transcribed by a vision model when the
+ * post is indexed, kept per attachment in `images`, and searched as part of the post's text.
  *
  * Only the announcements channel itself is indexed: never its threads or any member chat channel,
  * so everything the bot can quote was posted as an announcement. New, edited and deleted messages
@@ -19,12 +22,25 @@ const ADMIN_ROLE_ID = shared.discord.roles.admin;
 const COLLECTION = shared.firestore.announcementIndex;
 const EMBED_MODEL = process.env.ANNOUNCEMENT_EMBED_MODEL || "text-embedding-3-small";
 const EMBED_DIMENSIONS = 512;
-const MAX_TEXT_CHARS = 6000;
-const RESULT_TEXT_CHARS = 1500;
+const MAX_TEXT_CHARS = 8000;
+const RESULT_TEXT_CHARS = 3000;
+// Images in posts (a season calendar, a poster) are read by a vision model at index time.
+const IMAGE_MODEL = process.env.ANNOUNCEMENT_IMAGE_MODEL || process.env.COACH_MODEL || "gpt-6-luna";
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_IMAGES_PER_POST = 4;
+const MAX_IMAGE_TEXT_CHARS = 3000;
+const IMAGE_PROMPT = [
+  "This image was posted in the announcements channel of DZR, a Danish Zwift cycling club.",
+  "Transcribe all the text in it so it can be searched: keep dates, times, names, routes and numbers exactly as written,",
+  "write tables as one line per row (e.g. '03-11-2026 – DZR klubmesterskab - Hold'), and keep the original language.",
+  "If the image has no meaningful text, describe what it shows in one sentence. Reply with the transcription only.",
+].join(" ");
 const CACHE_MS = 10 * 60 * 1000;
 const SYNC_EVERY_MS = 24 * 60 * 60 * 1000;
 const RETRY_AFTER_MS = 15 * 60 * 1000;
 const SYNC_STATE_KEY = "announcement_index_sync";
+// 2: image text is indexed.
+const INDEX_VERSION = 2;
 // Discord error code for a member who has left the server.
 const UNKNOWN_MEMBER = 10007;
 // Recent posts win a near tie: "the recon on Sunday" should find this week's, not last year's.
@@ -36,23 +52,51 @@ const DUPLICATE_SIMILARITY = 0.9;
 const MIN_TEXT_CHARS = 40;
 
 let openaiClient = null;
-function defaultEmbed() {
-  return async (texts) => {
-    if (!openaiClient) {
-      const OpenAI = require("openai");
-      const config = require("../config/config");
-      if (!config.openai?.apiKey) throw new Error("OpenAI is not configured");
-      openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
-    }
-    const res = await openaiClient.embeddings.create({ model: EMBED_MODEL, input: texts, dimensions: EMBED_DIMENSIONS });
-    return res.data.map((d) => d.embedding);
-  };
+function openai() {
+  if (!openaiClient) {
+    const OpenAI = require("openai");
+    const config = require("../config/config");
+    if (!config.openai?.apiKey) throw new Error("OpenAI is not configured");
+    openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
+  }
+  return openaiClient;
+}
+
+async function defaultEmbed(texts) {
+  const res = await openai().embeddings.create({ model: EMBED_MODEL, input: texts, dimensions: EMBED_DIMENSIONS });
+  return res.data.map((d) => d.embedding);
+}
+
+/** The text in one image attachment. Downloaded here, since Discord CDN links are signed. */
+async function defaultReadImage(image) {
+  const res = await fetch(image.url, { signal: AbortSignal.timeout(20000) });
+  if (!res.ok) throw new Error(`image download ${res.status}`);
+  const data = Buffer.from(await res.arrayBuffer()).toString("base64");
+  const out = await openai().responses.create({
+    model: IMAGE_MODEL,
+    reasoning: { effort: "low" },
+    max_output_tokens: 4000,
+    input: [{
+      role: "user",
+      content: [
+        { type: "input_text", text: IMAGE_PROMPT },
+        { type: "input_image", image_url: `data:${image.contentType};base64,${data}` },
+      ],
+    }],
+  });
+  return out.output_text;
 }
 
 function defaultDeps() {
   // Required lazily: firebase initialises on load, which tests must not trigger.
   const firebase = require("./firebase");
-  return { db: firebase.db, embed: defaultEmbed(), getBotState: firebase.getBotState, setBotState: firebase.setBotState };
+  return {
+    db: firebase.db,
+    embed: defaultEmbed,
+    readImage: defaultReadImage,
+    getBotState: firebase.getBotState,
+    setBotState: firebase.setBotState,
+  };
 }
 
 let cache = { at: 0, rows: null };
@@ -74,7 +118,16 @@ function isIndexable(message) {
   const byAdmin = message.member?.roles?.cache?.has(ADMIN_ROLE_ID);
   const byThisBot = message.author?.id && message.author.id === message.client?.user?.id;
   if (!byAdmin && !byThisBot) return false;
-  return announcementText(message).length >= MIN_TEXT_CHARS;
+  return announcementText(message).length >= MIN_TEXT_CHARS || imageAttachments(message).length > 0;
+}
+
+/** Image attachments small enough to read: { id, url, contentType }. */
+function imageAttachments(message) {
+  const list = message.attachments?.values ? [...message.attachments.values()] : [];
+  return list
+    .filter((a) => /^image\/(png|jpe?g|webp|gif)/i.test(a.contentType || "") && (a.size || 0) <= MAX_IMAGE_BYTES)
+    .slice(0, MAX_IMAGES_PER_POST)
+    .map((a) => ({ id: a.id, url: a.url, contentType: a.contentType }));
 }
 
 /** Plain text of a message: content plus embeds, with mentions and timestamps made readable. */
@@ -126,20 +179,53 @@ async function upsertMessages(messages, deps = defaultDeps()) {
   for (const message of messages) {
     if (!isIndexable(message)) continue;
     const text = announcementText(message);
-    candidates.push({ message, text, hash: hashText(text) });
+    const images = imageAttachments(message);
+    candidates.push({ message, text, images, hash: hashText(`${text}\n${images.map((im) => im.id).join(",")}`) });
   }
   if (!candidates.length) return { written: 0 };
   const refs = candidates.map((c) => deps.db.collection(COLLECTION).doc(c.message.id));
   const snaps = await deps.db.getAll(...refs);
-  const changed = candidates.filter((c, i) => !snaps[i].exists || snaps[i].data()?.hash !== c.hash);
+  const changed = [];
+  candidates.forEach((c, i) => {
+    const existing = snaps[i].exists ? snaps[i].data() : null;
+    if (existing?.hash !== c.hash) changed.push({ ...c, known: existing?.images || {} });
+  });
+
+  // Images are read once each: a transcription is kept under its attachment id and reused when
+  // only the post's text changes. A failed read is left out and the row gets no hash, so the
+  // next sync tries again.
+  for (const c of changed) {
+    c.imageTexts = {};
+    let complete = true;
+    for (const image of c.images) {
+      if (c.known[image.id]) {
+        c.imageTexts[image.id] = c.known[image.id];
+        continue;
+      }
+      if (!deps.readImage) { complete = false; continue; }
+      try {
+        const read = String(await deps.readImage(image) || "").trim().slice(0, MAX_IMAGE_TEXT_CHARS);
+        if (read) c.imageTexts[image.id] = read;
+      } catch (error) {
+        complete = false;
+        console.warn(`Announcement image read failed (${c.message.id}):`, error?.message || error);
+      }
+    }
+    const imageText = c.images.map((im) => c.imageTexts[im.id]).filter(Boolean).map((t) => `[Billede]\n${t}`).join("\n\n");
+    c.fullText = [c.text, imageText].filter(Boolean).join("\n\n").slice(0, MAX_TEXT_CHARS);
+    if (!complete) c.hash = null;
+  }
+
+  const ready = changed.filter((c) => c.fullText);
   let written = 0;
-  for (let i = 0; i < changed.length; i += 100) {
-    const chunk = changed.slice(i, i + 100);
-    const vectors = await deps.embed(chunk.map((c) => c.text));
+  for (let i = 0; i < ready.length; i += 100) {
+    const chunk = ready.slice(i, i + 100);
+    const vectors = await deps.embed(chunk.map((c) => c.fullText));
     const batch = deps.db.batch();
     chunk.forEach((c, j) => {
       batch.set(deps.db.collection(COLLECTION).doc(c.message.id), {
-        ...toRow(c.message, c.text),
+        ...toRow(c.message, c.fullText),
+        images: c.imageTexts,
         hash: c.hash,
         embedding: vectors[j],
         embedModel: EMBED_MODEL,
@@ -220,19 +306,26 @@ async function syncAnnouncements(client, deps = defaultDeps()) {
  * Called every scheduler minute: syncs once a day after the last success, and retries a failed
  * sync after RETRY_AFTER_MS. The attempt is recorded first so a slow sync is not started twice.
  */
+let syncRunning = false;
 async function maybeSyncAnnouncements(client, deps = defaultDeps(), now = Date.now()) {
+  if (syncRunning) return null;
+  syncRunning = true;
   try {
     const state = await deps.getBotState(SYNC_STATE_KEY);
-    if (now - (Number(state?.lastSuccessAtMs) || 0) < SYNC_EVERY_MS) return null;
+    // A deploy that changes what is indexed bumps INDEX_VERSION, so it syncs at once.
+    const current = state?.version === INDEX_VERSION;
+    if (current && now - (Number(state?.lastSuccessAtMs) || 0) < SYNC_EVERY_MS) return null;
     if (now - (Number(state?.lastAttemptAtMs) || 0) < RETRY_AFTER_MS) return null;
     await deps.setBotState(SYNC_STATE_KEY, { lastAttemptAtMs: now });
     const result = await syncAnnouncements(client, deps);
-    await deps.setBotState(SYNC_STATE_KEY, { lastSuccessAtMs: now });
+    await deps.setBotState(SYNC_STATE_KEY, { lastSuccessAtMs: now, version: INDEX_VERSION });
     console.log(`📣 Announcement index synced: ${result.messages} messages, ${result.written} embedded, ${result.removed} removed`);
     return result;
   } catch (error) {
     console.error("Announcement index sync failed:", error?.message || error);
     return null;
+  } finally {
+    syncRunning = false;
   }
 }
 
@@ -326,5 +419,6 @@ module.exports = {
   searchAnnouncements,
   searchAnnouncementsToolDefinition,
   invalidateCache,
+  readAnnouncementImage: defaultReadImage,
   cosine,
 };
