@@ -23,7 +23,10 @@ const MAX_TEXT_CHARS = 6000;
 const RESULT_TEXT_CHARS = 1500;
 const CACHE_MS = 10 * 60 * 1000;
 const SYNC_EVERY_MS = 24 * 60 * 60 * 1000;
+const RETRY_AFTER_MS = 15 * 60 * 1000;
 const SYNC_STATE_KEY = "announcement_index_sync";
+// Discord error code for a member who has left the server.
+const UNKNOWN_MEMBER = 10007;
 // Recent posts win a near tie: "the recon on Sunday" should find this week's, not last year's.
 // The boost fades over RECENT_DAYS, so among copies of a weekly post the newest wins.
 const RECENT_DAYS = 60;
@@ -181,8 +184,6 @@ async function handleAnnouncementDelete(message, deps) {
 /** Index the whole channel and drop rows for deleted messages. */
 async function syncAnnouncements(client, deps = defaultDeps()) {
   const channel = await client.channels.fetch(CHANNEL_ID);
-  // Fetched messages carry no member, so load the members for the admin check.
-  if (channel.guild) await channel.guild.members.fetch();
   const messages = [];
   let before;
   for (;;) {
@@ -191,8 +192,23 @@ async function syncAnnouncements(client, deps = defaultDeps()) {
     if (page.size < 100) break;
     before = page.last().id;
   }
-  const { written } = await upsertMessages(messages, deps);
-  const live = new Set(messages.filter(isIndexable).map((m) => m.id));
+  // Fetched messages carry no member, so look up each author once for the admin check. One REST
+  // call per author: a full member fetch goes through the gateway and is rate limited at startup.
+  // An author whose lookup failed is left as it is, neither indexed nor removed, until next time.
+  const unknown = new Set();
+  if (channel.guild) {
+    for (const authorId of new Set(messages.map((m) => m.author?.id).filter(Boolean))) {
+      if (channel.guild.members.cache.has(authorId)) continue;
+      try {
+        await channel.guild.members.fetch(authorId);
+      } catch (error) {
+        if (error?.code !== UNKNOWN_MEMBER) unknown.add(authorId);
+      }
+    }
+  }
+  const known = messages.filter((m) => !unknown.has(m.author?.id));
+  const { written } = await upsertMessages(known, deps);
+  const live = new Set(messages.filter((m) => unknown.has(m.author?.id) || isIndexable(m)).map((m) => m.id));
   const indexed = await deps.db.collection(COLLECTION).select().get();
   const gone = indexed.docs.filter((d) => !live.has(d.id));
   for (const doc of gone) await doc.ref.delete();
@@ -200,14 +216,18 @@ async function syncAnnouncements(client, deps = defaultDeps()) {
   return { messages: messages.length, written, removed: gone.length };
 }
 
-/** Called every scheduler minute; syncs once a day (and on the first tick after a fresh deploy). */
+/**
+ * Called every scheduler minute: syncs once a day after the last success, and retries a failed
+ * sync after RETRY_AFTER_MS. The attempt is recorded first so a slow sync is not started twice.
+ */
 async function maybeSyncAnnouncements(client, deps = defaultDeps(), now = Date.now()) {
   try {
     const state = await deps.getBotState(SYNC_STATE_KEY);
-    const last = Number(state?.lastRunAtMs) || 0;
-    if (now - last < SYNC_EVERY_MS) return null;
-    await deps.setBotState(SYNC_STATE_KEY, { lastRunAtMs: now });
+    if (now - (Number(state?.lastSuccessAtMs) || 0) < SYNC_EVERY_MS) return null;
+    if (now - (Number(state?.lastAttemptAtMs) || 0) < RETRY_AFTER_MS) return null;
+    await deps.setBotState(SYNC_STATE_KEY, { lastAttemptAtMs: now });
     const result = await syncAnnouncements(client, deps);
+    await deps.setBotState(SYNC_STATE_KEY, { lastSuccessAtMs: now });
     console.log(`📣 Announcement index synced: ${result.messages} messages, ${result.written} embedded, ${result.removed} removed`);
     return result;
   } catch (error) {
