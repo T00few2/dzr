@@ -7,6 +7,37 @@ from bs4 import BeautifulSoup
 
 _zp_segments = None
 
+# ZwiftPower division numbers in rider lists.
+ZP_DIVISIONS = {5: "A+", 10: "A", 20: "B", 30: "C", 40: "D", 50: "E"}
+
+
+def _fold(text) -> str:
+    return " ".join(html.unescape(str(text or "")).casefold().split())
+
+
+def rider_search_rows(rows: list, query: str, limit: int = 10) -> list:
+    """
+    The public part of ZwiftPower rider search rows, best match first: exact name, then names that
+    start with the query, then the most active riders. FTP, weight and age are never returned.
+    """
+    folded = _fold(query)
+    riders = []
+    for row in rows or []:
+        zwid = row.get("zwid")
+        if not zwid:
+            continue
+        name = html.unescape(str(row.get("name") or "")).strip()
+        riders.append({
+            "zwiftId": int(zwid),
+            "name": name,
+            "country": (str(row.get("flag") or "").upper() or None),
+            "category": ZP_DIVISIONS.get(row.get("div")) or ZP_DIVISIONS.get(row.get("divw")),
+            "team": html.unescape(str(row.get("tname") or "")).strip() or None,
+            "_events": int(row.get("events") or 0),
+        })
+    riders.sort(key=lambda r: (_fold(r["name"]) != folded, not _fold(r["name"]).startswith(folded), -r["_events"]))
+    return [{k: v for k, v in r.items() if k != "_events"} for r in riders[:limit]]
+
 
 class ZwiftPower:
     """
@@ -595,6 +626,15 @@ class ZwiftPower:
             raise RuntimeError("ZwiftPower did not list any segments")
         _zp_segments = rows
         return rows
+
+    def search_riders(self, query: str, limit: int = 10) -> list:
+        """Riders whose ZwiftPower name contains the query (the site's Riders tab search, min 4 characters)."""
+        q = " ".join(str(query or "").split())
+        if len(q) < 4:
+            return []
+        resp = self.session.get("https://zwiftpower.com/api3.php", params={"do": "rider_list", "search": q}, timeout=20)
+        resp.raise_for_status()
+        return rider_search_rows(resp.json().get("data", []), q, limit)
 
     def search_segments(self, query: str) -> list:
         folded = " ".join(str(query or "").casefold().split())
