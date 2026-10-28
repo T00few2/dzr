@@ -19,6 +19,7 @@ const zwiftPower = require("./zwiftPowerReader");
 const zwiftRoutes = require("./zwiftRoutes");
 const { loadZwiftCatalog } = require("./zwiftCatalog");
 const { getZwiftEvent } = require("./zwiftEvents");
+const { findZwiftEvents, findZwiftEventsToolDefinition } = require("./zwiftEventSearch");
 const { readWebPage } = require("./webPage");
 const { getDcuRaces, dcuRacesToolDefinition } = require("./dcuESerien");
 const { getDcuResults, dcuResultsToolDefinition } = require("./dcuClubResults");
@@ -61,7 +62,7 @@ You only read. You cannot post messages, change roles, link IDs, save anything o
 3. ZwiftPower lookups are limited to DZR club riders and the member asking. Do not try to work around a refusal.
 4. Use the fewest tool calls that answer the question. Stop as soon as you can answer.
 5. Give web facts with their source URL. Say when sources disagree or you are unsure, and how recent the information is.
-6. When asked which route a race or event uses: for DCU E-serien use dcu_eserien_races. Otherwise search for the race calendar, open it with read_web_page, find the event for the date asked, and call zwift_event on its Zwift event link. Give the route name, world, date, start time, laps or distance and powerups from zwift_event, the Zwift event id, and the finish if a source states it. Only say you could not confirm it after trying this.
+6. When asked which route a race or event uses: for DCU E-serien use dcu_eserien_races. Otherwise, for a race from 3 days back to 7 days ahead, try find_zwift_events with the event name and date first. Else search for the race calendar, open it with read_web_page, find the event for the date asked, and call zwift_event on its Zwift event link. Give the route name, world, date, start time, laps or distance and powerups from zwift_event, the Zwift event id, and the finish if a source states it. Only say you could not confirm it after trying this.
 7. Answer in the language of the question. Be concise: a few short paragraphs or a short list. No preamble.
 8. For DCU E-serien results, placings or points, call dcu_eserien_results. Do not answer those from ZwiftPower or the race calendar.`;
 
@@ -86,7 +87,7 @@ const helperToolDefinitions = [
     type: "function",
     function: {
       name: "zwift_event",
-      description: "A Zwift event's course from Zwift's own data: route, world, laps or distance, start time (UTC), and categories with a different course. Takes an event id or a zwift.com/events/view/<id> link.",
+      description: "A Zwift event's course from Zwift's own data: route, world, laps or distance, start time (UTC), categories with a different course, and the powerups. Takes an event id or a zwift.com/events/view/<id> link.",
       parameters: {
         type: "object",
         properties: { event: { type: "string", description: "Event id or Zwift event link." } },
@@ -94,6 +95,7 @@ const helperToolDefinitions = [
       },
     },
   },
+  findZwiftEventsToolDefinition,
   {
     type: "function",
     function: {
@@ -161,6 +163,7 @@ function defaultDeps() {
     getClubResults: zwiftPower.getClubResults,
     zwiftRoutes,
     getZwiftEvent,
+    findZwiftEvents,
     readWebPage,
     getDcuRaces,
     getDcuResults,
@@ -259,6 +262,9 @@ async function executeHelperTool(call, run, deps) {
 
     case "zwift_event":
       return deps.getZwiftEvent(args.event);
+
+    case "find_zwift_events":
+      return deps.findZwiftEvents(args);
 
     case "dcu_eserien_races":
       return deps.getDcuRaces(args);

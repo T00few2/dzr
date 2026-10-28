@@ -85,7 +85,13 @@ async function withEvent(args, readEvent) {
   }
   return {
     args: merged,
-    powerups: { powerupIds: event.powerup_ids || [], archPowerups: event.arch_powerups || {}, names: event.powerups || [] },
+    powerups: {
+      powerupIds: event.powerup_ids || [],
+      archPowerups: event.arch_powerups || {},
+      names: event.powerups || [],
+      bannerNames: event.banner_powerups || [],
+      start: event.start_powerup || null,
+    },
   };
 }
 
@@ -121,9 +127,11 @@ async function buildRouteProfileImages(args = {}, deps = {}) {
   const event = fromEvent.powerups;
   const powerups = event ? placePowerups(profile, event) : [];
   if (event) {
-    text += event.names.length || powerups.length
-      ? `\nPowerups: ${event.names.join(", ") || "set per banner"}`
-      : "\nPowerups: none set for this event";
+    const parts = [];
+    if (event.names.length) parts.push(event.names.join(", "));
+    if (event.bannerNames.length) parts.push(`fixed on banners: ${event.bannerNames.join(", ")}`);
+    if (event.start) parts.push(`start: ${event.start}`);
+    text += parts.length || powerups.length ? `\nPowerups: ${parts.join(" · ")}` : "\nPowerups: none set for this event";
   }
   const main = await render.renderRouteProfile(profile, { name: resolved.name, subtitle: details, powerups });
   if (!main) return { success: false, message: "Could not draw the profile image." };

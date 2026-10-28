@@ -7,6 +7,15 @@ function tagValue(tag, name) {
   return m ? m[1] : null;
 }
 
+// The powerup every rider starts with: starting_powerup=4 (no quotes).
+function parseStartingPowerup(tags) {
+  for (const tag of tags || []) {
+    const m = String(tag).match(/^starting_powerup=(\d+)$/);
+    if (m) return Number(m[1]);
+  }
+  return null;
+}
+
 // Per-arch powerup choices: arch_powerup="archId,powerupId,..." (archId -> powerupId).
 function parseArchPowerups(tags) {
   const map = {};
@@ -107,4 +116,4 @@ function placePowerups(profile, fixture) {
   return [...groups.values()];
 }
 
-module.exports = { placePowerups, parseArchPowerups, parsePowerupPercent };
+module.exports = { placePowerups, parseArchPowerups, parsePowerupPercent, parseStartingPowerup };

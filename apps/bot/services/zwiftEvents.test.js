@@ -67,3 +67,12 @@ test("reads the powerup setup from the event tags, falling back to a category's 
   assert.deepEqual(fromCategory.powerups, ["Draft"]);
   assert.equal(compactEvent({ id: 4, routeId: 5103974 }).powerups, undefined);
 });
+
+test("a ZRL race has only fixed banner powerups and a start powerup, on its categories", () => {
+  const tags = ["zrl", "starting_powerup=4", "arch_powerup=\"0,0,82,0,81,5,5,3\""];
+  const event = compactEvent({ id: 5673134, routeId: 5103974, tags: ["zrl"], eventSubgroups: [{ subgroupLabel: "A", routeId: 5103974, tags }] });
+  assert.deepEqual(event.powerups, []);
+  assert.deepEqual(event.arch_powerups, { 0: 0, 82: 0, 81: 5, 5: 3 });
+  assert.deepEqual(event.banner_powerups, ["Feather", "Large XP", "Aero"]);
+  assert.equal(event.start_powerup, "Burrito");
+});

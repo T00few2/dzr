@@ -7,7 +7,7 @@
  */
 const axios = require("axios");
 const { getZwiftCatalog, loadZwiftCatalog } = require("./zwiftCatalog");
-const { parseArchPowerups, parsePowerupPercent } = require("./powerupPlaces");
+const { parseArchPowerups, parsePowerupPercent, parseStartingPowerup } = require("./powerupPlaces");
 const { powerupName } = require("./powerupIcons");
 
 const API = "https://us-or-rly101.zwift.com/api/public/events";
@@ -53,11 +53,17 @@ function powerupsOf(event) {
     .find((tags) => Array.isArray(tags) && tags.some((tag) => /powerup/.test(String(tag))));
   const ids = parsePowerupPercent(tagged || []);
   const arch = parseArchPowerups(tagged || []);
-  if (!ids.length && !Object.keys(arch).length) return {};
+  const start = parseStartingPowerup(tagged || []);
+  const name = (id) => powerupName(id) || String(id);
+  if (!ids.length && !Object.keys(arch).length && start == null) return {};
+  const fixed = [...new Set(Object.values(arch))];
   return {
-    powerups: ids.map((id) => powerupName(id) || String(id)),
+    powerups: ids.map(name),
     powerup_ids: ids,
+    // ZRL sets no random bag, only a fixed powerup per arch: those names, for the answer and caption.
+    banner_powerups: fixed.length ? fixed.map(name) : undefined,
     arch_powerups: Object.keys(arch).length ? arch : undefined,
+    start_powerup: start != null ? name(start) : undefined,
   };
 }
 
