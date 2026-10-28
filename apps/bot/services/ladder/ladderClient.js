@@ -72,12 +72,17 @@ async function refreshFixture(fixture, now = Date.now()) {
   return (await refreshSignups(fixture.zwiftEventId)) ? getFixture(fixture.id) : fixture;
 }
 
-// Start times never change once read, so each fixture page is fetched at most once per process for this.
+// A known start time never changes, so it is fetched at most once per process.
+// A missing one is not stored: a stale fixture is the "Refreshing Signups" spinner and has no start until that finishes.
 const startCache = new Map();
 
-async function getFixtureStart(id) {
-  if (!startCache.has(id)) startCache.set(id, (await getFixture(id)).start);
-  return startCache.get(id);
+async function getFixtureStart(id, { load = getFixture, cache = startCache } = {}) {
+  if (!cache.has(id)) {
+    const start = (await load(id)).start;
+    if (start) cache.set(id, start);
+    return start;
+  }
+  return cache.get(id);
 }
 
 // Walks the fixture list in order and returns the first fixture that has not started yet, or null.
