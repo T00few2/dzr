@@ -89,6 +89,7 @@ Coach notes and calendar entries are subcollections beneath Discord-ID parents. 
 | `coach_usage`, `coach_usage_daily`, `coach_usage_events`, `coach_feedback` | Bot accounting and ratings; website cleanup | Daily budgets, admin Coach reporting; disconnect cleanup |
 | `coach_weekly_load`, `coach_activity_metrics` | Bot training calculations and caches | Rebuildable training evidence; disconnect cleanup, not canonical provider records |
 | `ladder_bot` | Bot Ladder store | Teams, rider cache and posted IDs; local memory backed by serialized JSON documents |
+| `streaming_bot` | Bot streaming store | Member/channel mappings, hashed keys, discovery schedules/deadlines, search budget, announcement receipts and IT alerts; client access denied; [lifecycle](streaming.md#durable-delivery-and-lifecycle) |
 | `orders`, `teams`, `riders` | Legacy browser shop and ZRL components | Firebase Auth plus Firestore rules, not NextAuth role claims alone |
 | Firebase Storage series logos | Website `eventSeries` via Admin Storage SDK | Served by website logo route; separate from Firestore documents |
 

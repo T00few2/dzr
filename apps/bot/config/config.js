@@ -34,6 +34,7 @@ module.exports = {
     coachToken: process.env.COACH_BOT_TOKEN || null,
     coachClientId: process.env.COACH_BOT_CLIENT_ID || null,
     guildId: process.env.DISCORD_GUILD_ID || shared.discord.guildId,
+    itChannelId: process.env.IT_CHANNEL_ID || "1544209256100794378",
     welcomeChannelId: process.env.DISCORD_WELCOME_CHANNEL_ID, // Optional: specific welcome channel
     approvalChannelId: process.env.DISCORD_APPROVAL_CHANNEL_ID, // Optional: channel for role approval requests
   },
@@ -68,6 +69,15 @@ module.exports = {
       process.env.KEEP_ALIVE_URL ||
       "https://bot-tdnm.onrender.com",
     keepAliveInterval: 24 * 60 * 60 * 1000, // 24 hours. Not needed anymore. Remove at some point
+  },
+  streaming: {
+    publicUrl: process.env.STREAMING_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || "https://bot-tdnm.onrender.com",
+    channelId: process.env.STREAMING_CHANNEL_ID || "1196454773558345768",
+    youtubeApiKey: process.env.YOUTUBE_API_KEY,
+    twitchClientId: process.env.TWITCH_CLIENT_ID,
+    twitchClientSecret: process.env.TWITCH_CLIENT_SECRET,
+    // Bound discovery across members; tune this to the project's YouTube API quota.
+    searchBudget: Math.max(0, Number.parseInt(process.env.STREAMING_YOUTUBE_SEARCH_BUDGET || "90", 10) || 0),
   },
   contentApi: {
     baseUrl: process.env.CONTENT_API_BASE_URL, // Your Google Cloud Function URL

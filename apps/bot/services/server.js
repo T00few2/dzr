@@ -1,13 +1,21 @@
 const express = require("express");
 const axios = require("axios");
 const config = require("../config/config");
+const { createStreamingRouter } = require("./streaming/router");
 
-function setupKeepAliveServer() {
-  // Fake Web Server (to keep Render awake)
+function createHttpApp({ streaming } = {}) {
   const app = express();
+  // Render terminates HTTPS and forwards through one trusted proxy hop.
+  app.set("trust proxy", 1);
   app.get("/", (req, res) => res.send("Bot is running!"));
+  if (streaming) app.use("/streaming", createStreamingRouter(streaming));
+  return app;
+}
+
+function setupKeepAliveServer(options = {}) {
+  const app = createHttpApp(options);
   app.listen(config.server.port, "0.0.0.0", () =>
-    console.log(`Fake web server running on port ${config.server.port}`)
+    console.log(`Bot HTTP server running on port ${config.server.port}`)
   );
 
   // Keep-Alive Ping
@@ -22,5 +30,6 @@ function setupKeepAliveServer() {
 }
 
 module.exports = {
+  createHttpApp,
   setupKeepAliveServer,
-}; 
+};

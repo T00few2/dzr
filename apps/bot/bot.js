@@ -20,11 +20,15 @@ const { handleAIChatMessage, flushAllCoachSessions } = require("./handlers/aiCha
 const { handleAnnouncementUpsert, handleAnnouncementDelete } = require("./services/announcementIndex");
 const { isGapDraftInteraction, handleGapDraftInteraction } = require("./services/gapDrafts");
 const { startCoachBot } = require("./services/coachBot");
-const { checkCoachKeyCanary } = require("./services/firebase");
+const { checkCoachKeyCanary, db } = require("./services/firebase");
+const { createStore: createStreamingStore } = require("./services/streaming/store");
+const { createProviders: createStreamingProviders } = require("./services/streaming/providers");
+const { createPublisher: createStreamingPublisher } = require("./services/streaming/publisher");
+const { createStreamingService } = require("./services/streaming/service");
+const { createStreamingHandlers, isStreamingInteraction } = require("./handlers/streamingHandlers");
+const shared = require("./constants.json");
 const { loadZwiftCatalog, startZwiftCatalogRefresh } = require("./services/zwiftCatalog");
-
-// Setup keep-alive server
-setupKeepAliveServer();
+const { getClubRoleId } = require("./services/onboardingStatus");
 
 // Create Discord Bot Client
 const client = new Client({ 
@@ -41,6 +45,18 @@ const client = new Client({
   // Channel: receive DMs. Message/Reaction: reactions on messages sent before a restart.
   partials: [Partials.Channel, Partials.Message, Partials.Reaction]
 });
+
+const streaming = createStreamingService({
+  store: createStreamingStore(db, { searchBudget: config.streaming.searchBudget }),
+  providers: createStreamingProviders(config.streaming),
+  publisher: createStreamingPublisher(client, config.discord.guildId, { itChannelId: config.discord.itChannelId }),
+  guildId: config.discord.guildId,
+  channelId: config.streaming.channelId,
+});
+const streamingHandlers = createStreamingHandlers({ service: streaming, guildId: config.discord.guildId,
+  adminRoleId: shared.discord.roles.admin, publicUrl: config.streaming.publicUrl, channelId: config.streaming.channelId,
+  getClubRoleId: () => getClubRoleId(db) });
+setupKeepAliveServer({ streaming });
 
 // Register Slash Commands
 const rest = new REST({ version: "10" }).setToken(config.discord.token);
@@ -124,7 +140,12 @@ client.on("messageReactionRemove", async (reaction, user) => {
 });
 
 // Handle all interactions
-client.on("interactionCreate", (interaction) => {
+client.on("interactionCreate", async (interaction) => {
+  if (isStreamingInteraction(interaction)) {
+    await streamingHandlers.handle(interaction);
+    handleInteractionCreate(interaction);
+    return;
+  }
   // Handle Zwift ID confirmation buttons
   if (interaction.isButton() && (interaction.customId.startsWith("confirm_zwiftid_") || interaction.customId.startsWith("cancel_zwiftid_"))) {
     handleZwiftIdConfirmation(interaction);
@@ -145,6 +166,11 @@ client.on("guildMemberAdd", handleGuildMemberAdd);
 
 // Handle member updates (role changes)
 client.on("guildMemberUpdate", handleGuildMemberUpdate);
+client.on("guildMemberRemove", (member) => {
+  if (member.guild.id === config.discord.guildId) {
+    streaming.remove(member.id).catch(() => console.warn("Could not revoke streaming enrollment for departed member."));
+  }
+});
 
 // Handle activity for stats collection
 client.on("messageCreate", async (message) => {
@@ -172,6 +198,7 @@ client.once("ready", () => {
   
   // Start the message scheduler
   startScheduler(client);
+  streaming.start();
 });
 
 // Graceful shutdown handling.
@@ -184,6 +211,7 @@ let shuttingDown = false;
 async function gracefulShutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
+  streaming.stop();
   console.log('🔄 Graceful shutdown initiated...');
   forceSaveStats();
   const statsGrace = new Promise((resolve) => setTimeout(resolve, SHUTDOWN_STATS_MS));

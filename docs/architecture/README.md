@@ -20,6 +20,7 @@ This documentation describes implementation inspected at upstream `d7546b0` (202
 | Where should I implement a change? Which files are generated copies? | [Code map and shared modules](code-map.md) |
 | How do joining, payments, verification and Discord roles interact? | [Identity and membership](identity-membership.md) |
 | How do Discord events, scheduled messages and Ladder work? | [Bot and automation](bot-automation.md) |
+| How does an OBS callback become a verified stream announcement? | [OBS streaming](streaming.md) |
 | How does Coach connect to training data and answer a DM? | [DZR Coach](coach.md) |
 | How are races published, updated and added to a member's calendar? | [Events and calendars](events.md) |
 | Who writes Firestore data, and which identifiers join it? | [Data ownership and flows](data.md) |

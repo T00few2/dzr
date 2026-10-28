@@ -67,7 +67,7 @@ Binds `0.0.0.0:$PORT` (`8080` locally). Firebase uses Application Default Creden
 
 Cloud Run deploys `apps/api` from this repo. The service name stays `zwiftpower`. Health check is `GET /` and returns `{"service":"dzr-api",...}`. Admin UI is on the Next site, not this service.
 
-Required API env names: `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `CONTENT_API_KEY`, `ZWIFT_USERNAME`, `ZWIFT_PASSWORD`, `ZWIFTPOWER_CLUB_ID`, `FLASK_SECRET_KEY`. Legacy commentary jobs use `DISCORD_BOT_URL`, but the current Render server exposes only a health route; [the posting path is unresolved in this checkout](docs/architecture/findings.md#incomplete-and-legacy-paths).
+Required API env names: `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `CONTENT_API_KEY`, `ZWIFT_USERNAME`, `ZWIFT_PASSWORD`, `ZWIFTPOWER_CLUB_ID`, `FLASK_SECRET_KEY`. Legacy commentary jobs use `DISCORD_BOT_URL`, but Render has no general-purpose posting route; [the posting path is unresolved in this checkout](docs/architecture/findings.md#incomplete-and-legacy-paths).
 
 ## Discord bot (`apps/bot`)
 
@@ -119,6 +119,33 @@ $env:COACH_EVAL_JUDGE_MODEL="gpt-6.1-sol"
 $env:COACH_EVAL_REPEATS="3"
 npm run eval
 ```
+
+### OBS streaming
+
+Club Members use `/streaming_add` in the DZR guild to enter their YouTube/Twitch channels in a private modal. Both `/streaming_add` and `/streaming_remove` require the role configured in `system_settings/global.membership.clubMemberRoleId`. The bot returns the Lua download, installation instructions and a personal OBS key; removal revokes enrollment. `/streaming_overview [page]` gives admins a private list of members, channel links, last verified live starts, broadcast links and errors. Channel ownership is trusted; members do not connect provider accounts.
+
+The existing Render service serves `GET /streaming/dzr-stream.lua` and authenticated `POST /streaming/obs`; no extra service or provider OAuth flow is required. Set on Render before onboarding:
+
+| Variable | Purpose |
+| --- | --- |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 enabled; restrict the key to that API. Required for YouTube registrations/verification. |
+| `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | Twitch application credentials. Required for Twitch registrations/verification. |
+| `STREAMING_PUBLIC_URL` | Optional external HTTPS bot origin; defaults to `RENDER_EXTERNAL_URL`, then `https://bot-tdnm.onrender.com`. Used in onboarding links. |
+| `STREAMING_CHANNEL_ID` | Optional destination override; defaults to `1196454773558345768` (`#streaming-now`). |
+| `IT_CHANNEL_ID` | Shared Discord IT destination; defaults to `1544209256100794378` (`#it`). Currently used for streaming errors. |
+| `STREAMING_YOUTUBE_SEARCH_BUDGET` | Optional daily search cap; default `90`, reset at Pacific midnight. Set `0` to allow known-video verification only. |
+
+The provider secret names are also documented in `render.yaml` with `sync: false`; set their values on the existing Render service. Grant the bot **View Channel**, **Send Messages**, **Embed Links**, and **Read Message History** in the destination, plus **View Channel** and **Send Messages** in `#it`. History recovers uncertain sends without duplicate announcements. The overview accepts Administrator or the DZR Admin role; give the latter command visibility under Server Settings → Integrations if needed. Deploy the Firestore rules together with the bot; the server-only `streaming_bot` collection needs no composite index.
+
+After the updated commands are registered, open **Server Settings → Integrations → DZR bot → Commands** and grant the **Club Member** role access to both `streaming_add` and `streaming_remove`. They default to disabled (`default_member_permissions: "0"`), because Discord permission bits cannot express a role ID. Runtime role checks still apply, including to administrators and previously opened forms. Losing Club Member blocks both commands without deleting enrollment; leaving the guild revokes enrollment.
+
+After OBS starts, the bot verifies public live status immediately, then waits 15, 30, 60, 120, 240 and at most 300 seconds between attempts. Discovery stops on confirmation or after one hour from OBS start. Heartbeats do not extend that deadline; a new OBS session opens a new window. Scheduled streams and OBS preview do not qualify. Optional per-broadcast YouTube links bypass search; search otherwise uses the daily cap above. API/indexing delays can extend notification latency. Authenticated callback, verification and delivery errors, including discovery timeout, are reported to `#it` with repeated errors coalesced.
+
+Roll out first to one or two test streamers. Exercise Test forbindelse, a public start, a scheduled YouTube preview and reconnect on Windows/macOS OBS as applicable. CI tests Lua HTTPS/libcurl on Linux; native OBS still needs this acceptance run. See [streaming architecture](docs/architecture/streaming.md) for the callback contract and failure handling.
+
+Also test auto-detection for YouTube/Twitch and an unknown/custom OBS service: unknown platforms must produce an `unknown_platform` report in `#it` without an announcement. Select YouTube or Twitch manually in Lua settings to repair detection.
+
+Streaming tests are part of the bot suite. Install `luajit`, `libcurl` and `openssl` to run the real Lua transport test locally (or set `LUAJIT_BIN`); CI provides these. Without LuaJIT, that test is explicitly skipped. Tests do not post to Discord or read production Firestore.
 
 ## Shared constants
 
