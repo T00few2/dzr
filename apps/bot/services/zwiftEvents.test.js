@@ -57,3 +57,13 @@ test("fetches from Zwift's public API and handles a missing event", async () => 
   assert.match(urls[0], /\/api\/public\/events\/777777$/);
   assert.equal((await getZwiftEvent("404404", { http })).success, false);
 });
+
+test("reads the powerup setup from the event tags, falling back to a category's tags", () => {
+  const fromEvent = compactEvent({ id: 2, routeId: 5103974, tags: ["powerup_percent=\"0,50,5,50\"", "arch_powerup=\"0,3\""] });
+  assert.deepEqual(fromEvent.powerups, ["Feather", "Aero"]);
+  assert.deepEqual(fromEvent.powerup_ids, [0, 5]);
+  assert.deepEqual(fromEvent.arch_powerups, { 0: 3 });
+  const fromCategory = compactEvent({ id: 3, routeId: 5103974, tags: [], eventSubgroups: [{ subgroupLabel: "A", routeId: 5103974, tags: ["powerup_percent=\"1,100\""] }] });
+  assert.deepEqual(fromCategory.powerups, ["Draft"]);
+  assert.equal(compactEvent({ id: 4, routeId: 5103974 }).powerups, undefined);
+});

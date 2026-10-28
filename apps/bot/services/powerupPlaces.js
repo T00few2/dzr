@@ -1,4 +1,41 @@
-const { resolvePowerupId } = require("../powerupIcons");
+const { resolvePowerupId } = require("./powerupIcons");
+
+// Zwift event tags carry the powerup setup, on the event API and copied onto the ladder page.
+// Some organisers type curly quotes, so any straight or curly quote closes the value.
+function tagValue(tag, name) {
+  const m = String(tag).match(new RegExp(`${name}=["“”]([^"“”]+)["“”]`));
+  return m ? m[1] : null;
+}
+
+// Per-arch powerup choices: arch_powerup="archId,powerupId,..." (archId -> powerupId).
+function parseArchPowerups(tags) {
+  const map = {};
+  for (const tag of tags || []) {
+    const value = tagValue(tag, "arch_powerup");
+    if (!value) continue;
+    const parts = value.split(",");
+    for (let i = 0; i < parts.length - 1; i += 2) {
+      const id = parseInt(parts[i + 1].trim(), 10);
+      if (Number.isInteger(id)) map[parts[i].trim()] = id;
+    }
+  }
+  return map;
+}
+
+// The random bag: powerup_percent="id,pct,id,pct,...". Ids are unique and keep first-seen order.
+function parsePowerupPercent(tags) {
+  const ids = [];
+  for (const tag of tags || []) {
+    const value = tagValue(tag, "powerup_percent");
+    if (!value) continue;
+    const parts = value.split(",");
+    for (let i = 0; i < parts.length - 1; i += 2) {
+      const id = parseInt(parts[i].trim(), 10);
+      if (Number.isInteger(id) && !ids.includes(id)) ids.push(id);
+    }
+  }
+  return ids;
+}
 
 function bagIds(fixture) {
   const fromIds = (fixture?.powerupIds || []).map(resolvePowerupId).filter((id) => id != null);
@@ -70,4 +107,4 @@ function placePowerups(profile, fixture) {
   return [...groups.values()];
 }
 
-module.exports = { placePowerups };
+module.exports = { placePowerups, parseArchPowerups, parsePowerupPercent };

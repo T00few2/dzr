@@ -107,3 +107,31 @@ test("closes up every climb on a long route, not just the first three", async ()
   assert.equal(result.files.length, 5);
   assert.equal(result.files.at(-1).name, "itza-kom-closeup.png");
 });
+
+test("an event fills in the course and its powerups are drawn on the profile", async () => {
+  const requests = [];
+  const drawn = [];
+  const result = await buildRouteProfileImages({ event: "5754003" }, {
+    render: { ...render, renderRouteProfile: (_p, options) => { drawn.push(options); return Buffer.from("profile"); } },
+    getZwiftEvent: async () => ({
+      success: true,
+      event: { id: 5754003, route: "Road to Sky", world: "Watopia", laps: 1, distance_km: null, powerups: ["Feather"], powerup_ids: [0] },
+    }),
+    getRouteProfile: async (req) => { requests.push(req); return { success: true, profile }; },
+  });
+  assert.equal(result.success, true);
+  assert.equal(requests[0].route, "Road to Sky");
+  assert.ok(drawn[0].powerups.some((row) => row.powerupIds.includes(0)));
+  assert.match(result.caption, /Powerups: Feather/);
+});
+
+test("an event without powerup tags says so, and no route or event is an error", async () => {
+  const result = await buildRouteProfileImages({ event: "1", route: "Road to Sky" }, {
+    render,
+    getZwiftEvent: async () => ({ success: true, event: { id: 1, route: "Road to Sky", world: "Watopia" } }),
+    getRouteProfile: async () => ({ success: true, profile }),
+  });
+  assert.match(result.caption, /Powerups: none set for this event/);
+  const missing = await buildRouteProfileImages({}, { render });
+  assert.equal(missing.success, false);
+});

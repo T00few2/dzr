@@ -7,6 +7,8 @@
  */
 const axios = require("axios");
 const { getZwiftCatalog, loadZwiftCatalog } = require("./zwiftCatalog");
+const { parseArchPowerups, parsePowerupPercent } = require("./powerupPlaces");
+const { powerupName } = require("./powerupIcons");
 
 const API = "https://us-or-rly101.zwift.com/api/public/events";
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -43,6 +45,23 @@ function courseOf(row) {
 }
 
 /**
+ * The powerup setup from the event tags, the same tags the ladder page copies. Categories carry the
+ * same tags as the event, so the first tagged category is the fallback when the event has none.
+ */
+function powerupsOf(event) {
+  const tagged = [event.tags, ...(event.eventSubgroups || []).map((group) => group.tags)]
+    .find((tags) => Array.isArray(tags) && tags.some((tag) => /powerup/.test(String(tag))));
+  const ids = parsePowerupPercent(tagged || []);
+  const arch = parseArchPowerups(tagged || []);
+  if (!ids.length && !Object.keys(arch).length) return {};
+  return {
+    powerups: ids.map((id) => powerupName(id) || String(id)),
+    powerup_ids: ids,
+    arch_powerups: Object.keys(arch).length ? arch : undefined,
+  };
+}
+
+/**
  * The event's course, start and categories. Categories are listed only when one differs from the
  * main course, which is how races give shorter distances to lower categories.
  */
@@ -63,6 +82,7 @@ function compactEvent(event) {
     ...main,
     route_known: Boolean(main.route),
     categories_with_other_course: differing.length ? differing : undefined,
+    ...powerupsOf(event),
     description: String(event.description || "").replace(/\s+/g, " ").trim().slice(0, 600) || undefined,
   };
 }

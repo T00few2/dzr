@@ -498,7 +498,7 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "zwift_event",
-      description: "Read a Zwift event's course when they give an event link or id: route, world, laps or distance, start time (UTC), and categories with a different course. Use the result for route_profile_image or to answer about the event.",
+      description: "Read a Zwift event's course when they give an event link or id: route, world, laps or distance, start time (UTC), categories with a different course, and the powerups set for the event. Use the result for route_profile_image or to answer about the event.",
       parameters: {
         type: "object",
         properties: { event: { type: "string", description: "Event id or zwift.com/events/view/<id> link." } },
@@ -510,11 +510,12 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "route_profile_image",
-      description: "Post an elevation profile image of a Zwift route in the chat, with climbs and sprints marked, the same profile as on the DZR site. Supports a custom race distance, custom KOM stretches given in km, and a finish close-up, like the DZR site's route tool. Can add close-up images of climbs (KOMs) coloured by gradient. Use when they want to see a route, its profile, or a climb.",
+      description: "Post an elevation profile image of a Zwift route in the chat, with climbs and sprints marked, the same profile as on the DZR site. Give a Zwift event to draw that race's course with its powerups on the banners. Supports a custom race distance, custom KOM stretches given in km, and a finish close-up, like the DZR site's route tool. Can add close-up images of climbs (KOMs) coloured by gradient. Use when they want to see a route, its profile, or a climb.",
       parameters: {
         type: "object",
         properties: {
-          route: { type: "string", description: "Route name, e.g. 'Road to Sky'." },
+          route: { type: "string", description: "Route name, e.g. 'Road to Sky'. Can be left out when event is given." },
+          event: { type: "string", description: "Zwift event id or link. Draws the powerups set for that event; the route and length come from the event unless given." },
           world: { type: "string", description: "World, only if the route name exists in several worlds." },
           laps: { type: "number", description: "Number of laps for a race, default 1. Ignored when distance_km is given." },
           distance_km: { type: "number", description: "Custom total race distance in km, including the lead-in, e.g. 23.4. The profile is cut there, mid-lap if needed." },
@@ -531,7 +532,7 @@ const toolDefinitions = [
           },
           finish: { type: "string", description: "Where the race finishes, for a finish close-up. Use the site's wording: 'banner on top of Epic KOM', '2nd time banner on Fox Hill', or 'Epic KOM banner'." }
         },
-        required: ["route"]
+        required: []
       }
     }
   },
@@ -1961,7 +1962,7 @@ You can help users with:
 5. These are different actions, even when they concern the same rider: reading back a ZwiftID, linking a ZwiftID, showing stats, and deciding a race category. Call the one they asked for
 6. Before inventing answers about DZR teams or help topics, **check the knowledge base** or team data first
 7. If a question needs two knowledge articles, call get_help_article once per topic and combine the results
-8. For a DCU E-serien race ("DZR løbet", "torsdagens E-serie løb"), call dcu_eserien_races: it has the date, route, world, laps, distance and the segments that score points. For a profile, then call route_profile_image with that route, world and distance_km, and closeups: true so every climb gets a close-up. Mention which segments score points. For a preview (optakt), combine it with zwift_route_details. For a race or event outside DCU E-serien, use zwift_event if they gave a Zwift link, else ask_helper to find the route. Ask them for the route only if these cannot find it
+8. For a DCU E-serien race ("DZR løbet", "torsdagens E-serie løb"), call dcu_eserien_races: it has the date, route, world, laps, distance and the segments that score points. For a profile, then call route_profile_image with that route, world and distance_km, and closeups: true so every climb gets a close-up. Mention which segments score points. For a preview (optakt), combine it with zwift_route_details. For a race or event outside DCU E-serien, use zwift_event if they gave a Zwift link, else ask_helper to find the route and the Zwift event id. Ask them for the route only if these cannot find it. When they want a race's powerups on the profile, call route_profile_image with event set to that Zwift event: powerups come only from the event's own settings. Without an event id, say you need the race's Zwift event link for the powerups; never list powerups from articles as that race's, and never claim a setting or option exists that you do not have
 - Danish time and dates: today is in the tool result as "today". Resolve "torsdag", "i aften" and similar from it
 - For how a DCU E-serien race went, who placed, points, the season table or the club ranking, call dcu_eserien_results. It lists only DZR riders and their place in the full field. Say when results are provisional. Summarize (best DZR rider per division, or the rider they named). When they ask for all results or the full list, set send_full: true so the bot posts the whole list itself. Do not use dcu_eserien_races, ask_helper or ZwiftPower for these results
 9. For Zwift route, climb or segment questions, use zwift_routes, zwift_route_details or zwift_segments, not ask_helper. Only if a route is not found there (it may be newer than our data) use ask_helper

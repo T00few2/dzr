@@ -6,6 +6,8 @@ const { routeDetails, searchRoutes } = require("./zwiftRoutes");
 const { loadZwiftCatalog } = require("./zwiftCatalog");
 const { getRouteProfile } = require("./routeProfileApi");
 const { zoomWindows, totalGainM } = require("./routeProfileGeometry");
+const { getZwiftEvent } = require("./zwiftEvents");
+const { placePowerups } = require("./powerupPlaces");
 
 // Discord allows 10 attachments: the profile, up to 8 climbs, and the finish.
 const MAX_CLOSEUPS = 8;
@@ -63,7 +65,32 @@ function facts(profile, world, laps) {
 }
 
 /**
- * args: { route, world?, laps?, distance_km?, climbs?: string[], custom_koms?: [{ name, from_km, to_km }],
+ * The event's course fills in what the caller left out, and its powerup tags come along, so a race
+ * profile shows the powerups that were really set. Returns { args, powerups } or { error }.
+ */
+async function withEvent(args, readEvent) {
+  if (!args.event) return { args, powerups: null };
+  const read = await readEvent(args.event);
+  if (!read.success) return { error: read.message };
+  const event = read.event;
+  const merged = { ...args };
+  if (!String(merged.route || "").trim()) {
+    if (!event.route) return { error: `Zwift event ${event.id} has a route the catalog does not know.` };
+    merged.route = event.route;
+    merged.world = event.world;
+    if (!(Number(merged.distance_km) > 0) && !(Number(merged.laps) > 0)) {
+      if (event.distance_km) merged.distance_km = event.distance_km;
+      else merged.laps = event.laps;
+    }
+  }
+  return {
+    args: merged,
+    powerups: { powerupIds: event.powerup_ids || [], archPowerups: event.arch_powerups || {}, names: event.powerups || [] },
+  };
+}
+
+/**
+ * args: { route?, event?, world?, laps?, distance_km?, climbs?: string[], custom_koms?: [{ name, from_km, to_km }],
  *         finish?, closeups?: boolean }
  * Returns { success, files: [{ name, buffer }], caption } or { success:false, message }.
  */
@@ -71,6 +98,11 @@ async function buildRouteProfileImages(args = {}, deps = {}) {
   const render = deps.render || require("./routeProfileChart");
   const fetchProfile = deps.getRouteProfile || getRouteProfile;
   await loadZwiftCatalog();
+
+  const fromEvent = await withEvent(args, deps.getZwiftEvent || getZwiftEvent);
+  if (fromEvent.error) return { success: false, message: fromEvent.error };
+  args = fromEvent.args;
+  if (!String(args.route || "").trim()) return { success: false, message: "Give a route name or a Zwift event." };
 
   const resolved = resolveRoute(String(args.route || "").trim(), String(args.world || "").trim());
   if (!resolved.success) return { success: false, message: resolved.message, candidates: resolved.candidates };
@@ -85,8 +117,15 @@ async function buildRouteProfileImages(args = {}, deps = {}) {
   const profile = loaded.profile;
 
   const details = facts(profile, resolved.world, laps);
-  const text = `**${resolved.name}** · ${details}`;
-  const main = await render.renderRouteProfile(profile, { name: resolved.name, subtitle: details });
+  let text = `**${resolved.name}** · ${details}`;
+  const event = fromEvent.powerups;
+  const powerups = event ? placePowerups(profile, event) : [];
+  if (event) {
+    text += event.names.length || powerups.length
+      ? `\nPowerups: ${event.names.join(", ") || "set per banner"}`
+      : "\nPowerups: none set for this event";
+  }
+  const main = await render.renderRouteProfile(profile, { name: resolved.name, subtitle: details, powerups });
   if (!main) return { success: false, message: "Could not draw the profile image." };
   const files = [{ name: `${fileSlug(resolved.name)}-profile.png`, buffer: main }];
 

@@ -305,6 +305,12 @@ comes from the site's public `/api/route-profile`, the same profile the series p
 lead-in and segment positions match the site. The bot only draws (`services/routeProfileChart.js`,
 using `canvas`). Profiles are cached for an hour.
 
+Given a Zwift event (`event`), the profile shows that race's powerups. Zwift's public events API
+returns the event tags (`powerup_percent` for the random bag, `arch_powerup` for a fixed powerup
+on one arch), the same tags the ladder fixture page copies. `services/powerupPlaces.js` parses
+them and places them on the banners, and the ladder preview uses the same module, so both draw
+powerups the same way. Without an event the bot has no powerup data and says so.
+
 ## DZR Helper (`ask_helper`)
 
 Both the club bot and DZR Coach can call `ask_helper` when none of their own tools fit. It runs a
