@@ -22,7 +22,7 @@ const { readWebPage } = require("./webPage");
 const { getDcuRaces, dcuRacesToolDefinition } = require("./dcuESerien");
 const { getDcuResults, dcuResultsToolDefinition } = require("./dcuClubResults");
 const { zwiftRouteToolDefinitions, ZWIFT_ROUTE_TOOLS, runZwiftRouteTool } = zwiftRoutes;
-const { searchAnnouncements, searchAnnouncementsToolDefinition } = require("./announcementIndex");
+const { searchAnnouncements, searchAnnouncementsToolDefinition, SEARCH_RESULT_INSTRUCTION } = require("./announcementIndex");
 
 const HELPER_MODEL = process.env.HELPER_MODEL || COACH_MODEL;
 const HELPER_REASONING_EFFORT = process.env.HELPER_REASONING_EFFORT || "medium";
@@ -265,7 +265,7 @@ async function executeHelperTool(call, run, deps) {
     case "search_announcements": {
       const announcements = await deps.searchAnnouncements(args.query);
       return announcements.length
-        ? { success: true, today: new Date().toISOString().slice(0, 10), announcements }
+        ? { success: true, today: new Date().toISOString().slice(0, 10), announcements, note: SEARCH_RESULT_INSTRUCTION }
         : { success: false, message: "No announcement matched." };
     }
 
