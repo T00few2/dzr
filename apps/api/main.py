@@ -1098,6 +1098,25 @@ def zp_rider_search():
         return jsonify({"error": str(exc)}), 502
 
 
+@app.route('/zp_event_search', methods=['GET'])
+def zp_event_search():
+    """Find Zwift events by name on ZwiftPower's lists (3 days back, 7 ahead), with their Zwift event ids. Auth: Bearer CONTENT_API_KEY."""
+    unauthorized = require_api_or_401()
+    if unauthorized:
+        return unauthorized
+    def seconds(name):
+        value = request.args.get(name, "")
+        return int(value) if value.isdigit() else None
+    try:
+        zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
+        zp.session = get_authenticated_session()
+        events = zp.search_events(request.args.get("q", ""), seconds("from"), seconds("to"))
+        return jsonify({"events": events})
+    except Exception as exc:
+        print(f"ZwiftPower event search failed: {exc}")
+        return jsonify({"error": str(exc)}), 502
+
+
 def _racing_score_and_category(profile):
     """Racing score and the rider's category; both None when Zwift has no score."""
     metrics = (profile or {}).get("competitionMetrics") or {}

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { elevationForSlug, segmentLatLng } from '@/app/lib/routeElevation'
-import { sauceSegmentsForRoute } from '@/app/lib/sauceRouteSegments'
+import { sauceSegmentsForRoute, withArchIds } from '@/app/lib/sauceRouteSegments'
 import { resolveCatalogRoute, segmentsToLocate } from '@/app/lib/zwiftCatalog'
 import { buildRaceProfile, mergePositionedSegments, placeOnRoute, prepareLap, raceDistanceKm, shiftProfileSegments, type CustomClimbRange, type ProfileSegment } from '@/packages/shared/routeProfile'
 
@@ -71,7 +71,7 @@ export async function GET(req: Request) {
       mergePositionedSegments(match.segments, sauceSegmentsForRoute(match.id)),
       lap.leadInKm,
     )
-    const segments = [...positioned, ...locatedSegments(match.world, positioned, lap.distance, lap.latlng)]
+    const segments = withArchIds([...positioned, ...locatedSegments(match.world, positioned, lap.distance, lap.latlng)])
     const profile = buildRaceProfile({
       distanceM: lap.distance,
       altitudeM: lap.altitude,
