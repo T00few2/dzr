@@ -132,7 +132,7 @@ The existing Render service serves `GET /streaming/dzr-stream.lua` and authentic
 | `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | Twitch application credentials. Required for Twitch registrations/verification. |
 | `STREAMING_PUBLIC_URL` | Optional external HTTPS bot origin; defaults to `RENDER_EXTERNAL_URL`, then `https://bot-tdnm.onrender.com`. Used in onboarding links. |
 | `STREAMING_CHANNEL_ID` | Optional destination override; defaults to `1196454773558345768` (`#streaming-now`). |
-| `STREAMING_IT_CHANNEL_ID` | Optional IT destination override; otherwise resolves the guild's unique text channel named `it`. |
+| `STREAMING_IT_CHANNEL_ID` | Optional IT destination override; defaults to `1544209256100794378` (`#it`). |
 | `STREAMING_YOUTUBE_SEARCH_BUDGET` | Optional daily search cap; default `90`, reset at Pacific midnight. Set `0` to allow known-video verification only. |
 
 The provider secret names are also documented in `render.yaml` with `sync: false`; set their values on the existing Render service. Grant the bot **View Channel**, **Send Messages**, **Embed Links**, and **Read Message History** in the destination, plus **View Channel** and **Send Messages** in `#it`. History recovers uncertain sends without duplicate announcements. The overview accepts Administrator or the DZR Admin role; give the latter command visibility under Server Settings → Integrations if needed. Deploy the Firestore rules together with the bot; the server-only `streaming_bot` collection needs no composite index.
