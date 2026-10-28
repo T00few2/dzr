@@ -17,6 +17,8 @@ const {
 } = require("./handlers/statsHandler");
 const { handleZwiftIdMessage, handleZwiftIdConfirmation } = require("./handlers/zwiftIdMessageHandler");
 const { handleAIChatMessage, flushAllCoachSessions } = require("./handlers/aiChatHandler");
+const { handleAnnouncementUpsert, handleAnnouncementDelete } = require("./services/announcementIndex");
+const { isGapDraftInteraction, handleGapDraftInteraction } = require("./services/gapDrafts");
 const { startCoachBot } = require("./services/coachBot");
 const { checkCoachKeyCanary } = require("./services/firebase");
 
@@ -127,7 +129,12 @@ client.on("interactionCreate", (interaction) => {
     handleZwiftIdConfirmation(interaction);
     return;
   }
-  
+  // Knowledge gap drafts in the moderators channel
+  if (isGapDraftInteraction(interaction)) {
+    handleGapDraftInteraction(interaction).catch((error) => console.error("Gap draft interaction failed:", error));
+    return;
+  }
+
   handleInteractions(interaction);
   handleInteractionCreate(interaction); // Also track for stats
 });
@@ -142,8 +149,11 @@ client.on("guildMemberUpdate", handleGuildMemberUpdate);
 client.on("messageCreate", async (message) => {
   handleMessageCreate(message);
   handleZwiftIdMessage(message); // Also check for Zwift ID linking
+  handleAnnouncementUpsert(message); // Keep the announcement search index current
   await handleAIChatMessage(message, client); // Also check for AI chat requests
 });
+client.on("messageUpdate", (_oldMessage, message) => handleAnnouncementUpsert(message));
+client.on("messageDelete", (message) => handleAnnouncementDelete(message));
 client.on("voiceStateUpdate", handleVoiceStateUpdate);
 
 // Bot ready event

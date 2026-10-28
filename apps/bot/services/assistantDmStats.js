@@ -25,6 +25,7 @@ const COLLECTIONS = {
 
 const GAP_CATEGORIES = ["membership", "teams", "races", "zwift", "discord", "coach", "other"];
 const TOPIC_MAX = 80;
+const REDRAFT_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const RATINGS = { "👍": 1, "👎": -1 };
 
 // Which tools produced a reply, keyed by the sent message ids, so a later rating can say so.
@@ -146,11 +147,17 @@ async function recordKnowledgeGap({ topic, category }, { db = require("./firebas
   const cleanCategory = GAP_CATEGORIES.includes(category) ? category : "other";
   const key = normalizeTopic(cleanTopic);
   if (!key) return { recorded: false };
-  const ref = db.collection(COLLECTIONS.gaps).doc(`${cleanCategory}__${key}`);
-  await db.runTransaction(async (tx) => {
+  const gapId = `${cleanCategory}__${key}`;
+  const ref = db.collection(COLLECTIONS.gaps).doc(gapId);
+  const draft = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const data = snap.exists ? snap.data() || {} : null;
+    // Draft an article for a new gap, and again when a solved gap comes back (the published
+    // article did not cover it), at most once a week. Claimed here so two reports draft once.
+    const lastDraft = toMs(data?.draftedAt);
+    const draftNow = !lastDraft || (data?.status === "solved" && now.getTime() - lastDraft > REDRAFT_AFTER_MS);
     tx.set(ref, {
+      ...(data || {}),
       topic: cleanTopic,
       category: cleanCategory,
       count: (data?.count || 0) + 1,
@@ -158,9 +165,18 @@ async function recordKnowledgeGap({ topic, category }, { db = require("./firebas
       lastAt: now,
       // A new report after "solved" means the article did not cover it: open it again.
       status: "open",
+      ...(draftNow ? { draftedAt: now } : {}),
     });
+    return draftNow;
   });
-  return { recorded: true };
+  return { recorded: true, gapId, draft };
+}
+
+function toMs(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : 0;
 }
 
 module.exports = {
