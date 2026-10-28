@@ -305,6 +305,19 @@ comes from the site's public `/api/route-profile`, the same profile the series p
 lead-in and segment positions match the site. The bot only draws (`services/routeProfileChart.js`,
 using `canvas`). Profiles are cached for an hour.
 
+Given a Zwift event (`event`), the profile shows that race's powerups. Zwift's public events API
+returns the event tags (`powerup_percent` for the random bag, `arch_powerup` for a fixed powerup
+on one arch), the same tags the ladder fixture page copies. `services/powerupPlaces.js` parses
+them and places them on the banners, and the ladder preview uses the same module, so both draw
+powerups the same way. ZRL sets no random bag: its categories carry a fixed powerup per arch and
+a `starting_powerup`, which the caption lists.
+
+Without a link the bot finds the event with `find_zwift_events` (`services/zwiftEventSearch.js`).
+Zwift's public API lists only the next few hours and its full search needs a game login and answers
+in protobuf, so the Flask API's `/zp_event_search` searches ZwiftPower's event lists instead (3 days
+back, 7 days ahead, cached 10 minutes) through the club's ZwiftPower login. Each hit carries the
+Zwift event id. If nothing matches, the bot asks for the event link.
+
 ## DZR Helper (`ask_helper`)
 
 Both the club bot and DZR Coach can call `ask_helper` when none of their own tools fit. It runs a

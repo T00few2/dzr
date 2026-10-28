@@ -264,6 +264,20 @@ test("invalid keys never create IT alerts; authenticated callback failures do", 
   assert.equal(s.alerts[0].code, "invalid_event");
 });
 
+test("authenticated unknown platforms report to IT once, without sessions, provider checks or announcements", async () => {
+  const s = setup(); const { token } = await s.enroll();
+  s.providers.verify = () => assert.fail("unknown platforms cannot reach verification");
+  for (let i = 0; i < 3; i++) {
+    await assert.rejects(s.service.callback(token, s.event({ platform: "unknown" })), { code: "unknown_platform" });
+  }
+  await s.service.tick();
+  assert.equal(s.alerts.length, 1);
+  assert.equal(s.alerts[0].code, "unknown_platform");
+  assert.equal(s.alerts[0].discordId, userId);
+  assert.equal(s.published.length, 0);
+  assert.equal((await s.store.listSessions()).length, 0);
+});
+
 test("concurrent workers share one durable IT report and Firestore outages use a bounded fallback", async () => {
   const s = setup(); const { token } = await s.enroll();
   await assert.rejects(s.service.callback(token, { ...s.event(), sequence: 0 }));

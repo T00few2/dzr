@@ -1,7 +1,7 @@
 const { AttachmentBuilder, EmbedBuilder } = require("discord.js");
 const { buildLadderChart } = require("./ladderChart");
 const { describeProfile, loadMatchProfile } = require("./routeInfo");
-const { placePowerups } = require("./powerupPlaces");
+const { placePowerups } = require("../powerupPlaces");
 const { renderRouteProfile } = require("../routeProfileChart");
 const { enrichRiders } = require("./riderPower");
 

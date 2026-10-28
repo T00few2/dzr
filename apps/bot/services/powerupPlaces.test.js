@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { placePowerups } = require("./powerupPlaces");
+const { placePowerups, parseArchPowerups, parsePowerupPercent } = require("./powerupPlaces");
 
 const profile = {
   raceKm: 20,
@@ -57,4 +57,11 @@ test("a climb ridden downhill does not get a powerup", () => {
 test("an empty list places nothing", () => {
   assert.deepEqual(placePowerups(profile, { powerups: [], archPowerups: {} }), []);
   assert.deepEqual(placePowerups(null, { powerupIds: [0] }), []);
+});
+
+test("tag parsers read the bag and arch overrides, with straight or curly quotes", () => {
+  const tags = ["powerup_percent=\u201c5,30,1,40,0,30\"", "arch_powerup=\"0,3,4,5\"", "ranked"];
+  assert.deepEqual(parsePowerupPercent(tags), [5, 1, 0]);
+  assert.deepEqual(parseArchPowerups(tags), { 0: 3, 4: 5 });
+  assert.deepEqual(parsePowerupPercent(undefined), []);
 });

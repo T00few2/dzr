@@ -43,7 +43,7 @@ function createStreamingHandlers({ service, guildId, adminRoleId, publicUrl, cha
       const [, action, owner] = String(interaction.customId || "").split(":");
       if (interaction.customId && owner !== userId) throw new StreamingError("not_owner", "Start dit eget flow med /streaming_add.", 403);
 
-      if (interaction.commandName === "streaming_add" || ["channels", "save"].includes(action)) {
+      if (["streaming_add", "streaming_remove"].includes(interaction.commandName) || ["channels", "save", "remove"].includes(action)) {
         const clubRoleId = await getClubRoleId();
         const eligible = clubRoleId && (interaction.member?.roles?.cache?.has(clubRoleId) || interaction.member?.roles?.includes?.(clubRoleId));
         if (!eligible) throw new StreamingError("club_member_required", "Streaming er kun tilgængelig for Club Members.", 403);

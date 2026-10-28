@@ -1,4 +1,4 @@
-const { StreamingError, parseChannel, youtubeLive } = require("./model");
+const { StreamingError, requirePlatform, parseChannel, youtubeLive } = require("./model");
 
 // All outbound URLs are built here from validated IDs. No OBS/provider credentials cross to Discord.
 function createProviders({ youtubeApiKey, twitchClientId, twitchClientSecret }, { fetchImpl = fetch, now = Date.now } = {}) {
@@ -17,6 +17,7 @@ function createProviders({ youtubeApiKey, twitchClientId, twitchClientSecret }, 
   }
 
   function requireConfigured(platform) {
+    requirePlatform(platform);
     if (platform === "youtube" ? !youtubeApiKey : !twitchClientId || !twitchClientSecret) {
       throw new StreamingError("provider_not_configured", `${platform === "youtube" ? "YouTube" : "Twitch"} er ikke konfigureret på DZR endnu. Kontakt en admin.`, 503);
     }
@@ -75,6 +76,7 @@ function createProviders({ youtubeApiKey, twitchClientId, twitchClientSecret }, 
 
   // quota.reserveSearch is persistent and shared by every worker/registration, before each search call.
   async function verify(channel, session, quota) {
+    requirePlatform(session.platform);
     if (session.platform === "twitch") {
       const streams = (await twitch("streams", { user_id: channel.id, type: "live" }))?.data || [];
       const stream = streams.find((item) => item.user_id === channel.id && item.type === "live");

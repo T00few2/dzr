@@ -49,7 +49,7 @@ const client = new Client({
 const streaming = createStreamingService({
   store: createStreamingStore(db, { searchBudget: config.streaming.searchBudget }),
   providers: createStreamingProviders(config.streaming),
-  publisher: createStreamingPublisher(client, config.discord.guildId, { itChannelId: config.streaming.itChannelId }),
+  publisher: createStreamingPublisher(client, config.discord.guildId, { itChannelId: config.discord.itChannelId }),
   guildId: config.discord.guildId,
   channelId: config.streaming.channelId,
 });

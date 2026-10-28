@@ -20,8 +20,9 @@ test("OBS Lua uses real libcurl multi over TLS; start/heartbeat/stop ordering, r
     let body = "";
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
-      requests.push({ body: JSON.parse(body), authorization: req.headers.authorization, url: req.url });
-      res.writeHead(requests.length === 1 ? 503 : 202, { "Content-Type": "application/json" });
+      const parsed = JSON.parse(body);
+      requests.push({ body: parsed, authorization: req.headers.authorization, url: req.url });
+      res.writeHead(requests.length === 1 ? 503 : parsed.platform === "unknown" ? 400 : 202, { "Content-Type": "application/json" });
       res.end('{"accepted":true}');
     });
   });
@@ -46,6 +47,7 @@ ffi.load = function(name)
   end}, {__index = lib})
 end
 local tick, event, test_button
+local service_name, service_available = "YouTube - RTMPS", true
 local clock = os.time()
 os.time = function() return clock end
 obslua = {
@@ -63,8 +65,8 @@ obslua = {
     for k,v in pairs(data) do fields[#fields+1]=string.format('%q:', k)..(type(v)=="number" and string.format("%.0f",v) or string.format('%q',v)) end
     return "{"..table.concat(fields,",").."}"
   end,
-  obs_frontend_get_streaming_service=function() return true end,
-  obs_service_get_settings=function() return {service="YouTube - RTMPS"} end,
+  obs_frontend_get_streaming_service=function() return service_available and true or nil end,
+  obs_service_get_settings=function() return {service=service_name} end,
   obs_frontend_add_event_callback=function(fn) event=fn end,
   obs_frontend_remove_event_callback=function() end,
   obs_frontend_streaming_active=function() return false end,
@@ -83,6 +85,20 @@ event(1); pump(50)
 event(1); pump(20) -- duplicate OBS event is ignored
 clock=clock+31; pump(50)
 event(2); pump(50)
+service_name="Twitch"
+test_button(); pump(50)
+event(1); pump(50)
+event(2); pump(50)
+service_name="Custom RTMP"
+event(1); pump(50) -- unknown detection must reach DZR, so it can report to IT
+script_update({endpoint=${JSON.stringify(endpoint)}, key=${JSON.stringify(token)}, platform="twitch"})
+pump(50) -- selecting a known platform repairs the active session
+event(2); pump(50)
+service_available=false
+script_update({endpoint=${JSON.stringify(endpoint)}, key=${JSON.stringify(token)}, platform="auto"})
+test_button(); pump(50) -- missing OBS service also becomes unknown
+script_update({endpoint=${JSON.stringify(endpoint)}, key=${JSON.stringify(token)}, platform="facebook"})
+test_button(); pump(50) -- invalid persisted/manual settings cannot become a provider
 script_unload()
 `);
   const child = spawn(lua, [harness], { stdio: ["ignore", "pipe", "pipe"] });
@@ -92,9 +108,14 @@ script_unload()
   t.after(() => child.kill());
   const exit = await new Promise((resolve, reject) => { child.once("error", reject); child.once("exit", resolve); });
   assert.equal(exit, 0, output);
-  assert.deepEqual(requests.map((r) => r.body.event), ["test", "test", "started", "heartbeat", "stopped"], output);
-  assert.deepEqual(requests.slice(2).map((r) => r.body.sequence), [1, 2, 3]);
+  assert.deepEqual(requests.map((r) => r.body.event), ["test", "test", "started", "heartbeat", "stopped",
+    "test", "started", "stopped", "started", "started", "stopped", "test", "test"], output);
+  assert.deepEqual(requests.map((r) => r.body.platform), ["youtube", "youtube", "youtube", "youtube", "youtube",
+    "twitch", "twitch", "twitch", "unknown", "twitch", "twitch", "unknown", "unknown"]);
+  assert.deepEqual(requests.slice(2, 5).map((r) => r.body.sequence), [1, 2, 3]);
   assert.equal(requests[2].body.sessionId, requests[4].body.sessionId);
+  assert.equal(requests[8].body.sessionId, requests[9].body.sessionId);
+  assert.equal(requests[8].body.startedAt, requests[9].body.startedAt);
   assert.ok(requests.every((r) => r.authorization === `Bearer ${token}` && r.url === "/streaming/obs"));
   assert.ok(!output.includes(token));
 });

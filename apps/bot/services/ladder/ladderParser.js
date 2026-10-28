@@ -1,5 +1,6 @@
 // Regex parsers for ladder.cycleracing.club pages; the site has no public API.
 const { powerupName } = require("../powerupIcons");
+const { parseArchPowerups, parsePowerupPercent } = require("../powerupPlaces");
 
 const POWER_SECONDS = [5, 10, 15, 30, 60, 120, 300, 600, 1200, 1800, 3600];
 
@@ -68,36 +69,6 @@ function parseTags(html) {
   } catch {
     return [];
   }
-}
-
-// Per-arch powerup choices: arch_powerup="archId,powerupId,..." (archId -> powerupId).
-function parseArchPowerups(tags) {
-  const map = {};
-  for (const tag of tags) {
-    const m = String(tag).match(/arch_powerup="([^"]+)"/);
-    if (!m) continue;
-    const parts = m[1].split(",");
-    for (let i = 0; i < parts.length - 1; i += 2) {
-      const id = parseInt(parts[i + 1].trim(), 10);
-      if (Number.isInteger(id)) map[parts[i].trim()] = id;
-    }
-  }
-  return map;
-}
-
-// The random bag: powerup_percent="id,pct,id,pct,...". Ids are unique and keep first-seen order.
-function parsePowerupPercent(tags) {
-  const ids = [];
-  for (const tag of tags) {
-    const m = String(tag).match(/powerup_percent="([^"]+)"/);
-    if (!m) continue;
-    const parts = m[1].split(",");
-    for (let i = 0; i < parts.length - 1; i += 2) {
-      const id = parseInt(parts[i].trim(), 10);
-      if (Number.isInteger(id) && !ids.includes(id)) ids.push(id);
-    }
-  }
-  return ids;
 }
 
 // Club colours come from the clubPill(...) calls: the first is the home club, the second the away club.

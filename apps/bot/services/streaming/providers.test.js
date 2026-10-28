@@ -97,3 +97,10 @@ test("provider errors never retain request headers, URLs or credentials", async 
     return true;
   });
 });
+
+test("unknown platforms never call YouTube, Twitch or quota reservation", async () => {
+  const providers = createProviders({}, { fetchImpl() { assert.fail("must not fetch for an unknown platform"); } });
+  assert.throws(() => providers.requireConfigured("unknown"), { code: "unknown_platform" });
+  await assert.rejects(providers.resolveChannel("unknown", "@DZR"), { code: "unknown_platform" });
+  await assert.rejects(providers.verify(channel, { platform: "unknown" }, { reserveSearch() { assert.fail(); } }), { code: "unknown_platform" });
+});

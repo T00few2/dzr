@@ -18,6 +18,12 @@ class StreamingError extends Error {
   }
 }
 
+function requirePlatform(platform) {
+  if (!PLATFORMS.includes(platform)) {
+    throw new StreamingError("unknown_platform", "Ukendt streamingplatform. Vælg YouTube eller Twitch i OBS-scriptets Platform-indstilling.");
+  }
+}
+
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const registrationKey = (guildId, discordId) => `${guildId}_${discordId}`;
 const sessionKey = (registration, platform) => `${registration.id}_${platform}`;
@@ -38,6 +44,7 @@ function tokenMatches(token, tokenHash) {
 
 // Parse identities, never fetch user-supplied URLs (including redirects).
 function parseChannel(platform, input) {
+  requirePlatform(platform);
   let value = String(input || "").trim();
   if (!value) return null;
   if (value.length > 200) throw new StreamingError("invalid_channel", "Kanallinket er for langt.");
@@ -62,7 +69,8 @@ function parseChannel(platform, input) {
 }
 
 function parseEvent(body, now = Date.now()) {
-  if (!body || !PLATFORMS.includes(body.platform) || !["started", "heartbeat", "stopped", "test"].includes(body.event)
+  if (body) requirePlatform(body.platform);
+  if (!body || !["started", "heartbeat", "stopped", "test"].includes(body.event)
       || !/^[A-Za-z0-9_-]{16,80}$/.test(body.sessionId || "") || !Number.isSafeInteger(body.sequence) || body.sequence < 1
       || !Number.isSafeInteger(body.startedAt) || !Number.isSafeInteger(body.sentAt)
       || Math.abs(body.sentAt - now) > 120_000 || body.startedAt > body.sentAt || body.startedAt < now - 7 * 86400_000
@@ -80,6 +88,7 @@ function youtubeLive(video, channelId) {
 }
 
 function announcementMessage(registration, stream) {
+  requirePlatform(stream.platform);
   return {
     content: `🔴 <@${registration.discordId}> er live på ${stream.platform === "youtube" ? "YouTube" : "Twitch"}!`,
     embeds: [{ title: String(stream.title || "Se livestream").slice(0, 256), url: stream.url,
@@ -89,5 +98,5 @@ function announcementMessage(registration, stream) {
 }
 
 module.exports = { PLATFORMS, HEARTBEAT_TTL_MS, CHECK_INTERVAL_MS, DISCOVERY_WINDOW_MS, checkDelay, discoveryExpired, SNOWFLAKE, VIDEO_ID, StreamingError,
-  hash, registrationKey, sessionKey, announcementKey, createToken, tokenOwner, tokenMatches, parseChannel, parseEvent,
+  hash, registrationKey, sessionKey, announcementKey, createToken, tokenOwner, tokenMatches, requirePlatform, parseChannel, parseEvent,
   youtubeLive, announcementMessage };

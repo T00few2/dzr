@@ -28,6 +28,8 @@ services:
         value: "22"
       - key: DISCORD_GUILD_ID
         value: "1195850595014299669"
+      - key: IT_CHANNEL_ID
+        value: "1544209256100794378"
       - key: DISCORD_BOT_TOKEN
         sync: false
       - key: DISCORD_CLIENT_ID

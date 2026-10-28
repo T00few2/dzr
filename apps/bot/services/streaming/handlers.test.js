@@ -71,18 +71,19 @@ test("overview checks admin access at execution and never includes keys", async 
   assert.ok(serialized.includes("https://twitch.tv/dzr"));
 });
 
-test("self-removal is confirmed and passes only the invoking user's ID", async () => {
+test("Club Member self-removal is confirmed and passes only the invoking user's ID", async () => {
   let removed;
   const h = handler({ async remove(id) { removed = id; return true; } });
   await h.handle(interaction({ commandName: "streaming_remove" }));
   assert.equal(removed, undefined);
-  await h.handle(interaction({ customId: `streaming:remove:${userId}`, isButton: () => true, member: { roles: [] } }));
+  await h.handle(interaction({ customId: `streaming:remove:${userId}`, isButton: () => true }));
   assert.equal(removed, userId);
 });
 
 test("Club Member role is required on command, button and modal, even for administrators", async () => {
-  const h = handler({ getRegistration() { assert.fail("must reject before accessing registration"); }, enroll() { assert.fail(); } });
-  for (const entry of [{ commandName: "streaming_add" }, { customId: `streaming:channels:${userId}`, isButton: () => true },
+  const h = handler({ getRegistration() { assert.fail("must reject before accessing registration"); }, enroll() { assert.fail(); }, remove() { assert.fail(); } });
+  for (const entry of [{ commandName: "streaming_add" }, { commandName: "streaming_remove" },
+    { customId: `streaming:remove:${userId}`, isButton: () => true }, { customId: `streaming:channels:${userId}`, isButton: () => true },
     { customId: `streaming:save:${userId}`, isModalSubmit: () => true }]) {
     const i = interaction({ ...entry, member: { roles: ["verified-role", "admin-role"] },
       memberPermissions: new PermissionsBitField(PermissionsBitField.Flags.Administrator) });
@@ -97,4 +98,15 @@ test("missing Club Member role configuration fails closed", async () => {
   const h = createStreamingHandlers({ service: {}, guildId, publicUrl: "https://bot.example.test" });
   await h.handle(i);
   assert.match(i.calls[0][1].content, /Club Members/);
+});
+
+test("member command visibility defaults to disabled; role grants belong in Discord Integrations", () => {
+  const commands = require("../../commands/slashCommands");
+  for (const name of ["streaming_add", "streaming_remove"]) {
+    const command = commands.find((entry) => entry.name === name);
+    assert.equal(command.default_member_permissions, "0");
+    assert.equal(command.dm_permission, false);
+  }
+  assert.equal(commands.find((entry) => entry.name === "streaming_overview").default_member_permissions,
+    String(PermissionsBitField.Flags.Administrator));
 });

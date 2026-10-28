@@ -34,6 +34,7 @@ module.exports = {
     coachToken: process.env.COACH_BOT_TOKEN || null,
     coachClientId: process.env.COACH_BOT_CLIENT_ID || null,
     guildId: process.env.DISCORD_GUILD_ID || shared.discord.guildId,
+    itChannelId: process.env.IT_CHANNEL_ID || "1544209256100794378",
     welcomeChannelId: process.env.DISCORD_WELCOME_CHANNEL_ID, // Optional: specific welcome channel
     approvalChannelId: process.env.DISCORD_APPROVAL_CHANNEL_ID, // Optional: channel for role approval requests
   },
@@ -72,7 +73,6 @@ module.exports = {
   streaming: {
     publicUrl: process.env.STREAMING_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || "https://bot-tdnm.onrender.com",
     channelId: process.env.STREAMING_CHANNEL_ID || "1196454773558345768",
-    itChannelId: process.env.STREAMING_IT_CHANNEL_ID || "1544209256100794378",
     youtubeApiKey: process.env.YOUTUBE_API_KEY,
     twitchClientId: process.env.TWITCH_CLIENT_ID,
     twitchClientSecret: process.env.TWITCH_CLIENT_SECRET,

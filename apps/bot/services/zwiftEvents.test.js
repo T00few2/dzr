@@ -57,3 +57,22 @@ test("fetches from Zwift's public API and handles a missing event", async () => 
   assert.match(urls[0], /\/api\/public\/events\/777777$/);
   assert.equal((await getZwiftEvent("404404", { http })).success, false);
 });
+
+test("reads the powerup setup from the event tags, falling back to a category's tags", () => {
+  const fromEvent = compactEvent({ id: 2, routeId: 5103974, tags: ["powerup_percent=\"0,50,5,50\"", "arch_powerup=\"0,3\""] });
+  assert.deepEqual(fromEvent.powerups, ["Feather", "Aero"]);
+  assert.deepEqual(fromEvent.powerup_ids, [0, 5]);
+  assert.deepEqual(fromEvent.arch_powerups, { 0: 3 });
+  const fromCategory = compactEvent({ id: 3, routeId: 5103974, tags: [], eventSubgroups: [{ subgroupLabel: "A", routeId: 5103974, tags: ["powerup_percent=\"1,100\""] }] });
+  assert.deepEqual(fromCategory.powerups, ["Draft"]);
+  assert.equal(compactEvent({ id: 4, routeId: 5103974 }).powerups, undefined);
+});
+
+test("a ZRL race has only fixed banner powerups and a start powerup, on its categories", () => {
+  const tags = ["zrl", "starting_powerup=4", "arch_powerup=\"0,0,82,0,81,5,5,3\""];
+  const event = compactEvent({ id: 5673134, routeId: 5103974, tags: ["zrl"], eventSubgroups: [{ subgroupLabel: "A", routeId: 5103974, tags }] });
+  assert.deepEqual(event.powerups, []);
+  assert.deepEqual(event.arch_powerups, { 0: 0, 82: 0, 81: 5, 5: 3 });
+  assert.deepEqual(event.banner_powerups, ["Feather", "Large XP", "Aero"]);
+  assert.equal(event.start_powerup, "Burrito");
+});

@@ -1,4 +1,5 @@
 import html
+import time
 from collections import defaultdict
 from urllib.parse import urljoin
 
@@ -38,6 +39,38 @@ def rider_search_rows(rows: list, query: str, limit: int = 10) -> list:
     riders.sort(key=lambda r: (_fold(r["name"]) != folded, not _fold(r["name"]).startswith(folded), -r["_events"]))
     return [{k: v for k, v in r.items() if k != "_events"} for r in riders[:limit]]
 
+
+def event_search_rows(rows: list, query: str, start_after: int = None, start_before: int = None, limit: int = 15) -> list:
+    """
+    ZwiftPower event list rows whose name has every word of the query, inside the time window
+    (unix seconds), earliest first. Returns the Zwift event id, name, start (UTC) and length.
+    """
+    words = _fold(query).split()
+    seen = set()
+    events = []
+    for row in rows or []:
+        zid = str(row.get("zid") or "").strip()
+        tm = int(row.get("tm") or 0)
+        if not zid.isdigit() or zid in seen or not tm:
+            continue
+        if start_after is not None and tm < start_after:
+            continue
+        if start_before is not None and tm > start_before:
+            continue
+        name = html.unescape(str(row.get("t") or "")).strip()
+        if not all(word in _fold(name) for word in words):
+            continue
+        seen.add(zid)
+        metres = int(row.get("km") or 0)
+        events.append({
+            "zwiftEventId": int(zid),
+            "name": name,
+            "startUtc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(tm)),
+            "distanceKm": round(metres / 1000, 1) if metres > 0 else None,
+            "laps": int(row.get("laps") or 0) or None,
+        })
+    events.sort(key=lambda e: e["startUtc"])
+    return events[:limit]
 
 class ZwiftPower:
     """
@@ -635,6 +668,31 @@ class ZwiftPower:
         resp = self.session.get("https://zwiftpower.com/api3.php", params={"do": "rider_list", "search": q}, timeout=20)
         resp.raise_for_status()
         return rider_search_rows(resp.json().get("data", []), q, limit)
+
+    # Recent results (the last 3 days) and upcoming events (the next 7), cached briefly: each list
+    # is close to 1 MB and the site rebuilds them every few minutes.
+    _event_lists = {}
+
+    def list_events(self) -> list:
+        rows = []
+        for key, params in (("results", {"do": "zwift_event_list_results", "DAYS": 3}),
+                            ("upcoming", {"do": "zwift_event_list", "DAYS": 7})):
+            cached = ZwiftPower._event_lists.get(key)
+            if cached and time.time() - cached[0] < 600:
+                rows.extend(cached[1])
+                continue
+            resp = self.session.get("https://zwiftpower.com/api3.php", params=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json().get("data", [])
+            ZwiftPower._event_lists[key] = (time.time(), data)
+            rows.extend(data)
+        return rows
+
+    def search_events(self, query: str, start_after: int = None, start_before: int = None, limit: int = 15) -> list:
+        """Zwift events on ZwiftPower's lists by name, from 3 days back to 7 days ahead."""
+        if len(_fold(query)) < 3:
+            return []
+        return event_search_rows(self.list_events(), query, start_after, start_before, limit)
 
     def search_segments(self, query: str) -> list:
         folded = " ".join(str(query or "").casefold().split())

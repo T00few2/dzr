@@ -48,3 +48,12 @@ test("announcement contains verified stream URL, with all mentions disabled", ()
   assert.deepEqual(payload.allowedMentions, { parse: [] });
   assert.equal(payload.embeds[0].url, "https://www.youtube.com/watch?v=abcdefghijk");
 });
+
+test("unsupported platforms have a distinct error and cannot fall through to another provider", () => {
+  const now = Date.now();
+  for (const platform of ["unknown", "ukendt", "facebook", "", null, undefined]) {
+    assert.throws(() => parseEvent({ platform }, now), { code: "unknown_platform" });
+    assert.throws(() => parseChannel(platform, "@DZR"), { code: "unknown_platform" });
+    assert.throws(() => announcementMessage({}, { platform }), { code: "unknown_platform" });
+  }
+});

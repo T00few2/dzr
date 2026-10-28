@@ -55,16 +55,18 @@ local function load_curl()
 end
 
 local function platform()
-    if platform_setting ~= "auto" then return platform_setting end
+    if platform_setting == "youtube" or platform_setting == "twitch" then return platform_setting end
+    if platform_setting ~= "auto" then return "unknown" end
     local service = obs.obs_frontend_get_streaming_service()
-    if service == nil then return nil end
+    if service == nil then return "unknown" end
     local settings = obs.obs_service_get_settings(service)
+    if settings == nil then return "unknown" end
     local name = string.lower(obs.obs_data_get_string(settings, "service") or "")
     obs.obs_data_release(settings)
     -- Deliberately never read the service's "key", account credentials or authentication files.
     if name:find("youtube", 1, true) then return "youtube" end
     if name:find("twitch", 1, true) then return "twitch" end
-    return nil
+    return "unknown"
 end
 
 local function valid_settings()
@@ -75,7 +77,6 @@ local function valid_settings()
     if not owner or #owner < 17 or #owner > 20 or #secret ~= 43 then
         log(obs.LOG_ERROR, "Indsæt din personlige nøgle fra /streaming_add i DZR key."); return false
     end
-    if not platform() then log(obs.LOG_ERROR, "Vælg YouTube eller Twitch i Platform. Automatisk genkender ikke denne OBS-tjeneste."); return false end
     return true
 end
 
@@ -87,6 +88,9 @@ local function video_id()
 end
 
 local function new_session()
+    if platform() == "unknown" then
+        log(obs.LOG_ERROR, "Ukendt streamingplatform. DZR får besked; vælg YouTube eller Twitch i Platform.")
+    end
     last_session_start = math.max(millis(), last_session_start + 1)
     return { id = string.format("%d_%08x%08x", os.time(), math.random(0, 0x7fffffff), math.random(0, 0x7fffffff)),
         started_at = last_session_start, sequence = 0, platform = platform() }
@@ -184,7 +188,11 @@ local function pump()
         log(obs.LOG_ERROR, "Nøgle eller platform afvist. Kør /streaming_add, og kontrollér opsætningen.")
         queue = {}
     elseif code == 400 then
-        log(obs.LOG_ERROR, "Signal afvist. Kontrollér computerens ur og det valgfrie YouTube-link.")
+        if pending.platform == "unknown" then
+            log(obs.LOG_ERROR, "Ukendt platform afvist af DZR. Vælg YouTube eller Twitch i Platform.")
+        else
+            log(obs.LOG_ERROR, "Signal afvist. Kontrollér computerens ur og det valgfrie YouTube-link.")
+        end
     elseif pending.attempts < 5 then
         pending.retry_at = os.time() + math.min(30, 2 ^ pending.attempts)
         table.insert(queue, 1, pending)
@@ -232,6 +240,11 @@ function script_update(settings)
     platform_setting = obs.obs_data_get_string(settings, "platform")
     if platform_setting == "" then platform_setting = "auto" end
     video_link = trim(obs.obs_data_get_string(settings, "video_link"))
+    -- A manual selection can repair auto-detection while OBS is already streaming.
+    if session and session.platform == "unknown" and platform() ~= "unknown" then
+        session.platform = platform()
+        enqueue("started", session)
+    end
 end
 
 function script_load(settings)
