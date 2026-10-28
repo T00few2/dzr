@@ -1,4 +1,4 @@
-import { VERIFIED_MEMBER_ROLE_ID } from '@/app/lib/sharedConstants'
+import { COMMUNITY_MEMBER_ROLE_ID, VERIFIED_MEMBER_ROLE_ID } from '@/app/lib/sharedConstants'
 import { adminDb } from '@/app/utils/firebaseAdminConfig'
 import {
   DEFAULT_VERIFICATION_CRITERIA,
@@ -106,7 +106,11 @@ export async function syncMemberRoleOnLogin(input: {
 
   const settingsDoc = await adminDb.collection('system_settings').doc('global').get()
   const membership = (settingsDoc.exists ? (settingsDoc.data() as any)?.membership : null) || {}
-  const memberRoleIdFromSettings = typeof membership?.memberRoleId === 'string' ? membership.memberRoleId : ''
+  // Without the admin setting, members joining through /join got no 👤 member role at all.
+  const memberRoleIdFromSettings =
+    typeof membership?.memberRoleId === 'string' && membership.memberRoleId.trim()
+      ? membership.memberRoleId
+      : COMMUNITY_MEMBER_ROLE_ID
   const requiredRoleId = loginRoleId()
   const roleIds = Array.from(new Set(
     [requiredRoleId, String(memberRoleIdFromSettings || '').trim()].filter(Boolean)
