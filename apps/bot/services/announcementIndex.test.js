@@ -256,3 +256,29 @@ test("a new index version syncs at once even after today's sync", async () => {
   assert.deepEqual(await maybeSyncAnnouncements(client, deps, now), { messages: 0, written: 0, removed: 0 });
   assert.equal(await maybeSyncAnnouncements(client, deps, now + 20 * 60 * 1000), null, "same version: once a day");
 });
+
+test("results carry the edit date, and an edited post counts as recent", async () => {
+  invalidateCache();
+  const db = fakeDb();
+  const deps = { db, embed: fakeEmbed([]) };
+  const calendar = message("cal", long("Recon og klubmesterskab 3/11"), { createdAt: new Date("2026-08-15T10:00:00Z") });
+  calendar.editedAt = new Date("2026-10-27T10:00:00Z");
+  const moved = message("moved", long("Recon: klubmesterskab flyttet til 10/11"), { createdAt: new Date("2026-10-20T10:00:00Z") });
+  await upsertMessages([calendar, moved], deps);
+  const hits = await searchAnnouncements("klubmesterskab recon", { limit: 5, now: new Date("2026-10-28T12:00:00Z") }, deps);
+  // Same direction in the fake embedding, so they collapse: the most recently edited copy wins.
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].posted, "2026-08-15");
+  assert.equal(hits[0].edited, "2026-10-27");
+  const { SEARCH_RESULT_INSTRUCTION } = require("./announcementIndex");
+  assert.match(SEARCH_RESULT_INSTRUCTION, /most recently posted or edited one is correct/);
+});
+
+test("an unedited post has no edit date in the result", async () => {
+  invalidateCache();
+  const db = fakeDb();
+  const deps = { db, embed: fakeEmbed([]) };
+  await upsertMessages([message("a", long("Nyt kit"))], deps);
+  const [hit] = await searchAnnouncements("kit", { now: new Date("2026-10-28T12:00:00Z") }, deps);
+  assert.equal("edited" in hit, false);
+});
