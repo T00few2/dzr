@@ -20,3 +20,26 @@ test("publication uses a stable nonce; recovery matches the bot, URL and actual 
   channel.guild_id = "other-guild";
   await assert.rejects(publisher.send(notice, {}), /invalid_streaming_channel/);
 });
+
+test("IT reports resolve #it inside the configured guild and send only sanitized fields without pings", async () => {
+  const sent = [];
+  const rest = { async get(route) {
+    if (route === "/guilds/guild/channels") return [{ id: "it-channel", name: "it", type: 0 }, { id: "chat", name: "general", type: 0 }];
+    assert.equal(route, "/channels/it-channel");
+    return { guild_id: "guild", type: 0 };
+  }, async post(route, payload) { sent.push({ route, body: payload.body }); } };
+  const publisher = createPublisher({}, "guild", { rest });
+  await publisher.reportError({ id: "alert_test", discordId: "member", code: "provider_unavailable", createdAt: 1793124000000, secret: "must-not-leak" });
+  assert.equal(sent[0].route, "/channels/it-channel/messages");
+  assert.deepEqual(sent[0].body.allowed_mentions, { parse: [] });
+  assert.match(sent[0].body.content, /provider_unavailable/);
+  assert.ok(!JSON.stringify(sent).includes("must-not-leak"));
+});
+
+test("ambiguous #it lookup fails closed rather than reporting to an arbitrary channel", async () => {
+  const publisher = createPublisher({}, "guild", { rest: {
+    async get() { return [{ id: "one", name: "it", type: 0 }, { id: "two", name: "it", type: 0 }]; },
+    async post() { assert.fail(); },
+  } });
+  await assert.rejects(publisher.reportError({}), /streaming_it_channel_not_found/);
+});

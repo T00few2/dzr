@@ -1,7 +1,14 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+const { setZwiftCatalog } = require("./zwiftCatalog");
 const { buildRouteProfileImages } = require("./routeProfileImages");
+
+setZwiftCatalog({
+  worlds: [{ slug: "watopia", name: "Watopia" }],
+  routes: [{ name: "Road to Sky", world: "watopia", distance: 17.5, elevation: 1044, sports: ["cycling"], segments: [], segmentsOnRoute: [] }],
+  segments: [],
+});
 
 const profile = {
   routeName: "Road to Sky",

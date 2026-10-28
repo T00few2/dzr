@@ -19,7 +19,7 @@ function createJoinFixture() {
   f.state.httpCalls = [];
   const env = { DISCORD_GUILD_ID: f.state.guildId, DISCORD_BOT_TOKEN: 'test', DISCORD_REQUIRED_ROLE_ID: 'verified' };
   const website = loadCommonJs(outputText, {
-    '@/app/lib/sharedConstants': { VERIFIED_MEMBER_ROLE_ID: 'verified' },
+    '@/app/lib/sharedConstants': { VERIFIED_MEMBER_ROLE_ID: 'verified', COMMUNITY_MEMBER_ROLE_ID: 'community' },
     '@/app/utils/firebaseAdminConfig': { adminDb: f.db },
     '@/packages/shared/verificationCriteria': sharedCriteria,
   }, {
@@ -276,4 +276,12 @@ test('a paid member can still sign in before linking Zwift or obtaining Verified
     fetch: async () => ({ ok: true, json: async () => ({ roles: [...f.state.roles] }) }),
   });
   assert.equal(await auth.GET.callbacks.signIn({ account: { access_token: 'test' }, profile: { id: f.state.userId } }), true);
+});
+
+test('without a memberRoleId setting, the join login still adds the community member role', async () => {
+  const f = createJoinFixture();
+  f.state.docs.set('system_settings/global', { membership: { clubMemberRoleId: 'club' } });
+  await f.website.syncAccessRoles(f.state.userId, 'onboarding-discord-login');
+  assert.equal(f.state.roles.has('community'), true);
+  assert.equal(f.state.roles.has('verified'), false);
 });

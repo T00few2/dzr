@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+const { setZwiftCatalog } = require("./zwiftCatalog");
 const {
   MAX_ROUNDS,
   MAX_ZP_CALLS_PER_RUN,
@@ -11,6 +12,20 @@ const {
   takeDailyRun,
   resetDailyRuns,
 } = require("./helperAgent");
+
+setZwiftCatalog({
+  worlds: [{ slug: "watopia", name: "Watopia" }],
+  segments: [{ slug: "alpe", name: "Alpe du Zwift", type: "climb", world: "watopia" }],
+  routes: [{
+    name: "Road to Sky",
+    world: "watopia",
+    distance: 17.5,
+    elevation: 1044,
+    sports: ["cycling"],
+    segments: ["alpe"],
+    segmentsOnRoute: [{ segment: "alpe", from: 5, to: 17.4 }],
+  }],
+});
 
 function fakeDeps(overrides = {}) {
   const logged = [];
@@ -200,7 +215,7 @@ test("never throws when the model call fails", async () => {
   assert.equal(deps.logged[0].outcome, "error");
 });
 
-test("answers route questions from zwift-data", async () => {
+test("answers route questions from the website route catalog", async () => {
   const deps = fakeDeps();
   const details = await executeHelperTool({ name: "zwift_route_details", arguments: '{"route":"road to sky"}' }, run(), deps);
   assert.equal(details.success, true);

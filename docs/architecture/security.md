@@ -82,7 +82,7 @@ Roles/admin status are captured when the OAuth account is handled; the code does
 | Flask service routes | Explicit bearer `CONTENT_API_KEY` checks; retired session routes return `410` | [Flask main](../../apps/api/main.py) |
 | Weekly-series cron | Dedicated bearer `WEEKLY_SERIES_CRON_SECRET` | [cron route](../../app/api/cron/weekly-series/route.ts) |
 | Browser Firestore | Firebase Auth and collection rules, not the website's admin JWT | [rules](../../firestore.rules) |
-| Streaming enrollment/removal | Configured guild; invoking Discord member only; ephemeral replies and owner-bound components | [streaming handlers](../../apps/bot/handlers/streamingHandlers.js) |
+| Streaming enrollment/removal | Configured guild; enrollment requires the configured Club Member role at command and form submission; self-removal remains available after role loss; private owner-bound components | [streaming handlers](../../apps/bot/handlers/streamingHandlers.js) |
 | Streaming overview | Administrator permission or configured DZR Admin role, checked on execution | [streaming handlers](../../apps/bot/handlers/streamingHandlers.js) |
 | OBS callback | Per-member hashed bearer key, registered platform, validated payload, size/rate limits; provider verification before posting | [streaming guide](streaming.md) |
 
@@ -156,6 +156,7 @@ At-rest encryption does not prevent data being decrypted for a coaching turn. Se
 - The generic admin [collection allowlist](../../app/api/admin/_lib/collections.ts) blocks connections, profiles, notes and payments and redacts secret fields. Specialized admin routes have their own contracts; an allowlist does not authorize arbitrary collections.
 - Client Firestore rules for legacy shop/ZRL allow all authenticated users to read/write their feature collections. They do not enforce captain/admin policy. `users` ownership is UID equality, which differs from Discord-ID document ownership. See [data constraints](data.md#client-rules-versus-feature-ownership).
 - Onboarding and club-assistant DM tracking (`onboarding_dms`, `assistant_dm_*`) store timestamps, tools, outcomes and ratings only, never DM or reply text. Knowledge gaps hold the assistant's own topic summary without a user id. Keep it that way when extending the reporting.
+- The announcement index sends announcement text and images (already public to members) to OpenAI for embeddings and image transcription, and only indexes normal posts by this bot or current Admins. Gap drafts post only the gap topic and what DZR Helper wrote to the moderators channel, never member text, and need a Manage Messages or Administrator click before they reach `bot_knowledge`.
 - No consumer for `role_updates` or verified live Firestore TTL policy is established by this checkout. Missing automatic cleanup/delivery must not be represented as a guaranteed security or operational control.
 
 Application behavior is unchanged by this documentation task. [Findings](findings.md) records these limits and legacy references for future work.

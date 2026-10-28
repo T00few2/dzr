@@ -3,6 +3,13 @@ const axios = require("axios");
 const config = require("../../config/config");
 const { parseFixtureList, parseFixture } = require("./ladderParser");
 
+// Short reason shown to the user, so a failing API can be told apart without looking in the logs.
+function describeFailure(err) {
+  if (err.response) return `API svarede ${err.response.status}`;
+  if (err.code === "ECONNABORTED") return "API svarede ikke i tide";
+  return "ingen forbindelse til API";
+}
+
 async function getPage(path) {
   const { baseUrl, apiKey } = config.contentApi;
   if (!baseUrl || !apiKey) throw new Error("CONTENT_API_BASE_URL and CONTENT_API_KEY must be set to read the ladder");
@@ -18,7 +25,7 @@ async function getPage(path) {
   } catch (err) {
     const status = err.response ? err.response.status : "no response";
     const wrapped = new Error(`Ladder page ${path} failed: ${status} ${err.message}`);
-    wrapped.userMessage = "Ladder-siden kunne ikke hentes lige nu. Prøv igen senere.";
+    wrapped.userMessage = `Ladder-siden kunne ikke hentes lige nu (${describeFailure(err)}). Prøv igen senere.`;
     throw wrapped;
   }
 }
@@ -65,12 +72,17 @@ async function refreshFixture(fixture, now = Date.now()) {
   return (await refreshSignups(fixture.zwiftEventId)) ? getFixture(fixture.id) : fixture;
 }
 
-// Start times never change once read, so each fixture page is fetched at most once per process for this.
+// A known start time never changes, so it is fetched at most once per process.
+// A missing one is not stored: a stale fixture is the "Refreshing Signups" spinner and has no start until that finishes.
 const startCache = new Map();
 
-async function getFixtureStart(id) {
-  if (!startCache.has(id)) startCache.set(id, (await getFixture(id)).start);
-  return startCache.get(id);
+async function getFixtureStart(id, { load = getFixture, cache = startCache } = {}) {
+  if (!cache.has(id)) {
+    const start = (await load(id)).start;
+    if (start) cache.set(id, start);
+    return start;
+  }
+  return cache.get(id);
 }
 
 // Walks the fixture list in order and returns the first fixture that has not started yet, or null.
@@ -82,4 +94,4 @@ async function getNextFixture(team) {
   return null;
 }
 
-module.exports = { getPage, fixturesPath, getFixtures, getFixture, getFixtureStart, getNextFixture, refreshSignups, refreshFixture };
+module.exports = { getPage, describeFailure, fixturesPath, getFixtures, getFixture, getFixtureStart, getNextFixture, refreshSignups, refreshFixture };

@@ -115,6 +115,22 @@ test("paraphrased gap topics merge into one row and a solved gap reopens", async
   assert.equal(db.docs.get(key).count, 3);
 });
 
+test("a gap is drafted once, and again only when it comes back a week after being solved", async () => {
+  const db = fakeDb();
+  const day = (d) => new Date(`2026-10-${String(d).padStart(2, "0")}T12:00:00Z`);
+  const record = (d) => recordKnowledgeGap({ topic: "Krav til cykeltøj i DCU-løb", category: "races" }, { db, now: day(d) });
+  const first = await record(1);
+  assert.equal(first.draft, true);
+  assert.equal(first.gapId, "races__cykeltoej-dcu-krav-loeb");
+  assert.equal((await record(2)).draft, false);
+  const key = `${COLLECTIONS.gaps}/${first.gapId}`;
+  db.docs.set(key, { ...db.docs.get(key), status: "solved", articleKey: "a", draftId: "d1" });
+  assert.equal((await record(5)).draft, false, "solved but drafted less than a week ago");
+  db.docs.set(key, { ...db.docs.get(key), status: "solved" });
+  assert.equal((await record(20)).draft, true);
+  assert.equal(db.docs.get(key).articleKey, "a", "fields from the draft flow survive a new report");
+});
+
 test("gap topics are capped, categories fixed, and empty topics ignored", async () => {
   const db = fakeDb();
   await recordKnowledgeGap({ topic: "x".repeat(200), category: "secret" }, { db });

@@ -35,16 +35,13 @@ test("YouTube discovery is callback-triggered, quota reserved, then video status
   const result = await providers.verify(channel, { platform: "youtube", startedAt: 1000000 }, { async reserveSearch() { order.push("reserve"); return true; } });
   assert.deepEqual(order, ["reserve", "search", "videos"]);
   assert.equal(result.streams[0].url, `https://www.youtube.com/watch?v=${video.id}`);
-  assert.equal(result.state.nextSearchAt, 1060000);
 });
 
-test("exhausted budget and nextSearchAt prevent requests; known videos still get checked", async () => {
+test("exhausted discovery budget prevents search requests", async () => {
   let calls = 0;
   const providers = createProviders({ youtubeApiKey: "test-key" }, { now: () => 1000000, fetchImpl: async () => { calls++; return json({ items: [] }); } });
   const result = await providers.verify(channel, { platform: "youtube", startedAt: 1000000 }, { async reserveSearch() { return false; } });
   assert.equal(result.error, "youtube_search_budget");
-  assert.equal(calls, 0);
-  await providers.verify(channel, { platform: "youtube", nextSearchAt: 1060000 }, { reserveSearch() { assert.fail(); } });
   assert.equal(calls, 0);
 });
 

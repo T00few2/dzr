@@ -3,6 +3,7 @@
 The ladder has no API, so the club account signs in with the normal sign-in form and the bot asks this
 service for individual pages. The password therefore stays here and never reaches the bot.
 """
+import logging
 import os
 import re
 import threading
@@ -13,6 +14,7 @@ LADDER_BASE = "https://ladder.cycleracing.club"
 
 # Only these pages can be fetched, so /ladder_page cannot be used as an open proxy.
 ALLOWED_PATH = re.compile(r"/(matchlist/fixtures/[^/?#]+|fixture/\d+|rSignups/\d+)")
+_FIXTURE_PATH = re.compile(r"^/fixture/(\d+)$")
 
 _SIGN_IN_FORM = re.compile(r'<form[^>]+id="signin"', re.I)
 
@@ -27,6 +29,12 @@ def is_allowed_path(path: str) -> bool:
 
 def _is_sign_in_page(body: str) -> bool:
     return bool(_SIGN_IN_FORM.search(body))
+
+
+def _is_refreshing_page(body: str) -> bool:
+    # A fixture that has not been refreshed for a day is this spinner. It has no start time until
+    # something POSTs /fixture/{id}/doRefresh, which the page itself does from the browser.
+    return "Refreshing Signups" in (body or "")
 
 
 class LadderClient:
@@ -56,6 +64,13 @@ class LadderClient:
     def _get(self, path: str) -> requests.Response:
         return self.session.get(f"{LADDER_BASE}{path}", timeout=30)
 
+    def _finish_signup_refresh(self, path: str) -> None:
+        match = _FIXTURE_PATH.fullmatch(path)
+        if not match:
+            return
+        logging.info(f"Ladder fixture {path} was waiting on a signup refresh")
+        self.session.post(f"{LADDER_BASE}/fixture/{match.group(1)}/doRefresh", timeout=60)
+
     def get_page(self, path: str):
         """Returns (body, content_type) for an allow-listed ladder page, signing in again when the session has expired."""
         if not is_allowed_path(path):
@@ -72,6 +87,9 @@ class LadderClient:
             # The site interposes an optional "link Discord" page; /discord/skip is its own bypass.
             if "Discord Verification Required" in res.text:
                 self.session.get(f"{LADDER_BASE}/discord/skip", timeout=20)
+                res = self._get(path)
+            if _is_refreshing_page(res.text):
+                self._finish_signup_refresh(path)
                 res = self._get(path)
             res.raise_for_status()
             return res.text, res.headers.get("Content-Type", "text/html")

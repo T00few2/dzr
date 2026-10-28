@@ -1,15 +1,28 @@
 const { REST, Routes } = require("discord.js");
 
-function createPublisher(client, guildId, { rest: suppliedRest } = {}) {
+function createPublisher(client, guildId, { rest: suppliedRest, itChannelId } = {}) {
   // Keep network attempts shorter than the durable lease. In particular, do not let the
   // main bot's REST queue hold an announcement through a long rate limit and send it later.
   const rest = suppliedRest || new REST({ version: "10", timeout: 8000, retries: 0, rejectOnRateLimit: () => true });
   const api = () => suppliedRest || rest.setToken(client.token);
+  let resolvedItChannel = itChannelId;
   async function getChannel(id) {
     const channel = await api().get(Routes.channel(id));
     if (channel?.guild_id !== guildId || ![0, 5, 10, 11, 12].includes(channel.type)) throw new Error("invalid_streaming_channel");
   }
   return {
+    async reportError(alert) {
+      if (!resolvedItChannel) {
+        const matches = (await api().get(Routes.guildChannels(guildId))).filter((channel) => channel.name === "it" && channel.type === 0);
+        if (matches.length !== 1) throw new Error("streaming_it_channel_not_found");
+        resolvedItChannel = matches[0].id;
+      }
+      await getChannel(resolvedItChannel);
+      await api().post(Routes.channelMessages(resolvedItChannel), { body: {
+        content: `⚠️ DZR Streaming · ${alert.discordId ? `<@${alert.discordId}>` : "system"} · ${alert.code}\nFejl registreret: <t:${Math.floor(alert.createdAt / 1000)}:f>. Se /streaming_overview.`,
+        allowed_mentions: { parse: [] }, nonce: alert.id.slice(-24), enforce_nonce: true,
+      } });
+    },
     async send(notice, message) {
       await getChannel(notice.channelId);
       const { allowedMentions, ...body } = message;

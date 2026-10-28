@@ -1,7 +1,22 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+const { setZwiftCatalog } = require("./zwiftCatalog");
 const { getDcuRaces, resetCache, RACES_URL } = require("./dcuESerien");
+
+setZwiftCatalog({
+  worlds: [
+    { slug: "watopia", name: "Watopia" },
+    { slug: "paris", name: "Paris" },
+    { slug: "france", name: "France" },
+  ],
+  routes: [
+    { id: 4131664304, name: "Itza Party", world: "watopia" },
+    { id: 870135081, name: "La Boucle", world: "paris" },
+    { id: 2143464829, name: "Bon Voyage", world: "france" },
+  ],
+  segments: [],
+});
 // Three real races from the calendar API, trimmed: eCKD (past), DZR løbet, DBM (later).
 const fixture = require("./__fixtures__/dcu-races.json");
 

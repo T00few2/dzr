@@ -1,7 +1,14 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+const { setZwiftCatalog } = require("./zwiftCatalog");
 const { getZwiftEvent, parseEventId, compactEvent } = require("./zwiftEvents");
+
+setZwiftCatalog({
+  worlds: [{ slug: "new-york", name: "New York" }],
+  routes: [{ id: 5103974, name: "Lady Liberty", world: "new-york" }],
+  segments: [],
+});
 
 test("event ids come from numbers and any Zwift event link", () => {
   assert.equal(parseEventId("5380255"), 5380255);

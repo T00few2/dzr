@@ -1,8 +1,22 @@
-const { StreamingError, tokenOwner, tokenMatches, parseEvent, createToken, hash, announcementMessage } = require("./model");
+const { StreamingError, HEARTBEAT_TTL_MS, tokenOwner, tokenMatches, parseEvent, createToken, hash, announcementMessage } = require("./model");
 
 function createStreamingService({ store, providers, publisher, guildId, channelId, now = Date.now, logger = console }) {
   let running = false;
   let timer;
+  let lastFallbackAt = -Infinity;
+  const system = { registrationId: `worker_${guildId}`, guildId, discordId: null };
+
+  async function reportError(registration, code, sessionId) {
+    try { await store.queueAlert(registration, code, sessionId); }
+    catch {
+      // If Firestore is unavailable, still try to tell IT; never forward raw exception/request data.
+      if (now() - lastFallbackAt < 60_000) return;
+      lastFallbackAt = now();
+      try { await publisher.reportError({ id: `fallback_${hash(`${registration.registrationId}:${code}`)}`,
+        discordId: registration.discordId, code, createdAt: now() }); }
+      catch { logger.warn("Streaming IT reporting unavailable."); }
+    }
+  }
 
   async function enroll(discordId, discordName, inputs) {
     const channels = {};
@@ -18,24 +32,39 @@ function createStreamingService({ store, providers, publisher, guildId, channelI
   async function callback(token, body) {
     const discordId = tokenOwner(token);
     if (!discordId) throw new StreamingError("invalid_key", "DZR-nøglen er ikke gyldig.", 401);
-    const registration = await store.getRegistration(guildId, discordId);
+    let registration;
+    try { registration = await store.getRegistration(guildId, discordId); }
+    catch {
+      await reportError(system, "callback_store_unavailable");
+      throw new StreamingError("temporarily_unavailable", "DZR Streaming er midlertidigt utilgængelig.", 503);
+    }
     if (!registration || !tokenMatches(token, registration.tokenHash)) throw new StreamingError("invalid_key", "DZR-nøglen er ikke gyldig.", 401);
-    const event = parseEvent(body, now());
-    if (!registration.channels[event.platform]) throw new StreamingError("channel_not_registered", "Denne platform er ikke tilmeldt.", 403);
-    return store.acceptEvent(registration, event);
+    try {
+      const event = parseEvent(body, now());
+      if (!registration.channels[event.platform]) throw new StreamingError("channel_not_registered", "Denne platform er ikke tilmeldt.", 403);
+      return await store.acceptEvent(registration, event);
+    } catch (error) {
+      await reportError(registration, error instanceof StreamingError ? error.code : "callback_failed");
+      throw error;
+    }
   }
 
   async function check(id) {
     const claimed = await store.claimSession(id);
     if (!claimed) return;
-    const { session, registration } = claimed;
+    const { session, registration, expired } = claimed;
+    if (expired) { await reportError(registration, "live_detection_timeout", session.sessionId); return; }
     try {
       const result = await providers.verify(registration.channels[session.platform], session, store);
-      await store.finishCheck(session, result, channelId);
+      const finished = await store.finishCheck(session, result, channelId);
+      if (finished?.expired) await reportError(registration, "live_detection_timeout", session.sessionId);
+      else if (result.error) await reportError(registration, result.error, session.sessionId);
     } catch (error) {
       const code = error instanceof StreamingError ? error.code : "verification_failed";
       logger.warn(`Streaming verification: ${code}`); // Never log request objects, headers, keys or provider URLs.
-      await store.finishCheck(session, { error: code }, channelId);
+      let finished;
+      try { finished = await store.finishCheck(session, { error: code }, channelId); }
+      finally { await reportError(registration, finished?.expired ? "live_detection_timeout" : code, session.sessionId); }
     }
   }
 
@@ -53,6 +82,7 @@ function createStreamingService({ store, providers, publisher, guildId, channelI
         // If history is inaccessible/incomplete, fail closed rather than risk a duplicate.
         if (!recovered.complete) {
           await store.finishNotice(notice, { status: "pending", lastError: "discord_history_unavailable" });
+          await reportError(registration, "discord_history_unavailable", session.sessionId);
           return;
         }
       }
@@ -71,7 +101,8 @@ function createStreamingService({ store, providers, publisher, guildId, channelI
       await store.finishNotice(notice, { status: "sent", messageId, sentAt: now(), lastError: null });
     } catch {
       logger.warn("Streaming publication deferred; will reconcile Discord history before retrying.");
-      await store.finishNotice(notice, { status: "pending", lastError: "discord_delivery_pending" });
+      try { await store.finishNotice(notice, { status: "pending", lastError: "discord_delivery_pending" }); }
+      finally { await reportError(registration, "discord_delivery_pending", session.sessionId); }
     }
   }
 
@@ -80,12 +111,23 @@ function createStreamingService({ store, providers, publisher, guildId, channelI
     running = true;
     try {
       const sessions = (await store.listSessions()).filter((session) => session.guildId === guildId
-        && !(session.nextCheckAt > now()) && !(session.leaseUntil > now()));
+        && !(session.nextCheckAt > now()) && !(session.leaseUntil > now())
+        && (!session.discoveredAt || session.lastSeenAt <= now() - HEARTBEAT_TTL_MS));
       // Bounded concurrency keeps one slow provider from delaying every other streamer.
       for (let i = 0; i < sessions.length; i += 4) await Promise.all(sessions.slice(i, i + 4).map((session) => check(session.id)));
       for (const notice of await store.listNotices()) if (notice.channelId === channelId) await publish(notice.id);
+      for (const item of await store.listAlerts()) {
+        if (item.guildId !== guildId) continue;
+        const alert = await store.claimAlert(item.id);
+        if (!alert) continue;
+        let sent = false;
+        try { await publisher.reportError(alert); sent = true; }
+        catch { logger.warn("Streaming IT report deferred."); }
+        await store.finishAlert(alert, sent);
+      }
     } catch {
       logger.warn("Streaming worker temporarily unavailable; durable work will be retried.");
+      await reportError(system, "worker_unavailable");
     } finally { running = false; }
   }
 

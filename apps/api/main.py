@@ -1083,6 +1083,21 @@ def rider_data(rider_id: int):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/zp_rider_search', methods=['GET'])
+def zp_rider_search():
+    """Find riders on ZwiftPower by name (min 4 characters), for linking a Zwift ID. Auth: Bearer CONTENT_API_KEY."""
+    unauthorized = require_api_or_401()
+    if unauthorized:
+        return unauthorized
+    try:
+        zp = ZwiftPower(ZWIFT_USERNAME, ZWIFT_PASSWORD)
+        zp.session = get_authenticated_session()
+        return jsonify({"riders": zp.search_riders(request.args.get("q", ""))})
+    except Exception as exc:
+        print(f"ZwiftPower rider search failed: {exc}")
+        return jsonify({"error": str(exc)}), 502
+
+
 def _racing_score_and_category(profile):
     """Racing score and the rider's category; both None when Zwift has no score."""
     metrics = (profile or {}).get("competitionMetrics") or {}

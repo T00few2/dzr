@@ -74,12 +74,13 @@ function stepText(step, status, extras = {}) {
       return [
         "**Næste skridt: link dit Zwift ID** → så bliver du ✅ Verificeret Medlem og får adgang til members-zone på hjemmesiden og bot-kommandoerne.",
         `Skriv \`zwiftid 1234567\` (dit eget ID) i <#${CHANNELS.zwiftId}>, brug \`/my_zwiftid\` – eller send det bare til mig her. Jeg viser dig profilen, så du kan bekræfte, at det er dig.`,
-        "Kender du ikke dit ID? `/my_zwiftid searchterm:` finder dig på dit Zwift-navn.",
+        "Kender du ikke dit ID? Skriv dit navn, som det står på Zwift/ZwiftPower, til mig her – så finder jeg dig.",
       ].join("\n");
     case "link_zwift_id_join":
       return [
         "**Tak for din betaling! Sidste skridt: link dit Zwift ID**",
         `Gør det her: ${LINKS.joinZwiftId} – så er du både ⭐ Klub Medlem og ✅ Verificeret Medlem.`,
+        "Kender du ikke dit Zwift ID? Skriv dit navn, som det står på Zwift/ZwiftPower, til mig her – så finder jeg dig og viser profilen, så du kan bekræfte.",
       ].join("\n");
     case "meet_verification":
       return [
@@ -127,9 +128,12 @@ function buildMessage(keys, status, extras = {}) {
 /** Keys this event wants to send, before send-once filtering. */
 function wantedKeys(trigger, status) {
   if (trigger === "join") return ["join"];
-  const keys = [];
-  if (trigger === "community") keys.push("intro");
-  if (STEP_KEYS.has(status?.nextStep)) keys.push(status.nextStep);
+  const step = STEP_KEYS.has(status?.nextStep) ? status.nextStep : null;
+  // The intro rides along with the first step DM, whatever role triggered it: members who come
+  // through /join are added to the server without the community role, so that event never fires.
+  // Claiming drops it once it has been sent.
+  const keys = trigger === "community" || step ? ["intro"] : [];
+  if (step) keys.push(step);
   return keys;
 }
 

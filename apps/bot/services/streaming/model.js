@@ -2,7 +2,10 @@ const crypto = require("node:crypto");
 
 const PLATFORMS = ["youtube", "twitch"];
 const HEARTBEAT_TTL_MS = 150_000;
-const CHECK_INTERVAL_MS = 20_000;
+const CHECK_INTERVAL_MS = 15_000;
+const DISCOVERY_WINDOW_MS = 60 * 60_000;
+const checkDelay = (attempt) => Math.min(300_000, CHECK_INTERVAL_MS * 2 ** Math.min(attempt, 5));
+const discoveryExpired = (session, now) => !session.discoveredAt && now >= session.startedAt + DISCOVERY_WINDOW_MS;
 const SNOWFLAKE = /^\d{17,20}$/;
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 
@@ -85,6 +88,6 @@ function announcementMessage(registration, stream) {
   };
 }
 
-module.exports = { PLATFORMS, HEARTBEAT_TTL_MS, CHECK_INTERVAL_MS, SNOWFLAKE, VIDEO_ID, StreamingError,
+module.exports = { PLATFORMS, HEARTBEAT_TTL_MS, CHECK_INTERVAL_MS, DISCOVERY_WINDOW_MS, checkDelay, discoveryExpired, SNOWFLAKE, VIDEO_ID, StreamingError,
   hash, registrationKey, sessionKey, announcementKey, createToken, tokenOwner, tokenMatches, parseChannel, parseEvent,
   youtubeLive, announcementMessage };

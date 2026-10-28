@@ -62,7 +62,11 @@ const { MY_PAGES_COACH_URL, CALENDAR_URL, noEmbedUrl, coachHowItWorksText } = re
 const { proposeCoachGoal } = require("../services/coachGoalConfirm");
 const { buildZwo, describeWorkout } = require("../services/zwoBuilder");
 const { runHelper, askHelperToolDefinition } = require("../services/helperAgent");
+const { searchAnnouncements, searchAnnouncementsToolDefinition, SEARCH_RESULT_INSTRUCTION } = require("../services/announcementIndex");
+const { draftGapArticle } = require("../services/gapDrafts");
+const { findRidersByName, buildRiderSearchReply } = require("../services/riderSearch");
 const { zwiftRouteToolDefinitions, ZWIFT_ROUTE_TOOLS, runZwiftRouteTool } = require("../services/zwiftRoutes");
+const { loadZwiftCatalog } = require("../services/zwiftCatalog");
 const { buildRouteProfileImages } = require("../services/routeProfileImages");
 const { getZwiftEvent } = require("../services/zwiftEvents");
 const { getDcuRaces, dcuRacesToolDefinition } = require("../services/dcuESerien");
@@ -456,7 +460,7 @@ const toolDefinitions = [
           },
           searchterm: {
             type: "string",
-            description: "First 3+ letters of name to search for in club stats"
+            description: "Their name as it is on Zwift/ZwiftPower (4+ letters, the full name works best), when they do not know their ZwiftID. Searches DZR riders and all of ZwiftPower, and posts a menu where they pick themselves."
           }
         }
       }
@@ -531,6 +535,7 @@ const toolDefinitions = [
       }
     }
   },
+  searchAnnouncementsToolDefinition,
   askHelperToolDefinition
 ];
 
@@ -799,6 +804,7 @@ async function executeSingleToolCall(toolCall, message, turn) {
     let result;
 
     if (ZWIFT_ROUTE_TOOLS.has(name)) {
+      await loadZwiftCatalog();
       return { tool_call_id: toolCall.id, ...runZwiftRouteTool(name, args) };
     }
     
@@ -937,18 +943,36 @@ async function executeSingleToolCall(toolCall, message, turn) {
           return { tool_call_id: toolCall.id, success: true };
         }
 
+        if (args.searchterm) {
+          // Post the menu directly: the synthetic reply helper strips components, which left the
+          // member with "select your name" and nothing to select.
+          const term = String(args.searchterm).trim();
+          const result = await findRidersByName(term, { discordId: message.author.id });
+          const reply = buildRiderSearchReply(message.author.id, term, result);
+          // A channel message cannot be private like a slash command reply, so in a server the list
+          // goes to the member's DMs. Closed DMs (50007) fall back to the channel; the menu is bound
+          // to the member either way.
+          if (message.guild && reply.components) {
+            try {
+              await message.author.send(reply);
+              await safeReply(message, "Jeg har sendt dig listen i en DM 📬");
+              return { tool_call_id: toolCall.id, success: true, found: result.riders.length, sent_to_dm: true };
+            } catch (error) {
+              if (error?.code !== 50007) console.warn("Rider search DM failed:", error?.message || error);
+            }
+          }
+          await safeReply(message, reply);
+          return { tool_call_id: toolCall.id, success: true, found: result.riders.length };
+        }
+
         const options = {
           strings: {}
         };
-        
+
         if (args.zwiftid) {
           options.strings.zwiftid = args.zwiftid;
         }
-        
-        if (args.searchterm) {
-          options.strings.searchterm = args.searchterm;
-        }
-        
+
         const interaction = createSyntheticInteraction(message, options);
         await handleMyZwiftId(interaction);
         return { tool_call_id: toolCall.id, success: true };
@@ -1142,9 +1166,29 @@ async function executeSingleToolCall(toolCall, message, turn) {
         return { tool_call_id: toolCall.id, ...helped };
       }
 
+      case "search_announcements": {
+        try {
+          const announcements = await searchAnnouncements(args.query);
+          return announcements.length
+            ? {
+                tool_call_id: toolCall.id,
+                success: true,
+                today: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen" }).format(new Date()),
+                announcements,
+                instruction: SEARCH_RESULT_INSTRUCTION,
+              }
+            : { tool_call_id: toolCall.id, success: false, message: "No announcements are indexed yet." };
+        } catch (error) {
+          console.warn("Announcement search failed:", error?.message || error);
+          return { tool_call_id: toolCall.id, success: false, message: "Could not search the announcements right now." };
+        }
+      }
+
       case "report_knowledge_gap": {
         try {
-          await recordKnowledgeGap({ topic: args.topic, category: args.category });
+          const gap = await recordKnowledgeGap({ topic: args.topic, category: args.category });
+          // Research and post a draft article for moderators, after this reply; never awaited.
+          if (gap.draft) draftGapArticle(message.client, gap.gapId);
         } catch (error) {
           console.warn("Knowledge gap write failed:", error?.message || error);
         }
@@ -1901,6 +1945,7 @@ You can help users with:
 - DCU E-serien results for DZR (placings, points, season table, club ranking) via dcu_eserien_results
 - Providing information about DZR teams and race series
 - Answering questions using the admin-maintained knowledge base
+- Club news, events, group rides, recons and campaigns from the announcements channel via search_announcements
 - Onboarding: where someone is in joining DZR and their next step (my_onboarding_status), membership fee and what it gives (club_overview)
 - Determining Zwift Racing League (ZRL) category from rider watts + official limits via zrl_category
 - Starting a Zwift route quiz (guess the route from the map shape) via start_quiz
@@ -1924,7 +1969,9 @@ You can help users with:
 11. **ZRL category questions** ("hvilken ZRL kategori/gruppe/division er jeg?", "kan jeg køre B?", etc.): ALWAYS call zrl_category. Do not answer from memory, and do not use only rider_stats or get_help_article for this. Use the tool's summary and numbers as-is — do not recalculate.
 
 12. **Onboarding, joining, membership, fees or roles** ("hvordan bliver jeg medlem", "what should I do next", "hvorfor har jeg ikke rollen"): call my_onboarding_status, and club_overview for fees or what membership gives. Give the one next step from the result with its link. Never state fees, steps or teams from memory
-13. If you cannot answer a question about DZR (club, membership, teams, races, Discord) because no tool or knowledge article covers it, say you do not know, suggest asking in the help channel, and call report_knowledge_gap with your own short summary of the topic. Not for small talk or general cycling questions that ask_helper can research
+13. If you cannot answer a question about DZR (club, membership, teams, races, Discord) because no tool, knowledge article or announcement covers it, say you do not know, suggest asking in the help channel, and call report_knowledge_gap with your own short summary of the topic. Not for small talk or general cycling questions that ask_helper can research
+14. **DZR news and events** ("hvad sker der", "er der recon på søndag", "hvornår er næste DZR event", a campaign or kit): call search_announcements. Also call it before rule 13 for any DZR question the knowledge base did not answer. Give the post's date, and never present an event dated before today as upcoming. When posts disagree, the most recently posted or edited one is correct, and say that it changed
+15. Someone who wants to link their Zwift ID but does not know it: ask for their name as it is on Zwift/ZwiftPower, then call my_zwiftid with searchterm. They pick themselves from the menu and confirm on the profile card. Do not send them looking for the ID first
 
 ## Knowledge base
 Available articles (use get_help_article with the key or a tag):

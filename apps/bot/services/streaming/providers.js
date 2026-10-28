@@ -81,7 +81,7 @@ function createProviders({ youtubeApiKey, twitchClientId, twitchClientSecret }, 
       return { streams: stream ? [{ platform: "twitch", id: stream.id, title: stream.title,
         startedAt: new Date(stream.started_at).toISOString(), url: channel.url }] : [], state: {} };
     }
-    const state = { candidateIds: session.candidateIds || [], nextSearchAt: session.nextSearchAt || 0,
+    const state = { candidateIds: session.candidateIds || [],
       upcomingSearched: session.upcomingSearched || false };
     const found = [];
     async function checkVideos(ids) {
@@ -96,9 +96,8 @@ function createProviders({ youtubeApiKey, twitchClientId, twitchClientSecret }, 
       }
     }
     await checkVideos(session.videoId ? [session.videoId] : state.candidateIds);
-    if (!session.videoId && !found.length && now() >= state.nextSearchAt) {
-      // Search only after an OBS signal: once/minute initially, then once/two minutes.
-      state.nextSearchAt = now() + (now() - session.startedAt < 300_000 ? 60_000 : 120_000);
+    if (!session.videoId && !found.length) {
+      // The durable worker owns backoff and the one-hour discovery window.
       if (await quota.reserveSearch()) {
         const result = await youtube("search", { part: "snippet", channelId: channel.id, type: "video", eventType: "live", maxResults: "10" });
         const ids = [...new Set([...state.candidateIds, ...(result.items || []).map((item) => item.id?.videoId).filter(Boolean)])];

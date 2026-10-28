@@ -60,6 +60,13 @@ test("a missing route points the helper to the web", () => {
   assert.match(routes.routeDetails("Brand New Route 2027").message, /web/);
 });
 
+test("live tools wait for the website catalog instead of guessing a miss", () => {
+  const { searchRoutes } = require("./zwiftRoutes");
+  const { clearZwiftCatalog } = require("./zwiftCatalog");
+  clearZwiftCatalog();
+  assert.match(searchRoutes({ query: "road" }).message, /unavailable/);
+});
+
 test("the shared tool runner dispatches every declared route tool", () => {
   const { zwiftRouteToolDefinitions, runZwiftRouteTool } = require("./zwiftRoutes");
   const args = { zwift_routes: {}, zwift_route_details: { route: "Road to Sky" }, zwift_segments: {} };

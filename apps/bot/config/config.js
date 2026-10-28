@@ -72,6 +72,7 @@ module.exports = {
   streaming: {
     publicUrl: process.env.STREAMING_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || "https://bot-tdnm.onrender.com",
     channelId: process.env.STREAMING_CHANNEL_ID || "1196454773558345768",
+    itChannelId: process.env.STREAMING_IT_CHANNEL_ID || null, // Otherwise resolve the guild's unique #it channel.
     youtubeApiKey: process.env.YOUTUBE_API_KEY,
     twitchClientId: process.env.TWITCH_CLIENT_ID,
     twitchClientSecret: process.env.TWITCH_CLIENT_SECRET,

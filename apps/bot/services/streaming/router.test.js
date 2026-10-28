@@ -1,12 +1,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const express = require("express");
-const { createStreamingRouter } = require("./router");
+const { createHttpApp } = require("../server");
 const { StreamingError } = require("./model");
 
 async function server(t, service) {
-  const app = express();
-  app.use("/streaming", createStreamingRouter(service));
+  const app = createHttpApp({ streaming: service });
   const listener = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => listener.once("listening", resolve));
   t.after(() => new Promise((resolve) => listener.close(resolve)));
@@ -41,4 +39,14 @@ test("revoked key responses are generic, and Lua download contains no personal c
   const script = await download.text();
   assert.match(script, /OBS_FRONTEND_EVENT_STREAMING_STARTED/);
   assert.ok(!script.includes("os.execute"));
+});
+
+test("Render proxy rate limit separates clients and ignores a spoofed leftmost forwarded address", async (t) => {
+  const url = await server(t, { async callback() { return { accepted: true }; } });
+  const post = (key, forwarded) => fetch(`${url}/obs`, { method: "POST", headers: {
+    Authorization: `Bearer key-${key}`, "Content-Type": "application/json", "X-Forwarded-For": forwarded,
+  }, body: "{}" });
+  for (let i = 0; i < 300; i++) assert.equal((await post(i, `192.0.2.${i % 250}, 198.51.100.1`)).status, 202);
+  assert.equal((await post("spoof", "203.0.113.77, 198.51.100.1")).status, 429);
+  assert.equal((await post("other", "198.51.100.2")).status, 202);
 });

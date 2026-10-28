@@ -17,6 +17,8 @@ const {
 } = require("./handlers/statsHandler");
 const { handleZwiftIdMessage, handleZwiftIdConfirmation } = require("./handlers/zwiftIdMessageHandler");
 const { handleAIChatMessage, flushAllCoachSessions } = require("./handlers/aiChatHandler");
+const { handleAnnouncementUpsert, handleAnnouncementDelete } = require("./services/announcementIndex");
+const { isGapDraftInteraction, handleGapDraftInteraction } = require("./services/gapDrafts");
 const { startCoachBot } = require("./services/coachBot");
 const { checkCoachKeyCanary, db } = require("./services/firebase");
 const { createStore: createStreamingStore } = require("./services/streaming/store");
@@ -25,6 +27,8 @@ const { createPublisher: createStreamingPublisher } = require("./services/stream
 const { createStreamingService } = require("./services/streaming/service");
 const { createStreamingHandlers, isStreamingInteraction } = require("./handlers/streamingHandlers");
 const shared = require("./constants.json");
+const { loadZwiftCatalog, startZwiftCatalogRefresh } = require("./services/zwiftCatalog");
+const { getClubRoleId } = require("./services/onboardingStatus");
 
 // Create Discord Bot Client
 const client = new Client({ 
@@ -45,12 +49,13 @@ const client = new Client({
 const streaming = createStreamingService({
   store: createStreamingStore(db, { searchBudget: config.streaming.searchBudget }),
   providers: createStreamingProviders(config.streaming),
-  publisher: createStreamingPublisher(client, config.discord.guildId),
+  publisher: createStreamingPublisher(client, config.discord.guildId, { itChannelId: config.streaming.itChannelId }),
   guildId: config.discord.guildId,
   channelId: config.streaming.channelId,
 });
 const streamingHandlers = createStreamingHandlers({ service: streaming, guildId: config.discord.guildId,
-  adminRoleId: shared.discord.roles.admin, publicUrl: config.streaming.publicUrl, channelId: config.streaming.channelId });
+  adminRoleId: shared.discord.roles.admin, publicUrl: config.streaming.publicUrl, channelId: config.streaming.channelId,
+  getClubRoleId: () => getClubRoleId(db) });
 setupKeepAliveServer({ streaming });
 
 // Register Slash Commands
@@ -146,7 +151,12 @@ client.on("interactionCreate", async (interaction) => {
     handleZwiftIdConfirmation(interaction);
     return;
   }
-  
+  // Knowledge gap drafts in the moderators channel
+  if (isGapDraftInteraction(interaction)) {
+    handleGapDraftInteraction(interaction).catch((error) => console.error("Gap draft interaction failed:", error));
+    return;
+  }
+
   handleInteractions(interaction);
   handleInteractionCreate(interaction); // Also track for stats
 });
@@ -166,8 +176,11 @@ client.on("guildMemberRemove", (member) => {
 client.on("messageCreate", async (message) => {
   handleMessageCreate(message);
   handleZwiftIdMessage(message); // Also check for Zwift ID linking
+  handleAnnouncementUpsert(message); // Keep the announcement search index current
   await handleAIChatMessage(message, client); // Also check for AI chat requests
 });
+client.on("messageUpdate", (_oldMessage, message) => handleAnnouncementUpsert(message));
+client.on("messageDelete", (message) => handleAnnouncementDelete(message));
 client.on("voiceStateUpdate", handleVoiceStateUpdate);
 
 // Bot ready event
@@ -244,6 +257,10 @@ async function verifyCoachKeyOrExit() {
     console.warn("Coach key canary could not be checked (Firestore unavailable):", result.message);
   }
 }
+
+loadZwiftCatalog()
+  .catch((err) => console.warn("Zwift catalog:", err?.message || err))
+  .finally(() => startZwiftCatalogRefresh());
 
 client.login(config.discord.token);
 

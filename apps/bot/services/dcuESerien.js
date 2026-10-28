@@ -6,15 +6,22 @@
  * distance, division groups, Zwift event ids and the segments that score points.
  */
 const axios = require("axios");
-const zwiftData = require("zwift-data");
+const { getZwiftCatalog, loadZwiftCatalog } = require("./zwiftCatalog");
 
 const RACES_URL = "https://us-central1-dcu-member-liga-479507.cloudfunctions.net/dcu_api/races";
 const SCHEDULE_PAGE = "https://www.dansk-ecykling.dk/schedule";
 const CACHE_TTL_MS = 30 * 60 * 1000;
 let cache = null;
 
-const routeById = new Map(zwiftData.routes.filter((r) => r.id).map((r) => [String(r.id), r]));
-const worldBySlug = new Map(zwiftData.worlds.map((w) => [w.slug, w.name]));
+function routeById(routeId) {
+  const id = String(routeId || "");
+  if (!id) return null;
+  return (getZwiftCatalog()?.routes || []).find((route) => String(route.id) === id) || null;
+}
+
+function namedWorld(slug) {
+  return (getZwiftCatalog()?.worlds || []).find((world) => world.slug === slug)?.name || null;
+}
 
 function fold(value) {
   return String(value || "")
@@ -28,9 +35,9 @@ function fold(value) {
 }
 
 function worldName(map, route) {
-  if (route) return worldBySlug.get(route.world) || route.world;
+  if (route) return namedWorld(route.world) || route.world;
   const slug = String(map || "").toLowerCase().replace(/_/g, "-");
-  return worldBySlug.get(slug) || (map ? String(map).charAt(0) + String(map).slice(1).toLowerCase() : null);
+  return namedWorld(slug) || (map ? String(map).charAt(0) + String(map).slice(1).toLowerCase() : null);
 }
 
 function pointSegments(list) {
@@ -38,7 +45,7 @@ function pointSegments(list) {
 }
 
 function compactRace(race) {
-  const route = routeById.get(String(race.routeId || ""));
+  const route = routeById(race.routeId);
   const groups = (race.raceGroups || []).map((group) => ({
     name: group.name || null,
     divisions: (group.categories || []).map((c) => c.category),
@@ -76,6 +83,7 @@ async function loadRaces({ http = axios, now = Date.now() } = {}) {
  * `date` is YYYY-MM-DD in Danish time, matching the calendar's own dates.
  */
 async function getDcuRaces({ query = "", date = "", include_past = false, limit = 5 } = {}, { http, now = Date.now() } = {}) {
+  await loadZwiftCatalog();
   let races;
   try {
     races = await loadRaces({ http, now });

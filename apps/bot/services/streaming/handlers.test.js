@@ -7,15 +7,16 @@ const guildId = "1195850595014299669", userId = "111111111111111111";
 function interaction(overrides = {}) {
   const calls = [];
   const item = { guildId, user: { id: userId, username: "Rider", bot: false }, memberPermissions: new PermissionsBitField(0n),
+    member: { roles: ["club-role"] },
     isButton: () => false, isModalSubmit: () => false, options: { getInteger: () => null },
     async deferReply(value) { calls.push(["defer", value]); item.deferred = true; },
     async reply(value) { calls.push(["reply", value]); }, async editReply(value) { calls.push(["edit", value]); },
     async showModal(value) { calls.push(["modal", value.toJSON()]); }, calls, ...overrides };
   return item;
 }
-function handler(service = {}) { return createStreamingHandlers({ service, guildId, adminRoleId: "admin-role", publicUrl: "https://bot.example.test", channelId: "1196454773558345768" }); }
+function handler(service = {}) { return createStreamingHandlers({ service, guildId, adminRoleId: "admin-role", publicUrl: "https://bot.example.test", channelId: "1196454773558345768", getClubRoleId: async () => "club-role" }); }
 
-test("any guild member can start private onboarding without admin permissions", async () => {
+test("Club Members can start private onboarding without admin permissions", async () => {
   const i = interaction({ commandName: "streaming_add" });
   await handler({ async getRegistration() { return null; } }).handle(i);
   assert.equal(i.calls[0][1].flags, MessageFlags.Ephemeral);
@@ -75,6 +76,25 @@ test("self-removal is confirmed and passes only the invoking user's ID", async (
   const h = handler({ async remove(id) { removed = id; return true; } });
   await h.handle(interaction({ commandName: "streaming_remove" }));
   assert.equal(removed, undefined);
-  await h.handle(interaction({ customId: `streaming:remove:${userId}`, isButton: () => true }));
+  await h.handle(interaction({ customId: `streaming:remove:${userId}`, isButton: () => true, member: { roles: [] } }));
   assert.equal(removed, userId);
+});
+
+test("Club Member role is required on command, button and modal, even for administrators", async () => {
+  const h = handler({ getRegistration() { assert.fail("must reject before accessing registration"); }, enroll() { assert.fail(); } });
+  for (const entry of [{ commandName: "streaming_add" }, { customId: `streaming:channels:${userId}`, isButton: () => true },
+    { customId: `streaming:save:${userId}`, isModalSubmit: () => true }]) {
+    const i = interaction({ ...entry, member: { roles: ["verified-role", "admin-role"] },
+      memberPermissions: new PermissionsBitField(PermissionsBitField.Flags.Administrator) });
+    await h.handle(i);
+    assert.equal(i.calls[0][1].flags, MessageFlags.Ephemeral);
+    assert.match(i.calls[0][1].content, /kun.*Club Members/);
+  }
+});
+
+test("missing Club Member role configuration fails closed", async () => {
+  const i = interaction({ commandName: "streaming_add" });
+  const h = createStreamingHandlers({ service: {}, guildId, publicUrl: "https://bot.example.test" });
+  await h.handle(i);
+  assert.match(i.calls[0][1].content, /Club Members/);
 });

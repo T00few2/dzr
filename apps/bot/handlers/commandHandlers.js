@@ -11,6 +11,7 @@ const config = require("../config/config");
 const { syncZpRolesForGuild } = require("../services/zpRoleSync");
 const { checkVerificationAfterZwiftLink } = require("./memberHandler");
 const { prepareZwiftIdConfirmation, sendConfirmation } = require("./zwiftIdMessageHandler");
+const { findRidersByName, buildRiderSearchReply } = require("../services/riderSearch");
 const { MessageFlags } = require("discord.js");
 const { postSignupBoard, repostSignupBoard } = require("../services/signupService");
 
@@ -32,34 +33,10 @@ async function handleMyZwiftId(interaction) {
   }
 
   if (searchTerm) {
-    if (searchTerm.length < 3) {
-      await ephemeralReplyWithPublish(interaction, "❌ Please provide at least 3 letters!");
-      return;
-    }
-
-    const matchingRiders = await searchRidersByName(searchTerm);
-    if (matchingRiders.length === 0) {
-      await ephemeralReplyWithPublish(interaction, `❌ No riders found starting with "${searchTerm}".`);
-      return;
-    }
-
-    const options = matchingRiders.slice(0, 25).map(r => ({
-      label: r.name.slice(0, 100),
-      description: `ZwiftID: ${r.riderId}`,
-      value: r.riderId.toString()
-    }));
-
-    const row = new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId("myzwift_select")
-        .setPlaceholder("Select your name…")
-        .addOptions(options)
-    );
-
-    await interaction.editReply({
-      content: `**Found ${matchingRiders.length} riders** matching "${searchTerm}". Select your name:`,
-      components: [row]
-    });
+    // DZR club riders first, then all of ZwiftPower; picking a rider opens the confirm card.
+    const term = searchTerm.trim();
+    const result = await findRidersByName(term, { discordId: discordID });
+    await interaction.editReply(buildRiderSearchReply(discordID, term, result));
     return;
   }
 

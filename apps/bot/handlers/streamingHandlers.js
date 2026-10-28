@@ -9,7 +9,7 @@ const button = (action, userId, label, style = ButtonStyle.Primary) => new Butto
   .setCustomId(`streaming:${action}:${userId}`).setLabel(label).setStyle(style);
 const row = (...buttons) => new ActionRowBuilder().addComponents(...buttons);
 
-function createStreamingHandlers({ service, guildId, adminRoleId, publicUrl, channelId }) {
+function createStreamingHandlers({ service, guildId, adminRoleId, publicUrl, channelId, getClubRoleId = async () => null }) {
   const baseUrl = publicUrl.replace(/\/$/, "");
 
   async function overview(interaction) {
@@ -42,6 +42,12 @@ function createStreamingHandlers({ service, guildId, adminRoleId, publicUrl, cha
       const userId = interaction.user.id;
       const [, action, owner] = String(interaction.customId || "").split(":");
       if (interaction.customId && owner !== userId) throw new StreamingError("not_owner", "Start dit eget flow med /streaming_add.", 403);
+
+      if (interaction.commandName === "streaming_add" || ["channels", "save"].includes(action)) {
+        const clubRoleId = await getClubRoleId();
+        const eligible = clubRoleId && (interaction.member?.roles?.cache?.has(clubRoleId) || interaction.member?.roles?.includes?.(clubRoleId));
+        if (!eligible) throw new StreamingError("club_member_required", "Streaming er kun tilgængelig for Club Members.", 403);
+      }
 
       if (interaction.isButton() && action === "channels") {
         const registration = await service.getRegistration(userId);

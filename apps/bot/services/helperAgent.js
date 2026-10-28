@@ -17,11 +17,13 @@ const { COACH_MODEL, createStatelessResponse, functionCallOutputs } = require(".
 const { extractTokenUsage } = require("./coachUsage");
 const zwiftPower = require("./zwiftPowerReader");
 const zwiftRoutes = require("./zwiftRoutes");
+const { loadZwiftCatalog } = require("./zwiftCatalog");
 const { getZwiftEvent } = require("./zwiftEvents");
 const { readWebPage } = require("./webPage");
 const { getDcuRaces, dcuRacesToolDefinition } = require("./dcuESerien");
 const { getDcuResults, dcuResultsToolDefinition } = require("./dcuClubResults");
 const { zwiftRouteToolDefinitions, ZWIFT_ROUTE_TOOLS, runZwiftRouteTool } = zwiftRoutes;
+const { searchAnnouncements, searchAnnouncementsToolDefinition, SEARCH_RESULT_INSTRUCTION } = require("./announcementIndex");
 
 const HELPER_MODEL = process.env.HELPER_MODEL || COACH_MODEL;
 const HELPER_REASONING_EFFORT = process.env.HELPER_REASONING_EFFORT || "medium";
@@ -42,7 +44,8 @@ Another bot (the club bot or DZR Coach) asks you a question it could not answer 
 ## What you can do
 - Search the web for general facts: Zwift updates, routes, events, rules, equipment, training science.
 - Read the club's own knowledge base (search_club_knowledge). Prefer it for anything about DZR itself.
-- Look up Zwift routes, segments and worlds offline (zwift_routes, zwift_route_details, zwift_segments): distance, elevation, lead-in, climbs and sprints along a route, event-only status. Use these before the web for route questions. The data is a snapshot, so a very new route can be missing; then use the web.
+- Search the DZR announcements channel (search_announcements): club news, events, group rides, recons, campaigns and changes, each with its post date. Use it next for anything about DZR; a post dated before today describes the past.
+- Look up Zwift routes, segments and worlds (zwift_routes, zwift_route_details, zwift_segments): distance, elevation, lead-in, climbs and sprints along a route, event-only status. Use these before the web for route questions. The catalog comes from the DZR website and is a snapshot, so a very new route can be missing; then use the web. If the catalog is unavailable, say so instead of guessing.
 - DCU E-serien's race calendar (dcu_eserien_races): every race's date, route, world, laps, distance and point segments. Use it first for any DCU E-serien race; its calendar page cannot be read any other way.
 - DCU E-serien results (dcu_eserien_results): how a race went for DZR, who placed, points, the season table and the club ranking. Only DZR riders, with their place in the full field. Use this instead of ZwiftPower for DCU E-serien results.
 - Open a web page a search found (read_web_page) to read it properly, for example a race calendar. It lists any Zwift event links on the page.
@@ -66,6 +69,7 @@ const helperToolDefinitions = [
   ...zwiftRouteToolDefinitions,
   dcuRacesToolDefinition,
   dcuResultsToolDefinition,
+  searchAnnouncementsToolDefinition,
   {
     type: "function",
     function: {
@@ -160,6 +164,7 @@ function defaultDeps() {
     readWebPage,
     getDcuRaces,
     getDcuResults,
+    searchAnnouncements: (query) => searchAnnouncements(query),
   };
 }
 
@@ -243,7 +248,10 @@ async function executeHelperTool(call, run, deps) {
     return { success: false, message: "Invalid arguments." };
   }
 
-  if (ZWIFT_ROUTE_TOOLS.has(call.name)) return runZwiftRouteTool(call.name, args, deps.zwiftRoutes);
+  if (ZWIFT_ROUTE_TOOLS.has(call.name)) {
+    await loadZwiftCatalog();
+    return runZwiftRouteTool(call.name, args, deps.zwiftRoutes);
+  }
 
   switch (call.name) {
     case "read_web_page":
@@ -257,6 +265,13 @@ async function executeHelperTool(call, run, deps) {
 
     case "dcu_eserien_results":
       return deps.getDcuResults(args);
+
+    case "search_announcements": {
+      const announcements = await deps.searchAnnouncements(args.query);
+      return announcements.length
+        ? { success: true, today: new Date().toISOString().slice(0, 10), announcements, note: SEARCH_RESULT_INSTRUCTION }
+        : { success: false, message: "No announcement matched." };
+    }
 
     case "search_club_knowledge": {
       const matches = knowledgeMatches(await deps.getAllBotKnowledge(), args.query);

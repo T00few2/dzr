@@ -3,10 +3,17 @@ const axios = require("axios");
 const config = require("../config/config");
 const { createStreamingRouter } = require("./streaming/router");
 
-function setupKeepAliveServer({ streaming } = {}) {
+function createHttpApp({ streaming } = {}) {
   const app = express();
+  // Render terminates HTTPS and forwards through one trusted proxy hop.
+  app.set("trust proxy", 1);
   app.get("/", (req, res) => res.send("Bot is running!"));
   if (streaming) app.use("/streaming", createStreamingRouter(streaming));
+  return app;
+}
+
+function setupKeepAliveServer(options = {}) {
+  const app = createHttpApp(options);
   app.listen(config.server.port, "0.0.0.0", () =>
     console.log(`Bot HTTP server running on port ${config.server.port}`)
   );
@@ -23,5 +30,6 @@ function setupKeepAliveServer({ streaming } = {}) {
 }
 
 module.exports = {
+  createHttpApp,
   setupKeepAliveServer,
 };

@@ -1,5 +1,5 @@
 const crypto = require("node:crypto");
-const { HEARTBEAT_TTL_MS, CHECK_INTERVAL_MS, StreamingError, registrationKey, sessionKey, announcementKey } = require("./model");
+const { HEARTBEAT_TTL_MS, DISCOVERY_WINDOW_MS, checkDelay, discoveryExpired, hash, StreamingError, registrationKey, sessionKey, announcementKey } = require("./model");
 
 const COLLECTION = "streaming_bot";
 const LEASE_MS = 120_000;
@@ -12,7 +12,10 @@ function createStore(db, { now = Date.now, searchBudget = 90 } = {}) {
   const channelRef = (guildId, platform, channel) => ref(`channel_${guildId}_${platform}_${channel.id}`);
   const values = async (kind) => (await col.where("kind", "==", kind).get()).docs.map(read);
   const validSession = (session, registration) => registration && session?.active
-    && session.registrationId === registration.registrationId && session.lastSeenAt > now() - HEARTBEAT_TTL_MS;
+    && session.registrationId === registration.registrationId && session.lastSeenAt > now() - HEARTBEAT_TTL_MS
+    && !discoveryExpired(session, now());
+  const expire = (tx, session) => tx.update(ref(session.id), { active: false, detectionExpired: true,
+    leaseUntil: 0, lastError: "live_detection_timeout" });
 
   async function getRegistration(guildId, discordId) { return read(await memberRef(guildId, discordId).get()); }
 
@@ -67,7 +70,7 @@ function createStore(db, { now = Date.now, searchBudget = 90 } = {}) {
       const sameSession = previous?.sessionId === event.sessionId;
       if (previous && (sameSession ? event.sequence <= previous.sequence : event.startedAt <= previous.startedAt)) return { accepted: true, duplicate: true };
       // A late heartbeat must never reactivate a stopped session.
-      if (sameSession && previous.event === "stopped") return { accepted: true, duplicate: true };
+      if (sameSession && (previous.event === "stopped" || previous.detectionExpired)) return { accepted: true, duplicate: true };
       const session = { ...(sameSession ? previous : {}), ...event, id: target.id, kind: "session", memberId: current.id,
         guildId: current.guildId, discordId: current.discordId, registrationId: current.registrationId,
         active: event.event !== "stopped", lastSeenAt: now(), nextCheckAt: sameSession ? previous.nextCheckAt : now() };
@@ -82,7 +85,12 @@ function createStore(db, { now = Date.now, searchBudget = 90 } = {}) {
       const session = read(await tx.get(ref(id)));
       if (!session?.active || session.nextCheckAt > now() || session.leaseUntil > now()) return null;
       const registration = read(await tx.get(ref(session.memberId)));
+      if (registration?.registrationId === session.registrationId && discoveryExpired(session, now())) {
+        expire(tx, session);
+        return { session, registration, expired: true };
+      }
       if (!validSession(session, registration)) { tx.update(ref(id), { active: false }); return null; }
+      if (session.discoveredAt) return null; // One discovery per OBS session; delivery rechecks delayed notices separately.
       const leaseId = crypto.randomUUID();
       tx.update(ref(id), { leaseId, leaseUntil: now() + LEASE_MS });
       return { session: { ...session, leaseId }, registration };
@@ -93,6 +101,11 @@ function createStore(db, { now = Date.now, searchBudget = 90 } = {}) {
     return db.runTransaction(async (tx) => {
       const current = read(await tx.get(ref(session.id)));
       const registration = read(await tx.get(ref(session.memberId)));
+      if (current?.leaseId === session.leaseId && current.sessionId === session.sessionId
+          && registration?.registrationId === session.registrationId && discoveryExpired(current, now())) {
+        expire(tx, current);
+        return { expired: true };
+      }
       if (!validSession(current, registration) || current.leaseId !== session.leaseId || current.sessionId !== session.sessionId) return;
       const notices = await Promise.all(streams.map(async (stream) => {
         const id = `notice_${announcementKey(channelId, stream)}`;
@@ -113,7 +126,8 @@ function createStore(db, { now = Date.now, searchBudget = 90 } = {}) {
           lastStreams: { ...registration.lastStreams, [session.platform]: latest } });
       }
       tx.update(ref(session.id), { ...state, leaseUntil: 0, lastCheckAt: now(), lastError: error,
-        nextCheckAt: now() + (streams.length ? 180_000 : error ? 60_000 : CHECK_INTERVAL_MS) });
+        discoveredAt: streams.length ? now() : null, checkAttempts: (current.checkAttempts || 0) + 1,
+        nextCheckAt: Math.min(now() + checkDelay(current.checkAttempts || 0), current.startedAt + DISCOVERY_WINDOW_MS) });
     });
   }
 
@@ -165,7 +179,37 @@ function createStore(db, { now = Date.now, searchBudget = 90 } = {}) {
     });
   }
 
+  async function queueAlert(registration, code, sessionId = "callback") {
+    const id = `alert_${hash(`${registration.registrationId}:${sessionId}:${code}`)}`;
+    return db.runTransaction(async (tx) => {
+      const target = ref(id);
+      if ((await tx.get(target)).exists) return;
+      tx.set(target, { id, kind: "alert", guildId: registration.guildId, discordId: registration.discordId,
+        code, createdAt: now(), alertPending: true });
+    });
+  }
+
+  async function claimAlert(id) {
+    return db.runTransaction(async (tx) => {
+      const alert = read(await tx.get(ref(id)));
+      if (!alert?.alertPending || alert.nextAttemptAt > now() || alert.leaseUntil > now()) return null;
+      const leaseId = crypto.randomUUID();
+      tx.update(ref(id), { leaseId, leaseUntil: now() + LEASE_MS });
+      return { ...alert, leaseId };
+    });
+  }
+
+  async function finishAlert(alert, sent) {
+    return db.runTransaction(async (tx) => {
+      const current = read(await tx.get(ref(alert.id)));
+      if (current?.leaseId !== alert.leaseId) return;
+      tx.update(ref(alert.id), { alertPending: !sent, leaseUntil: 0, nextAttemptAt: now() + 60_000 });
+    });
+  }
+
   return { getRegistration, register, remove, acceptEvent, claimSession, finishCheck, claimNotice, beginSend, finishNotice, reserveSearch,
+    queueAlert, claimAlert, finishAlert,
+    listAlerts: async () => (await col.where("alertPending", "==", true).get()).docs.map(read),
     listRegistrations: async (guildId) => (await values("member")).filter((item) => item.guildId === guildId),
     listSessions: async () => (await col.where("active", "==", true).get()).docs.map(read),
     listNotices: async () => (await col.where("status", "==", "pending").get()).docs.map(read),
