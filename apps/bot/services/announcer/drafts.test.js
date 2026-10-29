@@ -164,6 +164,7 @@ function sources(overrides = {}) {
     commitLog: async () => ({ head: "h2", commits: [{ subject: "Internal refactor", body: "" }] }),
     silentDmCount: async () => 0,
     listKnowledge: async () => [],
+    featureCatalog: async () => require("./featureCatalog").buildFeatureCatalog({ commands: [{ name: "quiz", description: "Zwift route quiz" }] }),
     random: () => 0,
     ...overrides,
   };

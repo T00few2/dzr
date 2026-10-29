@@ -6,16 +6,27 @@
  *   bot_state/announcer  { lastRunDate, paused, published: [{ at, key, kind, channelId }],
  *                          perSignal: { [key]: at }, lastKind, lastPublishedAt,
  *                          github: { lastSha }, promotedEvents: { [name]: at }, shippedFeatures }
+ *   bot_state/announcer_features  { features, updatedAt }: the detected spotlight catalog, for
+ *                          /admin/announcer (the site cannot read the bot's code)
  */
 const { loadSettings } = require("./settings");
 const { localParts } = require("./pacing");
 const { gatherCandidates, pickCandidate } = require("./signals");
 const drafts = require("./drafts");
-const { defaultSources } = require("./sources");
+const { defaultSources, readFeatureCatalog } = require("./sources");
 const dmReminders = require("./dmReminders");
 
 const QUEUE_CHECK_MS = 15 * 60 * 1000;
+const CATALOG_PUBLISH_MS = 6 * 60 * 60 * 1000;
 let lastQueueCheck = 0;
+let lastCatalogPublish = 0;
+
+/** Write the detected feature catalog where the admin page reads it. */
+async function publishFeatureCatalog(db) {
+  const features = await readFeatureCatalog(db);
+  await db.collection("bot_state").doc("announcer_features").set({ features, updatedAt: new Date() });
+  return features.length;
+}
 let running = false;
 
 async function readState(db) {
@@ -97,6 +108,11 @@ async function maybeRunAnnouncer(client) {
       if (published?.ok) console.log(`📣 Announcer: posted a queued draft (${published.url})`);
     }
 
+    if (now.getTime() - lastCatalogPublish >= CATALOG_PUBLISH_MS) {
+      lastCatalogPublish = now.getTime();
+      await publishFeatureCatalog(deps.db).catch((error) => console.warn("Announcer feature catalog:", error?.message || error));
+    }
+
     await dmReminders.processDue(client);
   } catch (error) {
     console.error("❌ Announcer tick failed:", error?.message || error);
@@ -109,4 +125,4 @@ async function setPaused(paused, deps = drafts.defaultDeps()) {
   await drafts.stateRef(deps.db).set({ paused: !!paused }, { merge: true });
 }
 
-module.exports = { maybeRunAnnouncer, runDaily, setPaused, readState };
+module.exports = { maybeRunAnnouncer, runDaily, setPaused, readState, publishFeatureCatalog };

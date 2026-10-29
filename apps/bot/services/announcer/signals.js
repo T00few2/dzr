@@ -8,18 +8,15 @@
  * time-bound, 2 a need among members, 3 a feature spotlight, 4 evergreen filler.
  */
 const shared = require("../../constants.json");
-const { resolveFeatures } = require("../announcerFeatures");
 const { isCoolingDown, toMs, DAY_MS } = require("./pacing");
 
 const CHANNELS = shared.discord.channels;
 const SITE = String(shared.siteOrigin || "").replace(/\/+$/, "");
 
-const LINKS = { siteOrigin: SITE, zwiftIdChannelId: CHANNELS.zwiftId };
-
-/** The spotlight catalog with the admins' changes from /admin/announcer. */
-function featuresFor(settings) {
-  return resolveFeatures(settings?.features, LINKS);
-}
+const COMPANION = {
+  pitch: "Meld dig ind i DZR-klubben i Zwift Companion-appen, så ser du klubbens events i Zwift og tæller med i klubbens medlemstal.",
+  howTo: "Åbn Zwift Companion → Klubber → søg \"Danish Zwift Racers\" → Tilmeld.",
+};
 
 const KIND_LABELS = {
   upcomingClubEvents: "Kommende klub-events",
@@ -108,7 +105,6 @@ function notInCompanionClubSignal({ counts, settings }) {
   const cfg = settings.signals.notInCompanionClub;
   const missing = counts?.notInCompanionCount;
   if (missing == null || missing < cfg.minCount) return [];
-  const companion = featuresFor(settings).find((feature) => feature.key === "companion_club");
   return [{
     key: "notInCompanionClub",
     kind: "notInCompanionClub",
@@ -120,8 +116,8 @@ function notInCompanionClubSignal({ counts, settings }) {
     facts: {
       notInClubCount: missing,
       linkedCount: counts.linkedCount,
-      pitch: companion.pitch,
-      howTo: companion.howTo,
+      pitch: COMPANION.pitch,
+      howTo: COMPANION.howTo,
     },
   }];
 }
@@ -146,30 +142,43 @@ function dmUnseenSignal({ silentCount, settings }) {
   }];
 }
 
-/** The one spotlight that has gone longest without being featured, among those off cooldown. */
-function featureSpotlightSignal({ state, settings, now }) {
+/**
+ * One feature to spotlight, from the catalog the bot reads off its own commands and tools (see
+ * featureCatalog.js). Newly shipped features from the commit log go first, once, a month after
+ * their news; then the feature spotlighted longest ago, and among equals the one members use least.
+ */
+function featureSpotlightSignal({ catalog, state, settings, now }) {
   const cfg = settings.signals.featureSpotlight;
   const perSignal = state?.perSignal || {};
+  const excluded = new Set(settings.spotlightExcluded || []);
   const shipped = (state?.shippedFeatures || [])
     .filter((feature) => !feature.spotlightedAt && !feature.dismissed && !isCoolingDown(feature.at, cfg.shippedAfterDays, now))
-    .map((feature) => ({ key: `shipped:${feature.slug}`, title: feature.title, pitch: feature.pitch, howTo: feature.howTo || "", shipped: true }));
-  const options = [...shipped, ...featuresFor(settings).filter((feature) => feature.enabled !== false)]
-    .map((feature) => ({ feature, key: `featureSpotlight:${feature.key}`, lastMs: toMs(perSignal[`featureSpotlight:${feature.key}`]) || 0 }))
-    .filter((row) => !isCoolingDown(perSignal[row.key], cfg.cooldownDays, now));
-  if (!options.length) return [];
-  // Stable sort: never-featured shipped features first, then the catalog order.
-  options.sort((a, b) => a.lastMs - b.lastMs);
-  const { feature, key } = options[0];
+    .map((feature) => ({
+      key: `featureSpotlight:shipped:${feature.slug}`,
+      shippedSlug: feature.slug,
+      facts: { name: feature.title, description: feature.pitch, howToUse: feature.howTo || "" },
+    }));
+  const fromCatalog = (catalog || [])
+    .filter((feature) => !feature.internal && !excluded.has(feature.key))
+    .map((feature) => ({
+      key: `featureSpotlight:${feature.key}`,
+      usage: feature.usedLast30Days,
+      facts: { name: feature.name, description: feature.description, howToUse: feature.howToUse, usedLast30Days: feature.usedLast30Days },
+    }))
+    .sort((a, b) => (toMs(perSignal[a.key]) || 0) - (toMs(perSignal[b.key]) || 0) || (a.usage ?? 0) - (b.usage ?? 0));
+  const pick = [...shipped, ...fromCatalog].find((option) => !isCoolingDown(perSignal[option.key], cfg.cooldownDays, now));
+  if (!pick) return [];
+  const used = pick.usage != null ? ` (brugt ${pick.usage} gange i DMs de sidste 30 dage)` : "";
   return [{
-    key,
+    key: pick.key,
     kind: "featureSpotlight",
     priority: 3,
     score: 0,
     channelId: settings.channels.default,
     cooldownDays: cfg.cooldownDays,
-    reason: `Funktion i fokus: ${feature.title}`,
-    facts: { title: feature.title, pitch: feature.pitch, howTo: feature.howTo, links: feature.links || [] },
-    meta: feature.shipped ? { shippedSlug: feature.key.slice("shipped:".length) } : {},
+    reason: `Funktion i fokus: ${pick.facts.name}${used}`,
+    facts: pick.facts,
+    meta: pick.shippedSlug ? { shippedSlug: pick.shippedSlug } : {},
   }];
 }
 
@@ -256,7 +265,7 @@ async function gatherCandidates({ deps, settings, state, now }) {
     safely("unlinkedZwiftId", async () => unlinkedZwiftIdSignal({ counts, settings })),
     safely("notInCompanionClub", async () => notInCompanionClubSignal({ counts, settings })),
     safely("dmUnseen", async () => dmUnseenSignal({ silentCount: await deps.silentDmCount(now, settings.signals.dmUnseen.silentDays), settings })),
-    safely("featureSpotlight", async () => featureSpotlightSignal({ state, settings, now })),
+    safely("featureSpotlight", async () => featureSpotlightSignal({ catalog: await deps.featureCatalog(), state, settings, now })),
     safely("evergreen", async () => evergreenSignal({ articles: await deps.listKnowledge(), state, settings, now, random: deps.random })),
   ]);
   return groups.flat();
@@ -274,5 +283,4 @@ module.exports = {
   pickCandidate,
   computeMemberCounts,
   gatherCandidates,
-  featuresFor,
 };

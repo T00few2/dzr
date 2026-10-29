@@ -7,6 +7,7 @@ const { computeMemberCounts } = require("./signals");
 const { fetchCommitLog } = require("./github");
 const { isSilent } = require("./dmStats");
 const { DAY_MS } = require("./pacing");
+const { buildFeatureCatalog, countToolUsage } = require("./featureCatalog");
 
 // Same feed as packages/shared/zwiftEvents.js; the bot deploys on its own and cannot import it.
 const DZR_UPCOMING_EVENTS_URL = "https://us-or-rly101.zwift.com/api/public/events/upcoming?limit=200&tags=dzr";
@@ -60,8 +61,19 @@ function defaultSources(client, settings) {
       return snap.docs.filter((doc) => isSilent(doc.data(), now, silentDays)).length;
     },
     listKnowledge: () => firebase.getAllBotKnowledge(),
+    featureCatalog: () => readFeatureCatalog(db),
     random: Math.random,
   };
 }
 
-module.exports = { defaultSources, listCompanionIds, getGuild };
+/** The spotlight catalog from the bot's own commands and tools, with last-30-day DM tool usage. */
+async function readFeatureCatalog(db, now = new Date()) {
+  // Required here: the chat handler and commands load late in the bot's startup.
+  const { toolDefinitions } = require("../../handlers/aiChatHandler");
+  const commands = require("../../commands/slashCommands");
+  const since = new Date(now.getTime() - 30 * DAY_MS);
+  const snap = await db.collection(shared.firestore.assistantDmEvents).where("at", ">=", since).get();
+  return buildFeatureCatalog({ tools: toolDefinitions, commands, usage: countToolUsage(snap.docs.map((doc) => doc.data())) });
+}
+
+module.exports = { defaultSources, listCompanionIds, getGuild, readFeatureCatalog };

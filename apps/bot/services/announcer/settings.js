@@ -1,8 +1,8 @@
 /**
  * Announcer settings: the defaults in ../announcerSettings.js (shared with the admin site),
  * overridden field by field by system_settings/announcer, which admins edit on /admin/announcer.
- * The same document holds the feature spotlight changes (features.<key>) and the DM reminder
- * texts (dmReminders.texts.<step>).
+ * The same document holds the features admins keep out of the spotlight (spotlightExcluded) and
+ * the DM reminder texts (dmReminders.texts.<step>).
  */
 const shared = require("../../constants.json");
 const { announcerDefaults, mergeSettings } = require("../announcerSettings");
