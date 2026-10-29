@@ -3009,5 +3009,6 @@ module.exports = {
   handleCoachChatMessage,
   flushAllCoachSessions,
   clearConversation, // Export for testing/admin commands
-  AI_CONFIG // Export for external configuration if needed
+  AI_CONFIG, // Export for external configuration if needed
+  toolDefinitions, // The announcer spotlights member-facing tools from these
 };

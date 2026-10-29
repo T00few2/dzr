@@ -12,7 +12,6 @@ const {
   pickCandidate,
   computeMemberCounts,
   gatherCandidates,
-  featuresFor,
 } = require("./signals");
 const { compactCommits, areasOf, fetchCommitLog } = require("./github");
 const { isSilent, funnel } = require("./dmStats");
@@ -78,22 +77,51 @@ test("feature news carries the head sha so the log advances", () => {
   assert.deepEqual(candidate.facts.commits, [{ subject: "Draw powerups", details: "" }]);
 });
 
-const FEATURES = featuresFor(DEFAULTS);
+const { buildFeatureCatalog, countToolUsage } = require("./featureCatalog");
 
-test("spotlight rotates to the longest-unfeatured feature, and shipped features get one turn after a month", () => {
-  const perSignal = Object.fromEntries(FEATURES.map((feature, i) => [`featureSpotlight:${feature.key}`, ago(40 + i)]));
-  const oldest = FEATURES[FEATURES.length - 1].key;
-  assert.equal(featureSpotlightSignal({ state: { perSignal }, settings: DEFAULTS, now: NOW })[0].key, `featureSpotlight:${oldest}`);
+const tool = (name, description = `${name} does a thing`) => ({ type: "function", function: { name, description } });
+const command = (name, description = `${name} command`, adminOnly = false) => ({ name, description, ...(adminOnly ? { default_member_permissions: "8" } : {}) });
+const CATALOG = buildFeatureCatalog({
+  tools: [tool("rider_stats"), tool("route_profile_image"), tool("zrl_category"), tool("start_quiz"), tool("report_knowledge_gap")],
+  commands: [command("rider_stats"), command("quiz"), command("coach"), command("announcer_run", "admin", true)],
+  usage: { rider_stats: 40, route_profile_image: 2, zrl_category: 9, start_quiz: 1 },
+});
 
-  perSignal[`featureSpotlight:${oldest}`] = ago(2);
-  assert.notEqual(featureSpotlightSignal({ state: { perSignal }, settings: DEFAULTS, now: NOW })[0].key, `featureSpotlight:${oldest}`);
+test("the catalog comes from member commands and tools; admin commands and plumbing are left out", () => {
+  const keys = CATALOG.map((feature) => feature.key);
+  assert.deepEqual(keys, ["coach", "quiz", "report_knowledge_gap", "rider_stats", "route_profile_image", "zrl_category"]);
+  const stats = CATALOG.find((feature) => feature.key === "rider_stats");
+  assert.equal(stats.name, "/rider_stats");
+  assert.match(stats.howToUse, /\/rider_stats/);
+  assert.match(stats.howToUse, /DM/);
+  assert.equal(stats.usedLast30Days, 40);
+  assert.equal(CATALOG.find((feature) => feature.key === "quiz").tool, "start_quiz");
+  assert.equal(CATALOG.find((feature) => feature.key === "coach").usedLast30Days, null);
+  assert.equal(CATALOG.find((feature) => feature.key === "report_knowledge_gap").internal, true);
+  assert.deepEqual(countToolUsage([{ toolsUsed: ["a", "b"] }, { toolsUsed: ["a"] }, { toolsUsed: ["a"], test: true }]), { a: 2, b: 1 });
+});
 
+test("spotlight: never-featured first, least used among equals; switched-off and internal features are skipped", () => {
+  const pick = (state, settings = DEFAULTS) => featureSpotlightSignal({ catalog: CATALOG, state, settings, now: NOW })[0]?.key;
+  // coach has no usage count and was never featured; it ties at 0 with... coach first by usage ?? 0.
+  assert.equal(pick({ perSignal: {} }), "featureSpotlight:coach");
+  const perSignal = { "featureSpotlight:coach": ago(40) };
+  assert.equal(pick({ perSignal }), "featureSpotlight:quiz");
+  assert.equal(pick({ perSignal }, { ...DEFAULTS, spotlightExcluded: ["quiz"] }), "featureSpotlight:route_profile_image");
+  const all = Object.fromEntries(CATALOG.map((feature, i) => [`featureSpotlight:${feature.key}`, ago(10 + i)]));
+  assert.equal(pick({ perSignal: all }), undefined);
+  const keys = CATALOG.map((feature) => pick({ perSignal: { ...Object.fromEntries(CATALOG.map((f) => [`featureSpotlight:${f.key}`, ago(5)])), [`featureSpotlight:${feature.key}`]: ago(60) } }));
+  assert.ok(!keys.includes("featureSpotlight:report_knowledge_gap"));
+});
+
+test("shipped features from the commit log get one spotlight a month after their news, unless skipped", () => {
   const shippedFeatures = [
     { slug: "fresh", title: "Fresh", pitch: "p", at: ago(5) },
     { slug: "ripe", title: "Ripe", pitch: "p", at: ago(35) },
     { slug: "done", title: "Done", pitch: "p", at: ago(60), spotlightedAt: ago(20) },
+    { slug: "skip", title: "Skip", pitch: "p", at: ago(40), dismissed: true },
   ];
-  const [shipped] = featureSpotlightSignal({ state: { perSignal, shippedFeatures }, settings: DEFAULTS, now: NOW });
+  const [shipped] = featureSpotlightSignal({ catalog: CATALOG, state: { perSignal: {}, shippedFeatures }, settings: DEFAULTS, now: NOW });
   assert.equal(shipped.key, "featureSpotlight:shipped:ripe");
   assert.equal(shipped.meta.shippedSlug, "ripe");
 });
@@ -128,6 +156,7 @@ test("gatherCandidates keeps going when one source fails, and honours disabled s
         commitLog: async () => ({ head: "h", commits: [] }),
         silentDmCount: async () => 0,
         listKnowledge: async () => [{ id: "a", content: "x" }],
+        featureCatalog: async () => CATALOG,
       },
       settings,
       state: {},
@@ -186,37 +215,6 @@ test("funnel counts per step", () => {
   ], NOW, 3);
   assert.deepEqual(rows.link_zwift_id_channel, { sent: 2, failed: 1, engaged: 0, converted: 1, silent: 1 });
   assert.deepEqual(rows.join_companion, { sent: 2, failed: 0, engaged: 1, converted: 0, silent: 0 });
-});
-
-test("admins can switch a feature off, change it, add one and skip a shipped one", () => {
-  const settings = {
-    ...DEFAULTS,
-    features: {
-      coach: { enabled: false },
-      quiz: { title: "Quiz-tid" },
-      ladder: { title: "Ladder", pitch: "Holdkampe", howTo: "Spørg en holdkaptajn", links: [], enabled: true },
-    },
-  };
-  const features = featuresFor(settings);
-  assert.equal(features.find((feature) => feature.key === "coach").enabled, false);
-  assert.equal(features.find((feature) => feature.key === "quiz").title, "Quiz-tid");
-  assert.equal(features.find((feature) => feature.key === "quiz").pitch, FEATURES.find((feature) => feature.key === "quiz").pitch);
-  assert.equal(features.at(-1).key, "ladder");
-
-  const keys = [];
-  const perSignal = {};
-  for (let i = 0; i < features.length; i++) {
-    const [candidate] = featureSpotlightSignal({ state: { perSignal }, settings, now: NOW });
-    if (!candidate) break;
-    keys.push(candidate.key);
-    perSignal[candidate.key] = NOW;
-  }
-  assert.ok(!keys.includes("featureSpotlight:coach"));
-  assert.ok(keys.includes("featureSpotlight:ladder"));
-
-  const shippedFeatures = [{ slug: "skip", title: "Skip", pitch: "p", at: ago(40), dismissed: true }];
-  const [next] = featureSpotlightSignal({ state: { perSignal: {}, shippedFeatures }, settings: DEFAULTS, now: NOW });
-  assert.notEqual(next.key, "featureSpotlight:shipped:skip");
 });
 
 test("settings from the admin page are checked and clamped", () => {

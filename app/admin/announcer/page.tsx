@@ -16,7 +16,6 @@ import {
   SimpleGrid,
   Switch,
   Text,
-  Textarea,
   useToast,
   VStack,
 } from '@chakra-ui/react'
@@ -31,10 +30,8 @@ type SettingsData = {
   openDrafts: Array<{ id: string; kind: string; status: string; createdAt: string | null }>
   channels: Array<{ id: string; name: string }>
 }
-type Feature = { key: string; title: string; pitch: string; howTo: string; links: string[]; enabled: boolean; isDefault: boolean; isChanged: boolean }
-type Shipped = { slug: string; title: string; pitch: string; howTo: string; at: string | null; spotlightedAt: string | null; dismissed: boolean }
-
-const EMPTY_FEATURE = { title: '', pitch: '', howTo: '', links: '' }
+type Feature = { key: string; name: string; description: string; usedLast30Days: number | null; excluded: boolean; lastSpotlightedAt: string | null }
+type Shipped = { slug: string; title: string; pitch: string; at: string | null; spotlightedAt: string | null; dismissed: boolean }
 
 function fmtTime(iso: string | null) {
   return iso ? new Date(iso).toLocaleString() : '—'
@@ -47,36 +44,13 @@ async function send(url: string, method: string, body?: unknown) {
   return json
 }
 
-function FeatureEditor({ initial, onSave, onCancel, saving, withLinks = true }: {
-  initial: { title: string; pitch: string; howTo: string; links: string }
-  withLinks?: boolean
-  onSave: (value: { title: string; pitch: string; howTo: string; links: string }) => void
-  onCancel: () => void
-  saving: boolean
-}) {
-  const [value, setValue] = useState(initial)
-  const set = (field: keyof typeof value) => (e: { target: { value: string } }) => setValue((prev) => ({ ...prev, [field]: e.target.value }))
-  return (
-    <VStack align="stretch" spacing={2} mt={2}>
-      <Input placeholder="Title" value={value.title} onChange={set('title')} bg="gray.900" />
-      <Textarea placeholder="What it is (pitch)" value={value.pitch} onChange={set('pitch')} bg="gray.900" />
-      <Textarea placeholder="How to use it" value={value.howTo} onChange={set('howTo')} bg="gray.900" />
-      {withLinks ? <Textarea placeholder="Links, one per line (website links or <#channel id>)" value={value.links} onChange={set('links')} bg="gray.900" minH="60px" /> : null}
-      <HStack justify="flex-end">
-        <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
-        <Button size="sm" colorScheme="red" onClick={() => onSave(value)} isLoading={saving} isDisabled={!value.title.trim()}>Save</Button>
-      </HStack>
-    </VStack>
-  )
-}
-
 export default function AnnouncerAdminPage() {
   const toast = useToast()
   const [data, setData] = useState<SettingsData | null>(null)
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [features, setFeatures] = useState<Feature[]>([])
   const [shipped, setShipped] = useState<Shipped[]>([])
-  const [editing, setEditing] = useState<string | null>(null)
+  const [detectedAt, setDetectedAt] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -91,6 +65,7 @@ export default function AnnouncerAdminPage() {
       setForm(settings.values)
       setFeatures(featureData.features)
       setShipped(featureData.shipped)
+      setDetectedAt(featureData.detectedAt)
     } catch (err: any) {
       setError(err?.message || 'Failed to load')
     }
@@ -156,10 +131,6 @@ export default function AnnouncerAdminPage() {
     )
   }
 
-  const toFeatureBody = (value: { title: string; pitch: string; howTo: string; links: string }, enabled = true) => ({
-    title: value.title, pitch: value.pitch, howTo: value.howTo, links: value.links.split('\n'), enabled,
-  })
-
   return (
     <AdminShell title="Announcer">
       <Text color="gray.400" mb={4}>
@@ -208,99 +179,47 @@ export default function AnnouncerAdminPage() {
 
       <Heading size="md" mb={1}>Feature spotlight</Heading>
       <Text color="gray.400" mb={3}>
-        The features the bot takes turns to promote, the one featured longest ago first. The bot writes each post from the title,
-        pitch and how-to, so keep them factual. Switch a feature off to skip it.
+        The bot finds these itself, from its own slash commands and the things members can ask it, using the descriptions in
+        the code. Nothing here needs writing or updating. It spotlights the one featured longest ago, and among those the one
+        members use least. Switch off anything that should never be promoted.
+        {detectedAt ? ` Last detected ${fmtTime(detectedAt)}.` : ' The list appears once the updated bot has started.'}
       </Text>
-      <VStack align="stretch" spacing={3} mb={4}>
+      <VStack align="stretch" spacing={2} mb={8}>
         {features.map((f) => (
-          <Box key={f.key} borderWidth="1px" borderColor="gray.700" rounded="md" p={3} opacity={f.enabled ? 1 : 0.6}>
-            <HStack justify="space-between" align="start">
-              <Box>
-                <HStack mb={1}>
-                  <Text fontWeight="bold">{f.title}</Text>
-                  {!f.isDefault ? <Badge colorScheme="purple">Added</Badge> : f.isChanged ? <Badge colorScheme="purple">Changed</Badge> : null}
-                </HStack>
-                <Text fontSize="sm" color="gray.300">{f.pitch}</Text>
-                <Text fontSize="sm" color="gray.500">{f.howTo}</Text>
-                {f.links.length ? <Text fontSize="sm" color="gray.500">{f.links.join(' · ')}</Text> : null}
-              </Box>
-              <HStack flexShrink={0}>
-                <Switch isChecked={f.enabled} colorScheme="red"
-                  onChange={(e) => run(`toggle-${f.key}`, () => send('/api/admin/announcer/features', 'PUT', { key: f.key, feature: { ...f, enabled: e.target.checked } }), e.target.checked ? 'Feature on' : 'Feature off')} />
-                <Button size="xs" onClick={() => setEditing(editing === f.key ? null : f.key)}>Edit</Button>
-                {f.isChanged ? (
-                  <Button size="xs" variant="ghost" isLoading={busy === `reset-${f.key}`}
-                    onClick={() => run(`reset-${f.key}`, () => send(`/api/admin/announcer/features?key=${encodeURIComponent(f.key)}`, 'DELETE'), f.isDefault ? 'Reset to default' : 'Feature deleted')}>
-                    {f.isDefault ? 'Reset' : 'Delete'}
-                  </Button>
-                ) : null}
+          <HStack key={f.key} borderWidth="1px" borderColor="gray.700" rounded="md" p={3} justify="space-between" align="start" opacity={f.excluded ? 0.6 : 1}>
+            <Box>
+              <HStack mb={1}>
+                <Text fontWeight="bold">{f.name}</Text>
+                {f.usedLast30Days != null ? <Badge>{f.usedLast30Days} uses in DMs (30 days)</Badge> : null}
+                {f.lastSpotlightedAt ? <Badge colorScheme="green">Spotlighted {fmtTime(f.lastSpotlightedAt)}</Badge> : null}
               </HStack>
-            </HStack>
-            {editing === f.key ? (
-              <FeatureEditor
-                initial={{ title: f.title, pitch: f.pitch, howTo: f.howTo, links: f.links.join('\n') }}
-                saving={busy === `save-${f.key}`}
-                onCancel={() => setEditing(null)}
-                onSave={async (value) => {
-                  if (await run(`save-${f.key}`, () => send('/api/admin/announcer/features', 'PUT', { key: f.key, feature: toFeatureBody(value, f.enabled) }), 'Feature saved')) setEditing(null)
-                }}
-              />
-            ) : null}
-          </Box>
+              <Text fontSize="sm" color="gray.400" noOfLines={2}>{f.description}</Text>
+            </Box>
+            <Switch isChecked={!f.excluded} colorScheme="red" flexShrink={0} mt={1}
+              onChange={(e) => run(`toggle-${f.key}`, () => send('/api/admin/announcer/features', 'PUT', { key: f.key, excluded: !e.target.checked }), e.target.checked ? 'Back in the spotlight' : 'Left out of the spotlight')} />
+          </HStack>
         ))}
       </VStack>
-      {editing === '__new' ? (
-        <Box borderWidth="1px" borderColor="gray.700" rounded="md" p={3} mb={8}>
-          <Text fontWeight="bold">New feature</Text>
-          <FeatureEditor
-            initial={EMPTY_FEATURE}
-            saving={busy === 'save-new'}
-            onCancel={() => setEditing(null)}
-            onSave={async (value) => {
-              if (await run('save-new', () => send('/api/admin/announcer/features', 'PUT', { feature: toFeatureBody(value) }), 'Feature added')) setEditing(null)
-            }}
-          />
-        </Box>
-      ) : (
-        <Button size="sm" mb={8} onClick={() => setEditing('__new')}>Add a feature</Button>
-      )}
 
       <Heading size="md" mb={1}>New features from the commit log</Heading>
       <Text color="gray.400" mb={3}>
-        Features the bot announced as news. Each gets one spotlight about a month later. Fix the text, or skip one that should not be spotlighted.
+        Features the bot announced as news. Each gets one spotlight about a month later. Skip one that should not be spotlighted.
       </Text>
-      <VStack align="stretch" spacing={3}>
+      <VStack align="stretch" spacing={2}>
         {shipped.map((f) => (
-          <Box key={f.slug} borderWidth="1px" borderColor="gray.700" rounded="md" p={3} opacity={f.dismissed ? 0.6 : 1}>
-            <HStack justify="space-between" align="start">
-              <Box>
-                <HStack mb={1}>
-                  <Text fontWeight="bold">{f.title}</Text>
-                  {f.dismissed ? <Badge>Skipped</Badge> : f.spotlightedAt ? <Badge colorScheme="green">Spotlighted {fmtTime(f.spotlightedAt)}</Badge> : <Badge colorScheme="blue">Announced {fmtTime(f.at)}</Badge>}
-                </HStack>
-                <Text fontSize="sm" color="gray.300">{f.pitch}</Text>
-                <Text fontSize="sm" color="gray.500">{f.howTo}</Text>
-              </Box>
-              <HStack flexShrink={0}>
-                <Button size="xs" onClick={() => setEditing(editing === `shipped-${f.slug}` ? null : `shipped-${f.slug}`)}>Edit</Button>
-                <Button size="xs" variant="ghost" isLoading={busy === `skip-${f.slug}`}
-                  onClick={() => run(`skip-${f.slug}`, () => send('/api/admin/announcer/features', 'PATCH', { slug: f.slug, dismissed: !f.dismissed }), f.dismissed ? 'Back in the rotation' : 'Skipped')}>
-                  {f.dismissed ? 'Undo skip' : 'Skip'}
-                </Button>
+          <HStack key={f.slug} borderWidth="1px" borderColor="gray.700" rounded="md" p={3} justify="space-between" align="start" opacity={f.dismissed ? 0.6 : 1}>
+            <Box>
+              <HStack mb={1}>
+                <Text fontWeight="bold">{f.title}</Text>
+                {f.dismissed ? <Badge>Skipped</Badge> : f.spotlightedAt ? <Badge colorScheme="green">Spotlighted {fmtTime(f.spotlightedAt)}</Badge> : <Badge colorScheme="blue">Announced {fmtTime(f.at)}</Badge>}
               </HStack>
-            </HStack>
-            {editing === `shipped-${f.slug}` ? (
-              <FeatureEditor
-                initial={{ title: f.title, pitch: f.pitch, howTo: f.howTo, links: '' }}
-                withLinks={false}
-                saving={busy === `save-${f.slug}`}
-                onCancel={() => setEditing(null)}
-                onSave={async (value) => {
-                  if (await run(`save-${f.slug}`, () => send('/api/admin/announcer/features', 'PATCH', { slug: f.slug, title: value.title, pitch: value.pitch, howTo: value.howTo }), 'Saved')) setEditing(null)
-                }}
-              />
-            ) : null}
-          </Box>
+              <Text fontSize="sm" color="gray.400">{f.pitch}</Text>
+            </Box>
+            <Button size="xs" variant="ghost" flexShrink={0} isLoading={busy === `skip-${f.slug}`}
+              onClick={() => run(`skip-${f.slug}`, () => send('/api/admin/announcer/features', 'PATCH', { slug: f.slug, dismissed: !f.dismissed }), f.dismissed ? 'Back in the rotation' : 'Skipped')}>
+              {f.dismissed ? 'Undo skip' : 'Skip'}
+            </Button>
+          </HStack>
         ))}
         {!shipped.length ? <Text color="gray.500">None yet. They appear after the bot posts its first feature news.</Text> : null}
       </VStack>
