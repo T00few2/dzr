@@ -129,3 +129,28 @@ test("an admin's text replaces the default; an empty one falls back", () => {
   assert.match(reminderText("link_zwift_id_join", settings), /\/join\/zwift-id/);
   assert.equal(reminderText("unknown_step", settings), null);
 });
+
+test("turning bot announcements off leaves DM reminders running", async () => {
+  const { sent, deps, advance } = setup({ status: UNLINKED });
+  deps.loadSettings = async () => ({ ...DEFAULTS, enabled: false });
+  await processDue(null, { deps }); // takes the settings snapshot noteActivity reads
+  noteActivity("11", NOW.getTime(), () => 0);
+  advance(11 * MIN);
+  assert.deepEqual(await processDue(null, { deps }), [{ id: "11", outcome: "sent:link_zwift_id_channel" }]);
+  assert.equal(sent.length, 1);
+});
+
+test("a member skipped while paused is looked at again on their next activity after a resume", async () => {
+  const { db, sent, deps, advance } = setup({ status: UNLINKED });
+  deps.loadSettings = async () => DEFAULTS;
+  db.docs.set("bot_state/announcer", { paused: true });
+  noteActivity("12", NOW.getTime(), () => 0);
+  advance(11 * MIN);
+  assert.deepEqual(await processDue(null, { deps }), []);
+
+  db.docs.set("bot_state/announcer", { paused: false });
+  noteActivity("12", deps.now().getTime(), () => 0);
+  advance(11 * MIN);
+  assert.deepEqual(await processDue(null, { deps }), [{ id: "12", outcome: "sent:link_zwift_id_channel" }]);
+  assert.equal(sent.length, 1);
+});

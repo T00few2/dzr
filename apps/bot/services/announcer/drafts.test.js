@@ -196,3 +196,113 @@ test("runDaily writes nothing on a dry run, while paused, or with too many open 
   db.docs.set(`${COLLECTION}/x2`, { status: "queued", signalKey: "b" });
   assert.equal((await runDaily(client, { deps: d, sources: sources() })).skipped, "open_drafts");
 });
+
+/** A fake db whose writes of status "published" fail, as if Firestore went away after the post. */
+function failingPublishDb() {
+  const db = fakeDb();
+  const collection = db.collection;
+  db.collection = (name) => {
+    const col = collection(name);
+    return {
+      ...col,
+      doc: (id) => {
+        const ref = col.doc(id);
+        return { ...ref, set: async (data, options) => { if (data?.status === "published") throw new Error("firestore down"); return ref.set(data, options); } };
+      },
+    };
+  };
+  return db;
+}
+
+test("a post that went out is never handed back to the queue, even when recording it fails", async () => {
+  const db = failingPublishDb();
+  const client = fakeClient();
+  const { id } = await createDraft(client, CANDIDATE, DEFAULTS, deps(db));
+  const error = console.error;
+  console.error = () => {};
+  try {
+    const result = await publishDraft(client, id, { by: "mod", settings: DEFAULTS }, deps(db));
+    assert.equal(result.state, "published");
+    assert.notEqual(db.docs.get(`${COLLECTION}/${id}`).status, "queued");
+    assert.equal(await publishQueued(client, DEFAULTS, deps(db)), null);
+    assert.equal(client.sent.filter((row) => row.id === ANNOUNCEMENTS).length, 1);
+  } finally {
+    console.error = error;
+  }
+});
+
+test("a draft stuck in publishing can be decided on again once stale, and expires", async () => {
+  const db = fakeDb();
+  const client = fakeClient();
+  db.docs.set(`${COLLECTION}/fresh`, { status: "publishing", publishingAt: new Date(NOW.getTime() - 2 * 60 * 1000), signalKey: "a", kind: "evergreen", expiresAt: new Date(0) });
+  db.docs.set(`${COLLECTION}/stale`, { status: "publishing", publishingAt: new Date(NOW.getTime() - HOUR), signalKey: "b", kind: "evergreen", expiresAt: new Date(NOW.getTime() + HOUR) });
+  db.docs.set(`${COLLECTION}/stuck`, { status: "publishing", publishingAt: new Date(NOW.getTime() - HOUR), signalKey: "c", kind: "evergreen", expiresAt: new Date(0) });
+  assert.equal((await closeDraft("fresh", "rejected", { by: "mod" }, deps(db))).ok, false);
+  assert.equal((await closeDraft("stale", "rejected", { by: "mod" }, deps(db))).ok, true);
+  await expireDrafts(client, deps(db));
+  assert.equal(db.docs.get(`${COLLECTION}/stuck`).status, "expired");
+  assert.equal(db.docs.get(`${COLLECTION}/fresh`).status, "publishing");
+});
+
+test("a draft the moderators never saw is marked failed: no open slot, no cooldown, log not advanced", async () => {
+  const db = fakeDb();
+  const client = fakeClient();
+  const channelsFetch = client.channels.fetch;
+  client.channels.fetch = async (id) => { if (id === MODERATORS_CHANNEL_ID) throw new Error("Missing Access"); return channelsFetch(id); };
+  const d = { db, now: () => NOW, generate: async () => "FEATURES:\n- Ny funktion | Noget nyt | Spørg botten\nPOST:\nNyt!" };
+  const error = console.error;
+  console.error = () => {};
+  try {
+    const result = await runDaily(client, { deps: d, sources: sources({ commitLog: async () => ({ head: "h3", commits: [{ subject: "Ny funktion", body: "" }] }) }) });
+    assert.equal(result.skipped, "draft_post_failed");
+  } finally {
+    console.error = error;
+  }
+  const stored = [...db.docs.entries()].filter(([key]) => key.startsWith(`${COLLECTION}/`)).map(([, value]) => value);
+  assert.deepEqual(stored.map((draft) => draft.status), ["failed"]);
+  assert.equal(db.docs.get("bot_state/announcer")?.github?.lastSha, undefined);
+  assert.equal(db.docs.get("bot_state/announcer")?.perSignal, undefined);
+});
+
+test("a stale publishing draft no longer blocks new drafts; a fresh one does", async () => {
+  const db = fakeDb();
+  const client = fakeClient();
+  const d = { db, now: () => NOW, generate: async () => "Opslag" };
+  db.docs.set(`${COLLECTION}/p1`, { status: "pending", signalKey: "x" });
+  db.docs.set(`${COLLECTION}/s1`, { status: "publishing", publishingAt: new Date(NOW.getTime() - HOUR), signalKey: "unlinkedZwiftId" });
+  const result = await runDaily(client, { deps: d, sources: sources() });
+  assert.ok(result.draftId);
+  assert.equal(result.open, 1);
+  // ...but its topic stays taken: it may already be posted.
+  assert.ok(!result.ranked.some((candidate) => candidate.key === "unlinkedZwiftId"));
+
+  const busy = fakeDb();
+  busy.docs.set(`${COLLECTION}/p1`, { status: "pending", signalKey: "x" });
+  busy.docs.set(`${COLLECTION}/f1`, { status: "publishing", publishingAt: new Date(NOW.getTime() - 60 * 1000), signalKey: "y" });
+  assert.equal((await runDaily(client, { deps: { ...d, db: busy }, sources: sources() })).skipped, "open_drafts");
+});
+
+test("a draft whose card was posted stays pending when only storing the message id fails", async () => {
+  const db = fakeDb();
+  const client = fakeClient();
+  const collection = db.collection;
+  db.collection = (name) => {
+    const col = collection(name);
+    return {
+      ...col,
+      add: async (data) => {
+        const ref = await col.add(data);
+        return { ...ref, set: async (patch, options) => { if (patch?.messageId) throw new Error("firestore down"); return ref.set(patch, options); } };
+      },
+    };
+  };
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const { id } = await createDraft(client, CANDIDATE, DEFAULTS, deps(db));
+    assert.equal(db.docs.get(`${COLLECTION}/${id}`).status, "pending");
+    assert.equal((await publishDraft(client, id, { by: "mod", settings: DEFAULTS }, deps(db))).state, "published");
+  } finally {
+    console.warn = warn;
+  }
+});
