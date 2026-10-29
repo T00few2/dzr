@@ -17,6 +17,7 @@ const NAV = [
   { href: '/admin/knowledge', label: 'Knowledge' },
   { href: '/admin/coach', label: 'Coach' },
   { href: '/admin/onboarding', label: 'Onboarding' },
+  { href: '/admin/announcer', label: 'Announcer' },
   { href: '/admin/outreach', label: 'Outreach' },
 ]
 

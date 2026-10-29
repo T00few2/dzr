@@ -32,6 +32,9 @@ const TARGETS = [
   ["packages/shared/phenotype.js", "apps/bot/utils/phenotype.js"],
   ["packages/shared/verificationCriteria.js", "apps/bot/services/verificationCriteria.js"],
   ["packages/shared/reminderTexts.js", "apps/bot/services/reminderTexts.js"],
+  ["packages/shared/announcerSettings.js", "apps/bot/services/announcerSettings.js"],
+  ["packages/shared/announcerFeatures.js", "apps/bot/services/announcerFeatures.js"],
+  ["packages/shared/onboardingTexts.js", "apps/bot/services/onboardingTexts.js"],
 ];
 
 const checkOnly = process.argv.includes("--check");

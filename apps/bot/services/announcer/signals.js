@@ -8,11 +8,18 @@
  * time-bound, 2 a need among members, 3 a feature spotlight, 4 evergreen filler.
  */
 const shared = require("../../constants.json");
-const { FEATURES } = require("./features");
+const { resolveFeatures } = require("../announcerFeatures");
 const { isCoolingDown, toMs, DAY_MS } = require("./pacing");
 
 const CHANNELS = shared.discord.channels;
 const SITE = String(shared.siteOrigin || "").replace(/\/+$/, "");
+
+const LINKS = { siteOrigin: SITE, zwiftIdChannelId: CHANNELS.zwiftId };
+
+/** The spotlight catalog with the admins' changes from /admin/announcer. */
+function featuresFor(settings) {
+  return resolveFeatures(settings?.features, LINKS);
+}
 
 const KIND_LABELS = {
   upcomingClubEvents: "Kommende klub-events",
@@ -101,7 +108,7 @@ function notInCompanionClubSignal({ counts, settings }) {
   const cfg = settings.signals.notInCompanionClub;
   const missing = counts?.notInCompanionCount;
   if (missing == null || missing < cfg.minCount) return [];
-  const companion = FEATURES.find((feature) => feature.key === "companion_club");
+  const companion = featuresFor(settings).find((feature) => feature.key === "companion_club");
   return [{
     key: "notInCompanionClub",
     kind: "notInCompanionClub",
@@ -144,9 +151,9 @@ function featureSpotlightSignal({ state, settings, now }) {
   const cfg = settings.signals.featureSpotlight;
   const perSignal = state?.perSignal || {};
   const shipped = (state?.shippedFeatures || [])
-    .filter((feature) => !feature.spotlightedAt && !isCoolingDown(feature.at, cfg.shippedAfterDays, now))
+    .filter((feature) => !feature.spotlightedAt && !feature.dismissed && !isCoolingDown(feature.at, cfg.shippedAfterDays, now))
     .map((feature) => ({ key: `shipped:${feature.slug}`, title: feature.title, pitch: feature.pitch, howTo: feature.howTo || "", shipped: true }));
-  const options = [...shipped, ...FEATURES]
+  const options = [...shipped, ...featuresFor(settings).filter((feature) => feature.enabled !== false)]
     .map((feature) => ({ feature, key: `featureSpotlight:${feature.key}`, lastMs: toMs(perSignal[`featureSpotlight:${feature.key}`]) || 0 }))
     .filter((row) => !isCoolingDown(perSignal[row.key], cfg.cooldownDays, now));
   if (!options.length) return [];
@@ -267,4 +274,5 @@ module.exports = {
   pickCandidate,
   computeMemberCounts,
   gatherCandidates,
+  featuresFor,
 };

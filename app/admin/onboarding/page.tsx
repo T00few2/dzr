@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import NextLink from 'next/link'
 import AdminShell from '@/components/admin/AdminShell'
-import ReminderTextsEditor from '@/components/admin/ReminderTextsEditor'
+import TextTemplatesEditor from '@/components/admin/TextTemplatesEditor'
 import {
   Badge,
   Box,
@@ -152,7 +152,17 @@ export default function OnboardingAdminPage() {
         </>
       ) : null}
 
-      <ReminderTextsEditor />
+      <TextTemplatesEditor
+        apiPath="/api/admin/onboarding/texts"
+        title="Onboarding DM texts"
+        description="The DMs the bot sends new members, one per onboarding step. Preview one in Discord with /onboarding_preview."
+      />
+      <TextTemplatesEditor
+        apiPath="/api/admin/announcer/reminders"
+        title="DM reminder texts"
+        description="The reminders the bot sends members who are stuck on a step, when they are active on the server. Preview one in Discord with /announcer_preview_dm."
+        disabledNote="DM reminders are currently switched off (Announcer page)."
+      />
 
       {u ? (
         <>

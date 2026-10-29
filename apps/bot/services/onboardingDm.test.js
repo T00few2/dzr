@@ -204,3 +204,20 @@ test("become_club_member includes the live fee", () => {
   assert.match(text, /Kontingent: 10–100 kr\./);
   assert.doesNotMatch(buildMessage(["become_club_member"], {}, {}), /Kontingent/);
 });
+
+test("admin texts replace the defaults, and a line whose placeholder is empty is left out", () => {
+  const { resolveOnboardingTexts, renderTemplate } = require("./onboardingTexts");
+  const shared = require("../constants.json");
+  const texts = resolveOnboardingTexts({ connect_intervals: "Velkommen!\nHold der søger: {teams}", ask_me: "   " }, { siteOrigin: shared.siteOrigin, channels: shared.discord.channels });
+  const withTeams = buildMessage(["connect_intervals"], {}, { teams: [{ name: "A" }, { name: "B" }] }, texts);
+  assert.match(withTeams, /^Velkommen!\nHold der søger: A, B\n\n/);
+  assert.match(withTeams, /Spørg mig om hvad som helst/);
+  assert.equal(buildMessage(["connect_intervals"], {}, {}, texts).split("\n\n")[0], "Velkommen!");
+  assert.equal(renderTemplate("Hej {name}, {unknown}", { name: "Bo" }), "Hej Bo, {unknown}");
+  const missing = buildMessage(["meet_verification"], { missingCriteria: ["Konto 30 dage", "Rolle X"] }, {});
+  assert.match(missing, /• Konto 30 dage\n• Rolle X/);
+});
+
+test("the join greeting fills in the member's name", () => {
+  assert.match(buildMessage(["join"], null, { name: "Rider" }), /^Hej Rider 👋/);
+});

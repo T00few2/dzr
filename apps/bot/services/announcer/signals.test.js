@@ -12,8 +12,8 @@ const {
   pickCandidate,
   computeMemberCounts,
   gatherCandidates,
+  featuresFor,
 } = require("./signals");
-const { FEATURES } = require("./features");
 const { compactCommits, areasOf, fetchCommitLog } = require("./github");
 const { isSilent, funnel } = require("./dmStats");
 const { DEFAULTS } = require("./settings");
@@ -77,6 +77,8 @@ test("feature news carries the head sha so the log advances", () => {
   assert.equal(candidate.meta.headSha, "abc");
   assert.deepEqual(candidate.facts.commits, [{ subject: "Draw powerups", details: "" }]);
 });
+
+const FEATURES = featuresFor(DEFAULTS);
 
 test("spotlight rotates to the longest-unfeatured feature, and shipped features get one turn after a month", () => {
   const perSignal = Object.fromEntries(FEATURES.map((feature, i) => [`featureSpotlight:${feature.key}`, ago(40 + i)]));
@@ -184,4 +186,56 @@ test("funnel counts per step", () => {
   ], NOW, 3);
   assert.deepEqual(rows.link_zwift_id_channel, { sent: 2, failed: 1, engaged: 0, converted: 1, silent: 1 });
   assert.deepEqual(rows.join_companion, { sent: 2, failed: 0, engaged: 1, converted: 0, silent: 0 });
+});
+
+test("admins can switch a feature off, change it, add one and skip a shipped one", () => {
+  const settings = {
+    ...DEFAULTS,
+    features: {
+      coach: { enabled: false },
+      quiz: { title: "Quiz-tid" },
+      ladder: { title: "Ladder", pitch: "Holdkampe", howTo: "Spørg en holdkaptajn", links: [], enabled: true },
+    },
+  };
+  const features = featuresFor(settings);
+  assert.equal(features.find((feature) => feature.key === "coach").enabled, false);
+  assert.equal(features.find((feature) => feature.key === "quiz").title, "Quiz-tid");
+  assert.equal(features.find((feature) => feature.key === "quiz").pitch, FEATURES.find((feature) => feature.key === "quiz").pitch);
+  assert.equal(features.at(-1).key, "ladder");
+
+  const keys = [];
+  const perSignal = {};
+  for (let i = 0; i < features.length; i++) {
+    const [candidate] = featureSpotlightSignal({ state: { perSignal }, settings, now: NOW });
+    if (!candidate) break;
+    keys.push(candidate.key);
+    perSignal[candidate.key] = NOW;
+  }
+  assert.ok(!keys.includes("featureSpotlight:coach"));
+  assert.ok(keys.includes("featureSpotlight:ladder"));
+
+  const shippedFeatures = [{ slug: "skip", title: "Skip", pitch: "p", at: ago(40), dismissed: true }];
+  const [next] = featureSpotlightSignal({ state: { perSignal: {}, shippedFeatures }, settings: DEFAULTS, now: NOW });
+  assert.notEqual(next.key, "featureSpotlight:shipped:skip");
+});
+
+test("settings from the admin page are checked and clamped", () => {
+  const { sanitizeSettings, flattenSettings } = require("../announcerSettings");
+  const { patch, errors } = sanitizeSettings({
+    weeklyCap: "4",
+    dailyCap: 99,
+    "signals.unlinkedZwiftId.minShare": 0.123,
+    "signals.evergreen.enabled": false,
+    "channels.default": "not-a-channel",
+    unknown: 5,
+  });
+  assert.equal(patch.weeklyCap, 4);
+  assert.equal(patch.dailyCap, 5);
+  assert.equal(patch.signals.unlinkedZwiftId.minShare, 0.12);
+  assert.equal(patch.signals.evergreen.enabled, false);
+  assert.equal(patch.unknown, undefined);
+  assert.equal(patch.channels, undefined);
+  assert.equal(errors.length, 1);
+  assert.equal(sanitizeSettings({ "postWindow.startHour": 20, "postWindow.endHour": 10 }).errors.length, 1);
+  assert.equal(flattenSettings(DEFAULTS)["dmReminders.dailyCap"], 20);
 });
