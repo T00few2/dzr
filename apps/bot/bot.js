@@ -19,6 +19,8 @@ const { handleZwiftIdMessage, handleZwiftIdConfirmation } = require("./handlers/
 const { handleAIChatMessage, flushAllCoachSessions } = require("./handlers/aiChatHandler");
 const { handleAnnouncementUpsert, handleAnnouncementDelete } = require("./services/announcementIndex");
 const { isGapDraftInteraction, handleGapDraftInteraction } = require("./services/gapDrafts");
+const { isAnnouncerInteraction, handleAnnouncerInteraction } = require("./services/announcer/drafts");
+const { isReminderInteraction, handleReminderInteraction } = require("./services/announcer/dmReminders");
 const { startCoachBot } = require("./services/coachBot");
 const { checkCoachKeyCanary, db } = require("./services/firebase");
 const { createStore: createStreamingStore } = require("./services/streaming/store");
@@ -154,6 +156,16 @@ client.on("interactionCreate", async (interaction) => {
   // Knowledge gap drafts in the moderators channel
   if (isGapDraftInteraction(interaction)) {
     handleGapDraftInteraction(interaction).catch((error) => console.error("Gap draft interaction failed:", error));
+    return;
+  }
+  // Announcement drafts in the moderators channel
+  if (isAnnouncerInteraction(interaction)) {
+    handleAnnouncerInteraction(interaction).catch((error) => console.error("Announcer interaction failed:", error));
+    return;
+  }
+  // 👍 / 🔕 on DM reminders
+  if (isReminderInteraction(interaction)) {
+    handleReminderInteraction(interaction).catch((error) => console.error("DM reminder interaction failed:", error));
     return;
   }
 

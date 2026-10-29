@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { getDueScheduledMessages, getProbabilitySelectedMessages, markScheduledMessageSent, processMessageContent, refreshClubRoster, refreshZwiftPowerRoster, fixDueFiftyResults, applyDueWeeklySeries } = require("./contentApi");
+const { getDueScheduledMessages, markScheduledMessageSent, processMessageContent, refreshClubRoster, refreshZwiftPowerRoster, fixDueFiftyResults, applyDueWeeklySeries } = require("./contentApi");
 const { sweepGuildForNewMembers } = require("./newMemberService");
 const config = require("../config/config");
 const { getBotState, setBotState } = require("./firebase");
@@ -8,9 +8,10 @@ const { maybePostScheduledQuiz } = require("./quizService");
 const { maybeSendCoachFollowUps } = require("./coachFollowUp");
 const { maybeRunLadderJobs } = require("./ladder/ladderJobs");
 const { maybeSyncAnnouncements } = require("./announcementIndex");
+const { maybeRunAnnouncer } = require("./announcer");
 
 /**
- * Check for and send scheduled messages (both time-based and probability-based)
+ * Check for and send scheduled messages, and run the other periodic jobs
  */
 async function checkScheduledMessages(client) {
   try {
@@ -18,9 +19,6 @@ async function checkScheduledMessages(client) {
     
     // Check time-based scheduled messages
     await checkTimeBasedMessages(client);
-    
-    // Check probability-based messages (only once per day)
-    await checkProbabilityBasedMessages(client);
     
     // Sweep New Member role assignments once per hour
     await checkNewMemberSweeps(client);
@@ -51,6 +49,10 @@ async function checkScheduledMessages(client) {
     // Ladder match previews and match-day reminders. Not awaited: rendering the preview can take
     // several seconds and must not delay the other minute checks; it does its own error handling.
     maybeRunLadderJobs(client);
+
+    // Bot-written announcements and DM reminders (replaces the random scheduled_messages pool).
+    // Not awaited: drafting calls the model; it guards against overlapping runs itself.
+    maybeRunAnnouncer(client);
     
   } catch (error) {
     console.error("❌ Error checking scheduled messages:", error);
@@ -471,48 +473,6 @@ async function updateKmsStatus(client) {
     }
   } catch (error) {
     console.error("❌ Error updating KMS status:", error);
-  }
-}
-
-/**
- * Check for probability-based messages (once per day)
- */
-async function checkProbabilityBasedMessages(client) {
-  try {
-    // Get current time in Central European Time
-    const now = new Date();
-    const cetTime = new Date(now.toLocaleString("en-US", {timeZone: "Europe/Paris"}));
-    const currentHour = cetTime.getHours();
-    const currentMinute = cetTime.getMinutes();
-    
-    // Check probability messages at 2:00 PM CET
-    const PROBABILITY_CHECK_HOUR = 16;
-    const PROBABILITY_CHECK_MINUTE = 30;
-    
-    // Only run during the specific minute to avoid multiple checks
-    if (currentHour === PROBABILITY_CHECK_HOUR && currentMinute === PROBABILITY_CHECK_MINUTE) {
-      console.log("🎲 Checking probability-based scheduled messages... (CET)");
-      const selectedMessages = await getProbabilitySelectedMessages();
-      
-      console.log(`📋 Found ${selectedMessages.length} probability-selected messages`);
-      
-      if (selectedMessages.length === 0) {
-        console.log("✅ No probability-based messages selected for today");
-        return;
-      }
-      
-      for (const scheduledMessage of selectedMessages) {
-        console.log(`📤 Processing probability-selected message: ${scheduledMessage.title} (ID: ${scheduledMessage.id})`);
-        await sendScheduledMessage(client, scheduledMessage);
-      }
-    } else {
-      // Log only once per hour to avoid spam
-      if (currentMinute === 0) {
-        console.log(`🎲 Probability check scheduled for ${PROBABILITY_CHECK_HOUR}:${PROBABILITY_CHECK_MINUTE.toString().padStart(2, '0')} CET (current CET: ${currentHour}:${currentMinute.toString().padStart(2, '0')})`);
-      }
-    }
-  } catch (error) {
-    console.error("❌ Error checking probability-based scheduled messages:", error);
   }
 }
 

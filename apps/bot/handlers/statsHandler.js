@@ -1,4 +1,5 @@
 const { StatsCollector } = require('../services/statsCollector');
+const { noteActivity } = require('../services/announcer/dmReminders');
 
 // Create a single instance of the stats collector
 const statsCollector = new StatsCollector();
@@ -8,6 +9,8 @@ const statsCollector = new StatsCollector();
  */
 function handleMessageCreate(message) {
   statsCollector.addMessage(message);
+  // Server activity is when a DM reminder is most likely to be seen.
+  if (message.guildId && !message.author?.bot) noteActivity(message.author.id);
 }
 
 /**
@@ -15,6 +18,7 @@ function handleMessageCreate(message) {
  */
 function handleMessageReactionAdd(reaction, user) {
   statsCollector.addReaction(reaction, user);
+  if (reaction.message?.guildId && !user?.bot) noteActivity(user.id);
 }
 
 /**
@@ -22,6 +26,7 @@ function handleMessageReactionAdd(reaction, user) {
  */
 function handleVoiceStateUpdate(oldState, newState) {
   statsCollector.addVoiceActivity(oldState, newState);
+  if (!oldState.channelId && newState.channelId && !newState.member?.user?.bot) noteActivity(newState.id);
 }
 
 /**

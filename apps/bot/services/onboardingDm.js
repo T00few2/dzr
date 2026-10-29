@@ -6,6 +6,7 @@
  * another stage. Each step key is sent at most once, recorded in onboarding_dms/{discordId}:
  *
  *   steps.<key> = { sentAt?, dmFailedAt?, claimingAtMs? }
+ *   lastBotDmAt  newest DM from the bot of any kind; also written by announcer/dmReminders
  *
  * 1. Claim (transaction): drop keys already sent or failed. If any remaining key carries a lease
  *    younger than LEASE_MS, another instance is sending: claim nothing. Otherwise write the lease
@@ -17,7 +18,7 @@
  * The one duplicate left is a crash between a successful send and step 3.
  */
 const shared = require("../constants.json");
-const { LINKS } = require("./onboardingStatus");
+const { resolveOnboardingTexts, renderTemplate } = require("./onboardingTexts");
 
 const COLLECTION = shared.firestore.onboardingDms || "onboarding_dms";
 const CHANNELS = shared.discord.channels;
@@ -40,89 +41,45 @@ const DM_HINTS = {
   role: "Tjek dine **DMs fra mig** – der står dit næste skridt.",
 };
 
-const ASK_ME = "Spørg mig om hvad som helst her i DM – hold, løb, ZRL-kategori, Zwift. Giv gerne mine svar 👍 eller 👎, så jeg bliver bedre. _(You can write to me in English.)_";
+const TEXT_LINKS = { siteOrigin: shared.siteOrigin, channels: CHANNELS };
+const DEFAULT_TEXTS = resolveOnboardingTexts(null, TEXT_LINKS);
+const TEXTS_DOC = "onboarding_texts";
+const TEXTS_CACHE_MS = 5 * 60 * 1000;
+let textsCache = { at: 0, value: null };
 
-function joinGreeting(name) {
-  return [
-    `Hej ${name} 👋 Velkommen til **Danish Zwift Racers**!`,
-    "Jeg er DZR-botten. Når du er kommet helt ind på serveren, guider jeg dig videre herinde.",
-    ASK_ME,
-  ].join("\n\n");
-}
-
-function introText() {
-  return [
-    "**Kom godt i gang på DZR Discord**",
-    `• <#${CHANNELS.selfRoles}> – vælg løbsserier og hold, så du ser de rigtige kanaler`,
-    `• <#${CHANNELS.teamsLookingForRiders}> – hold der leder efter ryttere`,
-    `• <#${CHANNELS.announcements}> – vigtige opdateringer`,
-    `• <#${CHANNELS.raceSchedule}> – hvilke løb vi kører`,
-    `• <#${CHANNELS.help}> – få hjælp`,
-    "• DZR-kittet i Zwift får du ved at gennemføre et DZR-event med kittet som præmie – spørg mig hvilke.",
-  ].join("\n");
-}
-
-function teamsLine(teams) {
-  if (!teams?.length) return `Leder du efter et hold? Se <#${CHANNELS.teamsLookingForRiders}> eller spørg mig.`;
-  const names = teams.slice(0, 6).map((team) => team.name).join(", ");
-  return `Leder du efter et hold? Disse søger ryttere lige nu: ${names}. Se <#${CHANNELS.teamsLookingForRiders}> eller spørg mig.`;
-}
-
-function stepText(step, status, extras = {}) {
-  switch (step) {
-    case "link_zwift_id_channel":
-      return [
-        "**Næste skridt: link dit Zwift ID** → så bliver du ✅ Verificeret Medlem og får adgang til members-zone på hjemmesiden og bot-kommandoerne.",
-        `Skriv \`zwiftid 1234567\` (dit eget ID) i <#${CHANNELS.zwiftId}>, brug \`/my_zwiftid\` – eller send det bare til mig her. Jeg viser dig profilen, så du kan bekræfte, at det er dig.`,
-        "Kender du ikke dit ID? Skriv dit navn, som det står på Zwift/ZwiftPower, til mig her – så finder jeg dig.",
-      ].join("\n");
-    case "link_zwift_id_join":
-      return [
-        "**Tak for din betaling! Sidste skridt: link dit Zwift ID**",
-        `Gør det her: ${LINKS.joinZwiftId} – så er du både ⭐ Klub Medlem og ✅ Verificeret Medlem.`,
-        "Kender du ikke dit Zwift ID? Skriv dit navn, som det står på Zwift/ZwiftPower, til mig her – så finder jeg dig og viser profilen, så du kan bekræfte.",
-      ].join("\n");
-    case "meet_verification":
-      return [
-        "**Næste skridt for at blive ✅ Verificeret Medlem:**",
-        ...(status.missingCriteria || []).map((item) => `• ${item}`),
-      ].join("\n");
-    case "become_club_member": {
-      const fee = extras.fee ? `Kontingent: ${extras.fee}.` : null;
-      return [
-        "**Du er nu ✅ Verificeret Medlem 🎉**",
-        "Næste skridt, hvis du vil: bliv ⭐ **Klub Medlem**. Det giver bl.a. adgang til DZR Coach – en træningscoach her på Discord, der kender dine data.",
-        fee,
-        `Meld dig ind her: ${LINKS.join}`,
-      ].filter(Boolean).join("\n");
-    }
-    case "club_role_pending":
-      return [
-        "**Din ⭐ Klub Medlem-status er ved at blive opdateret**",
-        `Din betaling og din rolle her på Discord passer ikke sammen endnu. Det retter sig som regel selv kort efter – ellers skriv i <#${CHANNELS.help}>, så hjælper en admin.`,
-      ].join("\n");
-    case "connect_intervals":
-      return [
-        "**Velkommen som ⭐ Klub Medlem 🥳**",
-        "Som klubmedlem kan du bruge **DZR Coach**. Skriv `/coach` på serveren, så får du et link til at forbinde din intervals.icu-konto, og coachen skriver til dig.",
-        teamsLine(extras.teams),
-      ].join("\n");
-    default:
-      return null;
+/**
+ * The DM texts with the admins' changes from /admin/onboarding (system_settings/onboarding_texts).
+ * Cached; a failed read uses the defaults rather than holding a DM back.
+ */
+async function loadOnboardingTexts(db, nowMs = Date.now()) {
+  if (textsCache.value && nowMs - textsCache.at < TEXTS_CACHE_MS) return textsCache.value;
+  let stored = null;
+  try {
+    const snap = await db.collection(shared.firestore.systemSettings).doc(TEXTS_DOC).get();
+    stored = snap.exists ? snap.data()?.texts : null;
+  } catch (error) {
+    console.warn("Onboarding texts unavailable, using defaults:", error?.message || error);
   }
+  textsCache = { at: nowMs, value: resolveOnboardingTexts(stored, TEXT_LINKS) };
+  return textsCache.value;
 }
 
 /** One message for the claimed keys: intro first, then the step, then the ask-me line. */
-function buildMessage(keys, status, extras = {}) {
-  if (keys.includes("join")) return joinGreeting(extras.name || "der");
+function buildMessage(keys, status, extras = {}, texts = DEFAULT_TEXTS) {
+  if (keys.includes("join")) return renderTemplate(texts.join, { name: extras.name || "der" });
   const parts = [];
-  if (keys.includes("intro")) parts.push(introText());
+  if (keys.includes("intro")) parts.push(renderTemplate(texts.intro));
   for (const key of keys) {
-    if (STEP_KEYS.has(key)) parts.push(stepText(key, status, extras));
+    if (!STEP_KEYS.has(key)) continue;
+    parts.push(renderTemplate(texts[key], {
+      missing: (status?.missingCriteria || []).map((item) => `• ${item}`).join("\n"),
+      fee: extras.fee || "",
+      teams: (extras.teams || []).slice(0, 6).map((team) => team.name).join(", "),
+    }));
   }
   if (!parts.length) return null;
-  parts.push(ASK_ME);
-  return parts.join("\n\n");
+  parts.push(renderTemplate(texts.ask_me));
+  return parts.filter(Boolean).join("\n\n");
 }
 
 /** Keys this event wants to send, before send-once filtering. */
@@ -170,7 +127,8 @@ async function finishKeys(db, discordId, keys, outcome, now) {
       if (outcome === "sent") patch[key].sentAt = now;
       if (outcome === "dm_closed") patch[key].dmFailedAt = now;
     }
-    tx.set(ref, { steps: patch }, { merge: true });
+    // lastBotDmAt is shared with the announcer's DM reminders, so the two never DM back to back.
+    tx.set(ref, outcome === "sent" ? { steps: patch, lastBotDmAt: now } : { steps: patch }, { merge: true });
   });
 }
 
@@ -194,11 +152,11 @@ function fallbackChannelId(trigger, config) {
   return CHANNELS.zwiftId;
 }
 
-async function postFallback(member, channelId) {
+async function postFallback(member, channelId, texts = DEFAULT_TEXTS) {
   const channel = member.guild.channels.cache.get(channelId);
   if (!channel) return;
   await channel.send({
-    content: `<@${member.id}> Jeg kunne ikke sende dig en DM. Åbn for DMs fra servermedlemmer, eller @mention mig her, så hjælper jeg dig i gang.`,
+    content: renderTemplate(texts.dm_closed_fallback, { mention: `<@${member.id}>` }),
     allowedMentions: { users: [member.id] },
   });
 }
@@ -212,6 +170,7 @@ function defaultDeps() {
     getOnboardingStatus,
     getFee: async () => feeText(await getMembershipFacts()),
     getTeamsLookingForRiders,
+    loadTexts: (db) => loadOnboardingTexts(db),
   };
 }
 
@@ -261,9 +220,10 @@ async function runOnboarding({ client, member, trigger, deps } = {}) {
   }
   if (!claimed.length) return { outcome: "already_handled" };
 
+  const texts = d.loadTexts ? await d.loadTexts(d.db) : DEFAULT_TEXTS;
   let outcome = "error";
   try {
-    const content = buildMessage(claimed, status, await extrasFor(claimed, member, d));
+    const content = buildMessage(claimed, status, await extrasFor(claimed, member, d), texts);
     if (!content) {
       outcome = "sent";
     } else {
@@ -283,7 +243,7 @@ async function runOnboarding({ client, member, trigger, deps } = {}) {
 
   if (outcome === "dm_closed") {
     try {
-      await postFallback(member, fallbackChannelId(trigger, d.config));
+      await postFallback(member, fallbackChannelId(trigger, d.config), texts);
     } catch (error) {
       console.warn("Onboarding fallback post failed:", error?.message || error);
     }
@@ -294,6 +254,7 @@ async function runOnboarding({ client, member, trigger, deps } = {}) {
 module.exports = {
   runOnboarding,
   buildMessage,
+  loadOnboardingTexts,
   wantedKeys,
   claimKeys,
   finishKeys,

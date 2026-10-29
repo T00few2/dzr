@@ -2,7 +2,7 @@ const { getWelcomeMessage, processMessageContent } = require("../services/conten
 const config = require("../config/config");
 const shared = require("../constants.json");
 const { getOnboardingStatus, getClubRoleId } = require("../services/onboardingStatus");
-const { buildMessage, STEP_KEYS, DM_HINTS, COLLECTION } = require("../services/onboardingDm");
+const { buildMessage, loadOnboardingTexts, STEP_KEYS, DM_HINTS, COLLECTION } = require("../services/onboardingDm");
 const { getMembershipFacts, feeText, getTeamsLookingForRiders } = require("../services/clubFacts");
 
 const ROLES = shared.discord.roles;
@@ -84,7 +84,7 @@ async function handleOnboardingPreview(interaction) {
     const extras = { name: interaction.member?.displayName || interaction.user.username };
     if (keys.includes("become_club_member")) extras.fee = feeText(await getMembershipFacts());
     if (keys.includes("connect_intervals")) extras.teams = await getTeamsLookingForRiders();
-    const content = buildMessage(keys, status, extras);
+    const content = buildMessage(keys, status, extras, await loadOnboardingTexts(require("../services/firebase").db));
 
     try {
       await interaction.user.send({ content });

@@ -231,6 +231,47 @@ const commands = [
         .setRequired(true)
     )
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+  // Announcer (admin only)
+  new SlashCommandBuilder()
+    .setName("announcer_run")
+    .setDescription("Show what the announcer would post about now; optionally draft it (admin only)")
+    .addBooleanOption(option =>
+      option
+        .setName("draft")
+        .setDescription("Write a draft for moderators now instead of only showing the candidates")
+        .setRequired(false)
+    )
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+  new SlashCommandBuilder()
+    .setName("announcer_pause")
+    .setDescription("Pause or resume bot-written announcements (admin only)")
+    .addBooleanOption(option =>
+      option
+        .setName("paused")
+        .setDescription("True to pause, false to resume")
+        .setRequired(true)
+    )
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+  new SlashCommandBuilder()
+    .setName("announcer_stats")
+    .setDescription("Bot DMs per step (sent, closed, engaged, converted, silent) and recent announcements (admin only)")
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+  new SlashCommandBuilder()
+    .setName("announcer_preview_dm")
+    .setDescription("Send yourself a DM reminder as members get it (admin only)")
+    .addStringOption(option =>
+      option
+        .setName("step")
+        .setDescription("The reminder to preview")
+        .setRequired(true)
+        .addChoices(
+          { name: "Link Zwift ID (not paid)", value: "link_zwift_id_channel" },
+          { name: "Link Zwift ID (paid on /join)", value: "link_zwift_id_join" },
+          { name: "Connect intervals.icu for DZR Coach", value: "connect_intervals" },
+          { name: "Join DZR in Zwift Companion", value: "join_companion" }
+        )
+    )
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
 
   // Legacy self-role management commands (for backward compatibility)
   new SlashCommandBuilder()
