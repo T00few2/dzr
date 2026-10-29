@@ -32,11 +32,13 @@ async function runDaily(client, { dryRun = false, deps = drafts.defaultDeps(), s
   const settings = await loadSettings(deps.db);
   const now = deps.now();
   const state = await readState(deps.db);
+  const unfinished = await drafts.listOpenDrafts(deps.db);
   // A draft left in "publishing" past the stale limit (a crash, or a post whose result could not be
-  // saved) no longer blocks new drafts; moderators can still close it and it expires.
-  const open = (await drafts.listOpenDrafts(deps.db)).filter((draft) => drafts.holdsSlot(draft, now.getTime()));
+  // saved) frees its slot, so it cannot block new drafts until it expires. It still holds its topic:
+  // it may already be posted, and a moderator can still publish it.
+  const open = unfinished.filter((draft) => drafts.holdsSlot(draft, now.getTime()));
   const candidates = await gatherCandidates({ deps: sources || defaultSources(client, settings), settings, state, now });
-  const openKeys = new Set(open.map((draft) => draft.signalKey));
+  const openKeys = new Set(unfinished.map((draft) => draft.signalKey));
   const ranked = [];
   let rest = candidates;
   for (let pick = pickCandidate(rest, { state, now, openKeys }); pick; pick = pickCandidate(rest, { state, now, openKeys })) {

@@ -269,10 +269,12 @@ test("a stale publishing draft no longer blocks new drafts; a fresh one does", a
   const client = fakeClient();
   const d = { db, now: () => NOW, generate: async () => "Opslag" };
   db.docs.set(`${COLLECTION}/p1`, { status: "pending", signalKey: "x" });
-  db.docs.set(`${COLLECTION}/s1`, { status: "publishing", publishingAt: new Date(NOW.getTime() - HOUR), signalKey: "y" });
+  db.docs.set(`${COLLECTION}/s1`, { status: "publishing", publishingAt: new Date(NOW.getTime() - HOUR), signalKey: "unlinkedZwiftId" });
   const result = await runDaily(client, { deps: d, sources: sources() });
   assert.ok(result.draftId);
   assert.equal(result.open, 1);
+  // ...but its topic stays taken: it may already be posted.
+  assert.ok(!result.ranked.some((candidate) => candidate.key === "unlinkedZwiftId"));
 
   const busy = fakeDb();
   busy.docs.set(`${COLLECTION}/p1`, { status: "pending", signalKey: "x" });
