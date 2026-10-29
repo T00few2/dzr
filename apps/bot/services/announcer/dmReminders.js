@@ -78,7 +78,8 @@ function noteActivity(userId, nowMs = Date.now(), random = Math.random) {
   const id = String(userId);
   lastActivity.set(id, nowMs);
   const cfg = settingsSnapshot.dmReminders;
-  if (!settingsSnapshot.enabled || !cfg.enabled || due.has(id)) return;
+  // Only the reminders' own switch: turning bot announcements off leaves reminders running.
+  if (!cfg.enabled || due.has(id)) return;
   if (nowMs - (lastLooked.get(id) || 0) < cfg.recheckHours * 60 * 60 * 1000) return;
   lastLooked.set(id, nowMs);
   const delayMin = cfg.delayMinMinutes + random() * (cfg.delayMaxMinutes - cfg.delayMinMinutes);
@@ -87,6 +88,11 @@ function noteActivity(userId, nowMs = Date.now(), random = Math.random) {
   if (lastLooked.size > 5000) {
     for (const [key, at] of lastLooked) if (nowMs - at > cfg.recheckHours * 60 * 60 * 1000) lastLooked.delete(key);
   }
+}
+
+/** Let these members be scheduled again on their next activity. */
+function forgetLooks(ids) {
+  for (const id of ids) lastLooked.delete(id);
 }
 
 /** Members whose look is due and who are still active: [{ id }]. Removes them from the schedule. */
@@ -171,17 +177,22 @@ async function maybeRemind(id, { deps, settings }) {
 /** Minute tick: look at members whose delay has passed. */
 async function processDue(client, { deps } = {}) {
   const d = deps || defaultDeps(client);
-  const settings = await loadSettings(d.db);
+  const settings = await (d.loadSettings || loadSettings)(d.db);
   settingsSnapshot = settings;
-  if (!settings.enabled || !settings.dmReminders.enabled) {
+  if (!settings.dmReminders.enabled) {
+    forgetLooks([...due.keys()]);
     due.clear();
     return [];
   }
   const ready = takeDue(d.now().getTime(), settings.dmReminders);
   if (!ready.length) return [];
-  // /announcer_pause pauses reminders too.
+  // /announcer_pause pauses reminders too. The skipped members are looked at again on their next
+  // activity after a resume, instead of waiting out recheckHours.
   const stateSnap = await d.db.collection("bot_state").doc("announcer").get();
-  if (stateSnap.exists && stateSnap.data()?.paused) return [];
+  if (stateSnap.exists && stateSnap.data()?.paused) {
+    forgetLooks(ready);
+    return [];
+  }
   const outcomes = [];
   for (const id of ready) {
     try {

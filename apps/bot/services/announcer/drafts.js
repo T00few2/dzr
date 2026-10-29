@@ -6,6 +6,7 @@
  *     status: pending -> publishing -> published
  *             pending -> queued (approved, waiting for a slot) -> publishing -> published
  *             pending | queued -> rejected | expired
+ *             failed: the moderators channel could not be posted to; never seen, so no cooldown
  *
  * Publish claims the draft in a transaction (status "publishing"), so two moderators pressing at
  * once post it once. Pacing is checked at that moment, not when the draft was written: a draft
@@ -23,6 +24,15 @@ const MODERATORS_CHANNEL_ID = shared.discord.channels.moderators;
 const PREFIX = "ann:";
 const MAX_POST_CHARS = 1900;
 const OPEN = ["pending", "queued"];
+// A draft left in "publishing" this long means the bot stopped mid-post: moderators may decide on it
+// again, and it can expire. The scheduler never re-posts it on its own, since the post may be out.
+const STALE_PUBLISHING_MS = 10 * 60 * 1000;
+
+/** Whether a moderator or the expiry job may still decide on this draft. */
+function isOpen(draft, nowMs) {
+  if (OPEN.includes(draft?.status)) return true;
+  return draft?.status === "publishing" && nowMs - (toMs(draft.publishingAt) || 0) > STALE_PUBLISHING_MS;
+}
 
 const INSTRUCTIONS = [
   "Du skriver opslag til Discord-serveren for Danish Zwift Racers (DZR), en dansk Zwift-cykelklub.",
@@ -173,9 +183,15 @@ async function createDraft(client, candidate, settings, deps = defaultDeps()) {
     expiresAt: new Date(now.getTime() + settings.draftExpiryDays * DAY_MS),
   };
   const ref = await deps.db.collection(COLLECTION).add(draft);
-  const channel = await client.channels.fetch(MODERATORS_CHANNEL_ID);
-  const posted = await channel.send({ embeds: [draftEmbed(draft)], components: draftButtons(ref.id, "pending"), allowedMentions: { parse: [] } });
-  await ref.set({ messageId: posted.id }, { merge: true });
+  try {
+    const channel = await client.channels.fetch(MODERATORS_CHANNEL_ID);
+    const posted = await channel.send({ embeds: [draftEmbed(draft)], components: draftButtons(ref.id, "pending"), allowedMentions: { parse: [] } });
+    await ref.set({ messageId: posted.id }, { merge: true });
+  } catch (error) {
+    // No moderator saw it: it must not hold a slot or start the topic's cooldown.
+    await ref.set({ status: "failed", lastError: String(error?.message || error) }, { merge: true });
+    throw error;
+  }
   return { id: ref.id };
 }
 
@@ -232,8 +248,9 @@ async function publishDraft(client, draftId, { by, text, force = false, settings
   const claim = await deps.db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const draft = snap.exists ? snap.data() : null;
-    if (!draft || !OPEN.includes(draft.status)) return { ok: false, state: draft?.status || "missing" };
-    const patch = { status: "publishing", previousStatus: draft.status };
+    if (!draft || !isOpen(draft, deps.now().getTime())) return { ok: false, state: draft?.status || "missing" };
+    const previousStatus = draft.status === "publishing" ? draft.previousStatus || "queued" : draft.status;
+    const patch = { status: "publishing", previousStatus, publishingAt: deps.now() };
     if (text) patch.text = String(text).slice(0, MAX_POST_CHARS);
     if (by && !draft.approvedBy) Object.assign(patch, { approvedBy: by, approvedAt: deps.now() });
     tx.set(ref, patch, { merge: true });
@@ -243,29 +260,34 @@ async function publishDraft(client, draftId, { by, text, force = false, settings
   const draft = claim.draft;
   const now = deps.now();
 
-  let stateData = {};
+  let posted;
   try {
-    const snap = await stateRef(deps.db).get();
-    stateData = (snap.exists && snap.data()) || {};
     if (!force) {
+      const snap = await stateRef(deps.db).get();
       const context = await readChannelContext(client, draft.channelId, settings, now);
-      const verdict = canPostNow({ now, settings, state: stateData, ...context });
+      const verdict = canPostNow({ now, settings, state: (snap.exists && snap.data()) || {}, ...context });
       if (!verdict.ok) {
         await ref.set({ status: "queued", queuedReason: verdict.reason }, { merge: true });
         return { ok: false, state: "queued", reason: verdict.reason, draft: { ...draft, status: "queued" } };
       }
     }
     const channel = client.channels.cache?.get(draft.channelId) || await client.channels.fetch(draft.channelId);
-    const posted = await channel.send({ content: draft.text, allowedMentions: { parse: [] } });
-    await ref.set({ status: "published", publishedAt: now, postedMessageId: posted.id, decidedBy: by || draft.approvedBy || null }, { merge: true });
-    await recordDecision(deps.db, draft, "published", now);
-    return { ok: true, state: "published", url: posted.url, draft: { ...draft, status: "published" } };
+    posted = await channel.send({ content: draft.text, allowedMentions: { parse: [] } });
   } catch (error) {
-    // Nothing was posted (or we cannot tell): hand it back so it is tried again.
+    // Nothing was posted: hand it back so it is tried again.
     await ref.set({ status: draft.previousStatus === "queued" || draft.approvedBy ? "queued" : "pending", lastError: String(error?.message || error) }, { merge: true });
     console.error(`Announcer publish failed for ${draftId}:`, error?.message || error);
     return { ok: false, state: "error", reason: String(error?.message || error) };
   }
+
+  // The post is out. From here a failure must never hand the draft back, or it would be posted twice.
+  try {
+    await ref.set({ status: "published", publishedAt: now, postedMessageId: posted.id, decidedBy: by || draft.approvedBy || null }, { merge: true });
+    await recordDecision(deps.db, draft, "published", now);
+  } catch (error) {
+    console.error(`Announcer posted ${draftId} but could not record it:`, error?.message || error);
+  }
+  return { ok: true, state: "published", url: posted.url, draft: { ...draft, status: "published" } };
 }
 
 async function closeDraft(draftId, status, { by }, deps = defaultDeps()) {
@@ -273,7 +295,7 @@ async function closeDraft(draftId, status, { by }, deps = defaultDeps()) {
   const result = await deps.db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const draft = snap.exists ? snap.data() : null;
-    if (!draft || !OPEN.includes(draft.status)) return { ok: false, state: draft?.status || "missing" };
+    if (!draft || !isOpen(draft, deps.now().getTime())) return { ok: false, state: draft?.status || "missing" };
     tx.set(ref, { status, decidedBy: by || null, decidedAt: deps.now() }, { merge: true });
     return { ok: true, draft };
   });
@@ -281,8 +303,9 @@ async function closeDraft(draftId, status, { by }, deps = defaultDeps()) {
   return result;
 }
 
+/** Drafts waiting for a moderator or a slot, and any in the middle of being posted. */
 async function listOpenDrafts(db) {
-  const snap = await db.collection(COLLECTION).where("status", "in", OPEN).get();
+  const snap = await db.collection(COLLECTION).where("status", "in", [...OPEN, "publishing"]).get();
   return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
@@ -335,7 +358,7 @@ async function handleAnnouncerInteraction(interaction, deps = defaultDeps()) {
   if (action === "edit") {
     const snap = await deps.db.collection(COLLECTION).doc(draftId).get();
     const draft = snap.exists ? snap.data() : null;
-    if (!draft || !OPEN.includes(draft.status)) {
+    if (!draft || !isOpen(draft, deps.now().getTime())) {
       await interaction.reply({ content: `Forslaget er ${ALREADY[draft?.status] || "afgjort"}.`, ephemeral: true });
       return;
     }

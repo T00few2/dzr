@@ -50,7 +50,15 @@ async function runDaily(client, { dryRun = false, deps = drafts.defaultDeps(), s
   // The model may find nothing worth saying (feature news with only internal commits); then the
   // next topic gets its turn.
   for (const candidate of ranked.slice(0, 2)) {
-    const created = await drafts.createDraft(client, candidate, settings, deps);
+    let created;
+    try {
+      created = await drafts.createDraft(client, candidate, settings, deps);
+    } catch (error) {
+      // The moderators channel could not be reached: try again tomorrow, with the commit log
+      // where it was, so no feature news is lost.
+      console.error(`Announcer could not post the draft for ${candidate.key}:`, error?.message || error);
+      return { ...report, skipped: "draft_post_failed" };
+    }
     if (candidate.meta?.headSha) {
       await drafts.stateRef(deps.db).set({ github: { lastSha: candidate.meta.headSha } }, { merge: true });
     }
