@@ -96,7 +96,8 @@ async function handleAnnouncerPreviewDm(interaction) {
   if (!(await adminOnly(interaction))) return;
   const step = interaction.options.getString("step");
   try {
-    await interaction.user.send({ content: reminderText(step) });
+    const { db } = require("../services/firebase");
+    await interaction.user.send({ content: reminderText(step, await loadSettings(db)) });
     await interaction.editReply({ content: `✅ Påmindelsen for \`${step}\` er sendt til dig som DM (uden knapper). Intet er gemt.` });
   } catch (error) {
     await interaction.editReply({ content: `⚠️ Kunne ikke sende DM (${error.message}).` });

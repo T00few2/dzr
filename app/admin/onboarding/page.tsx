@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import NextLink from 'next/link'
 import AdminShell from '@/components/admin/AdminShell'
+import ReminderTextsEditor from '@/components/admin/ReminderTextsEditor'
 import {
   Badge,
   Box,
@@ -150,6 +151,8 @@ export default function OnboardingAdminPage() {
           </Box>
         </>
       ) : null}
+
+      <ReminderTextsEditor />
 
       {u ? (
         <>

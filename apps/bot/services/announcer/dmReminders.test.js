@@ -121,3 +121,11 @@ test("a member found in the Companion club after a reminder is counted as conver
   assert.deepEqual(await processDue(null, { deps }), [{ id: "9", outcome: "nothing_due" }]);
   assert.ok(db.docs.get(`${COLLECTION}/9`).companionJoinedAt);
 });
+
+test("an admin's text replaces the default; an empty one falls back", () => {
+  const settings = { dmReminders: { texts: { join_companion: "  Hej! Kom med i Companion-klubben.  ", connect_intervals: "   " } } };
+  assert.equal(reminderText("join_companion", settings), "Hej! Kom med i Companion-klubben.");
+  assert.match(reminderText("connect_intervals", settings), /DZR Coach/);
+  assert.match(reminderText("link_zwift_id_join", settings), /\/join\/zwift-id/);
+  assert.equal(reminderText("unknown_step", settings), null);
+});

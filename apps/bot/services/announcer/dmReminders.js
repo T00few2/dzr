@@ -10,6 +10,7 @@
  *   reminders.<step> = { count, lastAt, snoozedAt?, clickedAt?, dmFailedAt? }
  *   lastBotDmAt      the newest DM from the bot of any kind (onboarding, reminder, admin outreach)
  *   companionJoinedAt funnel: first seen in the Companion club after a join_companion reminder
+ * Texts: packages/shared/reminderTexts.js, editable by admins on /admin/onboarding.
  * Claiming a reminder (count + 1, lastAt, lastBotDmAt, daily counter) happens in one transaction
  * before the send, so two instances cannot both send it; a failed send costs that reminder.
  */
@@ -18,7 +19,7 @@ const shared = require("../../constants.json");
 const { DEFAULTS, loadSettings } = require("./settings");
 const { localParts, toMs, DAY_MS } = require("./pacing");
 const { sendsOf } = require("./dmStats");
-const { FEATURES } = require("./features");
+const { resolveReminderText } = require("../reminderTexts");
 
 const COLLECTION = shared.firestore.onboardingDms || "onboarding_dms";
 const DAILY_STATE = "dm_reminders_daily";
@@ -57,45 +58,12 @@ function decideReminder(doc, step, nowMs, cfg) {
   return { ok: true };
 }
 
-function stepBody(step) {
-  const { LINKS } = require("../onboardingStatus");
-  const channels = shared.discord.channels;
-  switch (step) {
-    case "link_zwift_id_channel":
-      return [
-        "**Du mangler stadig at linke dit Zwift ID** → så bliver du ✅ Verificeret Medlem og får adgang til members-zone på hjemmesiden og bot-kommandoerne.",
-        `Skriv \`zwiftid 1234567\` (dit eget ID) i <#${channels.zwiftId}>, brug \`/my_zwiftid\` – eller send det bare til mig her.`,
-        "Kender du ikke dit ID? Skriv dit navn, som det står på Zwift/ZwiftPower, til mig her – så finder jeg dig.",
-      ].join("\n");
-    case "link_zwift_id_join":
-      return [
-        "**Du mangler stadig at linke dit Zwift ID**",
-        `Gør det her: ${LINKS.joinZwiftId} – så er du både ⭐ Klub Medlem og ✅ Verificeret Medlem.`,
-        "Kender du ikke dit Zwift ID? Skriv dit navn, som det står på Zwift/ZwiftPower, til mig her – så finder jeg dig.",
-      ].join("\n");
-    case "connect_intervals":
-      return [
-        "**Har du prøvet DZR Coach?**",
-        "Som ⭐ Klub Medlem kan du bruge DZR Coach – en træningscoach her på Discord, der kender dine data og svarer på spørgsmål om din træning.",
-        "Skriv `/coach` på serveren, så får du et link til at forbinde din intervals.icu-konto.",
-      ].join("\n");
-    case "join_companion": {
-      const companion = FEATURES.find((feature) => feature.key === "companion_club");
-      return `**Er du med i DZR-klubben i Zwift Companion?**\n${companion.pitch}\n${companion.howTo}`;
-    }
-    default:
-      return null;
-  }
-}
-
-function reminderText(step) {
-  const body = stepBody(step);
-  if (!body) return null;
-  return [
-    "👋 Lille påmindelse fra DZR-botten",
-    body,
-    "Har du spørgsmål, så skriv til mig her – jeg hjælper gerne. _(You can write to me in English.)_",
-  ].join("\n\n");
+/** The DM text for a step: the admin's text from /admin/onboarding when set, else the default. */
+function reminderText(step, settings = settingsSnapshot) {
+  return resolveReminderText(step, settings?.dmReminders?.texts, {
+    siteOrigin: shared.siteOrigin,
+    zwiftIdChannelId: shared.discord.channels.zwiftId,
+  });
 }
 
 function reminderButtons(step) {
@@ -188,7 +156,7 @@ async function maybeRemind(id, { deps, settings }) {
   if (!(await claimReminder(deps.db, id, step, now, settings))) return "not_due";
   try {
     const user = await deps.fetchUser(id);
-    await user.send({ content: reminderText(step), components: reminderButtons(step) });
+    await user.send({ content: reminderText(step, settings), components: reminderButtons(step) });
     return `sent:${step}`;
   } catch (error) {
     if (error?.code === DM_CLOSED) {
