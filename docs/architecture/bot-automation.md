@@ -97,9 +97,6 @@ sequenceDiagram
     T->>D: Send content and optional embed/buttons
     T->>A: POST schedules/id/sent after successful send
     A->>F: Update delivery state and next run
-    T->>A: Daily probability-check when eligible
-    A->>F: Read settings and select eligible content
-    Note over A,T: Selected messages, if any
     end
 ```
 
@@ -107,13 +104,40 @@ sequenceDiagram
 
 Sources: [scheduler](../../apps/bot/services/scheduler.js), [contentApi](../../apps/bot/services/contentApi.js), [Flask schedule endpoints](../../apps/api/main.py). The network acknowledgment follows the Discord send. A crash or acknowledgment failure between them can permit a repeated post; this is not an exactly-once queue.
 
+## Announcer: what does the bot post on its own?
+
+Purpose: replace the hand-kept random pool (`scheduled_messages` with `schedule.type == "probability"`, no longer read by the bot) with posts the bot writes from live data, and personal DM reminders.
+
+**Channel posts.** Once a day (`runHour:runMinute`, `bot_state/announcer.lastRunDate`) the bot gathers candidates from [signals](../../apps/bot/services/announcer/signals.js), picks one, has the model write it in Danish and posts it as a draft in the moderators channel with Publicér / Ret og publicér / Afvis. Nothing reaches a public channel without a moderator.
+
+| Signal | Priority | Fires when |
+| --- | --- | --- |
+| `upcomingClubEvents` | 1 time-bound | DZR-tagged Zwift events in the next 3 days; a series name at most every 21 days |
+| `newFeatures` | 1 time-bound | New commits on `main` of the monorepo (website, API and bot) via the GitHub API; the model keeps only member-facing changes or answers NOTHING |
+| `unlinkedZwiftId` | 2 need | ≥15 community members, or ≥10 %, have no Zwift ID |
+| `notInCompanionClub` | 2 need | ≥15 members with a Zwift ID are not in `companion_club_members` |
+| `dmUnseen` | 2 need | ≥15 members got a bot DM ≥3 days ago and never reacted |
+| `featureSpotlight` | 3 | The [feature catalog](../../apps/bot/services/announcer/features.js) entry featured longest ago; shipped features get one spotlight a month after their news |
+| `evergreen` | 4 filler | A `bot_knowledge` article not featured for 90 days |
+
+The pick skips topics on cooldown, topics with an open draft and a repeat of the last published kind (time-bound topics excepted). No new draft while two are open; drafts expire after 3 days.
+
+[Pacing](../../apps/bot/services/announcer/pacing.js) is checked when a moderator presses Publicér, not when the draft is written: 10–20 local time, at most 1 a day and 3 a week, never on a day an admin posted in #announcements, never within 24 hours of any message in the target channel. A blocked post is queued and posted by the scheduler when a slot opens, or at once with "Post nu alligevel".
+
+**DM reminders.** Server activity (message, reaction, voice join) schedules a look at the member 10–60 minutes later, at most every 12 hours. If the member is still active, [dmReminders](../../apps/bot/services/announcer/dmReminders.js) reads their onboarding status: `link_zwift_id_channel`, `link_zwift_id_join`, `connect_intervals`, else `join_companion` for verified members outside the Companion club. Limits: 7 days after any bot DM, 14 days between reminders to one member, 3 per step, 20 a day, never after closed DMs or 🔕 Ikke nu.
+
+Onboarding DMs, reminders and the admin outreach page share one record, `onboarding_dms/{discordId}`: `lastBotDmAt` is written by all three, reminders under `reminders.<step>`. Discord gives no read receipts, so `/announcer_stats` reports proxies per step: sent, closed DMs (50007), engaged (replied or pressed a button), converted (did the step afterwards) and silent (an upper bound on "never saw it").
+
+**Settings** live in code ([settings](../../apps/bot/services/announcer/settings.js)) and can be overridden field by field in `system_settings/announcer`, e.g. `{ signals: { evergreen: { enabled: false } } }` or `{ dmReminders: { enabled: false } }`, without a redeploy. `/announcer_pause` stops posts and reminders; `/announcer_run` shows the candidates (with `draft:true` it drafts now); `/announcer_preview_dm` sends you a reminder. `GITHUB_TOKEN` (read-only) is needed on Render only if the repository is private.
+
 ## Scheduler: which work runs on a tick?
 
 `startScheduler` checks immediately and then every 60 seconds. Each job supplies its own time window and state guards. Much of the sweep is sequential; it is not a durable job runner and a slow sweep can overlap a later tick. Ladder and Coach follow-ups add their own in-process overlap guards.
 
 | Responsibility | Timing and state | Implementation |
 | --- | --- | --- |
-| Fixed and probability-based posts | Minute checks; probability selection daily | [scheduler](../../apps/bot/services/scheduler.js), [content API](../../apps/bot/services/contentApi.js) |
+| Fixed-time posts (daily, weekly, monthly) | Minute checks | [scheduler](../../apps/bot/services/scheduler.js), [content API](../../apps/bot/services/contentApi.js) |
+| Announcer and DM reminders | Daily draft at 09:15 Europe/Copenhagen; queue every 15 minutes; due reminders every tick | [announcer](../../apps/bot/services/announcer/index.js), [below](#announcer-what-does-the-bot-post-on-its-own) |
 | New Member role and KMS status | Hourly member sweep; recurring status refresh | [newMemberService](../../apps/bot/services/newMemberService.js), [scheduler](../../apps/bot/services/scheduler.js) |
 | Companion and ZwiftPower rosters | Daily configured minute, default 04:00 Europe/Paris; `bot_state` date markers | [contentApi](../../apps/bot/services/contentApi.js), [Flask roster jobs](../../apps/api/main.py) |
 | ZwiftPower pace roles | Daily configured minute, default 07:00 Europe/Paris; **add-only**, old pace roles remain | [config](../../apps/bot/config/config.js), [zpRoleSync](../../apps/bot/services/zpRoleSync.js) |

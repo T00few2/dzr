@@ -51,6 +51,7 @@
     "assistantDmFeedback": "assistant_dm_feedback",
     "assistantKnowledgeGaps": "assistant_knowledge_gaps",
     "announcementIndex": "announcement_index",
-    "knowledgeGapDrafts": "knowledge_gap_drafts"
+    "knowledgeGapDrafts": "knowledge_gap_drafts",
+    "announcerDrafts": "announcer_drafts"
   }
 }

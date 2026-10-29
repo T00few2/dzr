@@ -1,4 +1,5 @@
 const { handleOnboardingPreview, handleOnboardingReset } = require("./onboardingCommands");
+const { handleAnnouncerRun, handleAnnouncerPause, handleAnnouncerStats, handleAnnouncerPreviewDm } = require("./announcerCommands");
 const { ActionRowBuilder, StringSelectMenuBuilder, InteractionResponseType, MessageFlags, EmbedBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const roleService = require("../services/roleService");
 const { linkUserZwiftId, getTodaysClubStats } = require("../services/firebase");
@@ -539,6 +540,10 @@ async function handleInteractions(interaction) {
       "event_results": handleEventResults,
       "onboarding_preview": handleOnboardingPreview,
       "onboarding_reset": handleOnboardingReset,
+      "announcer_run": handleAnnouncerRun,
+      "announcer_pause": handleAnnouncerPause,
+      "announcer_stats": handleAnnouncerStats,
+      "announcer_preview_dm": handleAnnouncerPreviewDm,
       "refresh_club_roster": handleRefreshClubRoster,
       "refresh_zwiftpower_roster": handleRefreshZwiftPowerRoster,
       "sync_zp_roles": handleSyncZpRoles,

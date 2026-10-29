@@ -21,7 +21,7 @@ export default function OutreachAdminPage() {
     const body = await res.json().catch(() => ({}))
     setBusy(false)
     toast({
-      title: res.ok ? `Sent ${body.sent || 0}, skipped ${body.skipped || 0}` : (body.error || 'Failed'),
+      title: res.ok ? `Sent ${body.sent || 0}, skipped ${body.skipped || 0}, DMed by the bot in the last 3 days ${body.recent || 0}` : (body.error || 'Failed'),
       status: res.ok ? 'success' : 'error',
     })
   }

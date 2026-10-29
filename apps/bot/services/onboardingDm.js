@@ -6,6 +6,7 @@
  * another stage. Each step key is sent at most once, recorded in onboarding_dms/{discordId}:
  *
  *   steps.<key> = { sentAt?, dmFailedAt?, claimingAtMs? }
+ *   lastBotDmAt  newest DM from the bot of any kind; also written by announcer/dmReminders
  *
  * 1. Claim (transaction): drop keys already sent or failed. If any remaining key carries a lease
  *    younger than LEASE_MS, another instance is sending: claim nothing. Otherwise write the lease
@@ -170,7 +171,8 @@ async function finishKeys(db, discordId, keys, outcome, now) {
       if (outcome === "sent") patch[key].sentAt = now;
       if (outcome === "dm_closed") patch[key].dmFailedAt = now;
     }
-    tx.set(ref, { steps: patch }, { merge: true });
+    // lastBotDmAt is shared with the announcer's DM reminders, so the two never DM back to back.
+    tx.set(ref, outcome === "sent" ? { steps: patch, lastBotDmAt: now } : { steps: patch }, { merge: true });
   });
 }
 
