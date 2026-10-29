@@ -83,13 +83,14 @@ const tool = (name, description = `${name} does a thing`) => ({ type: "function"
 const command = (name, description = `${name} command`, adminOnly = false) => ({ name, description, ...(adminOnly ? { default_member_permissions: "8" } : {}) });
 const CATALOG = buildFeatureCatalog({
   tools: [tool("rider_stats"), tool("route_profile_image"), tool("zrl_category"), tool("start_quiz"), tool("report_knowledge_gap")],
-  commands: [command("rider_stats"), command("quiz"), command("coach"), command("announcer_run", "admin", true)],
+  commands: [command("rider_stats"), command("quiz"), command("coach"), command("announcer_run", "admin", true), { name: "streaming_add", description: "Tilmeld din stream", default_member_permissions: "0" }, { name: "set_zwiftid", description: "mods", default_member_permissions: "8192" }],
   usage: { rider_stats: 40, route_profile_image: 2, zrl_category: 9, start_quiz: 1 },
 });
 
 test("the catalog comes from member commands and tools; admin commands and plumbing are left out", () => {
   const keys = CATALOG.map((feature) => feature.key);
-  assert.deepEqual(keys, ["coach", "quiz", "report_knowledge_gap", "rider_stats", "route_profile_image", "zrl_category"]);
+  // "0" (granted to a role, like the streamers' commands) is a member command; a real permission is not.
+  assert.deepEqual(keys, ["coach", "quiz", "report_knowledge_gap", "rider_stats", "route_profile_image", "streaming_add", "zrl_category"]);
   const stats = CATALOG.find((feature) => feature.key === "rider_stats");
   assert.equal(stats.name, "/rider_stats");
   assert.match(stats.howToUse, /\/rider_stats/);
@@ -106,8 +107,9 @@ test("spotlight: never-featured first, least used among equals; switched-off and
   // coach has no usage count and was never featured; it ties at 0 with... coach first by usage ?? 0.
   assert.equal(pick({ perSignal: {} }), "featureSpotlight:coach");
   const perSignal = { "featureSpotlight:coach": ago(40) };
-  assert.equal(pick({ perSignal }), "featureSpotlight:quiz");
-  assert.equal(pick({ perSignal }, { ...DEFAULTS, spotlightExcluded: ["quiz"] }), "featureSpotlight:route_profile_image");
+  assert.equal(pick({ perSignal }), "featureSpotlight:streaming_add");
+  assert.equal(pick({ perSignal }, { ...DEFAULTS, spotlightExcluded: ["streaming_add"] }), "featureSpotlight:quiz");
+  assert.equal(pick({ perSignal }, { ...DEFAULTS, spotlightExcluded: ["streaming_add", "quiz"] }), "featureSpotlight:route_profile_image");
   const all = Object.fromEntries(CATALOG.map((feature, i) => [`featureSpotlight:${feature.key}`, ago(10 + i)]));
   assert.equal(pick({ perSignal: all }), undefined);
   const keys = CATALOG.map((feature) => pick({ perSignal: { ...Object.fromEntries(CATALOG.map((f) => [`featureSpotlight:${f.key}`, ago(5)])), [`featureSpotlight:${feature.key}`]: ago(60) } }));
