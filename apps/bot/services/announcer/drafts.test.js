@@ -263,3 +263,44 @@ test("a draft the moderators never saw is marked failed: no open slot, no cooldo
   assert.equal(db.docs.get("bot_state/announcer")?.github?.lastSha, undefined);
   assert.equal(db.docs.get("bot_state/announcer")?.perSignal, undefined);
 });
+
+test("a stale publishing draft no longer blocks new drafts; a fresh one does", async () => {
+  const db = fakeDb();
+  const client = fakeClient();
+  const d = { db, now: () => NOW, generate: async () => "Opslag" };
+  db.docs.set(`${COLLECTION}/p1`, { status: "pending", signalKey: "x" });
+  db.docs.set(`${COLLECTION}/s1`, { status: "publishing", publishingAt: new Date(NOW.getTime() - HOUR), signalKey: "y" });
+  const result = await runDaily(client, { deps: d, sources: sources() });
+  assert.ok(result.draftId);
+  assert.equal(result.open, 1);
+
+  const busy = fakeDb();
+  busy.docs.set(`${COLLECTION}/p1`, { status: "pending", signalKey: "x" });
+  busy.docs.set(`${COLLECTION}/f1`, { status: "publishing", publishingAt: new Date(NOW.getTime() - 60 * 1000), signalKey: "y" });
+  assert.equal((await runDaily(client, { deps: { ...d, db: busy }, sources: sources() })).skipped, "open_drafts");
+});
+
+test("a draft whose card was posted stays pending when only storing the message id fails", async () => {
+  const db = fakeDb();
+  const client = fakeClient();
+  const collection = db.collection;
+  db.collection = (name) => {
+    const col = collection(name);
+    return {
+      ...col,
+      add: async (data) => {
+        const ref = await col.add(data);
+        return { ...ref, set: async (patch, options) => { if (patch?.messageId) throw new Error("firestore down"); return ref.set(patch, options); } };
+      },
+    };
+  };
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const { id } = await createDraft(client, CANDIDATE, DEFAULTS, deps(db));
+    assert.equal(db.docs.get(`${COLLECTION}/${id}`).status, "pending");
+    assert.equal((await publishDraft(client, id, { by: "mod", settings: DEFAULTS }, deps(db))).state, "published");
+  } finally {
+    console.warn = warn;
+  }
+});

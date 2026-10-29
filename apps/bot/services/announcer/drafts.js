@@ -28,6 +28,12 @@ const OPEN = ["pending", "queued"];
 // again, and it can expire. The scheduler never re-posts it on its own, since the post may be out.
 const STALE_PUBLISHING_MS = 10 * 60 * 1000;
 
+/** Whether a draft holds a slot and its topic: waiting, or being posted right now. */
+function holdsSlot(draft, nowMs) {
+  if (OPEN.includes(draft?.status)) return true;
+  return draft?.status === "publishing" && !isOpen(draft, nowMs);
+}
+
 /** Whether a moderator or the expiry job may still decide on this draft. */
 function isOpen(draft, nowMs) {
   if (OPEN.includes(draft?.status)) return true;
@@ -183,14 +189,21 @@ async function createDraft(client, candidate, settings, deps = defaultDeps()) {
     expiresAt: new Date(now.getTime() + settings.draftExpiryDays * DAY_MS),
   };
   const ref = await deps.db.collection(COLLECTION).add(draft);
+  let posted;
   try {
     const channel = await client.channels.fetch(MODERATORS_CHANNEL_ID);
-    const posted = await channel.send({ embeds: [draftEmbed(draft)], components: draftButtons(ref.id, "pending"), allowedMentions: { parse: [] } });
-    await ref.set({ messageId: posted.id }, { merge: true });
+    posted = await channel.send({ embeds: [draftEmbed(draft)], components: draftButtons(ref.id, "pending"), allowedMentions: { parse: [] } });
   } catch (error) {
     // No moderator saw it: it must not hold a slot or start the topic's cooldown.
     await ref.set({ status: "failed", lastError: String(error?.message || error) }, { merge: true });
     throw error;
+  }
+  // The card is up and its buttons carry the draft id, so the draft stays pending even when the
+  // message id cannot be stored; only editing the card later needs it.
+  try {
+    await ref.set({ messageId: posted.id }, { merge: true });
+  } catch (error) {
+    console.warn(`Announcer could not store the moderator message for ${ref.id}:`, error?.message || error);
   }
   return { id: ref.id };
 }
@@ -418,6 +431,7 @@ module.exports = {
   closeDraft,
   expireDrafts,
   listOpenDrafts,
+  holdsSlot,
   readChannelContext,
   recordDecision,
   handleAnnouncerInteraction,
