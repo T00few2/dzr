@@ -49,6 +49,7 @@
   },
   "overrides": {
     "@grpc/grpc-js": "1.14.6",
+    "follow-redirects": "1.16.2",
     "glob": "10.5.0",
     "jose": "4.15.9"
   },
