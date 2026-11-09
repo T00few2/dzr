@@ -114,7 +114,7 @@ jobs:
         os: [windows-2025, macos-15]
     env:
       OBS_VERSION: 31.1.2
-      OBS_SMOKE_ARTIFACTS: ${{ runner.temp }}/obs-native-artifacts
+      OBS_SMOKE_ARTIFACTS: ${{ github.workspace }}/.obs-native-artifacts
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
