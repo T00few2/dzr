@@ -103,7 +103,8 @@ async function main() {
   token = backend.token;
   assert.match(token, /^dzrs_\d{17,20}\.[\w-]{43}$/);
   server = https.createServer({ key: await fs.readFile(tlsKey), cert: await fs.readFile(caFile) }, backend.app);
-  server.on("request", (request, response) => {
+  // Capture the public URL before Express temporarily strips its mounted prefix.
+  server.prependListener("request", (request, response) => {
     const item = { method: request.method, path: request.url };
     requests.push(item);
     response.on("finish", () => { item.status = response.statusCode; });

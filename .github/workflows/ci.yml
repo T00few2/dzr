@@ -180,3 +180,4 @@ jobs:
           name: obs-native-${{ matrix.os }}
           path: ${{ env.OBS_SMOKE_ARTIFACTS }}
           if-no-files-found: warn
+          include-hidden-files: true
