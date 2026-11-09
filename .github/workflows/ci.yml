@@ -103,3 +103,80 @@ jobs:
       # source alone does not even rebuild the bot — the drift would be silent without this.
       - name: Check shared copies
         run: node scripts/sync-shared.js --check
+
+  obs-native:
+    name: Native OBS smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, macos-15]
+    env:
+      OBS_VERSION: 31.1.2
+      OBS_SMOKE_ARTIFACTS: ${{ runner.temp }}/obs-native-artifacts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Prepare native OBS diagnostics
+        run: |
+          node -e "const fs = require('node:fs'); const path = require('node:path'); fs.mkdirSync(process.env.OBS_SMOKE_ARTIFACTS, { recursive: true }); fs.writeFileSync(path.join(process.env.OBS_SMOKE_ARTIFACTS, 'runner.json'), JSON.stringify({ platform: process.platform, arch: process.arch, node: process.version, obsVersion: process.env.OBS_VERSION }, null, 2))"
+      - name: Install isolated callback fixture dependencies
+        run: npm ci --prefix apps/bot --ignore-scripts
+      - name: Install official OBS Studio (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP 'obs-native'
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+          $archive = Join-Path $installDir 'obs.zip'
+          $asset = "OBS-Studio-$env:OBS_VERSION-Windows-x64.zip"
+          Invoke-WebRequest -Uri "https://github.com/obsproject/obs-studio/releases/download/$env:OBS_VERSION/$asset" -OutFile $archive
+          $expected = '9513cd402936593a6a5500da5d2bd49e6cd04dce05509c7b7f48dd25c391d2d8'
+          $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "OBS archive checksum mismatch: $actual" }
+          Expand-Archive -Path $archive -DestinationPath $installDir
+          $executable = Join-Path $installDir 'bin/64bit/obs64.exe'
+          if (!(Test-Path $executable)) { throw "OBS executable missing: $executable" }
+          "OBS_EXECUTABLE=$executable" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          @{ version = $env:OBS_VERSION; asset = $asset; sha256 = $actual; executable = $executable } |
+            ConvertTo-Json | Set-Content -Path (Join-Path $env:OBS_SMOKE_ARTIFACTS 'installation.json')
+      - name: Install official OBS Studio (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_dir="$RUNNER_TEMP/obs-native"
+          mkdir -p "$install_dir/mount"
+          case "$(uname -m)" in
+            arm64)
+              architecture=Apple
+              expected=8f18142c8599d4e80baee5913b03f8357c3e5fd0b76835f54e76dedf9f857188
+              ;;
+            x86_64)
+              architecture=Intel
+              expected=8eff8f85f6b72a476c9074b00840326a2888f208f3c3c70aed1bedacd692935f
+              ;;
+            *) exit 1 ;;
+          esac
+          asset="OBS-Studio-$OBS_VERSION-macOS-$architecture.dmg"
+          curl --fail --location --retry 3 "https://github.com/obsproject/obs-studio/releases/download/$OBS_VERSION/$asset" --output "$install_dir/obs.dmg"
+          actual=$(shasum -a 256 "$install_dir/obs.dmg" | cut -d ' ' -f 1)
+          test "$actual" = "$expected"
+          hdiutil attach "$install_dir/obs.dmg" -nobrowse -readonly -mountpoint "$install_dir/mount"
+          trap 'hdiutil detach "$install_dir/mount" || true' EXIT
+          ditto "$install_dir/mount/OBS.app" "$install_dir/OBS.app"
+          test -x "$install_dir/OBS.app/Contents/MacOS/OBS"
+          printf 'OBS_EXECUTABLE=%s\n' "$install_dir/OBS.app/Contents/MacOS/OBS" >> "$GITHUB_ENV"
+          printf 'version=%s\nasset=%s\nsha256=%s\n' "$OBS_VERSION" "$asset" "$actual" > "$OBS_SMOKE_ARTIFACTS/installation.txt"
+      - name: Exercise shipped Lua in native OBS with isolated HTTPS callback
+        run: node scripts/obs-native-smoke.mjs
+      - name: Upload native OBS diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: obs-native-${{ matrix.os }}
+          path: ${{ env.OBS_SMOKE_ARTIFACTS }}
+          if-no-files-found: warn

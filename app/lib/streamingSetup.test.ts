@@ -11,9 +11,29 @@ test('guide and proxy share the configured origin; malformed origins fail closed
     upstreamScriptUrl: 'https://bot.example.test/streaming/dzr-stream.lua',
     scriptUrl: '/api/streaming/script',
   })
-  for (const value of [undefined, '', 'http://bot.test', 'https://user:secret@bot.test',
+  for (const value of ['', ' ', 'http://bot.test', 'https://user:secret@bot.test',
     'https://bot.test/path', 'https://bot.test?key=secret', 'https://bot.test/#secret']) {
     assert.throws(() => getStreamingSetupConfig({ STREAMING_PUBLIC_URL: value }))
+  }
+})
+
+test('missing origin uses the production bot for both the guide and generic Lua proxy', async () => {
+  const expected = {
+    callbackUrl: 'https://bot-tdnm.onrender.com/streaming/obs',
+    upstreamScriptUrl: 'https://bot-tdnm.onrender.com/streaming/dzr-stream.lua',
+    scriptUrl: '/api/streaming/script',
+  }
+  for (const missing of [{}, { STREAMING_PUBLIC_URL: undefined }]) {
+    assert.deepEqual(getStreamingSetupConfig(missing), expected)
+    let called = false
+    const response = await getStreamingScriptResponse(missing, async (input) => {
+      called = true
+      assert.equal(input, expected.upstreamScriptUrl)
+      return new Response(script)
+    })
+    assert.equal(called, true)
+    assert.equal(response.status, 200)
+    assert.equal(await response.text(), script)
   }
 })
 
@@ -31,7 +51,7 @@ test('proxy returns exactly the generic Lua bytes and sends no browser credentia
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
 })
 
-test('missing config, unavailable, empty, HTML and oversized responses cannot become scripts', async () => {
+test('invalid config, unavailable, empty, HTML and oversized responses cannot become scripts', async () => {
   const cases = [
     async () => new Response('missing', { status: 404 }),
     async () => new Response(''),
@@ -45,7 +65,12 @@ test('missing config, unavailable, empty, HTML and oversized responses cannot be
     assert.equal(response.headers.get('content-disposition'), null)
     assert.equal(response.headers.get('cache-control'), 'no-store')
   }
-  let called = false
-  assert.equal((await getStreamingScriptResponse({}, async () => { called = true; return new Response(script) })).status, 503)
-  assert.equal(called, false)
+  for (const value of ['', 'http://bot.test', 'https://bot.test/path']) {
+    let called = false
+    assert.equal((await getStreamingScriptResponse({ STREAMING_PUBLIC_URL: value }, async () => {
+      called = true
+      return new Response(script)
+    })).status, 503)
+    assert.equal(called, false)
+  }
 })
