@@ -53,7 +53,14 @@ async function closeOBS() {
   } else {
     const app = path.resolve(path.dirname(executable), "../..");
     const appleString = app.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
-    await execFileAsync("/usr/bin/osascript", ["-e", `tell application "${appleString}" to quit`], { timeout: 10000 });
+    try {
+      await execFileAsync("/usr/bin/osascript", ["-e", `tell application "${appleString}" to quit`], { timeout: 10000 });
+    } catch (error) {
+      // OBS can reply -128 to the AppleEvent while finishing its normal shutdown.
+      // Require the independent process-exit and script_unload proof below.
+      if (!/\(-128\)/.test(String(error.stderr))) throw error;
+      await fs.writeFile(path.join(artifacts, "quit-helper.txt"), redact(error.stderr));
+    }
   }
 }
 
