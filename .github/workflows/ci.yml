@@ -111,7 +111,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2025, macos-15]
+        # Pin the supported Intel pool; macos-15 selects the separate Arm64 pool.
+        os: [windows-2025, macos-15-intel]
     env:
       OBS_VERSION: 31.1.2
       OBS_SMOKE_ARTIFACTS: ${{ github.workspace }}/.obs-native-artifacts
