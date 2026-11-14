@@ -849,6 +849,23 @@ const commands = [
         .setRequired(false)
     ),
   new SlashCommandBuilder()
+    .setName("ladder_scout")
+    .setDescription("Sammenlign hele truppen med et modstanderhold privat")
+    .addStringOption(option =>
+      option
+        .setName("team")
+        .setDescription("Vælg et DZR-hold tilføjet med /ladder_link")
+        .setAutocomplete(true)
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName("opponent")
+        .setDescription("Vælg modstanderens holdnavn, eller angiv et Ladder-holdlink")
+        .setAutocomplete(true)
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
     .setName("ladder_ai")
     .setDescription("AI analysis of how to ride a ladder match (limited uses per day)")
     .addStringOption(option =>
@@ -864,7 +881,6 @@ const commands = [
         .setDescription("Ladder match id (default: the team's next match)")
         .setRequired(false)
     ),
-].map(cmd => cmd.toJSON())
-  .filter(cmd => cmd.name !== "streaming_add_new" || process.env.STREAMING_SETUP_ENABLED === "true");
+].map(cmd => cmd.toJSON());
 
 module.exports = commands;
